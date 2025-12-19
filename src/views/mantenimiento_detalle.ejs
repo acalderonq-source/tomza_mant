@@ -46,8 +46,10 @@
     </div>
 
     <div class="card-body">
+
       <% if (user.rol === 'TALLER' || user.rol === 'ADMIN') { %>
 
+        <!-- SOLO TALLER / ADMIN PUEDEN EDITAR -->
         <form method="POST" action="/mantenimientos/<%= mantenimiento.id %>/plan">
           <div class="mb-3">
             <textarea
@@ -65,11 +67,13 @@
 
       <% } else { %>
 
+        <!-- SUPERVISOR / MECANICO SOLO LECTURA -->
         <p class="mb-0">
           <%= mantenimiento.plan || 'El plan aún no ha sido definido.' %>
         </p>
 
       <% } %>
+
     </div>
   </div>
 
@@ -80,15 +84,14 @@
     </div>
 
     <div class="card-body">
+
       <% if (user.rol === 'MECANICO' || user.rol === 'ADMIN') { %>
 
+        <!-- SOLO MECANICO / ADMIN PUEDEN EJECUTAR -->
         <form method="POST" action="/mantenimientos/<%= mantenimiento.id %>/ejecutar">
 
-          <!-- TRABAJOS REALIZADOS -->
           <div class="mb-3">
-            <label class="fw-bold">
-              Trabajos realizados
-            </label>
+            <label class="fw-bold">Trabajos realizados</label>
             <textarea
               name="ejecucion"
               class="form-control"
@@ -96,16 +99,13 @@
               required><%= mantenimiento.ejecucion || '' %></textarea>
           </div>
 
-          <!-- PENDIENTES -->
           <div class="mb-3">
-            <label class="fw-bold">
-              Pendientes por realizar
-            </label>
+            <label class="fw-bold">Pendientes</label>
             <textarea
               name="pendientes"
               class="form-control"
               rows="3"
-              placeholder="Repuestos, trabajos futuros, observaciones..."><%= mantenimiento.pendientes || '' %></textarea>
+              placeholder="Trabajos pendientes, repuestos, observaciones..."><%= mantenimiento.pendientes || '' %></textarea>
           </div>
 
           <button class="btn btn-success">
@@ -116,6 +116,7 @@
 
       <% } else { %>
 
+        <!-- SUPERVISOR / TALLER SOLO LECTURA -->
         <p>
           <strong>Trabajos realizados:</strong><br>
           <%= mantenimiento.ejecucion || '—' %>
@@ -127,6 +128,7 @@
         </p>
 
       <% } %>
+
     </div>
   </div>
 
