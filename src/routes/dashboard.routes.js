@@ -2,7 +2,13 @@ const express = require("express");
 const router = express.Router();
 
 router.get("/", (req, res) => {
-  res.send("DASHBOARD OK");
+  if (!req.session.user) {
+    return res.redirect("/login");
+  }
+
+  res.render("dashboard", {
+    user: req.session.user
+  });
 });
 
 module.exports = router;
