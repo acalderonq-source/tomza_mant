@@ -1,46 +1,80 @@
 const express = require("express");
 const bcrypt = require("bcryptjs");
 const pool = require("../db");
-const { signToken } = require("../auth");
 
 const router = express.Router();
 
+/**
+ * MOSTRAR LOGIN
+ */
 router.get("/login", (req, res) => {
   res.render("login", { error: null });
 });
 
+/**
+ * PROCESAR LOGIN
+ */
 router.post("/login", async (req, res) => {
-  const { usuario, password } = req.body;
+  try {
+    const { usuario, password } = req.body;
 
-  const [rows] = await pool.query(
-    "SELECT * FROM usuarios WHERE usuario=? LIMIT 1",
-    [usuario]
-  );
+    // Validación básica
+    if (!usuario || !password) {
+      return res.render("login", {
+        error: "Debe ingresar usuario y contraseña"
+      });
+    }
 
-  if (!rows.length) {
-    return res.render("login", { error: "Usuario o contraseña incorrecta" });
+    // Buscar usuario
+    const [rows] = await pool.query(
+      "SELECT * FROM usuarios WHERE usuario = ? LIMIT 1",
+      [usuario]
+    );
+
+    // Usuario no existe
+    if (rows.length === 0) {
+      return res.render("login", {
+        error: "Usuario o contraseña incorrecta"
+      });
+    }
+
+    const user = rows[0];
+
+    // Comparar contraseña
+    const match = await bcrypt.compare(password, user.password);
+
+    if (!match) {
+      return res.render("login", {
+        error: "Usuario o contraseña incorrecta"
+      });
+    }
+
+    // Login correcto -> guardar sesión
+    req.session.user = {
+      id: user.id,
+      nombre: user.nombre,
+      usuario: user.usuario,
+      rol: user.rol
+    };
+
+    // Redirigir
+    res.redirect("/dashboard");
+
+  } catch (error) {
+    console.error("❌ ERROR LOGIN:", error);
+    res.render("login", {
+      error: "Error interno, intente nuevamente"
+    });
   }
-
-  const user = rows[0];
-  const ok = await bcrypt.compare(password, user.password_hash);
-
-  if (!ok) {
-    return res.render("login", { error: "Usuario o contraseña incorrecta" });
-  }
-
-  const token = signToken({
-    id: user.id,
-    nombre: user.nombre,
-    rol: user.rol
-  });
-
-  res.cookie("token", token, { httpOnly: true });
-  res.redirect("/dashboard");
 });
 
+/**
+ * LOGOUT
+ */
 router.post("/logout", (req, res) => {
-  res.clearCookie("token");
-  res.redirect("/login");
+  req.session.destroy(() => {
+    res.redirect("/login");
+  });
 });
 
 module.exports = router;
