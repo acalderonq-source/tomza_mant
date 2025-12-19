@@ -1,0 +1,106 @@
+/* ===============================
+   GAS TOMZA – TEMA CORPORATIVO
+   =============================== */
+
+:root {
+  --tomza-azul: #0f1f2e;
+  --tomza-azul-oscuro: #0b1824;
+  --tomza-amarillo: #f5b301;
+  --tomza-gris: #e9edf2;
+  --tomza-card: #1b2f45;
+}
+
+/* ===== BODY ===== */
+body {
+  background-color: var(--tomza-azul);
+  color: var(--tomza-gris);
+  font-family: "Segoe UI", system-ui, sans-serif;
+}
+
+/* ===== NAVBAR ===== */
+.navbar {
+  background-color: var(--tomza-azul-oscuro) !important;
+  border-bottom: 4px solid var(--tomza-amarillo);
+}
+
+.navbar-brand,
+.navbar-nav .nav-link {
+  color: white !important;
+  font-weight: 600;
+}
+
+/* ===== TITULOS ===== */
+h1, h2, h3, h4, h5 {
+  color: var(--tomza-amarillo);
+}
+
+/* ===== BOTONES ===== */
+.btn-tomza {
+  background-color: var(--tomza-amarillo);
+  color: var(--tomza-azul);
+  font-weight: 700;
+  border: none;
+}
+
+.btn-tomza:hover {
+  background-color: #d8a000;
+  color: var(--tomza-azul);
+}
+
+.btn-outline-tomza {
+  border: 2px solid var(--tomza-amarillo);
+  color: var(--tomza-amarillo);
+  font-weight: 600;
+}
+
+.btn-outline-tomza:hover {
+  background-color: var(--tomza-amarillo);
+  color: var(--tomza-azul);
+}
+
+/* ===== TABLAS ===== */
+.table {
+  background-color: var(--tomza-card);
+  color: white;
+}
+
+.table thead {
+  background-color: #132638;
+  color: var(--tomza-amarillo);
+}
+
+.table-striped tbody tr:nth-of-type(odd) {
+  background-color: #162c41;
+}
+
+.table td, .table th {
+  border-color: #2b3e55;
+  vertical-align: middle;
+}
+
+/* ===== LINKS ===== */
+a {
+  color: var(--tomza-amarillo);
+}
+
+a:hover {
+  color: #ffd24d;
+}
+
+/* ===== BADGES ===== */
+.badge {
+  padding: 6px 12px;
+  font-size: 0.8rem;
+}
+
+.badge-PROGRAMADO {
+  background-color: #6c757d;
+}
+
+.badge-EN_PROCESO {
+  background-color: #0d6efd;
+}
+
+.badge-CERRADO {
+  background-color: #198754;
+}

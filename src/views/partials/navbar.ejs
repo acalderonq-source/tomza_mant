@@ -1,0 +1,31 @@
+<nav class="navbar navbar-expand-lg navbar-tomza px-3">
+  <a class="navbar-brand d-flex align-items-center" href="/dashboard">
+    <img
+      src="https://www.tomzasureste.com/img/grp_tomza.png"
+      alt="Gas Tomza"
+      style="height:42px; margin-right:10px;"
+    >
+    <span class="fw-bold">Gas Tomza</span>
+  </a>
+
+  <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#menuTomza">
+    <span class="navbar-toggler-icon" style="filter: invert(1)"></span>
+  </button>
+
+  <div class="collapse navbar-collapse" id="menuTomza">
+    <ul class="navbar-nav ms-auto">
+      <% if (user) { %>
+        <li class="nav-item">
+          <span class="nav-link">
+            <%= user.nombre %> (<%= user.rol %>)
+          </span>
+        </li>
+        <li class="nav-item">
+          <form method="POST" action="/logout">
+            <button class="btn btn-tomza btn-sm ms-2">Salir</button>
+          </form>
+        </li>
+      <% } %>
+    </ul>
+  </div>
+</nav>
