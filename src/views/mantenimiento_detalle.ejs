@@ -28,34 +28,17 @@
 
   <!-- ================= PLAN (TALLER) ================= -->
   <div class="card mb-3">
-    <div class="card-header fw-bold">
-      Plan (Taller)
-    </div>
+    <div class="card-header fw-bold">Plan (Taller)</div>
     <div class="card-body">
 
       <% if (user.rol === 'TALLER' || user.rol === 'ADMIN') { %>
-
         <form method="POST" action="/mantenimientos/<%= mantenimiento.id %>/plan">
-          <div class="mb-3">
-            <textarea
-              name="plan"
-              class="form-control"
-              rows="4"
-              placeholder="Qué se le va a realizar a esta unidad"
-              required><%= mantenimiento.plan || '' %></textarea>
-          </div>
-
-          <button class="btn btn-primary">
-            Guardar plan
-          </button>
+          <textarea name="plan" class="form-control mb-2" rows="4" required>
+<%= mantenimiento.plan || '' %></textarea>
+          <button class="btn btn-primary">Guardar plan</button>
         </form>
-
       <% } else { %>
-
-        <p class="text-muted mb-0">
-          <%= mantenimiento.plan || 'El plan aún no ha sido definido.' %>
-        </p>
-
+        <p class="mb-0"><%= mantenimiento.plan || 'Sin plan definido' %></p>
       <% } %>
 
     </div>
@@ -63,40 +46,15 @@
 
   <!-- ================= EJECUCIÓN (MECÁNICOS) ================= -->
   <div class="card mb-3">
-    <div class="card-header fw-bold">
-      Ejecución (Mecánicos)
-    </div>
+    <div class="card-header fw-bold">Ejecución (Mecánicos)</div>
     <div class="card-body">
 
       <% if (user.rol === 'MECANICO' || user.rol === 'ADMIN') { %>
 
         <form method="POST" action="/mantenimientos/<%= mantenimiento.id %>/ejecutar">
-          <div class="mb-3">
-            <textarea
-              name="ejecucion"
-              class="form-control"
-              rows="4"
-              placeholder="Trabajos realizados"
-              required><%= mantenimiento.ejecucion || '' %></textarea>
-          </div>
 
-          <button class="btn btn-success">
-            Guardar y cerrar mantenimiento
-          </button>
-        </form>
-
-      <% } else { %>
-
-        <p class="text-muted mb-0">
-          <%= mantenimiento.ejecucion || 'Aún no se ha registrado la ejecución.' %>
-        </p>
-
-      <% } %>
-
-    </div>
-  </div>
-
-</div>
-
-</body>
-</html>
+          <label class="fw-bold">Trabajos realizados</label>
+          <textarea
+            name="ejecucion"
+            class="form-control mb-3"
+router.post("/:id/ejecutar", async (req, res)

@@ -68,25 +68,32 @@ router.post("/:id/plan", async (req, res) => {
 
 /* ================= EJECUCIÓN (MECÁNICOS) ================= */
 router.post("/:id/ejecutar", async (req, res) => {
-  if (
-    !req.session.user ||
-    !['MECANICO', 'ADMIN'].includes(req.session.user.rol)
-  ) {
-    return res.redirect("/dashboard");
+  try {
+    if (
+      !req.session.user ||
+      !['MECANICO', 'ADMIN'].includes(req.session.user.rol)
+    ) {
+      return res.redirect("/dashboard");
+    }
+
+    const { ejecucion, pendientes } = req.body;
+
+    await pool.query(
+      `UPDATE mantenimientos
+       SET ejecucion = ?,
+           pendientes = ?,
+           estado = 'CERRADO',
+           fecha_cierre = NOW()
+       WHERE id = ?`,
+      [ejecucion, pendientes, req.params.id]
+    );
+
+    res.redirect(`/mantenimientos/${req.params.id}`);
+
+  } catch (error) {
+    console.error("❌ Error al cerrar mantenimiento:", error);
+    res.status(500).send("Error interno");
   }
-
-  const { ejecucion } = req.body;
-
-  await pool.query(
-    `UPDATE mantenimientos
-     SET ejecucion = ?,
-         estado = 'CERRADO',
-         fecha_cierre = NOW()
-     WHERE id = ?`,
-    [ejecucion, req.params.id]
-  );
-
-  res.redirect(`/mantenimientos/${req.params.id}`);
 });
 
 module.exports = router;
