@@ -13,7 +13,7 @@ router.post("/login", async (req, res) => {
   const { usuario, password } = req.body;
 
   const [rows] = await pool.query(
-    "SELECT * FROM users WHERE usuario=? AND activo=1 LIMIT 1",
+    "SELECT * FROM usuarios WHERE usuario=? LIMIT 1",
     [usuario]
   );
 
