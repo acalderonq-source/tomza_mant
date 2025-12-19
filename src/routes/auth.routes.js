@@ -76,5 +76,17 @@ router.post("/logout", (req, res) => {
     res.redirect("/login");
   });
 });
+// =======================
+// LOGOUT
+// =======================
+router.get("/logout", (req, res) => {
+  req.session.destroy(err => {
+    if (err) {
+      console.error("Error cerrando sesión:", err);
+      return res.redirect("/dashboard");
+    }
+    res.redirect("/login");
+  });
+});
 
 module.exports = router;
