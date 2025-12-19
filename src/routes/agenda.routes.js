@@ -1,63 +1,83 @@
 const express = require("express");
-const pool = require("../db");
-const { generarAgenda } = require("../ia");
-const { requireRole } = require("../middleware");
-
 const router = express.Router();
-/**
- * COMPATIBILIDAD: /agenda/hoy
- */
-router.get("/hoy", (req, res) => {
-  const hoy = new Date().toISOString().slice(0, 10);
-  res.redirect(`/agenda?fecha=${hoy}`);
-});
+const pool = require("../db");
 
-/**
- * AGENDA POR FECHA
- * /agenda?fecha=YYYY-MM-DD
- */
+// Agenda HOY
 router.get("/", async (req, res) => {
-function hoyCR() {
-  const now = new Date();
-  now.setHours(now.getHours() - 6); // Costa Rica UTC-6
-  return now.toISOString().slice(0, 10);
-}
+  try {
+    if (!req.session.user) {
+      return res.redirect("/login");
+    }
 
-const fecha = req.query.fecha || hoyCR();
+    const fecha = new Date().toISOString().split("T")[0];
 
+    const [agenda] = await pool.query(
+      `
+      SELECT 
+        m.id,
+        u.placa,
+        m.tipo,
+        m.estado,
+        m.plan
+      FROM mantenimientos m
+      JOIN unidades u ON u.id = m.unidad_id
+      WHERE m.fecha_programada = ?
+      ORDER BY m.id
+      `,
+      [fecha]
+    );
 
-  const [rows] = await pool.query(
-    `
-    SELECT 
-      m.id,
-      m.fecha_programada,
-      m.tipo,
-      m.prioridad,
-      m.estado,
-      u.placa
-    FROM mantenimientos m
-    JOIN unidades u ON u.id = m.unidad_id
-    WHERE m.fecha_programada = ?
-    ORDER BY u.placa
-    `,
-    [fecha]
-  );
+    res.render("agenda", {
+      agenda,
+      fecha,
+      user: req.session.user,
+      vista: "hoy"
+    });
 
-  res.render("agenda_hoy", {
-    fecha,
-    items: rows
-  });
+  } catch (error) {
+    console.error("❌ Error agenda hoy:", error);
+    res.status(500).send("Error interno");
+  }
 });
 
-/**
- * GENERAR AGENDA PARA UNA FECHA (ADMIN)
- */
-router.post("/generar", requireRole("ADMIN"), async (req, res) => {
-  const { fecha } = req.body;
+// Agenda MAÑANA
+router.get("/manana", async (req, res) => {
+  try {
+    if (!req.session.user) {
+      return res.redirect("/login");
+    }
 
-  await generarAgenda(fecha, "CARTAGO");
+    const manana = new Date();
+    manana.setDate(manana.getDate() + 1);
+    const fecha = manana.toISOString().split("T")[0];
 
-  res.redirect(`/agenda?fecha=${fecha}`);
+    const [agenda] = await pool.query(
+      `
+      SELECT 
+        m.id,
+        u.placa,
+        m.tipo,
+        m.estado,
+        m.plan
+      FROM mantenimientos m
+      JOIN unidades u ON u.id = m.unidad_id
+      WHERE m.fecha_programada = ?
+      ORDER BY m.id
+      `,
+      [fecha]
+    );
+
+    res.render("agenda", {
+      agenda,
+      fecha,
+      user: req.session.user,
+      vista: "manana"
+    });
+
+  } catch (error) {
+    console.error("❌ Error agenda mañana:", error);
+    res.status(500).send("Error interno");
+  }
 });
 
 module.exports = router;
