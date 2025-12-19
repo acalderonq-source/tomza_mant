@@ -3,6 +3,7 @@ require("dotenv").config();
 const express = require("express");
 const path = require("path");
 const session = require("express-session");
+const MySQLStore = require("express-mysql-session")(session);
 
 const app = express();
 
@@ -18,13 +19,34 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, "..", "public")));
 
 /* ===============================
-   SESIONES
+   BASE DE DATOS
    =============================== */
+const pool = require("./db");
+
+/* ===============================
+   SESIONES EN MYSQL (PRODUCCIÓN)
+   =============================== */
+const sessionStore = new MySQLStore(
+  {
+    clearExpired: true,
+    checkExpirationInterval: 900000, // 15 min
+    expiration: 1000 * 60 * 60 * 8    // 8 horas
+  },
+  pool
+);
+
 app.use(
   session({
+    name: "tomza_session",
     secret: process.env.SESSION_SECRET || "tomza_secret",
+    store: sessionStore,
     resave: false,
-    saveUninitialized: false
+    saveUninitialized: false,
+    cookie: {
+      secure: false,   // Render maneja HTTPS por proxy
+      httpOnly: true,
+      maxAge: 1000 * 60 * 60 * 8
+    }
   })
 );
 
@@ -35,7 +57,7 @@ app.set("view engine", "ejs");
 app.set("views", path.join(__dirname, "views"));
 
 /* ===============================
-   MIDDLEWARE GLOBAL DE USUARIO
+   USUARIO GLOBAL EN VISTAS
    =============================== */
 app.use((req, res, next) => {
   res.locals.user = req.session.user || null;
@@ -56,14 +78,14 @@ app.use("/agenda", agendaRoutes);
 app.use("/mantenimientos", mantenimientosRoutes);
 
 /* ===============================
-   RUTA SALUD (DEBUG)
+   HEALTH CHECK (RENDER)
    =============================== */
 app.get("/health", (req, res) => {
   res.send("OK");
 });
 
 /* ===============================
-   REDIRECCIONES
+   RUTA RAÍZ
    =============================== */
 app.get("/", (req, res) => {
   if (req.session.user) {
@@ -74,7 +96,7 @@ app.get("/", (req, res) => {
 });
 
 /* ===============================
-   MANEJO DE ERRORES 404
+   404
    =============================== */
 app.use((req, res) => {
   res.status(404).send("Ruta no encontrada");
