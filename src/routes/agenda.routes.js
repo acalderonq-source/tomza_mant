@@ -2,14 +2,23 @@ const express = require("express");
 const router = express.Router();
 const pool = require("../db");
 
-// Agenda HOY
+// Fecha local Costa Rica
+function fechaCostaRica(offsetDias = 0) {
+  const ahora = new Date();
+  ahora.setMinutes(ahora.getMinutes() - ahora.getTimezoneOffset());
+  ahora.setHours(ahora.getHours() - 6);
+  ahora.setDate(ahora.getDate() + offsetDias);
+  return ahora.toISOString().slice(0, 10);
+}
+
+// ===================== AGENDA HOY =====================
 router.get("/", async (req, res) => {
   try {
     if (!req.session.user) {
       return res.redirect("/login");
     }
 
-    const fecha = new Date().toISOString().split("T")[0];
+    const fecha = fechaCostaRica();
 
     const [agenda] = await pool.query(
       `
@@ -40,16 +49,14 @@ router.get("/", async (req, res) => {
   }
 });
 
-// Agenda MAÑANA
+// ===================== AGENDA MAÑANA =====================
 router.get("/manana", async (req, res) => {
   try {
     if (!req.session.user) {
       return res.redirect("/login");
     }
 
-    const manana = new Date();
-    manana.setDate(manana.getDate() + 1);
-    const fecha = manana.toISOString().split("T")[0];
+    const fecha = fechaCostaRica(1);
 
     const [agenda] = await pool.query(
       `
