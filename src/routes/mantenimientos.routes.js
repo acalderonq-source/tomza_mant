@@ -15,10 +15,7 @@ router.get("/", async (req, res) => {
         u.placa,
         m.tipo,
         m.estado,
-        m.fecha_programada,
-        m.plan,
-        m.ejecucion,
-        m.pendiente
+        m.fecha_programada
       FROM mantenimientos m
       JOIN unidades u ON u.id = m.unidad_id
       ORDER BY m.fecha_programada DESC, m.id DESC
@@ -47,7 +44,13 @@ router.get("/:id", async (req, res) => {
     const [[mantenimiento]] = await pool.query(
       `
       SELECT 
-        m.*,
+        m.id,
+        m.tipo,
+        m.estado,
+        m.prioridad,
+        m.plan,
+        m.ejecucion,
+        m.pendiente,
         u.placa
       FROM mantenimientos m
       JOIN unidades u ON u.id = m.unidad_id
@@ -66,12 +69,12 @@ router.get("/:id", async (req, res) => {
     });
 
   } catch (error) {
-    console.error("❌ ERROR mantenimiento detalle:", error);
+    console.error("❌ ERROR detalle mantenimiento:", error);
     res.status(500).send("Internal Server Error");
   }
 });
 
-// ===================== GUARDAR PLAN (TALLER / ADMIN) =====================
+// ===================== GUARDAR PLAN (ADMIN / TALLER) =====================
 router.post("/:id/plan", async (req, res) => {
   try {
     if (!req.session.user) {
@@ -86,7 +89,7 @@ router.post("/:id/plan", async (req, res) => {
     const { plan } = req.body;
 
     await pool.query(
-      `UPDATE mantenimientos SET plan = ? WHERE id = ?`,
+      "UPDATE mantenimientos SET plan = ? WHERE id = ?",
       [plan, id]
     );
 
@@ -98,7 +101,7 @@ router.post("/:id/plan", async (req, res) => {
   }
 });
 
-// ===================== GUARDAR EJECUCIÓN (MECÁNICO / ADMIN) =====================
+// ===================== GUARDAR EJECUCIÓN (ADMIN / MECÁNICO) =====================
 router.post("/:id/ejecucion", async (req, res) => {
   try {
     if (!req.session.user) {
