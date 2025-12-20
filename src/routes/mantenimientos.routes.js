@@ -2,9 +2,7 @@ const express = require("express");
 const router = express.Router();
 const pool = require("../db");
 
-/* =======================
-   LISTADO DE MANTENIMIENTOS
-======================= */
+// ===================== LISTADO DE MANTENIMIENTOS =====================
 router.get("/", async (req, res) => {
   try {
     if (!req.session.user) {
@@ -15,12 +13,15 @@ router.get("/", async (req, res) => {
       SELECT 
         m.id,
         u.placa,
-        m.fecha_programada,
         m.tipo,
-        m.estado
+        m.estado,
+        m.fecha_programada,
+        m.plan,
+        m.ejecucion,
+        m.pendiente
       FROM mantenimientos m
       JOIN unidades u ON u.id = m.unidad_id
-      ORDER BY m.fecha_programada DESC
+      ORDER BY m.fecha_programada DESC, m.id DESC
     `);
 
     res.render("mantenimientos", {
@@ -29,19 +30,19 @@ router.get("/", async (req, res) => {
     });
 
   } catch (error) {
-    console.error("❌ Error listado mantenimientos:", error);
-    res.status(500).send("Error interno");
+    console.error("❌ ERROR /mantenimientos:", error);
+    res.status(500).send("Internal Server Error");
   }
 });
 
-/* =======================
-   DETALLE DE MANTENIMIENTO
-======================= */
+// ===================== DETALLE DE MANTENIMIENTO =====================
 router.get("/:id", async (req, res) => {
   try {
     if (!req.session.user) {
       return res.redirect("/login");
     }
+
+    const { id } = req.params;
 
     const [[mantenimiento]] = await pool.query(
       `
@@ -52,11 +53,11 @@ router.get("/:id", async (req, res) => {
       JOIN unidades u ON u.id = m.unidad_id
       WHERE m.id = ?
       `,
-      [req.params.id]
+      [id]
     );
 
     if (!mantenimiento) {
-      return res.redirect("/agenda");
+      return res.status(404).send("Mantenimiento no encontrado");
     }
 
     res.render("mantenimiento_detalle", {
@@ -65,70 +66,69 @@ router.get("/:id", async (req, res) => {
     });
 
   } catch (error) {
-    console.error("❌ Error detalle mantenimiento:", error);
-    res.status(500).send("Error interno");
+    console.error("❌ ERROR mantenimiento detalle:", error);
+    res.status(500).send("Internal Server Error");
   }
 });
 
-/* =======================
-   PLAN (SOLO TALLER / ADMIN)
-======================= */
+// ===================== GUARDAR PLAN (TALLER / ADMIN) =====================
 router.post("/:id/plan", async (req, res) => {
   try {
-    if (
-      !req.session.user ||
-      !["TALLER", "ADMIN"].includes(req.session.user.rol)
-    ) {
-      return res.redirect("/dashboard");
+    if (!req.session.user) {
+      return res.redirect("/login");
     }
 
+    if (!["ADMIN", "TALLER"].includes(req.session.user.rol)) {
+      return res.status(403).send("No autorizado");
+    }
+
+    const { id } = req.params;
     const { plan } = req.body;
 
     await pool.query(
-      "UPDATE mantenimientos SET plan = ? WHERE id = ?",
-      [plan, req.params.id]
+      `UPDATE mantenimientos SET plan = ? WHERE id = ?`,
+      [plan, id]
     );
 
-    res.redirect(`/mantenimientos/${req.params.id}`);
+    res.redirect(`/mantenimientos/${id}`);
 
   } catch (error) {
-    console.error("❌ Error guardando plan:", error);
-    res.status(500).send("Error interno");
+    console.error("❌ ERROR guardar plan:", error);
+    res.status(500).send("Internal Server Error");
   }
 });
 
-/* =======================
-   EJECUCIÓN + PENDIENTES
-   (SOLO MECÁNICO / ADMIN)
-======================= */
-router.post("/:id/ejecutar", async (req, res) => {
+// ===================== GUARDAR EJECUCIÓN (MECÁNICO / ADMIN) =====================
+router.post("/:id/ejecucion", async (req, res) => {
   try {
-    if (
-      !req.session.user ||
-      !["MECANICO", "ADMIN"].includes(req.session.user.rol)
-    ) {
-      return res.redirect("/dashboard");
+    if (!req.session.user) {
+      return res.redirect("/login");
     }
 
-    const { ejecucion, pendientes } = req.body;
+    if (!["ADMIN", "MECANICO"].includes(req.session.user.rol)) {
+      return res.status(403).send("No autorizado");
+    }
+
+    const { id } = req.params;
+    const { ejecucion, pendiente } = req.body;
 
     await pool.query(
       `
-      UPDATE mantenimientos
-      SET ejecucion = ?,
-          pendientes = ?,
-          estado = 'CERRADO',
-          fecha_cierre = NOW()
+      UPDATE mantenimientos 
+      SET 
+        ejecucion = ?,
+        pendiente = ?,
+        estado = 'CERRADO'
       WHERE id = ?
       `,
-      [ejecucion, pendientes, req.params.id]
+      [ejecucion, pendiente, id]
     );
 
-    res.redirect(`/mantenimientos/${req.params.id}`);
+    res.redirect("/agenda");
 
   } catch (error) {
-    console.error("❌ Error cerrando mantenimiento:", error);
-    res.status(500).send("Error interno");
+    console.error("❌ ERROR cerrar mantenimiento:", error);
+    res.status(500).send("Internal Server Error");
   }
 });
 
