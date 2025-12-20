@@ -18,7 +18,25 @@
 
 <div class="container-fluid mt-4">
 
-  <h3 class="mb-4">📋 Listado de Mantenimientos</h3>
+  <h3 class="mb-3">📋 Listado de Mantenimientos</h3>
+
+  <!-- BOTONES DE FILTRO -->
+  <div class="mb-3">
+    <a href="/mantenimientos"
+       class="btn btn-outline-dark me-2 <%= !filtro ? 'active' : '' %>">
+      Todos
+    </a>
+
+    <a href="/mantenimientos?filtro=pendientes"
+       class="btn btn-outline-warning me-2 <%= filtro === 'pendientes' ? 'active' : '' %>">
+      Pendientes
+    </a>
+
+    <a href="/mantenimientos?filtro=realizados"
+       class="btn btn-outline-success <%= filtro === 'realizados' ? 'active' : '' %>">
+      Realizados
+    </a>
+  </div>
 
   <div class="table-responsive">
     <table class="table table-bordered table-hover align-middle">
@@ -44,14 +62,13 @@
           <tr>
             <td><strong><%= m.placa %></strong></td>
             <td><%= m.tipo %></td>
-            <td><%= m.fecha_programada %></td>
+            <td><%= m.fecha_formato %></td>
             <td>
               <span class="badge bg-<%= m.estado === 'CERRADO' ? 'success' : 'secondary' %>">
                 <%= m.estado %>
               </span>
             </td>
 
-            <!-- EJECUCIÓN -->
             <td style="max-width:300px">
               <% if (m.estado === 'CERRADO') { %>
                 <%= m.ejecucion || '—' %>
@@ -60,7 +77,6 @@
               <% } %>
             </td>
 
-            <!-- PENDIENTE -->
             <td style="max-width:250px">
               <% if (m.estado === 'CERRADO') { %>
                 <%= m.pendiente || '—' %>

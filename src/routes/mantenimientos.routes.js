@@ -9,23 +9,35 @@ router.get("/", async (req, res) => {
       return res.redirect("/login");
     }
 
+    const filtro = req.query.filtro;
+
+    let where = "";
+    if (filtro === "pendientes") {
+      where = "WHERE m.estado != 'CERRADO'";
+    }
+    if (filtro === "realizados") {
+      where = "WHERE m.estado = 'CERRADO'";
+    }
+
     const [mantenimientos] = await pool.query(`
       SELECT 
         m.id,
         u.placa,
         m.tipo,
         m.estado,
-        m.fecha_programada,
+        DATE_FORMAT(m.fecha_programada, '%d/%m/%Y') AS fecha_formato,
         m.ejecucion,
         m.pendiente
       FROM mantenimientos m
       JOIN unidades u ON u.id = m.unidad_id
+      ${where}
       ORDER BY m.fecha_programada DESC, m.id DESC
     `);
 
     res.render("mantenimientos", {
       mantenimientos,
-      user: req.session.user
+      user: req.session.user,
+      filtro
     });
 
   } catch (error) {
@@ -53,6 +65,7 @@ router.get("/:id", async (req, res) => {
         m.plan,
         m.ejecucion,
         m.pendiente,
+        DATE_FORMAT(m.fecha_programada, '%d/%m/%Y') AS fecha_formato,
         u.placa
       FROM mantenimientos m
       JOIN unidades u ON u.id = m.unidad_id
@@ -129,7 +142,7 @@ router.post("/:id/ejecucion", async (req, res) => {
       [ejecucion, pendiente, id]
     );
 
-    res.redirect("/agenda");
+    res.redirect("/mantenimientos");
 
   } catch (error) {
     console.error("❌ ERROR cerrar mantenimiento:", error);
