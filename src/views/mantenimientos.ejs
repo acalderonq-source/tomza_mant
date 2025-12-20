@@ -16,47 +16,72 @@
   </div>
 </nav>
 
-<div class="container mt-4">
+<div class="container-fluid mt-4">
+
   <h3 class="mb-4">📋 Listado de Mantenimientos</h3>
 
-  <table class="table table-bordered table-hover">
-    <thead class="table-dark">
-      <tr>
-        <th>Placa</th>
-        <th>Tipo</th>
-        <th>Fecha</th>
-        <th>Estado</th>
-        <th style="width:120px">Acción</th>
-      </tr>
-    </thead>
-    <tbody>
-      <% if (mantenimientos.length === 0) { %>
+  <div class="table-responsive">
+    <table class="table table-bordered table-hover align-middle">
+      <thead class="table-dark">
         <tr>
-          <td colspan="5" class="text-center">No hay mantenimientos</td>
+          <th>Placa</th>
+          <th>Tipo</th>
+          <th>Fecha</th>
+          <th>Estado</th>
+          <th>Ejecución</th>
+          <th>Pendiente</th>
+          <th style="width:90px">Acción</th>
         </tr>
-      <% } %>
+      </thead>
+      <tbody>
+        <% if (mantenimientos.length === 0) { %>
+          <tr>
+            <td colspan="7" class="text-center">No hay mantenimientos</td>
+          </tr>
+        <% } %>
 
-      <% mantenimientos.forEach(m => { %>
-        <tr>
-          <td><strong><%= m.placa %></strong></td>
-          <td><%= m.tipo %></td>
-          <td><%= m.fecha_programada.toISOString().slice(0,10) %></td>
-          <td>
-            <span class="badge bg-<%= m.estado === 'CERRADO' ? 'success' : 'secondary' %>">
-              <%= m.estado %>
-            </span>
-          </td>
-          <td>
-            <a href="/mantenimientos/<%= m.id %>" class="btn btn-warning btn-sm">
-              Abrir
-            </a>
-          </td>
-        </tr>
-      <% }) %>
-    </tbody>
-  </table>
+        <% mantenimientos.forEach(m => { %>
+          <tr>
+            <td><strong><%= m.placa %></strong></td>
+            <td><%= m.tipo %></td>
+            <td><%= m.fecha_programada %></td>
+            <td>
+              <span class="badge bg-<%= m.estado === 'CERRADO' ? 'success' : 'secondary' %>">
+                <%= m.estado %>
+              </span>
+            </td>
 
-  <a href="/dashboard" class="btn btn-secondary">Volver</a>
+            <!-- EJECUCIÓN -->
+            <td style="max-width:300px">
+              <% if (m.estado === 'CERRADO') { %>
+                <%= m.ejecucion || '—' %>
+              <% } else { %>
+                <span class="text-muted">Pendiente</span>
+              <% } %>
+            </td>
+
+            <!-- PENDIENTE -->
+            <td style="max-width:250px">
+              <% if (m.estado === 'CERRADO') { %>
+                <%= m.pendiente || '—' %>
+              <% } else { %>
+                <span class="text-muted">—</span>
+              <% } %>
+            </td>
+
+            <td>
+              <a href="/mantenimientos/<%= m.id %>" class="btn btn-warning btn-sm">
+                Abrir
+              </a>
+            </td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+
+  <a href="/dashboard" class="btn btn-secondary mt-3">Volver</a>
+
 </div>
 
 </body>

@@ -15,7 +15,9 @@ router.get("/", async (req, res) => {
         u.placa,
         m.tipo,
         m.estado,
-        m.fecha_programada
+        m.fecha_programada,
+        m.ejecucion,
+        m.pendiente
       FROM mantenimientos m
       JOIN unidades u ON u.id = m.unidad_id
       ORDER BY m.fecha_programada DESC, m.id DESC
