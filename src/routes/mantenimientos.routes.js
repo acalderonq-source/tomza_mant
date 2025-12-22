@@ -100,21 +100,21 @@ router.post("/:id/plan", async (req, res) => {
       return res.status(403).send("No autorizado");
     }
 
-    const { id } = req.params;
     const { plan } = req.body;
 
     await pool.query(
-      "UPDATE mantenimientos SET plan = ? WHERE id = ?",
-      [plan, id]
+      `UPDATE mantenimientos SET plan = ? WHERE id = ?`,
+      [plan, req.params.id]
     );
 
-    res.redirect(`/mantenimientos/${id}`);
+    res.redirect(`/mantenimientos/${req.params.id}`);
 
   } catch (error) {
-    console.error("❌ ERROR guardar plan:", error);
-    res.status(500).send("Internal Server Error");
+    console.error("❌ Error guardando plan:", error);
+    res.status(500).send("Error interno");
   }
 });
+
 
 // ===================== GUARDAR EJECUCIÓN (ADMIN / MECÁNICO) =====================
 router.post("/:id/ejecucion", async (req, res) => {
