@@ -54,7 +54,8 @@ router.post("/login", async (req, res) => {
       id: user.id,
       nombre: user.nombre,
       usuario: user.usuario,
-      rol: user.rol
+      rol: user.rol,
+      sede: user.sede
     };
 
     // Redirigir
