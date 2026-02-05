@@ -2,12 +2,10 @@ const express = require("express");
 const router = express.Router();
 const pool = require("../db");
 
-// LISTADO
+// LISTADO DE MANTENIMIENTOS
 router.get("/", async (req, res) => {
   try {
-    if (!req.session.user) {
-      return res.redirect("/login");
-    }
+    if (!req.session.user) return res.redirect("/login");
 
     const filtro = req.query.filtro;
 
@@ -21,15 +19,15 @@ router.get("/", async (req, res) => {
       condiciones.push("m.estado = 'CERRADO'");
     }
 
-    // determinar sede a usar
+    // determinar sede
     let sedeFiltro = null;
 
     if (req.session.user.rol === "ADMIN") {
-      // admin usa lo que eligió en el dashboard
-      sedeFiltro = req.session.sedeActual || null;
+      if (req.session.sedeSeleccionada && req.session.sedeSeleccionada !== "TODAS") {
+        sedeFiltro = req.session.sedeSeleccionada;
+      }
     } else {
-      // otros usuarios solo su propia sede
-      sedeFiltro = req.session.user.sede || null;
+      sedeFiltro = req.session.user.sede;
     }
 
     if (sedeFiltro) {
@@ -60,7 +58,8 @@ router.get("/", async (req, res) => {
     res.render("mantenimientos", {
       mantenimientos,
       user: req.session.user,
-      filtro
+      filtro,
+      sedeSeleccionada: req.session.sedeSeleccionada || req.session.user.sede
     });
 
   } catch (error) {
@@ -72,11 +71,7 @@ router.get("/", async (req, res) => {
 // DETALLE
 router.get("/:id", async (req, res) => {
   try {
-    if (!req.session.user) {
-      return res.redirect("/login");
-    }
-
-    const { id } = req.params;
+    if (!req.session.user) return res.redirect("/login");
 
     let sql = `
       SELECT 
@@ -94,16 +89,21 @@ router.get("/:id", async (req, res) => {
       WHERE m.id = ?
     `;
 
-    let params = [id];
+    let params = [req.params.id];
 
-    // si no es admin, solo puede ver su sede
-    if (req.session.user.rol !== "ADMIN") {
+    let sedeFiltro = null;
+
+    if (req.session.user.rol === "ADMIN") {
+      if (req.session.sedeSeleccionada && req.session.sedeSeleccionada !== "TODAS") {
+        sedeFiltro = req.session.sedeSeleccionada;
+      }
+    } else {
+      sedeFiltro = req.session.user.sede;
+    }
+
+    if (sedeFiltro) {
       sql += " AND u.sede = ?";
-      params.push(req.session.user.sede);
-    } else if (req.session.sedeActual) {
-      // admin con sede seleccionada
-      sql += " AND u.sede = ?";
-      params.push(req.session.sedeActual);
+      params.push(sedeFiltro);
     }
 
     const [rows] = await pool.query(sql, params);
@@ -112,60 +112,13 @@ router.get("/:id", async (req, res) => {
       return res.send("Mantenimiento no encontrado");
     }
 
-    const mantenimiento = rows[0];
-
     res.render("mantenimiento_detalle", {
-      mantenimiento,
+      mantenimiento: rows[0],
       user: req.session.user
     });
 
   } catch (error) {
     console.error("❌ ERROR detalle mantenimiento:", error);
-    res.status(500).send("Internal Server Error");
-  }
-});
-
-// GUARDAR PLAN (ADMIN / TALLER)
-router.post("/:id/plan", async (req, res) => {
-  try {
-    if (!req.session.user) return res.redirect("/login");
-    if (!["ADMIN", "TALLER"].includes(req.session.user.rol)) {
-      return res.status(403).send("No autorizado");
-    }
-
-    const { plan } = req.body;
-
-    await pool.query(
-      "UPDATE mantenimientos SET plan = ? WHERE id = ?",
-      [plan, req.params.id]
-    );
-
-    res.redirect(`/mantenimientos/${req.params.id}`);
-  } catch (error) {
-    console.error("❌ Error guardando plan:", error);
-    res.status(500).send("Error interno");
-  }
-});
-
-// CERRAR MANTENIMIENTO (ADMIN / MECANICO)
-router.post("/:id/ejecucion", async (req, res) => {
-  try {
-    if (!req.session.user) return res.redirect("/login");
-    if (!["ADMIN", "MECANICO"].includes(req.session.user.rol)) {
-      return res.status(403).send("No autorizado");
-    }
-
-    const { ejecucion, pendiente } = req.body;
-
-    await pool.query(`
-      UPDATE mantenimientos 
-      SET ejecucion = ?, pendiente = ?, estado = 'CERRADO'
-      WHERE id = ?
-    `, [ejecucion, pendiente, req.params.id]);
-
-    res.redirect("/mantenimientos");
-  } catch (error) {
-    console.error("❌ ERROR cerrar mantenimiento:", error);
     res.status(500).send("Internal Server Error");
   }
 });

@@ -1,21 +1,18 @@
 const express = require("express");
 const router = express.Router();
 
-// Cambiar sede solo ADMIN
 router.post("/cambiar-sede", (req, res) => {
-  if (!req.session.user || req.session.user.rol !== "ADMIN") {
-    return res.redirect("/dashboard");
+  if (!req.session.user) return res.redirect("/login");
+
+  const { sede } = req.body;
+
+  if (!["Cartago", "La Cruz", "TODAS"].includes(sede)) {
+    return res.status(400).send("Sede inválida");
   }
 
-  const { sede } = req.body; // "Cartago" | "La Cruz" | ""
+  req.session.sedeSeleccionada = sede;
 
-  if (!sede || sede === "") {
-    // ver todas las sedes
-    req.session.sedeActual = null;
-  } else {
-    // fijar sede elegida
-    req.session.sedeActual = sede;
-  }
+  console.log("👉 Sede en sesión:", req.session.sedeSeleccionada);
 
   res.redirect("/dashboard");
 });

@@ -5,55 +5,61 @@ const pool = require("../db");
 // DASHBOARD PRINCIPAL
 router.get("/", async (req, res) => {
   try {
-    if (!req.session.user) {
-      return res.redirect("/login");
-    }
+    if (!req.session.user) return res.redirect("/login");
 
-    // fecha de hoy en formato YYYY-MM-DD
     const hoy = new Date();
     const fechaHoy = hoy.toISOString().split("T")[0];
 
-    let sqlHoy = `
+    let condicionesHoy = ["m.fecha_programada = ?"];
+    let paramsHoy = [fechaHoy];
+
+    let condicionesStats = ["1=1"];
+    let paramsStats = [];
+
+    // definir sede a usar
+    let sedeFiltro = null;
+
+    if (req.session.user.rol === "ADMIN") {
+      if (req.session.sedeSeleccionada && req.session.sedeSeleccionada !== "TODAS") {
+        sedeFiltro = req.session.sedeSeleccionada;
+      }
+    } else {
+      sedeFiltro = req.session.user.sede;
+    }
+
+    if (sedeFiltro) {
+      condicionesHoy.push("u.sede = ?");
+      paramsHoy.push(sedeFiltro);
+
+      condicionesStats.push("u.sede = ?");
+      paramsStats.push(sedeFiltro);
+    }
+
+    const sqlHoy = `
       SELECT 
         m.id,
         u.placa,
+        u.sede,
         m.tipo,
         m.estado,
         m.plan,
         DATE_FORMAT(m.fecha_programada, '%d/%m/%Y') AS fecha
       FROM mantenimientos m
       JOIN unidades u ON u.id = m.unidad_id
-      WHERE m.fecha_programada = ?
+      WHERE ${condicionesHoy.join(" AND ")}
+      ORDER BY m.id
     `;
-
-    let paramsHoy = [fechaHoy];
-
-    // si NO es admin, filtrar por sede
-    if (req.session.user.rol !== "ADMIN") {
-      sqlHoy += " AND u.sede = ?";
-      paramsHoy.push(req.session.user.sede);
-    }
-
-    sqlHoy += " ORDER BY m.id";
 
     const [hoyMantenimientos] = await pool.query(sqlHoy, paramsHoy);
 
-    // estadísticas generales
-    let sqlStats = `
+    const sqlStats = `
       SELECT 
         SUM(CASE WHEN m.estado = 'CERRADO' THEN 1 ELSE 0 END) AS realizados,
         SUM(CASE WHEN m.estado != 'CERRADO' THEN 1 ELSE 0 END) AS pendientes
       FROM mantenimientos m
       JOIN unidades u ON u.id = m.unidad_id
-      WHERE 1=1
+      WHERE ${condicionesStats.join(" AND ")}
     `;
-
-    let paramsStats = [];
-
-    if (req.session.user.rol !== "ADMIN") {
-      sqlStats += " AND u.sede = ?";
-      paramsStats.push(req.session.user.sede);
-    }
 
     const [statsRows] = await pool.query(sqlStats, paramsStats);
     const stats = statsRows[0] || { realizados: 0, pendientes: 0 };
@@ -61,7 +67,8 @@ router.get("/", async (req, res) => {
     res.render("dashboard", {
       user: req.session.user,
       hoy: hoyMantenimientos,
-      stats
+      stats,
+      sedeSeleccionada: req.session.sedeSeleccionada || "TODAS"
     });
 
   } catch (error) {

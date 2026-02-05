@@ -1,11 +1,27 @@
 require("dotenv").config();
 const pool = require("../db");
 
+function esDiaHabil(fecha) {
+  const d = fecha.getDay();
+  return d !== 0 && d !== 6; // 0 domingo, 6 sábado
+}
+
+function hoyOProximoHabil() {
+  const hoy = new Date();
+  if (esDiaHabil(hoy)) return hoy;
+
+  const f = new Date(hoy);
+  do {
+    f.setDate(f.getDate() + 1);
+  } while (!esDiaHabil(f));
+  return f;
+}
+
 function siguienteDiaHabil(fecha) {
   const f = new Date(fecha);
   do {
     f.setDate(f.getDate() + 1);
-  } while (f.getDay() === 0 || f.getDay() === 6); // domingo o sábado
+  } while (!esDiaHabil(f));
   return f;
 }
 
