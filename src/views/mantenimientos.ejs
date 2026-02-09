@@ -15,6 +15,15 @@
     <a href="/logout" class="btn btn-warning btn-sm ms-3">Salir</a>
   </div>
 </nav>
+<% if (user.rol === 'MECANICO') { %>
+  <a href="/mantenimientos/correctivos/nuevo" class="btn btn-danger mb-3">
+    ➕ Correctivos
+  </a>
+<% } %>
+
+<a href="/mantenimientos/correctivos" class="btn btn-outline-danger mb-3 ms-2">
+  Ver Correctivos
+</a>
 
 <div class="container-fluid mt-4">
 
