@@ -8,7 +8,6 @@ router.get("/correctivos", async (req, res) => {
     if (!req.session.user) return res.redirect("/login");
 
     let sedeFiltro = null;
-
     if (req.session.user.rol === "ADMIN") {
       if (req.session.sedeSeleccionada && req.session.sedeSeleccionada !== "TODAS") {
         sedeFiltro = req.session.sedeSeleccionada;
@@ -16,6 +15,7 @@ router.get("/correctivos", async (req, res) => {
     } else {
       sedeFiltro = req.session.user.sede;
     }
+    if (!sedeFiltro) sedeFiltro = req.session.user.sede;
 
     const [rows] = await pool.query(`
       SELECT 
@@ -24,7 +24,7 @@ router.get("/correctivos", async (req, res) => {
         u.placa,
         c.trabajo_realizado,
         c.pendiente,
-        GROUP_CONCAT(m.nombre SEPARATOR ', ') AS mecanicos
+        COALESCE(GROUP_CONCAT(m.nombre SEPARATOR ', '), '—') AS mecanicos
       FROM correctivos c
       JOIN unidades u ON u.id = c.unidad_id
       LEFT JOIN correctivo_mecanicos cm ON cm.correctivo_id = c.id
@@ -34,10 +34,7 @@ router.get("/correctivos", async (req, res) => {
       ORDER BY c.fecha DESC
     `, [sedeFiltro]);
 
-    res.render("correctivos", {
-      correctivos: rows,
-      user: req.session.user
-    });
+    res.render("correctivos", { correctivos: rows, user: req.session.user });
 
   } catch (error) {
     console.error("❌ ERROR listado correctivos:", error);
@@ -61,6 +58,7 @@ router.get("/correctivos/nuevo", async (req, res) => {
     } else {
       sedeFiltro = req.session.user.sede;
     }
+    if (!sedeFiltro) sedeFiltro = req.session.user.sede;
 
     const [unidades] = await pool.query(
       "SELECT id, placa FROM unidades WHERE sede = ? ORDER BY placa",
@@ -72,11 +70,7 @@ router.get("/correctivos/nuevo", async (req, res) => {
       [sedeFiltro]
     );
 
-    res.render("correctivos_nuevo", {
-      unidades,
-      mecanicos,
-      user: req.session.user
-    });
+    res.render("correctivos_nuevo", { unidades, mecanicos, user: req.session.user });
 
   } catch (error) {
     console.error("❌ ERROR form correctivo:", error);
@@ -92,7 +86,8 @@ router.post("/correctivos", async (req, res) => {
       return res.status(403).send("No autorizado");
     }
 
-    const { unidad_id, trabajo_realizado, pendiente, mecanicos } = req.body;
+    const { unidad_id, trabajo_realizado, pendiente } = req.body;
+    const mecanicos = Array.isArray(req.body.mecanicos) ? req.body.mecanicos : [];
 
     let sedeFiltro = null;
     if (req.session.user.rol === "ADMIN") {
@@ -102,6 +97,7 @@ router.post("/correctivos", async (req, res) => {
     } else {
       sedeFiltro = req.session.user.sede;
     }
+    if (!sedeFiltro) sedeFiltro = req.session.user.sede;
 
     const [result] = await pool.query(`
       INSERT INTO correctivos (unidad_id, sede, trabajo_realizado, pendiente, creado_por)
@@ -110,13 +106,11 @@ router.post("/correctivos", async (req, res) => {
 
     const correctivoId = result.insertId;
 
-    if (Array.isArray(mecanicos)) {
-      for (const mecanicoId of mecanicos) {
-        await pool.query(
-          "INSERT INTO correctivo_mecanicos (correctivo_id, mecanico_id) VALUES (?, ?)",
-          [correctivoId, mecanicoId]
-        );
-      }
+    for (const mecanicoId of mecanicos) {
+      await pool.query(
+        "INSERT INTO correctivo_mecanicos (correctivo_id, mecanico_id) VALUES (?, ?)",
+        [correctivoId, mecanicoId]
+      );
     }
 
     res.redirect("/mantenimientos/correctivos");
@@ -147,7 +141,6 @@ router.get("/", async (req, res) => {
     } else {
       sedeFiltro = req.session.user.sede;
     }
-
     if (sedeFiltro) {
       condiciones.push("u.sede = ?");
       params.push(sedeFiltro);
@@ -171,12 +164,7 @@ router.get("/", async (req, res) => {
       ORDER BY m.fecha_programada DESC, m.id DESC
     `, params);
 
-    res.render("mantenimientos", {
-      mantenimientos,
-      user: req.session.user,
-      filtro,
-      sedeSeleccionada: sedeFiltro || "TODAS"
-    });
+    res.render("mantenimientos", { mantenimientos, user: req.session.user, filtro, sedeSeleccionada: sedeFiltro || "TODAS" });
 
   } catch (error) {
     console.error("❌ ERROR /mantenimientos:", error);
@@ -204,7 +192,6 @@ router.get("/:id", async (req, res) => {
       JOIN unidades u ON u.id = m.unidad_id
       WHERE m.id = ?
     `;
-
     let params = [req.params.id];
 
     let sedeFiltro = null;
@@ -215,7 +202,6 @@ router.get("/:id", async (req, res) => {
     } else {
       sedeFiltro = req.session.user.sede;
     }
-
     if (sedeFiltro) {
       sql += " AND u.sede = ?";
       params.push(sedeFiltro);
@@ -236,12 +222,7 @@ router.get("/:id", async (req, res) => {
       WHERE mm.mantenimiento_id = ?
     `, [req.params.id]);
 
-    res.render("mantenimiento_detalle", {
-      mantenimiento: rows[0],
-      user: req.session.user,
-      mecanicos,
-      mecanicosAsignados
-    });
+    res.render("mantenimiento_detalle", { mantenimiento: rows[0], user: req.session.user, mecanicos, mecanicosAsignados });
 
   } catch (error) {
     console.error("❌ ERROR detalle mantenimiento:", error);
@@ -271,23 +252,22 @@ router.post("/:id/ejecucion", async (req, res) => {
     if (!req.session.user) return res.redirect("/login");
     if (!["ADMIN", "MECANICO"].includes(req.session.user.rol)) return res.status(403).send("No autorizado");
 
-    const { ejecucion, pendiente, mecanicos } = req.body;
+    const { ejecucion, pendiente } = req.body;
+    const mecanicos = Array.isArray(req.body.mecanicos) ? req.body.mecanicos : [];
 
     await pool.query(`
       UPDATE mantenimientos 
-      SET ejecucion = ?, pendiente = ?, estado = 'CERRADO'
+      SET ejecucion = ?, pendiente = ?, estado = 'CERRADO', fecha_cierre = NOW()
       WHERE id = ?
     `, [ejecucion, pendiente, req.params.id]);
 
     await pool.query("DELETE FROM mantenimiento_mecanicos WHERE mantenimiento_id = ?", [req.params.id]);
 
-    if (Array.isArray(mecanicos)) {
-      for (const mecanicoId of mecanicos) {
-        await pool.query(
-          "INSERT INTO mantenimiento_mecanicos (mantenimiento_id, mecanico_id) VALUES (?, ?)",
-          [req.params.id, mecanicoId]
-        );
-      }
+    for (const mecanicoId of mecanicos) {
+      await pool.query(
+        "INSERT INTO mantenimiento_mecanicos (mantenimiento_id, mecanico_id) VALUES (?, ?)",
+        [req.params.id, mecanicoId]
+      );
     }
 
     res.redirect("/mantenimientos");
