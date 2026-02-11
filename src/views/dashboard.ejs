@@ -51,6 +51,12 @@
       Ir a unidades
     </a>
 
+    <% if (user.rol === 'ADMIN') { %>
+      <a href="/kpis/mecanicos" class="btn btn-dark">
+        📊 Ver KPIs de Mecánicos
+      </a>
+    <% } %>
+
   </div>
 
 </div>

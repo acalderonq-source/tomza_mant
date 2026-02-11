@@ -24,11 +24,13 @@ router.get("/correctivos", async (req, res) => {
         u.placa,
         c.trabajo_realizado,
         c.pendiente,
-        us.nombre
+        GROUP_CONCAT(m.nombre SEPARATOR ', ') AS mecanicos
       FROM correctivos c
       JOIN unidades u ON u.id = c.unidad_id
-      JOIN usuarios us ON us.id = c.creado_por
+      LEFT JOIN correctivo_mecanicos cm ON cm.correctivo_id = c.id
+      LEFT JOIN mecanicos m ON m.id = cm.mecanico_id
       WHERE c.sede = ?
+      GROUP BY c.id
       ORDER BY c.fecha DESC
     `, [sedeFiltro]);
 
@@ -47,13 +49,11 @@ router.get("/correctivos", async (req, res) => {
 router.get("/correctivos/nuevo", async (req, res) => {
   try {
     if (!req.session.user) return res.redirect("/login");
-
     if (!["MECANICO", "ADMIN"].includes(req.session.user.rol)) {
       return res.redirect("/mantenimientos");
     }
 
     let sedeFiltro = null;
-
     if (req.session.user.rol === "ADMIN") {
       if (req.session.sedeSeleccionada && req.session.sedeSeleccionada !== "TODAS") {
         sedeFiltro = req.session.sedeSeleccionada;
@@ -67,8 +67,14 @@ router.get("/correctivos/nuevo", async (req, res) => {
       [sedeFiltro]
     );
 
+    const [mecanicos] = await pool.query(
+      "SELECT id, nombre FROM mecanicos WHERE sede = ? ORDER BY nombre",
+      [sedeFiltro]
+    );
+
     res.render("correctivos_nuevo", {
       unidades,
+      mecanicos,
       user: req.session.user
     });
 
@@ -82,15 +88,13 @@ router.get("/correctivos/nuevo", async (req, res) => {
 router.post("/correctivos", async (req, res) => {
   try {
     if (!req.session.user) return res.redirect("/login");
-
     if (!["MECANICO", "ADMIN"].includes(req.session.user.rol)) {
       return res.status(403).send("No autorizado");
     }
 
-    const { unidad_id, trabajo_realizado, pendiente } = req.body;
+    const { unidad_id, trabajo_realizado, pendiente, mecanicos } = req.body;
 
     let sedeFiltro = null;
-
     if (req.session.user.rol === "ADMIN") {
       if (req.session.sedeSeleccionada && req.session.sedeSeleccionada !== "TODAS") {
         sedeFiltro = req.session.sedeSeleccionada;
@@ -99,16 +103,21 @@ router.post("/correctivos", async (req, res) => {
       sedeFiltro = req.session.user.sede;
     }
 
-    await pool.query(`
+    const [result] = await pool.query(`
       INSERT INTO correctivos (unidad_id, sede, trabajo_realizado, pendiente, creado_por)
       VALUES (?, ?, ?, ?, ?)
-    `, [
-      unidad_id,
-      sedeFiltro,
-      trabajo_realizado,
-      pendiente || null,
-      req.session.user.id
-    ]);
+    `, [unidad_id, sedeFiltro, trabajo_realizado, pendiente || null, req.session.user.id]);
+
+    const correctivoId = result.insertId;
+
+    if (Array.isArray(mecanicos)) {
+      for (const mecanicoId of mecanicos) {
+        await pool.query(
+          "INSERT INTO correctivo_mecanicos (correctivo_id, mecanico_id) VALUES (?, ?)",
+          [correctivoId, mecanicoId]
+        );
+      }
+    }
 
     res.redirect("/mantenimientos/correctivos");
 
@@ -124,18 +133,13 @@ router.get("/", async (req, res) => {
     if (!req.session.user) return res.redirect("/login");
 
     const filtro = req.query.filtro;
-
     let condiciones = [];
     let params = [];
 
-    if (filtro === "pendientes") {
-      condiciones.push("m.estado != 'CERRADO'");
-    } else if (filtro === "realizados") {
-      condiciones.push("m.estado = 'CERRADO'");
-    }
+    if (filtro === "pendientes") condiciones.push("m.estado != 'CERRADO'");
+    else if (filtro === "realizados") condiciones.push("m.estado = 'CERRADO'");
 
     let sedeFiltro = null;
-
     if (req.session.user.rol === "ADMIN") {
       if (req.session.sedeSeleccionada && req.session.sedeSeleccionada !== "TODAS") {
         sedeFiltro = req.session.sedeSeleccionada;
@@ -204,7 +208,6 @@ router.get("/:id", async (req, res) => {
     let params = [req.params.id];
 
     let sedeFiltro = null;
-
     if (req.session.user.rol === "ADMIN") {
       if (req.session.sedeSeleccionada && req.session.sedeSeleccionada !== "TODAS") {
         sedeFiltro = req.session.sedeSeleccionada;
@@ -219,14 +222,25 @@ router.get("/:id", async (req, res) => {
     }
 
     const [rows] = await pool.query(sql, params);
+    if (rows.length === 0) return res.send("Mantenimiento no encontrado");
 
-    if (rows.length === 0) {
-      return res.send("Mantenimiento no encontrado");
-    }
+    const [mecanicos] = await pool.query(
+      "SELECT id, nombre FROM mecanicos WHERE sede = ? ORDER BY nombre",
+      [sedeFiltro]
+    );
+
+    const [mecanicosAsignados] = await pool.query(`
+      SELECT m.id, m.nombre
+      FROM mantenimiento_mecanicos mm
+      JOIN mecanicos m ON m.id = mm.mecanico_id
+      WHERE mm.mantenimiento_id = ?
+    `, [req.params.id]);
 
     res.render("mantenimiento_detalle", {
       mantenimiento: rows[0],
-      user: req.session.user
+      user: req.session.user,
+      mecanicos,
+      mecanicosAsignados
     });
 
   } catch (error) {
@@ -239,18 +253,10 @@ router.get("/:id", async (req, res) => {
 router.post("/:id/plan", async (req, res) => {
   try {
     if (!req.session.user) return res.redirect("/login");
-
-    if (!["ADMIN", "TALLER"].includes(req.session.user.rol)) {
-      return res.status(403).send("No autorizado");
-    }
+    if (!["ADMIN", "TALLER"].includes(req.session.user.rol)) return res.status(403).send("No autorizado");
 
     const { plan } = req.body;
-
-    await pool.query(
-      "UPDATE mantenimientos SET plan = ? WHERE id = ?",
-      [plan, req.params.id]
-    );
-
+    await pool.query("UPDATE mantenimientos SET plan = ? WHERE id = ?", [plan, req.params.id]);
     res.redirect(`/mantenimientos/${req.params.id}`);
 
   } catch (error) {
@@ -263,18 +269,26 @@ router.post("/:id/plan", async (req, res) => {
 router.post("/:id/ejecucion", async (req, res) => {
   try {
     if (!req.session.user) return res.redirect("/login");
+    if (!["ADMIN", "MECANICO"].includes(req.session.user.rol)) return res.status(403).send("No autorizado");
 
-    if (!["ADMIN", "MECANICO"].includes(req.session.user.rol)) {
-      return res.status(403).send("No autorizado");
-    }
-
-    const { ejecucion, pendiente } = req.body;
+    const { ejecucion, pendiente, mecanicos } = req.body;
 
     await pool.query(`
       UPDATE mantenimientos 
       SET ejecucion = ?, pendiente = ?, estado = 'CERRADO'
       WHERE id = ?
     `, [ejecucion, pendiente, req.params.id]);
+
+    await pool.query("DELETE FROM mantenimiento_mecanicos WHERE mantenimiento_id = ?", [req.params.id]);
+
+    if (Array.isArray(mecanicos)) {
+      for (const mecanicoId of mecanicos) {
+        await pool.query(
+          "INSERT INTO mantenimiento_mecanicos (mantenimiento_id, mecanico_id) VALUES (?, ?)",
+          [req.params.id, mecanicoId]
+        );
+      }
+    }
 
     res.redirect("/mantenimientos");
 
