@@ -92,6 +92,13 @@ router.post("/", async (req, res) => {
       sedeFiltro = req.session.user.sede;
     }
     if (!sedeFiltro) sedeFiltro = req.session.user.sede;
+await pool.query(`
+  INSERT INTO cambios_aceite_historial
+  (unidad_id, sede, km_actual, galones, proximo_km, observaciones, creado_por)
+  SELECT unidad_id, sede, km_actual, galones, proximo_km, observaciones, creado_por
+  FROM cambios_aceite
+  WHERE unidad_id = ?
+`, [unidad_id]);
 
     await pool.query(`
   INSERT INTO cambios_aceite 
