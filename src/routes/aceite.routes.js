@@ -94,9 +94,18 @@ router.post("/", async (req, res) => {
     if (!sedeFiltro) sedeFiltro = req.session.user.sede;
 
     await pool.query(`
-      INSERT INTO cambios_aceite (unidad_id, sede, km_actual, galones, proximo_km, observaciones, creado_por)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `, [unidad_id, sedeFiltro, km_actual, galones, proximo_km, observaciones || null, req.session.user.id]);
+  INSERT INTO cambios_aceite 
+    (unidad_id, sede, km_actual, galones, proximo_km, observaciones, creado_por)
+  VALUES (?, ?, ?, ?, ?, ?, ?)
+  ON DUPLICATE KEY UPDATE
+    sede = VALUES(sede),
+    km_actual = VALUES(km_actual),
+    galones = VALUES(galones),
+    proximo_km = VALUES(proximo_km),
+    observaciones = VALUES(observaciones),
+    creado_por = VALUES(creado_por),
+    fecha = CURRENT_TIMESTAMP
+`, [unidad_id, sedeFiltro, km_actual, galones, proximo_km, observaciones || null, req.session.user.id]);
 
     res.redirect("/aceite");
 
