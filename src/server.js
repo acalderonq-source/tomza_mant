@@ -14,9 +14,10 @@ console.log("DB:", process.env.DB_NAME);
 app.use(express.urlencoded({ extended: false }));
 app.use(express.json());
 
-// Ajusta esta ruta si tu carpeta public está en src/public
+// Static
 app.use(express.static(path.join(__dirname, "public")));
 
+// Session (ANTES de rutas)
 app.use(session({
   secret: "tomza_secret_key",
   resave: false,
@@ -25,7 +26,6 @@ app.use(session({
 
 // ===================== VISTAS =====================
 app.set("view engine", "ejs");
-// Ajusta si tus vistas están en src/views
 app.set("views", path.join(__dirname, "views"));
 
 // ===================== RUTAS =====================
@@ -37,6 +37,7 @@ const mantenimientosRoutes = require("./routes/mantenimientos.routes");
 const unidadesRoutes = require("./routes/unidades.routes");
 const sedeRoutes = require("./routes/sede.routes");
 const kpisRoutes = require("./routes/kpis.routes");
+const aceiteRoutes = require("./routes/aceite.routes");
 
 // Rutas base
 app.use("/", authRoutes);
@@ -49,6 +50,7 @@ app.use("/agenda", agendaRoutes);
 app.use("/mantenimientos", mantenimientosRoutes);
 app.use("/unidades", unidadesRoutes);
 app.use("/kpis", kpisRoutes);
+app.use("/aceite", aceiteRoutes);
 
 // ===================== ROOT =====================
 app.get("/", (req, res) => {

@@ -30,6 +30,11 @@
       </form>
     </div>
   <% } %>
+<% if (['ADMIN','MECANICO'].includes(user.rol)) { %>
+  <a href="/aceite" class="btn btn-success">
+    🛢️ Cambios de Aceite
+  </a>
+<% } %>
 
   <!-- MISMO DASHBOARD DE ANTES -->
   <h3>Bienvenido, <strong><%= user.usuario %></strong></h3>
