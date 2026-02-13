@@ -14,7 +14,7 @@
 
 <div class="container mt-4">
 
-  <!-- Selector de sede solo para ADMIN, pequeño y arriba -->
+  <!-- Selector de sede para ADMIN -->
   <% if (user.rol === 'ADMIN') { %>
     <div class="mb-3">
       <form method="POST" action="/cambiar-sede" style="display:inline;">
@@ -30,13 +30,28 @@
       </form>
     </div>
   <% } %>
-<% if (['ADMIN','MECANICO'].includes(user.rol)) { %>
-  <a href="/aceite" class="btn btn-success">
-    🛢️ Cambios de Aceite
-  </a>
-<% } %>
 
-  <!-- MISMO DASHBOARD DE ANTES -->
+  <!-- Selector de sede para usuario pesados -->
+  <% if (user.usuario === 'pesados') { %>
+    <div class="mb-3">
+      <span class="badge bg-secondary me-2">
+        Vista actual: <%= sedeSeleccionada || 'Transportadora' %>
+      </span>
+
+      <form method="POST" action="/cambiar-sede" style="display:inline;">
+        <button class="btn btn-sm btn-outline-primary" name="sede" value="Transportadora">
+          Transportadora
+        </button>
+      </form>
+
+      <form method="POST" action="/cambiar-sede" style="display:inline;">
+        <button class="btn btn-sm btn-outline-success" name="sede" value="Granel">
+          Granel
+        </button>
+      </form>
+    </div>
+  <% } %>
+
   <h3>Bienvenido, <strong><%= user.usuario %></strong></h3>
   <p>Rol: <strong><%= user.rol %></strong></p>
 
@@ -56,9 +71,9 @@
       Ir a unidades
     </a>
 
-    <% if (user.rol === 'ADMIN') { %>
-      <a href="/kpis/mecanicos" class="btn btn-dark">
-        📊 Ver KPIs de Mecánicos
+    <% if (['ADMIN','MECANICO'].includes(user.rol)) { %>
+      <a href="/aceite" class="btn btn-success">
+        🛢️ Cambios de Aceite
       </a>
     <% } %>
 

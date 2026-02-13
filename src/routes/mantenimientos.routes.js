@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const pool = require("../db");
+const { getSedesPermitidas } = require("../utils/sedes");
 
 // ===================== LISTADO DE CORRECTIVOS =====================
 router.get("/correctivos", async (req, res) => {
@@ -50,15 +51,13 @@ router.get("/correctivos/nuevo", async (req, res) => {
       return res.redirect("/mantenimientos");
     }
 
-    let sedeFiltro = null;
-    if (req.session.user.rol === "ADMIN") {
-      if (req.session.sedeSeleccionada && req.session.sedeSeleccionada !== "TODAS") {
-        sedeFiltro = req.session.sedeSeleccionada;
-      }
-    } else {
-      sedeFiltro = req.session.user.sede;
-    }
-    if (!sedeFiltro) sedeFiltro = req.session.user.sede;
+    const sedesPermitidas = getSedesPermitidas(req);
+
+if (sedesPermitidas.length) {
+  condiciones.push("u.sede IN (?)");
+  params.push(sedesPermitidas);
+}
+
 
     const [unidades] = await pool.query(
       "SELECT id, placa FROM unidades WHERE sede = ? ORDER BY placa",

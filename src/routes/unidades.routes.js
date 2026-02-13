@@ -2,11 +2,30 @@ const express = require("express");
 const router = express.Router();
 const pool = require("../db");
 
-// ===================== LISTAR UNIDADES =====================
+// ===================== LISTADO DE UNIDADES =====================
 router.get("/", async (req, res) => {
   try {
-    if (!req.session.user) {
-      return res.redirect("/login");
+    if (!req.session.user) return res.redirect("/login");
+
+    const user = req.session.user;
+
+    let sedesPermitidas = [];
+
+    if (user.rol === "ADMIN") {
+      if (req.session.sedeSeleccionada && req.session.sedeSeleccionada !== "TODAS") {
+        sedesPermitidas = [req.session.sedeSeleccionada];
+      } else {
+        sedesPermitidas = []; // TODAS
+      }
+    } else if (user.usuario === "pesados") {
+      // El mecánico de pesados puede alternar entre Transportadora y Granel
+      if (req.session.sedeSeleccionada) {
+        sedesPermitidas = [req.session.sedeSeleccionada];
+      } else {
+        sedesPermitidas = ["Transportadora", "Granel"];
+      }
+    } else {
+      sedesPermitidas = [user.sede];
     }
 
     let sql = `
@@ -15,10 +34,9 @@ router.get("/", async (req, res) => {
     `;
     let params = [];
 
-    // 🔐 Filtro por sede
-    if (req.session.user.rol !== "ADMIN") {
-      sql += " WHERE sede = ?";
-      params.push(req.session.user.sede);
+    if (sedesPermitidas.length > 0) {
+      sql += " WHERE sede IN (?)";
+      params.push(sedesPermitidas);
     }
 
     sql += " ORDER BY placa";
@@ -27,89 +45,38 @@ router.get("/", async (req, res) => {
 
     res.render("unidades", {
       unidades,
-      user: req.session.user,
-      error: null
+      user,
+      sedeSeleccionada: req.session.sedeSeleccionada || "TODAS"
     });
 
   } catch (error) {
-    console.error("❌ ERROR listando unidades:", error);
-    res.render("unidades", {
-      unidades: [],
-      user: req.session.user,
-      error: "Error cargando unidades"
-    });
+    console.error("❌ ERROR /unidades:", error);
+    res.status(500).send("Error interno");
   }
 });
 
-// ===================== AGREGAR UNIDAD =====================
-router.post("/", async (req, res) => {
-  console.log("📥 POST /unidades", req.body);
-
+// ===================== AGREGAR UNIDAD (ADMIN) =====================
+router.post("/agregar", async (req, res) => {
   try {
-    if (!req.session.user) {
-      return res.redirect("/login");
-    }
+    if (!req.session.user) return res.redirect("/login");
+    if (req.session.user.rol !== "ADMIN") return res.status(403).send("No autorizado");
 
-    if (req.session.user.rol !== "ADMIN") {
-      return res.status(403).send("No autorizado");
-    }
+    const { placa } = req.body;
 
-    const { placa, sede } = req.body;
-
-    if (!placa || !sede) {
-      return res.render("unidades", {
-        unidades: [],
-        user: req.session.user,
-        error: "Placa y sede son obligatorios"
-      });
-    }
+    const sede = req.session.sedeSeleccionada && req.session.sedeSeleccionada !== "TODAS"
+      ? req.session.sedeSeleccionada
+      : req.session.user.sede;
 
     await pool.query(
       "INSERT INTO unidades (placa, sede) VALUES (?, ?)",
-      [placa.trim(), sede]
+      [placa.trim().toUpperCase(), sede]
     );
 
     res.redirect("/unidades");
 
   } catch (error) {
-    console.error("❌ ERROR agregando unidad:", error);
-
-    let mensaje = "Error agregando unidad";
-    if (error.code === "ER_DUP_ENTRY") {
-      mensaje = "Esa placa ya existe";
-    }
-
-    res.render("unidades", {
-      unidades: [],
-      user: req.session.user,
-      error: mensaje
-    });
-  }
-});
-
-// ===================== ELIMINAR UNIDAD =====================
-router.post("/:id/eliminar", async (req, res) => {
-  try {
-    if (!req.session.user) {
-      return res.redirect("/login");
-    }
-
-    if (req.session.user.rol !== "ADMIN") {
-      return res.status(403).send("No autorizado");
-    }
-
-    const { id } = req.params;
-
-    await pool.query(
-      "DELETE FROM unidades WHERE id = ?",
-      [id]
-    );
-
-    res.redirect("/unidades");
-
-  } catch (error) {
-    console.error("❌ ERROR eliminando unidad:", error);
-    res.redirect("/unidades");
+    console.error("❌ ERROR agregar unidad:", error);
+    res.status(500).send("Error interno");
   }
 });
 

@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const pool = require("../db");
+const { getSedesPermitidas } = require("../utils/sedes");
 
 // fecha hoy en formato YYYY-MM-DD
 function hoy() {
@@ -23,8 +24,8 @@ router.get("/", async (req, res) => {
   try {
     if (!req.session.user) return res.redirect("/login");
 
-    const user = req.session.user;
     const fecha = hoy();
+    const sedesPermitidas = getSedesPermitidas(req);
 
     let sql = `
       SELECT 
@@ -42,10 +43,9 @@ router.get("/", async (req, res) => {
 
     const params = [fecha];
 
-    // 🔒 si el usuario tiene sede, solo ver esa sede
-    if (user.sede && user.sede !== "") {
-      sql += " AND u.sede = ?";
-      params.push(user.sede);
+    if (sedesPermitidas.length) {
+      sql += " AND u.sede IN (?)";
+      params.push(sedesPermitidas);
     }
 
     sql += " ORDER BY m.id";
@@ -55,7 +55,7 @@ router.get("/", async (req, res) => {
     res.render("agenda", {
       agenda,
       fecha,
-      user,
+      user: req.session.user,
       vista: "hoy"
     });
 
@@ -70,9 +70,8 @@ router.get("/manana", async (req, res) => {
   try {
     if (!req.session.user) return res.redirect("/login");
 
-    const user = req.session.user;
-
     const manana = siguienteDiaHabil(new Date());
+    const sedesPermitidas = getSedesPermitidas(req);
 
     let sql = `
       SELECT 
@@ -90,10 +89,9 @@ router.get("/manana", async (req, res) => {
 
     const params = [manana];
 
-    // 🔒 filtro por sede del usuario
-    if (user.sede && user.sede !== "") {
-      sql += " AND u.sede = ?";
-      params.push(user.sede);
+    if (sedesPermitidas.length) {
+      sql += " AND u.sede IN (?)";
+      params.push(sedesPermitidas);
     }
 
     sql += " ORDER BY m.id";
@@ -103,7 +101,7 @@ router.get("/manana", async (req, res) => {
     res.render("agenda", {
       agenda,
       fecha: manana,
-      user,
+      user: req.session.user,
       vista: "manana"
     });
 

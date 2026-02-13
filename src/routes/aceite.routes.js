@@ -1,21 +1,14 @@
 const express = require("express");
 const router = express.Router();
 const pool = require("../db");
+const { getSedesPermitidas } = require("../utils/sedes");
 
 // ===================== LISTADO =====================
 router.get("/", async (req, res) => {
   try {
     if (!req.session.user) return res.redirect("/login");
 
-    let sedeFiltro = null;
-    if (req.session.user.rol === "ADMIN") {
-      if (req.session.sedeSeleccionada && req.session.sedeSeleccionada !== "TODAS") {
-        sedeFiltro = req.session.sedeSeleccionada;
-      }
-    } else {
-      sedeFiltro = req.session.user.sede;
-    }
-    if (!sedeFiltro) sedeFiltro = req.session.user.sede;
+    const sedesPermitidas = getSedesPermitidas(req);
 
     const [rows] = await pool.query(`
       SELECT 
@@ -30,9 +23,9 @@ router.get("/", async (req, res) => {
       FROM cambios_aceite ca
       JOIN unidades u ON u.id = ca.unidad_id
       JOIN usuarios us ON us.id = ca.creado_por
-      WHERE ca.sede = ?
+      WHERE ca.sede IN (?)
       ORDER BY ca.fecha DESC
-    `, [sedeFiltro]);
+    `, [sedesPermitidas]);
 
     res.render("aceite_listado", { cambios: rows, user: req.session.user });
 
@@ -50,19 +43,11 @@ router.get("/nuevo", async (req, res) => {
       return res.redirect("/aceite");
     }
 
-    let sedeFiltro = null;
-    if (req.session.user.rol === "ADMIN") {
-      if (req.session.sedeSeleccionada && req.session.sedeSeleccionada !== "TODAS") {
-        sedeFiltro = req.session.sedeSeleccionada;
-      }
-    } else {
-      sedeFiltro = req.session.user.sede;
-    }
-    if (!sedeFiltro) sedeFiltro = req.session.user.sede;
+    const sedesPermitidas = getSedesPermitidas(req);
 
     const [unidades] = await pool.query(
-      "SELECT id, placa FROM unidades WHERE sede = ? ORDER BY placa",
-      [sedeFiltro]
+      "SELECT id, placa FROM unidades WHERE sede IN (?) ORDER BY placa",
+      [sedesPermitidas]
     );
 
     res.render("aceite_nuevo", { unidades, user: req.session.user });
@@ -83,36 +68,41 @@ router.post("/", async (req, res) => {
 
     const { unidad_id, km_actual, galones, proximo_km, observaciones } = req.body;
 
-    let sedeFiltro = null;
-    if (req.session.user.rol === "ADMIN") {
-      if (req.session.sedeSeleccionada && req.session.sedeSeleccionada !== "TODAS") {
-        sedeFiltro = req.session.sedeSeleccionada;
-      }
-    } else {
-      sedeFiltro = req.session.user.sede;
-    }
-    if (!sedeFiltro) sedeFiltro = req.session.user.sede;
-await pool.query(`
-  INSERT INTO cambios_aceite_historial
-  (unidad_id, sede, km_actual, galones, proximo_km, observaciones, creado_por)
-  SELECT unidad_id, sede, km_actual, galones, proximo_km, observaciones, creado_por
-  FROM cambios_aceite
-  WHERE unidad_id = ?
-`, [unidad_id]);
+    const sedesPermitidas = getSedesPermitidas(req);
 
+    // obtenemos la sede real de la unidad (para no depender del form)
+    const [[unidad]] = await pool.query(
+      "SELECT sede FROM unidades WHERE id = ?",
+      [unidad_id]
+    );
+
+    if (!unidad || !sedesPermitidas.includes(unidad.sede)) {
+      return res.status(403).send("No autorizado para esa unidad");
+    }
+
+    // guardar historial si existe registro previo
     await pool.query(`
-  INSERT INTO cambios_aceite 
-    (unidad_id, sede, km_actual, galones, proximo_km, observaciones, creado_por)
-  VALUES (?, ?, ?, ?, ?, ?, ?)
-  ON DUPLICATE KEY UPDATE
-    sede = VALUES(sede),
-    km_actual = VALUES(km_actual),
-    galones = VALUES(galones),
-    proximo_km = VALUES(proximo_km),
-    observaciones = VALUES(observaciones),
-    creado_por = VALUES(creado_por),
-    fecha = CURRENT_TIMESTAMP
-`, [unidad_id, sedeFiltro, km_actual, galones, proximo_km, observaciones || null, req.session.user.id]);
+      INSERT INTO cambios_aceite_historial
+      (unidad_id, sede, km_actual, galones, proximo_km, observaciones, creado_por)
+      SELECT unidad_id, sede, km_actual, galones, proximo_km, observaciones, creado_por
+      FROM cambios_aceite
+      WHERE unidad_id = ?
+    `, [unidad_id]);
+
+    // upsert en tabla actual
+    await pool.query(`
+      INSERT INTO cambios_aceite 
+        (unidad_id, sede, km_actual, galones, proximo_km, observaciones, creado_por)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+      ON DUPLICATE KEY UPDATE
+        sede = VALUES(sede),
+        km_actual = VALUES(km_actual),
+        galones = VALUES(galones),
+        proximo_km = VALUES(proximo_km),
+        observaciones = VALUES(observaciones),
+        creado_por = VALUES(creado_por),
+        fecha = CURRENT_TIMESTAMP
+    `, [unidad_id, unidad.sede, km_actual, galones, proximo_km, observaciones || null, req.session.user.id]);
 
     res.redirect("/aceite");
 
