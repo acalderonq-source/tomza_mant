@@ -9,7 +9,10 @@ function obtenerSedeFiltro(req) {
   let sedeFiltro = null;
 
   if (req.session.user.rol === "ADMIN") {
-    if (req.session.sedeSeleccionada && req.session.sedeSeleccionada !== "TODAS") {
+    if (
+      req.session.sedeSeleccionada &&
+      req.session.sedeSeleccionada !== "TODAS"
+    ) {
       sedeFiltro = req.session.sedeSeleccionada;
     }
   } else {
@@ -20,14 +23,19 @@ function obtenerSedeFiltro(req) {
   return sedeFiltro;
 }
 
-// ===================== LISTADO DE CORRECTIVOS =====================
+// =====================================================
+// ================== CORRECTIVOS ======================
+// =====================================================
+
+// LISTADO
 router.get("/correctivos", async (req, res) => {
   try {
     if (!req.session.user) return res.redirect("/login");
 
     const sedeFiltro = obtenerSedeFiltro(req);
 
-    const [rows] = await pool.query(`
+    const [rows] = await pool.query(
+      `
       SELECT 
         c.id,
         DATE_FORMAT(c.fecha, '%d/%m/%Y %H:%i') AS fecha_formato,
@@ -42,17 +50,18 @@ router.get("/correctivos", async (req, res) => {
       WHERE c.sede = ?
       GROUP BY c.id
       ORDER BY c.fecha DESC
-    `, [sedeFiltro]);
+    `,
+      [sedeFiltro]
+    );
 
     res.render("correctivos", { correctivos: rows, user: req.session.user });
-
   } catch (error) {
     console.error("❌ ERROR listado correctivos:", error);
     res.status(500).send("Error interno");
   }
 });
 
-// ===================== FORM NUEVO CORRECTIVO =====================
+// FORM NUEVO
 router.get("/correctivos/nuevo", async (req, res) => {
   try {
     if (!req.session.user) return res.redirect("/login");
@@ -75,16 +84,15 @@ router.get("/correctivos/nuevo", async (req, res) => {
     res.render("correctivos_nuevo", {
       unidades,
       mecanicos,
-      user: req.session.user
+      user: req.session.user,
     });
-
   } catch (error) {
     console.error("❌ ERROR form correctivo:", error);
     res.status(500).send("Error interno");
   }
 });
 
-// ===================== GUARDAR CORRECTIVO =====================
+// GUARDAR CORRECTIVO
 router.post("/correctivos", async (req, res) => {
   try {
     if (!req.session.user) return res.redirect("/login");
@@ -93,22 +101,33 @@ router.post("/correctivos", async (req, res) => {
     }
 
     const { unidad_id, trabajo_realizado, pendiente } = req.body;
+
     const mecanicos = Array.isArray(req.body.mecanicos)
       ? req.body.mecanicos
-      : (req.body.mecanicos ? [req.body.mecanicos] : []);
+      : req.body.mecanicos
+      ? [req.body.mecanicos]
+      : [];
+
+    if (!mecanicos.length) {
+      return res.status(400).send("Debe seleccionar al menos un mecánico.");
+    }
 
     const sedeFiltro = obtenerSedeFiltro(req);
 
-    const [result] = await pool.query(`
-      INSERT INTO correctivos (unidad_id, sede, trabajo_realizado, pendiente, creado_por)
+    const [result] = await pool.query(
+      `
+      INSERT INTO correctivos 
+        (unidad_id, sede, trabajo_realizado, pendiente, creado_por)
       VALUES (?, ?, ?, ?, ?)
-    `, [
-      unidad_id,
-      sedeFiltro,
-      trabajo_realizado,
-      pendiente || null,
-      req.session.user.id
-    ]);
+    `,
+      [
+        unidad_id,
+        sedeFiltro,
+        trabajo_realizado,
+        pendiente || null,
+        req.session.user.id,
+      ]
+    );
 
     const correctivoId = result.insertId;
 
@@ -120,14 +139,17 @@ router.post("/correctivos", async (req, res) => {
     }
 
     res.redirect("/mantenimientos/correctivos");
-
   } catch (error) {
     console.error("❌ ERROR guardar correctivo:", error);
     res.status(500).send("Error interno");
   }
 });
 
-// ===================== LISTADO DE MANTENIMIENTOS =====================
+// =====================================================
+// ================= MANTENIMIENTOS ====================
+// =====================================================
+
+// LISTADO
 router.get("/", async (req, res) => {
   try {
     if (!req.session.user) return res.redirect("/login");
@@ -137,7 +159,8 @@ router.get("/", async (req, res) => {
     let params = [];
 
     if (filtro === "pendientes") condiciones.push("m.estado != 'CERRADO'");
-    else if (filtro === "realizados") condiciones.push("m.estado = 'CERRADO'");
+    else if (filtro === "realizados")
+      condiciones.push("m.estado = 'CERRADO'");
 
     const sedeFiltro = obtenerSedeFiltro(req);
 
@@ -150,7 +173,8 @@ router.get("/", async (req, res) => {
       ? "WHERE " + condiciones.join(" AND ")
       : "";
 
-    const [mantenimientos] = await pool.query(`
+    const [mantenimientos] = await pool.query(
+      `
       SELECT 
         m.id,
         u.placa,
@@ -164,22 +188,23 @@ router.get("/", async (req, res) => {
       JOIN unidades u ON u.id = m.unidad_id
       ${where}
       ORDER BY m.fecha_programada DESC, m.id DESC
-    `, params);
+    `,
+      params
+    );
 
     res.render("mantenimientos", {
       mantenimientos,
       user: req.session.user,
       filtro,
-      sedeSeleccionada: sedeFiltro || "TODAS"
+      sedeSeleccionada: sedeFiltro || "TODAS",
     });
-
   } catch (error) {
-    console.error("❌ ERROR /mantenimientos:", error);
-    res.status(500).send("Internal Server Error");
+    console.error("❌ ERROR listado mantenimientos:", error);
+    res.status(500).send("Error interno");
   }
 });
 
-// ===================== DETALLE DE MANTENIMIENTO =====================
+// DETALLE
 router.get("/:id", async (req, res) => {
   try {
     if (!req.session.user) return res.redirect("/login");
@@ -217,23 +242,97 @@ router.get("/:id", async (req, res) => {
       [sedeFiltro]
     );
 
-    const [mecanicosAsignados] = await pool.query(`
+    const [mecanicosAsignados] = await pool.query(
+      `
       SELECT m.id, m.nombre
       FROM mantenimiento_mecanicos mm
       JOIN mecanicos m ON m.id = mm.mecanico_id
       WHERE mm.mantenimiento_id = ?
-    `, [req.params.id]);
+    `,
+      [req.params.id]
+    );
 
     res.render("mantenimiento_detalle", {
       mantenimiento: rows[0],
       user: req.session.user,
       mecanicos,
-      mecanicosAsignados
+      mecanicosAsignados,
     });
-
   } catch (error) {
     console.error("❌ ERROR detalle mantenimiento:", error);
-    res.status(500).send("Internal Server Error");
+    res.status(500).send("Error interno");
+  }
+});
+
+// GUARDAR PLAN
+router.post("/:id/plan", async (req, res) => {
+  try {
+    if (!req.session.user) return res.redirect("/login");
+    if (!["ADMIN", "TALLER"].includes(req.session.user.rol)) {
+      return res.status(403).send("No autorizado");
+    }
+
+    const { plan } = req.body;
+
+    await pool.query(
+      "UPDATE mantenimientos SET plan = ? WHERE id = ?",
+      [plan, req.params.id]
+    );
+
+    res.redirect(`/mantenimientos/${req.params.id}`);
+  } catch (error) {
+    console.error("❌ ERROR guardando plan:", error);
+    res.status(500).send("Error interno");
+  }
+});
+
+// GUARDAR EJECUCIÓN
+router.post("/:id/ejecucion", async (req, res) => {
+  try {
+    if (!req.session.user) return res.redirect("/login");
+    if (!["ADMIN", "MECANICO"].includes(req.session.user.rol)) {
+      return res.status(403).send("No autorizado");
+    }
+
+    const { ejecucion, pendiente } = req.body;
+
+    const mecanicos = Array.isArray(req.body.mecanicos)
+      ? req.body.mecanicos
+      : req.body.mecanicos
+      ? [req.body.mecanicos]
+      : [];
+
+    if (!mecanicos.length) {
+      return res.status(400).send(
+        "Debe asignar al menos un mecánico antes de cerrar."
+      );
+    }
+
+    await pool.query(
+      `
+      UPDATE mantenimientos 
+      SET ejecucion = ?, pendiente = ?, estado = 'CERRADO', fecha_cierre = NOW()
+      WHERE id = ?
+    `,
+      [ejecucion, pendiente, req.params.id]
+    );
+
+    await pool.query(
+      "DELETE FROM mantenimiento_mecanicos WHERE mantenimiento_id = ?",
+      [req.params.id]
+    );
+
+    for (const mecanicoId of mecanicos) {
+      await pool.query(
+        "INSERT INTO mantenimiento_mecanicos (mantenimiento_id, mecanico_id) VALUES (?, ?)",
+        [req.params.id, mecanicoId]
+      );
+    }
+
+    res.redirect("/mantenimientos");
+  } catch (error) {
+    console.error("❌ ERROR cerrar mantenimiento:", error);
+    res.status(500).send("Error interno");
   }
 });
 
