@@ -61,5 +61,18 @@
   </div>
 
 </div>
+
+<script>
+  document.querySelector("form").addEventListener("submit", function(e) {
+    const checkboxes = document.querySelectorAll("input[name='mecanicos[]']");
+    const algunoSeleccionado = Array.from(checkboxes).some(cb => cb.checked);
+
+    if (!algunoSeleccionado) {
+      e.preventDefault();
+      alert("Debe seleccionar al menos un mecánico.");
+    }
+  });
+</script>
+
 </body>
 </html>

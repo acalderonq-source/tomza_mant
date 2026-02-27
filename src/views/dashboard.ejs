@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Dashboard</title>
+  <title>Dashboard - Gas Tomza</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 </head>
 <body class="bg-light">
@@ -14,37 +14,53 @@
 
 <div class="container mt-4">
 
-  <!-- Selector de sede para ADMIN -->
+  <!-- ================== SELECTOR DE SEDE ADMIN ================== -->
   <% if (user.rol === 'ADMIN') { %>
     <div class="mb-3">
-      <form method="POST" action="/cambiar-sede" style="display:inline;">
-        <button class="btn btn-sm btn-primary" name="sede" value="Cartago">Cartago</button>
+      <span class="me-2 fw-bold">
+        Sede actual: <%= sedeSeleccionada || user.sede || 'TODAS' %>
+      </span>
+
+      <form method="POST" action="/cambiar-sede" class="d-inline">
+        <button class="btn btn-sm btn-primary" name="sede" value="Cartago">
+          Cartago
+        </button>
       </form>
 
-      <form method="POST" action="/cambiar-sede" style="display:inline;">
-        <button class="btn btn-sm btn-success" name="sede" value="La Cruz">La Cruz</button>
+      <form method="POST" action="/cambiar-sede" class="d-inline">
+        <button class="btn btn-sm btn-success" name="sede" value="La Cruz">
+          La Cruz
+        </button>
       </form>
 
-      <form method="POST" action="/cambiar-sede" style="display:inline;">
-        <button class="btn btn-sm btn-dark" name="sede" value="">Todo</button>
+      <form method="POST" action="/cambiar-sede" class="d-inline">
+        <button class="btn btn-sm btn-info text-white" name="sede" value="Perez Zeledon">
+          Pérez Zeledón
+        </button>
+      </form>
+
+      <form method="POST" action="/cambiar-sede" class="d-inline">
+        <button class="btn btn-sm btn-dark" name="sede" value="TODAS">
+          Todo
+        </button>
       </form>
     </div>
   <% } %>
 
-  <!-- Selector de sede para usuario pesados -->
+  <!-- ================== SELECTOR USUARIO PESADOS ================== -->
   <% if (user.usuario === 'pesados') { %>
     <div class="mb-3">
       <span class="badge bg-secondary me-2">
         Vista actual: <%= sedeSeleccionada || 'Transportadora' %>
       </span>
 
-      <form method="POST" action="/cambiar-sede" style="display:inline;">
+      <form method="POST" action="/cambiar-sede" class="d-inline">
         <button class="btn btn-sm btn-outline-primary" name="sede" value="Transportadora">
           Transportadora
         </button>
       </form>
 
-      <form method="POST" action="/cambiar-sede" style="display:inline;">
+      <form method="POST" action="/cambiar-sede" class="d-inline">
         <button class="btn btn-sm btn-outline-success" name="sede" value="Granel">
           Granel
         </button>
@@ -52,28 +68,36 @@
     </div>
   <% } %>
 
+  <!-- ================== BIENVENIDA ================== -->
   <h3>Bienvenido, <strong><%= user.usuario %></strong></h3>
   <p>Rol: <strong><%= user.rol %></strong></p>
 
   <hr>
 
-  <div class="d-grid gap-2 col-4">
+  <!-- ================== BOTONES PRINCIPALES ================== -->
+  <div class="d-grid gap-2 col-md-4">
 
     <a href="/mantenimientos" class="btn btn-primary">
-      Ir a mantenimientos
+      🔧 Ir a mantenimientos
     </a>
 
     <a href="/agenda" class="btn btn-secondary">
-      Ir a agenda
+      📅 Ir a agenda
     </a>
 
     <a href="/unidades" class="btn btn-info text-white">
-      Ir a unidades
+      🚛 Ir a unidades
     </a>
 
     <% if (['ADMIN','MECANICO'].includes(user.rol)) { %>
       <a href="/aceite" class="btn btn-success">
         🛢️ Cambios de Aceite
+      </a>
+    <% } %>
+
+    <% if (user.rol === 'ADMIN') { %>
+      <a href="/kpis/mecanicos" class="btn btn-dark">
+        📊 KPIs Mecánicos
       </a>
     <% } %>
 
