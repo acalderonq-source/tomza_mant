@@ -1,6 +1,7 @@
 require("dotenv").config();
 const pool = require("../db");
 
+/* ================== FECHAS ================== */
 function esDiaHabil(fecha) {
   const d = fecha.getDay();
   return d !== 0 && d !== 6; // 0 domingo, 6 sábado
@@ -35,16 +36,14 @@ function siguienteDiaHabil(fecha) {
     );
 
     const porDia = 5;
-    let fecha = new Date();
 
-    // empezar desde mañana
-    fecha.setDate(fecha.getDate() + 1);
+    // 🔹 Arrancar desde HOY hábil
+    let fecha = hoyOProximoHabil();
 
     let index = 0;
 
     while (index < unidades.length) {
       const hoy = fecha.toISOString().slice(0, 10);
-
       const lote = unidades.slice(index, index + porDia);
 
       for (const u of lote) {
@@ -59,7 +58,7 @@ function siguienteDiaHabil(fecha) {
       fecha = siguienteDiaHabil(fecha);
     }
 
-    console.log("✅ Agenda CARTAGO generada correctamente");
+    console.log("✅ Agenda CARTAGO generada DESDE HOY");
     process.exit();
 
   } catch (err) {

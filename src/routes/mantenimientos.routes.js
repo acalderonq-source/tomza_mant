@@ -1,22 +1,31 @@
 const express = require("express");
 const router = express.Router();
 const pool = require("../db");
-const { getSedesPermitidas } = require("../utils/sedes");
+
+// =====================================================
+// 🔧 FUNCIÓN AUXILIAR PARA OBTENER SEDE SEGÚN USUARIO
+// =====================================================
+function obtenerSedeFiltro(req) {
+  let sedeFiltro = null;
+
+  if (req.session.user.rol === "ADMIN") {
+    if (req.session.sedeSeleccionada && req.session.sedeSeleccionada !== "TODAS") {
+      sedeFiltro = req.session.sedeSeleccionada;
+    }
+  } else {
+    sedeFiltro = req.session.user.sede;
+  }
+
+  if (!sedeFiltro) sedeFiltro = req.session.user.sede;
+  return sedeFiltro;
+}
 
 // ===================== LISTADO DE CORRECTIVOS =====================
 router.get("/correctivos", async (req, res) => {
   try {
     if (!req.session.user) return res.redirect("/login");
 
-    let sedeFiltro = null;
-    if (req.session.user.rol === "ADMIN") {
-      if (req.session.sedeSeleccionada && req.session.sedeSeleccionada !== "TODAS") {
-        sedeFiltro = req.session.sedeSeleccionada;
-      }
-    } else {
-      sedeFiltro = req.session.user.sede;
-    }
-    if (!sedeFiltro) sedeFiltro = req.session.user.sede;
+    const sedeFiltro = obtenerSedeFiltro(req);
 
     const [rows] = await pool.query(`
       SELECT 
@@ -51,13 +60,7 @@ router.get("/correctivos/nuevo", async (req, res) => {
       return res.redirect("/mantenimientos");
     }
 
-    const sedesPermitidas = getSedesPermitidas(req);
-
-if (sedesPermitidas.length) {
-  condiciones.push("u.sede IN (?)");
-  params.push(sedesPermitidas);
-}
-
+    const sedeFiltro = obtenerSedeFiltro(req);
 
     const [unidades] = await pool.query(
       "SELECT id, placa FROM unidades WHERE sede = ? ORDER BY placa",
@@ -69,7 +72,11 @@ if (sedesPermitidas.length) {
       [sedeFiltro]
     );
 
-    res.render("correctivos_nuevo", { unidades, mecanicos, user: req.session.user });
+    res.render("correctivos_nuevo", {
+      unidades,
+      mecanicos,
+      user: req.session.user
+    });
 
   } catch (error) {
     console.error("❌ ERROR form correctivo:", error);
@@ -86,22 +93,22 @@ router.post("/correctivos", async (req, res) => {
     }
 
     const { unidad_id, trabajo_realizado, pendiente } = req.body;
-    const mecanicos = Array.isArray(req.body.mecanicos) ? req.body.mecanicos : [];
+    const mecanicos = Array.isArray(req.body.mecanicos)
+      ? req.body.mecanicos
+      : (req.body.mecanicos ? [req.body.mecanicos] : []);
 
-    let sedeFiltro = null;
-    if (req.session.user.rol === "ADMIN") {
-      if (req.session.sedeSeleccionada && req.session.sedeSeleccionada !== "TODAS") {
-        sedeFiltro = req.session.sedeSeleccionada;
-      }
-    } else {
-      sedeFiltro = req.session.user.sede;
-    }
-    if (!sedeFiltro) sedeFiltro = req.session.user.sede;
+    const sedeFiltro = obtenerSedeFiltro(req);
 
     const [result] = await pool.query(`
       INSERT INTO correctivos (unidad_id, sede, trabajo_realizado, pendiente, creado_por)
       VALUES (?, ?, ?, ?, ?)
-    `, [unidad_id, sedeFiltro, trabajo_realizado, pendiente || null, req.session.user.id]);
+    `, [
+      unidad_id,
+      sedeFiltro,
+      trabajo_realizado,
+      pendiente || null,
+      req.session.user.id
+    ]);
 
     const correctivoId = result.insertId;
 
@@ -132,20 +139,16 @@ router.get("/", async (req, res) => {
     if (filtro === "pendientes") condiciones.push("m.estado != 'CERRADO'");
     else if (filtro === "realizados") condiciones.push("m.estado = 'CERRADO'");
 
-    let sedeFiltro = null;
-    if (req.session.user.rol === "ADMIN") {
-      if (req.session.sedeSeleccionada && req.session.sedeSeleccionada !== "TODAS") {
-        sedeFiltro = req.session.sedeSeleccionada;
-      }
-    } else {
-      sedeFiltro = req.session.user.sede;
-    }
+    const sedeFiltro = obtenerSedeFiltro(req);
+
     if (sedeFiltro) {
       condiciones.push("u.sede = ?");
       params.push(sedeFiltro);
     }
 
-    const where = condiciones.length ? "WHERE " + condiciones.join(" AND ") : "";
+    const where = condiciones.length
+      ? "WHERE " + condiciones.join(" AND ")
+      : "";
 
     const [mantenimientos] = await pool.query(`
       SELECT 
@@ -163,7 +166,12 @@ router.get("/", async (req, res) => {
       ORDER BY m.fecha_programada DESC, m.id DESC
     `, params);
 
-    res.render("mantenimientos", { mantenimientos, user: req.session.user, filtro, sedeSeleccionada: sedeFiltro || "TODAS" });
+    res.render("mantenimientos", {
+      mantenimientos,
+      user: req.session.user,
+      filtro,
+      sedeSeleccionada: sedeFiltro || "TODAS"
+    });
 
   } catch (error) {
     console.error("❌ ERROR /mantenimientos:", error);
@@ -175,6 +183,8 @@ router.get("/", async (req, res) => {
 router.get("/:id", async (req, res) => {
   try {
     if (!req.session.user) return res.redirect("/login");
+
+    const sedeFiltro = obtenerSedeFiltro(req);
 
     let sql = `
       SELECT 
@@ -191,23 +201,16 @@ router.get("/:id", async (req, res) => {
       JOIN unidades u ON u.id = m.unidad_id
       WHERE m.id = ?
     `;
+
     let params = [req.params.id];
 
-    let sedeFiltro = null;
-    if (req.session.user.rol === "ADMIN") {
-      if (req.session.sedeSeleccionada && req.session.sedeSeleccionada !== "TODAS") {
-        sedeFiltro = req.session.sedeSeleccionada;
-      }
-    } else {
-      sedeFiltro = req.session.user.sede;
-    }
     if (sedeFiltro) {
       sql += " AND u.sede = ?";
       params.push(sedeFiltro);
     }
 
     const [rows] = await pool.query(sql, params);
-    if (rows.length === 0) return res.send("Mantenimiento no encontrado");
+    if (!rows.length) return res.send("Mantenimiento no encontrado");
 
     const [mecanicos] = await pool.query(
       "SELECT id, nombre FROM mecanicos WHERE sede = ? ORDER BY nombre",
@@ -221,58 +224,15 @@ router.get("/:id", async (req, res) => {
       WHERE mm.mantenimiento_id = ?
     `, [req.params.id]);
 
-    res.render("mantenimiento_detalle", { mantenimiento: rows[0], user: req.session.user, mecanicos, mecanicosAsignados });
+    res.render("mantenimiento_detalle", {
+      mantenimiento: rows[0],
+      user: req.session.user,
+      mecanicos,
+      mecanicosAsignados
+    });
 
   } catch (error) {
     console.error("❌ ERROR detalle mantenimiento:", error);
-    res.status(500).send("Internal Server Error");
-  }
-});
-
-// ===================== GUARDAR PLAN =====================
-router.post("/:id/plan", async (req, res) => {
-  try {
-    if (!req.session.user) return res.redirect("/login");
-    if (!["ADMIN", "TALLER"].includes(req.session.user.rol)) return res.status(403).send("No autorizado");
-
-    const { plan } = req.body;
-    await pool.query("UPDATE mantenimientos SET plan = ? WHERE id = ?", [plan, req.params.id]);
-    res.redirect(`/mantenimientos/${req.params.id}`);
-
-  } catch (error) {
-    console.error("❌ Error guardando plan:", error);
-    res.status(500).send("Error interno");
-  }
-});
-
-// ===================== GUARDAR EJECUCIÓN =====================
-router.post("/:id/ejecucion", async (req, res) => {
-  try {
-    if (!req.session.user) return res.redirect("/login");
-    if (!["ADMIN", "MECANICO"].includes(req.session.user.rol)) return res.status(403).send("No autorizado");
-
-    const { ejecucion, pendiente } = req.body;
-    const mecanicos = Array.isArray(req.body.mecanicos) ? req.body.mecanicos : [];
-
-    await pool.query(`
-      UPDATE mantenimientos 
-      SET ejecucion = ?, pendiente = ?, estado = 'CERRADO', fecha_cierre = NOW()
-      WHERE id = ?
-    `, [ejecucion, pendiente, req.params.id]);
-
-    await pool.query("DELETE FROM mantenimiento_mecanicos WHERE mantenimiento_id = ?", [req.params.id]);
-
-    for (const mecanicoId of mecanicos) {
-      await pool.query(
-        "INSERT INTO mantenimiento_mecanicos (mantenimiento_id, mecanico_id) VALUES (?, ?)",
-        [req.params.id, mecanicoId]
-      );
-    }
-
-    res.redirect("/mantenimientos");
-
-  } catch (error) {
-    console.error("❌ ERROR cerrar mantenimiento:", error);
     res.status(500).send("Internal Server Error");
   }
 });
