@@ -5,13 +5,14 @@ const pool = require("../db");
 // ===================== KPIs DE MECÁNICOS (SOLO ADMIN) =====================
 router.get("/mecanicos", async (req, res) => {
   try {
+
     if (!req.session.user) return res.redirect("/login");
     if (req.session.user.rol !== "ADMIN") return res.redirect("/dashboard");
 
     const desde = req.query.desde;
     const hasta = req.query.hasta;
 
-    // Validación básica
+    // ================= VALIDACIÓN =================
     if (!desde || !hasta) {
       return res.render("kpis_mecanicos", {
         user: req.session.user,
@@ -22,8 +23,9 @@ router.get("/mecanicos", async (req, res) => {
       });
     }
 
-    // Determinar sede activa
+    // ================= SEDE ACTIVA =================
     let sede = null;
+
     if (req.session.user.rol === "ADMIN") {
       if (req.session.sedeSeleccionada && req.session.sedeSeleccionada !== "TODAS") {
         sede = req.session.sedeSeleccionada;
@@ -32,67 +34,58 @@ router.get("/mecanicos", async (req, res) => {
       sede = req.session.user.sede;
     }
 
-    // --- SQL PREVENTIVOS ---
-    const SQL_PREVENTIVOS = `
+    // ================= SQL PRINCIPAL =================
+    const SQL = `
       SELECT 
-        m.id AS mecanico_id,
+        m.id,
         m.nombre AS mecanico,
-        COUNT(mm.mantenimiento_id) AS preventivos
-      FROM mantenimiento_mecanicos mm
-      JOIN mecanicos m ON m.id = mm.mecanico_id
-      JOIN mantenimientos man ON man.id = mm.mantenimiento_id
-      WHERE man.estado = 'CERRADO'
-        AND man.fecha_cierre BETWEEN ? AND ?
-        AND man.sede = ?
-      GROUP BY m.id, m.nombre
+
+        COALESCE(p.preventivos,0) AS preventivos,
+        COALESCE(c.correctivos,0) AS correctivos,
+
+        COALESCE(p.preventivos,0) + COALESCE(c.correctivos,0) AS total_trabajos
+
+      FROM mecanicos m
+
+      LEFT JOIN (
+        SELECT 
+          mm.mecanico_id,
+          COUNT(*) AS preventivos
+        FROM mantenimiento_mecanicos mm
+        JOIN mantenimientos mt ON mt.id = mm.mantenimiento_id
+        WHERE mt.estado = 'CERRADO'
+          AND mt.fecha_cierre BETWEEN ? AND ?
+          AND mt.sede = ?
+        GROUP BY mm.mecanico_id
+      ) p ON p.mecanico_id = m.id
+
+      LEFT JOIN (
+        SELECT 
+          cm.mecanico_id,
+          COUNT(*) AS correctivos
+        FROM correctivo_mecanicos cm
+        JOIN correctivos c ON c.id = cm.correctivo_id
+        WHERE c.fecha BETWEEN ? AND ?
+          AND c.sede = ?
+        GROUP BY cm.mecanico_id
+      ) c ON c.mecanico_id = m.id
+
+      WHERE m.sede = ?
+
+      ORDER BY total_trabajos DESC
     `;
 
-    // --- SQL CORRECTIVOS ---
-    const SQL_CORRECTIVOS = `
-      SELECT 
-        m.id AS mecanico_id,
-        m.nombre AS mecanico,
-        COUNT(cm.correctivo_id) AS correctivos
-      FROM correctivo_mecanicos cm
-      JOIN mecanicos m ON m.id = cm.mecanico_id
-      JOIN correctivos c ON c.id = cm.correctivo_id
-      WHERE c.fecha BETWEEN ? AND ?
-        AND c.sede = ?
-      GROUP BY m.id, m.nombre
-    `;
+    const [totales] = await pool.query(SQL, [
+      desde + " 00:00:00",
+      hasta + " 23:59:59",
+      sede,
+      desde + " 00:00:00",
+      hasta + " 23:59:59",
+      sede,
+      sede
+    ]);
 
-    // Ejecutar queries
-    const [preventivosRows] = await pool.query(SQL_PREVENTIVOS, [desde + " 00:00:00", hasta + " 23:59:59", sede]);
-    const [correctivosRows] = await pool.query(SQL_CORRECTIVOS, [desde + " 00:00:00", hasta + " 23:59:59", sede]);
-
-    // Unir resultados por mecánico
-    const mapa = {};
-
-    preventivosRows.forEach(r => {
-      mapa[r.mecanico_id] = {
-        mecanico: r.mecanico,
-        preventivos: r.preventivos,
-        correctivos: 0,
-        total_trabajos: r.preventivos
-      };
-    });
-
-    correctivosRows.forEach(r => {
-      if (!mapa[r.mecanico_id]) {
-        mapa[r.mecanico_id] = {
-          mecanico: r.mecanico,
-          preventivos: 0,
-          correctivos: r.correctivos,
-          total_trabajos: r.correctivos
-        };
-      } else {
-        mapa[r.mecanico_id].correctivos = r.correctivos;
-        mapa[r.mecanico_id].total_trabajos += r.correctivos;
-      }
-    });
-
-    const totales = Object.values(mapa).sort((a, b) => b.total_trabajos - a.total_trabajos);
-
+    // ================= RENDER =================
     res.render("kpis_mecanicos", {
       user: req.session.user,
       desde,
@@ -102,8 +95,10 @@ router.get("/mecanicos", async (req, res) => {
     });
 
   } catch (error) {
+
     console.error("❌ ERROR KPIs mecánicos:", error);
     res.status(500).send("Error interno");
+
   }
 });
 
