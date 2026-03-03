@@ -3,7 +3,6 @@
 <head>
   <meta charset="UTF-8">
   <title>Mantenimiento - <%= mantenimiento.placa %></title>
-
   <meta name="viewport" content="width=device-width, initial-scale=1">
 
   <link
@@ -16,7 +15,7 @@
 
 <nav class="navbar navbar-dark bg-dark px-3">
   <span class="navbar-brand">
-    Tomza - Taller Cartago
+    Tomza - Taller
   </span>
 
   <div class="d-flex align-items-center gap-2">
@@ -42,77 +41,141 @@
     <strong>Estado:</strong> <%= mantenimiento.estado %>
   </div>
 
-  <!-- PLAN -->
+  <!-- ================= PLAN ================= -->
   <div class="card mb-3">
     <div class="card-header bg-dark text-white">
       Plan (Taller)
     </div>
     <div class="card-body">
+
       <% if (['ADMIN','TALLER'].includes(user.rol)) { %>
+
         <form method="POST" action="/mantenimientos/<%= mantenimiento.id %>/plan">
-          <textarea name="plan" class="form-control mb-2" rows="3" required><%= mantenimiento.plan || '' %></textarea>
-          <button class="btn btn-primary btn-sm">Guardar plan</button>
+          <textarea
+            name="plan"
+            class="form-control mb-2"
+            rows="3"
+            required
+          ><%= mantenimiento.plan || '' %></textarea>
+
+          <button class="btn btn-primary btn-sm">
+            Guardar plan
+          </button>
         </form>
+
       <% } else { %>
-        <p class="mb-0"><%= mantenimiento.plan || 'No definido' %></p>
+
+        <p class="mb-0">
+          <%= mantenimiento.plan || 'No definido' %>
+        </p>
+
       <% } %>
+
     </div>
   </div>
 
-  <!-- EJECUCIÓN -->
+  <!-- ================= EJECUCIÓN ================= -->
   <div class="card mb-4">
     <div class="card-header bg-dark text-white">
       Ejecución (Mecánicos)
     </div>
+
     <div class="card-body">
 
       <% if (['ADMIN','MECANICO'].includes(user.rol)) { %>
-        <form method="POST" action="/mantenimientos/<%= mantenimiento.id %>/ejecucion">
 
+        <form method="POST" action="/mantenimientos/<%= mantenimiento.id %>/ejecucion" id="formEjecucion">
+
+          <!-- MECÁNICOS -->
           <label class="form-label">Mecánicos que trabajaron</label>
+
           <div class="row mb-3">
             <% mecanicos.forEach(m => { %>
               <div class="col-12 col-md-6">
                 <div class="form-check">
+
                   <input
                     class="form-check-input"
                     type="checkbox"
                     name="mecanicos[]"
                     value="<%= m.id %>"
                     id="mec_<%= m.id %>"
-                    <%= mecanicosAsignados.some(a => a.id === m.id) ? 'checked' : '' %>
+                    <%= mecanicosAsignados.some(a => String(a.id) === String(m.id)) ? 'checked' : '' %>
                   >
+
                   <label class="form-check-label" for="mec_<%= m.id %>">
                     <%= m.nombre %>
                   </label>
+
                 </div>
               </div>
             <% }) %>
           </div>
 
+          <!-- TRABAJOS REALIZADOS -->
           <div class="mb-3">
             <label class="form-label">Trabajos realizados</label>
-            <textarea name="ejecucion" class="form-control" rows="4" required><%= mantenimiento.ejecucion || '' %></textarea>
+            <textarea
+              name="ejecucion"
+              class="form-control"
+              rows="4"
+              required
+            ><%= mantenimiento.ejecucion || '' %></textarea>
           </div>
 
+          <!-- PENDIENTE -->
           <div class="mb-3">
             <label class="form-label">Pendiente</label>
-            <textarea name="pendiente" class="form-control" rows="3"><%= mantenimiento.pendiente || '' %></textarea>
+            <textarea
+              name="pendiente"
+              class="form-control"
+              rows="3"
+            ><%= mantenimiento.pendiente || '' %></textarea>
           </div>
 
-          <button class="btn btn-success">Guardar y cerrar mantenimiento</button>
+          <button class="btn btn-success">
+            Guardar y cerrar mantenimiento
+          </button>
+
         </form>
+
       <% } else { %>
-        <p><strong>Mecánicos:</strong> <%= mecanicosAsignados.map(m => m.nombre).join(', ') || '—' %></p>
+
+        <p><strong>Mecánicos:</strong>
+          <%= mecanicosAsignados.map(m => m.nombre).join(', ') || '—' %>
+        </p>
+
         <p><strong>Trabajos realizados:</strong></p>
         <p><%= mantenimiento.ejecucion || '—' %></p>
+
         <p><strong>Pendiente:</strong></p>
         <p><%= mantenimiento.pendiente || '—' %></p>
+
       <% } %>
 
     </div>
   </div>
 
 </div>
+
+<!-- ================= VALIDACIÓN JS ================= -->
+<script>
+  const form = document.getElementById("formEjecucion");
+
+  if (form) {
+    form.addEventListener("submit", function(e) {
+
+      const checkboxes = document.querySelectorAll("input[name='mecanicos[]']");
+      const seleccionado = Array.from(checkboxes).some(cb => cb.checked);
+
+      if (!seleccionado) {
+        e.preventDefault();
+        alert("Debe seleccionar al menos un mecánico antes de cerrar.");
+      }
+
+    });
+  }
+</script>
+
 </body>
 </html>

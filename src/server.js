@@ -11,17 +11,24 @@ console.log("ENTORNO:", process.env.NODE_ENV);
 console.log("DB:", process.env.DB_NAME);
 
 // ===================== MIDDLEWARES =====================
-app.use(express.urlencoded({ extended: false }));
+
+// 🔥 IMPORTANTE: extended TRUE para que funcionen los arreglos (mecanicos[])
+app.use(express.urlencoded({ extended: true }));
+
 app.use(express.json());
 
-// Static
+// Static files
 app.use(express.static(path.join(__dirname, "public")));
 
-// Session (ANTES de rutas)
+// ===================== SESSION =====================
 app.use(session({
   secret: "tomza_secret_key",
   resave: false,
-  saveUninitialized: false
+  saveUninitialized: false,
+  cookie: {
+    secure: false, // true solo si usas https
+    httpOnly: true
+  }
 }));
 
 // ===================== VISTAS =====================
@@ -67,5 +74,5 @@ app.get("/logout", (req, res) => {
 
 // ===================== SERVER =====================
 app.listen(PORT, () => {
-  console.log("Servidor corriendo en puerto", PORT);
+  console.log("🚀 Servidor corriendo en puerto", PORT);
 });
