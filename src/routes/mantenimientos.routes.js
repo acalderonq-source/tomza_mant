@@ -183,6 +183,11 @@ router.get("/", async (req, res) => {
       params.push(sedeFiltro);
     }
 
+    // 🔴 SOLO MECÁNICOS NO VEN FUTURO
+    if (req.session.user.rol === "MECANICO") {
+      condiciones.push("DATE(m.fecha_programada) <= CURDATE()");
+    }
+
     const where = condiciones.length
       ? "WHERE " + condiciones.join(" AND ")
       : "";
@@ -210,7 +215,7 @@ router.get("/", async (req, res) => {
       mantenimientos,
       user: req.session.user,
       filtro,
-      sedeSeleccionada: sedeFiltro || "TODAS"
+      sedeSeleccionada: sedeFiltro || "TODAS",
     });
 
   } catch (error) {
