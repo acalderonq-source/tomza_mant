@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const pool = require("../db");
-
+const calcularPuntos = require("../utils/puntajeCorrectivos");
 // =====================================================
 // 🔧 FUNCIÓN AUXILIAR PARA OBTENER SEDE SEGÚN USUARIO
 // =====================================================
@@ -33,7 +33,9 @@ router.get("/correctivos", async (req, res) => {
     if (!req.session.user) return res.redirect("/login");
 
     const sedeFiltro = obtenerSedeFiltro(req);
+const descripcion = req.body.trabajo_realizado;
 
+const puntos = calcularPuntos(descripcion);
     const [rows] = await pool.query(
       `
       SELECT 
@@ -107,6 +109,8 @@ router.post("/correctivos", async (req, res) => {
 
     const { unidad_id, trabajo_realizado, pendiente } = req.body;
 
+const puntos = calcularPuntos(trabajo_realizado);
+
     // 🔥 NORMALIZACIÓN ROBUSTA
     let mecanicos = [];
 
@@ -129,19 +133,20 @@ router.post("/correctivos", async (req, res) => {
     const sedeFiltro = obtenerSedeFiltro(req);
 
     const [result] = await pool.query(
-      `
-      INSERT INTO correctivos 
-        (unidad_id, sede, trabajo_realizado, pendiente, creado_por)
-      VALUES (?, ?, ?, ?, ?)
-      `,
-      [
-        unidad_id,
-        sedeFiltro,
-        trabajo_realizado,
-        pendiente || null,
-        req.session.user.id
-      ]
-    );
+`
+INSERT INTO correctivos 
+(unidad_id, sede, trabajo_realizado, pendiente, creado_por, puntos)
+VALUES (?, ?, ?, ?, ?, ?)
+`,
+[
+  unidad_id,
+  sedeFiltro,
+  trabajo_realizado,
+  pendiente || null,
+  req.session.user.id,
+  puntos
+]
+);
 
     const correctivoId = result.insertId;
 
@@ -151,7 +156,7 @@ router.post("/correctivos", async (req, res) => {
         [correctivoId, mecanicoId]
       );
     }
-
+    
     res.redirect("/mantenimientos/correctivos");
 
   } catch (error) {
