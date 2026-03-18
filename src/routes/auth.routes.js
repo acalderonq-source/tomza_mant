@@ -25,11 +25,14 @@ router.post("/login", async (req, res) => {
       });
     }
 
-    // Buscar usuario
+    // 🔥 QUERY CORREGIDO
     const [rows] = await pool.query(
-      "SELECT * FROM usuarios WHERE usuario = ? LIMIT 1",
-      [usuario]
-    );
+  "SELECT * FROM usuarios WHERE usuario = ? LIMIT 1",
+  [usuario]
+);
+
+    console.log("Usuario recibido:", usuario);
+    console.log("Rows encontradas:", rows);
 
     // Usuario no existe
     if (rows.length === 0) {
@@ -40,8 +43,13 @@ router.post("/login", async (req, res) => {
 
     const user = rows[0];
 
+    console.log("Usuario BD:", user);
+    console.log("Hash guardado:", user.password);
+
     // Comparar contraseña
     const match = await bcrypt.compare(password, user.password);
+
+    console.log("Resultado bcrypt:", match);
 
     if (!match) {
       return res.render("login", {
@@ -52,7 +60,7 @@ router.post("/login", async (req, res) => {
     // Login correcto -> guardar sesión
     req.session.user = {
       id: user.id,
-      nombre: user.nombre,
+      nombre: user.nombre || user.usuario,
       usuario: user.usuario,
       rol: user.rol,
       sede: user.sede
@@ -62,24 +70,14 @@ router.post("/login", async (req, res) => {
     res.redirect("/dashboard");
 
   } catch (error) {
-    console.error("❌ ERROR LOGIN:", error);
-    res.render("login", {
-      error: "Error interno, intente nuevamente"
-    });
+    console.error("❌ ERROR LOGIN COMPLETO:", error);
+    return res.send(error.message); // 🔥 para ver el error real
   }
 });
 
 /**
  * LOGOUT
  */
-router.post("/logout", (req, res) => {
-  req.session.destroy(() => {
-    res.redirect("/login");
-  });
-});
-// =======================
-// LOGOUT
-// =======================
 router.get("/logout", (req, res) => {
   req.session.destroy(err => {
     if (err) {

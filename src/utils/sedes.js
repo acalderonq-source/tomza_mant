@@ -6,7 +6,7 @@ function getSedesPermitidas(req) {
     if (req.session.sedeSeleccionada && req.session.sedeSeleccionada !== "TODAS") {
       sedes = [req.session.sedeSeleccionada];
     } else {
-      sedes = ["Cartago", "La Cruz", "Transportadora", "Granel"];
+      sedes = ["Cartago", "Guapiles","La Cruz", "Transportadora", "Granel"];
     }
   } else if (user.usuario === "pesados") {
     if (req.session.sedeSeleccionada) {
