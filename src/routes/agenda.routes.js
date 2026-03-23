@@ -61,10 +61,10 @@ router.get("/", async (req, res) => {
       vista: "hoy"
     });
 
-  } catch (err) {
-    console.error("Error agenda hoy:", err);
-    res.status(500).send("Error interno");
-  }
+  }catch (err) {
+  console.error("🔥 ERROR REAL:", err);
+  return res.send(err.message);
+}
 });
 
 // ================= AGENDA MAÑANA =================
@@ -156,16 +156,17 @@ router.post("/nuevo", async (req, res) => {
     }
 
     await pool.query(`
-      INSERT INTO mantenimientos 
-      (unidad_id, tipo, plan, estado, fecha_programada, creado_por)
-      VALUES (?, ?, ?, 'PENDIENTE', ?, ?)
-    `, [
-      unidad_id,
-      tipo,
-      plan || null,
-      fecha,
-      req.session.user.id
-    ]);
+  INSERT INTO mantenimientos 
+  (unidad_id, sede, tipo, plan, estado, fecha_programada, creado_por)
+  VALUES (?, ?, ?, ?, 'PENDIENTE', ?, ?)
+`, [
+  unidad_id,
+  req.session.user.sede, // 🔥 AQUÍ ESTÁ LA CLAVE
+  tipo,
+  plan || null,
+  fecha,
+  req.session.user.id
+]);
 
     res.redirect("/agenda");
 
