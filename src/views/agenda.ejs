@@ -15,13 +15,14 @@
     <img src="https://www.tomzasureste.com/img/grp_tomza.png" height="28">
     Gas Tomza
   </span>
-<% if (user.rol === 'ADMIN') { %>
-  <form method="POST" action="/admin/regenerar-agenda" class="mb-3">
-    <button class="btn btn-outline-warning">
-      🔁 Regenerar agenda automáticamente
-    </button>
-  </form>
-<% } %>
+
+  <% if (user.rol === 'ADMIN') { %>
+    <form method="POST" action="/admin/regenerar-agenda" class="mb-3">
+      <button class="btn btn-outline-warning">
+        🔁 Regenerar agenda automáticamente
+      </button>
+    </form>
+  <% } %>
 
   <span class="me-3">
     <%= user.nombre || user.usuario %> (<%= user.rol %>)
@@ -45,6 +46,15 @@
     <a href="/agenda" class="btn btn-outline-warning btn-sm me-2">Hoy</a>
     <a href="/agenda/manana" class="btn btn-outline-warning btn-sm">Mañana</a>
   </div>
+
+  <!-- 🔥 BOTÓN NUEVO -->
+  <% if (user && (user.rol === 'SUPERVISOR_PESADO' || user.rol === 'ADMIN' || user.rol === 'TALLER')) { %>
+    <div class="mb-3">
+      <a href="/agenda/nuevo" class="btn btn-warning">
+        ➕ Nuevo mantenimiento
+      </a>
+    </div>
+  <% } %>
 
   <div class="table-responsive">
     <table class="table table-light align-middle rounded overflow-hidden">

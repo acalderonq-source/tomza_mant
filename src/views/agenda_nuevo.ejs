@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Nuevo Mantenimiento</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+
+<body class="bg-dark text-light">
+
+<div class="container mt-5">
+
+  <div class="card shadow-lg border-0">
+    <div class="card-header bg-warning text-dark fw-bold">
+      🛠 Nuevo Mantenimiento
+    </div>
+
+    <div class="card-body bg-dark text-light">
+
+      <form method="POST" action="/agenda/nuevo">
+
+        <!-- Unidad -->
+        <div class="mb-3">
+          <label class="form-label">Unidad</label>
+          <select name="unidad_id" class="form-select" required>
+            <% unidades.forEach(u => { %>
+              <option value="<%= u.id %>"><%= u.placa %></option>
+            <% }) %>
+          </select>
+        </div>
+
+        <!-- Tipo -->
+        <div class="mb-3">
+          <label class="form-label">Tipo de mantenimiento</label>
+          <select name="tipo" class="form-select" required>
+            <option value="PREVENTIVO">Preventivo</option>
+            <option value="CORRECTIVO">Correctivo</option>
+          </select>
+        </div>
+
+        <!-- Plan -->
+        <div class="mb-3">
+          <label class="form-label">Plan de trabajo</label>
+          <textarea name="plan" class="form-control" rows="3" placeholder="Describa el mantenimiento..."></textarea>
+        </div>
+
+        <!-- Fecha -->
+        <div class="mb-4">
+          <label class="form-label">Fecha programada</label>
+          <input type="date" name="fecha" class="form-control" required>
+        </div>
+
+        <!-- Botones -->
+        <div class="d-flex justify-content-between">
+          <a href="/agenda" class="btn btn-secondary">
+            ⬅ Volver
+          </a>
+
+          <button class="btn btn-warning fw-bold">
+            💾 Guardar mantenimiento
+          </button>
+        </div>
+
+      </form>
+
+    </div>
+  </div>
+
+</div>
+
+</body>
+</html>

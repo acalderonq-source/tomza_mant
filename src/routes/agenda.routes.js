@@ -3,14 +3,16 @@ const router = express.Router();
 const pool = require("../db");
 const { getSedesPermitidas } = require("../utils/sedes");
 
-// fecha hoy en formato YYYY-MM-DD
+// ================= FUNCIONES =================
+
+// fecha hoy YYYY-MM-DD
 function hoy() {
   const f = new Date();
   f.setHours(0, 0, 0, 0);
   return f.toISOString().slice(0, 10);
 }
 
-// siguiente día hábil (sin sábado ni domingo)
+// siguiente día hábil
 function siguienteDiaHabil(fechaBase) {
   const f = new Date(fechaBase);
   do {
@@ -107,6 +109,68 @@ router.get("/manana", async (req, res) => {
 
   } catch (err) {
     console.error("Error agenda mañana:", err);
+    res.status(500).send("Error interno");
+  }
+});
+
+// ================= FORM NUEVO =================
+router.get("/nuevo", async (req, res) => {
+  try {
+    if (!req.session.user) return res.redirect("/login");
+
+    if (!["SUPERVISOR_PESADO", "ADMIN", "TALLER"].includes(req.session.user.rol)) {
+      return res.status(403).send("No autorizado");
+    }
+
+    const sedesPermitidas = getSedesPermitidas(req);
+
+    const [unidades] = await pool.query(
+      "SELECT id, placa FROM unidades WHERE sede IN (?) ORDER BY placa",
+      [sedesPermitidas]
+    );
+
+    res.render("agenda_nuevo", {
+      unidades,
+      user: req.session.user
+    });
+
+  } catch (err) {
+    console.error("Error form agenda:", err);
+    res.status(500).send("Error interno");
+  }
+});
+
+// ================= GUARDAR =================
+router.post("/nuevo", async (req, res) => {
+  try {
+    if (!req.session.user) return res.redirect("/login");
+
+    if (!["SUPERVISOR_PESADO", "ADMIN", "TALLER"].includes(req.session.user.rol)) {
+      return res.status(403).send("No autorizado");
+    }
+
+    const { unidad_id, tipo, plan, fecha } = req.body;
+
+    if (!unidad_id || !tipo || !fecha) {
+      return res.status(400).send("Datos incompletos");
+    }
+
+    await pool.query(`
+      INSERT INTO mantenimientos 
+      (unidad_id, tipo, plan, estado, fecha_programada, creado_por)
+      VALUES (?, ?, ?, 'PENDIENTE', ?, ?)
+    `, [
+      unidad_id,
+      tipo,
+      plan || null,
+      fecha,
+      req.session.user.id
+    ]);
+
+    res.redirect("/agenda");
+
+  } catch (err) {
+    console.error("Error guardando agenda:", err);
     res.status(500).send("Error interno");
   }
 });
