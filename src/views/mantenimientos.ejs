@@ -27,7 +27,11 @@
 
 <div class="container-fluid mt-4">
 
-  <h3 class="mb-3">📋 Listado de Mantenimientos</h3>
+<% if (user.rol === 'ADMIN') { %>
+  <a href="/mantenimientos/exportar" class="btn btn-success mb-3">
+    📥 Descargar Excel
+  </a>
+<% } %>
 
   <!-- BOTONES DE FILTRO -->
   <div class="mb-3">

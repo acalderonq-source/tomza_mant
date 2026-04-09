@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const pool = require("../db");
 const calcularPuntos = require("../utils/puntajeCorrectivos");
+const ExcelJS = require("exceljs");
 // =====================================================
 // 🔧 FUNCIÓN AUXILIAR PARA OBTENER SEDE SEGÚN USUARIO
 // =====================================================
@@ -66,7 +67,75 @@ const puntos = calcularPuntos(descripcion);
     res.status(500).send("Error interno");
   }
 });
+// ================= EXPORTAR EXCEL =================
+router.get("/exportar", async (req, res) => {
+  try {
+    if (!req.session.user) return res.redirect("/login");
 
+    // 🔒 SOLO ADMIN
+    if (req.session.user.rol !== "ADMIN") {
+      return res.status(403).send("No autorizado");
+    }
+
+const [rows] = await pool.query(`
+  SELECT 
+    u.placa,
+    u.sede,
+    'PREVENTIVO' AS tipo,
+    DATE_FORMAT(m.fecha_programada,'%d/%m/%Y') AS fecha,
+    m.estado,
+    m.ejecucion
+  FROM mantenimientos m
+  JOIN unidades u ON u.id = m.unidad_id
+  WHERE m.estado = 'CERRADO'
+
+  UNION ALL
+
+  SELECT 
+    u.placa,
+    u.sede,
+    'CORRECTIVO' AS tipo,
+    DATE_FORMAT(c.fecha,'%d/%m/%Y') AS fecha,
+    'CERRADO' AS estado,
+    c.trabajo_realizado AS ejecucion
+  FROM correctivos c
+  JOIN unidades u ON u.id = c.unidad_id
+
+  ORDER BY fecha DESC
+`);
+
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet("Mantenimientos");
+
+    sheet.columns = [
+  { header: "Placa", key: "placa", width: 15 },
+  { header: "Sede", key: "sede", width: 20 }, // 🔥 NUEVA
+  { header: "Tipo", key: "tipo", width: 15 },
+  { header: "Fecha", key: "fecha", width: 15 },
+  { header: "Estado", key: "estado", width: 15 },
+  { header: "Ejecución", key: "ejecucion", width: 50 }
+];
+
+    sheet.addRows(rows);
+
+    res.setHeader(
+      "Content-Type",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    );
+
+    res.setHeader(
+      "Content-Disposition",
+      "attachment; filename=mantenimientos.xlsx"
+    );
+
+    await workbook.xlsx.write(res);
+    res.end();
+
+  } catch (err) {
+    console.error("Error exportando:", err);
+    res.status(500).send("Error exportando datos");
+  }
+});
 // ===================== FORM NUEVO =====================
 router.get("/correctivos/nuevo", async (req, res) => {
   try {
