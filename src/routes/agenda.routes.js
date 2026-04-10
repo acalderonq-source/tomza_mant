@@ -41,6 +41,7 @@ router.get("/", async (req, res) => {
       FROM mantenimientos m
       JOIN unidades u ON u.id = m.unidad_id
       WHERE m.fecha_programada = ?
+AND m.tipo = 'PREVENTIVO'
     `;
 
     const params = [fecha];
