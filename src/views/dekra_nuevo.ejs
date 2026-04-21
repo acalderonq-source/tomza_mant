@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Nuevo DEKRA</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-dark text-light">
+
+<div class="container mt-5">
+  <div class="card border-0 shadow-lg">
+    <div class="card-header bg-warning text-dark fw-bold">
+      Registrar unidad para DEKRA
+    </div>
+    <div class="card-body bg-dark text-light">
+      <form method="POST" action="/dekra/nuevo">
+        <div class="mb-3">
+          <label class="form-label">Unidad</label>
+          <select name="unidad_id" class="form-select" required>
+            <option value="">Seleccione una unidad</option>
+            <% unidades.forEach(u => { %>
+              <option value="<%= u.id %>"><%= u.placa %> - <%= u.sede %></option>
+            <% }) %>
+          </select>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">Mes DEKRA</label>
+          <select name="mes" class="form-select" required>
+            <option value="">Seleccione mes</option>
+            <option value="ENE-JUL">ENE-JUL</option>
+            <option value="FEB-AGO">FEB-AGO</option>
+            <option value="MAR-SET">MAR-SET</option>
+            <option value="ABR-OCT">ABR-OCT</option>
+            <option value="MAY-NOV">MAY-NOV</option>
+            <option value="JUN-DIC">JUN-DIC</option>
+          </select>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">Negocio</label>
+          <select name="negocio" class="form-select" required>
+            <option value="">Seleccione negocio</option>
+            <option value="CILINDROS">CILINDROS</option>
+            <option value="GRANEL">GRANEL</option>
+            <option value="TALLER">TALLER</option>
+            <option value="TECNICOS">TECNICOS</option>
+          </select>
+        </div>
+
+        <div class="d-flex justify-content-between">
+          <a href="/dekra" class="btn btn-secondary">Volver</a>
+          <button class="btn btn-warning fw-bold">Guardar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

@@ -4,10 +4,11 @@ const express = require("express");
 const path = require("path");
 const session = require("express-session");
 require('dotenv').config();
-
+const cron = require("node-cron");
+const enviarAlertasDekra = require("./utils/dekraMail");
 const app = express();
 const PORT = process.env.PORT || 3000;
-
+const dekraRoutes = require("./routes/dekra.routes");
 console.log("ENTORNO:", process.env.NODE_ENV);
 console.log("DB:", process.env.DB_NAME);
 
@@ -31,11 +32,20 @@ app.use(session({
     httpOnly: true
   }
 }));
-
+app.use("/dekra", dekraRoutes);
 // ===================== VISTAS =====================
 app.set("view engine", "ejs");
 app.set("views", path.join(__dirname, "views"));
+cron.schedule("0 7 * * *", async () => {
 
+  const hoy = new Date().getDate();
+
+  if (hoy === 1 || hoy === 15) {
+    console.log("📧 Enviando alertas DEKRA...");
+    await enviarAlertasDekra();
+  }
+
+});
 // ===================== RUTAS =====================
 const authRoutes = require("./routes/auth.routes");
 const adminRoutes = require("./routes/admin.routes");
