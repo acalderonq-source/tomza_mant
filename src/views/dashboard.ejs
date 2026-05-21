@@ -14,7 +14,7 @@
 
 <div class="container mt-4">
 
- <!-- ================== SELECTOR DE SEDE ADMIN ================== -->
+  <!-- ================== SELECTOR DE SEDE ADMIN ================== -->
 <% if (user.rol === 'ADMIN') { %>
 
 <div class="mb-3">
@@ -118,3 +118,66 @@
 </div>
 
 <% } %>
+  <!-- ================== SELECTOR USUARIO PESADOS ================== -->
+  <% if (user.usuario === 'pesados') { %>
+    <div class="mb-3">
+      <span class="badge bg-secondary me-2">
+        Vista actual: <%= sedeSeleccionada || 'Transportadora' %>
+      </span>
+
+      <form method="POST" action="/cambiar-sede" class="d-inline">
+        <button class="btn btn-sm btn-outline-primary" name="sede" value="Transportadora">
+          Transportadora
+        </button>
+      </form>
+
+      <form method="POST" action="/cambiar-sede" class="d-inline">
+        <button class="btn btn-sm btn-outline-success" name="sede" value="Granel">
+          Granel
+        </button>
+      </form>
+    </div>
+  <% } %>
+
+  <!-- ================== BIENVENIDA ================== -->
+  <h3>Bienvenido, <strong><%= user.usuario %></strong></h3>
+  <p>Rol: <strong><%= user.rol %></strong></p>
+
+  <hr>
+
+  <!-- ================== BOTONES PRINCIPALES ================== -->
+  <div class="d-grid gap-2 col-md-4">
+
+    <a href="/mantenimientos" class="btn btn-primary">
+      🔧 Ir a mantenimientos
+    </a>
+
+    <a href="/agenda" class="btn btn-secondary">
+      📅 Ir a agenda
+    </a>
+
+    <a href="/unidades" class="btn btn-info text-white">
+      🚛 Ir a unidades
+    </a>
+
+    <% if (['ADMIN','MECANICO'].includes(user.rol)) { %>
+      <a href="/aceite" class="btn btn-success">
+        🛢️ Cambios de Aceite
+      </a>
+    <% } %>
+
+    <% if (user.rol === 'ADMIN') { %>
+      <a href="/kpis/mecanicos" class="btn btn-dark">
+        📊 KPIs Mecánicos
+      </a>
+    <% } %>
+    
+      <a href="/dekra" class="btn w-100 mb-2" style="background:#8e44ad; color:white;">
+  📋 Control DEKRA
+</a>
+  </div>
+
+</div>
+
+</body>
+</html>
