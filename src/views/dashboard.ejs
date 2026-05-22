@@ -50,7 +50,7 @@
     <button class="btn btn-sm btn-success" name="sede" value="Alajuela">
       Alajuela
     </button>
-  </form>
+  </form><% if (user.usuario === 'pesados') { %>
 
   <!-- SAN CARLOS -->
   <form method="POST" action="/cambiar-sede" class="d-inline">
@@ -119,7 +119,35 @@
 
 <% } %>
   <!-- ================== SELECTOR USUARIO PESADOS ================== -->
-  <% if (user.usuario === 'pesados') { %>
+  <% if (sedesMultiples && sedesMultiples.length > 0) { %>
+
+<div class="mb-3">
+
+  <span class="badge bg-secondary me-2">
+    Vista actual:
+    <%= sedeSeleccionada || sedesMultiples[0] %>
+  </span>
+
+  <% sedesMultiples.forEach(sede => { %>
+
+    <form method="POST" action="/cambiar-sede" class="d-inline">
+
+      <button
+        class="btn btn-sm btn-outline-primary"
+        name="sede"
+        value="<%= sede %>">
+
+        <%= sede %>
+
+      </button>
+
+    </form>
+
+  <% }) %>
+
+</div>
+
+<% } %>
     <div class="mb-3">
       <span class="badge bg-secondary me-2">
         Vista actual: <%= sedeSeleccionada || 'Transportadora' %>

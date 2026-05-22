@@ -65,12 +65,19 @@ router.get("/", async (req, res) => {
     const stats = statsRows[0] || { realizados: 0, pendientes: 0 };
 
     res.render("dashboard", {
+      
       user: req.session.user,
       hoy: hoyMantenimientos,
       stats,
       sedeSeleccionada: req.session.sedeSeleccionada || "TODAS"
     });
+const [extras] = await pool.query(`
+  SELECT sede
+  FROM usuarios_sedes
+  WHERE usuario_id = ?
+`, [req.session.user.id]);
 
+const sedesMultiples = extras.map(e => e.sede);
   } catch (error) {
     console.error("❌ ERROR dashboard:", error);
     res.status(500).send("Internal Server Error");
