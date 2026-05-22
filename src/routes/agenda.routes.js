@@ -27,7 +27,8 @@ router.get("/", async (req, res) => {
     if (!req.session.user) return res.redirect("/login");
 
     const fecha = hoy();
-    const sedesPermitidas = getSedesPermitidas(req);
+    const sedesPermitidas =
+  await getSedesPermitidas(req);
 
     let sql = `
       SELECT 
@@ -126,10 +127,14 @@ router.get("/nuevo", async (req, res) => {
     const sedesPermitidas = getSedesPermitidas(req);
 
     const [unidades] = await pool.query(
-      "SELECT id, placa FROM unidades WHERE sede IN (?) ORDER BY placa",
-      [sedesPermitidas]
-    );
-
+  `
+  SELECT id, sede
+  FROM unidades
+  WHERE sede = ?
+  ORDER BY id
+  `,
+  [sede]
+);
     res.render("agenda_nuevo", {
       unidades,
       user: req.session.user

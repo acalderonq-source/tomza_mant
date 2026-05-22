@@ -17,16 +17,52 @@ router.get("/", async (req, res) => {
       } else {
         sedesPermitidas = []; // TODAS
       }
-    } else if (user.usuario === "pesados") {
-      // El mecánico de pesados puede alternar entre Transportadora y Granel
-      if (req.session.sedeSeleccionada) {
-        sedesPermitidas = [req.session.sedeSeleccionada];
-      } else {
-        sedesPermitidas = ["Transportadora", "Granel"];
-      }
     } else {
-      sedesPermitidas = [user.sede];
-    }
+
+  // =========================
+  // TRAER SEDES EXTRA
+  // =========================
+  const [extras] = await pool.query(`
+    SELECT sede
+    FROM usuarios_sedes
+    WHERE usuario_id = ?
+  `, [user.id]);
+
+  // =========================
+  // ARMAR SEDES
+  // =========================
+  const sedesExtras = extras.map(
+    e => e.sede
+  );
+
+  const todasLasSedes = [
+    ...new Set([
+      user.sede,
+      ...sedesExtras
+    ])
+  ];
+
+  // =========================
+  // SI ELIGIÓ UNA SEDE
+  // =========================
+  if (
+    req.session.sedeSeleccionada &&
+    todasLasSedes.includes(
+      req.session.sedeSeleccionada
+    )
+  ) {
+
+    sedesPermitidas = [
+      req.session.sedeSeleccionada
+    ];
+
+  } else {
+
+    sedesPermitidas = todasLasSedes;
+
+  }
+
+}
 
     let sql = `
       SELECT id, placa, sede

@@ -1,27 +1,108 @@
 const express = require("express");
 const router = express.Router();
+const pool = require("../db");
 
-router.post("/cambiar-sede", (req, res) => {
-  if (!req.session.user) return res.redirect("/login");
+/* =========================================================
+   CAMBIAR SEDE
+========================================================= */
 
-  const sede = req.body.sede;
+router.post("/cambiar-sede", async (req, res) => {
 
-  // ADMIN: puede cambiar entre todas
-  if (req.session.user.rol === "ADMIN") {
-    req.session.sedeSeleccionada = sede || "TODAS";
-    return res.redirect(req.get("Referrer") || "/dashboard");
-  }
+  try {
 
-  // Usuario especial: pesados
-  if (req.session.user.usuario === "pesados") {
-    if (!["Transportadora", "Granel"].includes(sede)) {
-      return res.status(403).send("Sede no permitida");
+    // =========================
+    // VALIDAR LOGIN
+    // =========================
+    if (!req.session.user) {
+      return res.redirect("/login");
     }
+
+    const { sede } = req.body;
+
+    const user = req.session.user;
+
+    // =========================
+    // ADMIN
+    // =========================
+    if (user.rol === "ADMIN") {
+
+      req.session.sedeSeleccionada = sede;
+
+      console.log(
+        `🟢 ADMIN cambió a sede: ${sede}`
+      );
+
+      return res.redirect("/dashboard");
+
+    }
+
+    // =========================
+    // TRAER SEDES EXTRA
+    // =========================
+    const [extras] = await pool.query(`
+      SELECT sede
+      FROM usuarios_sedes
+      WHERE usuario_id = ?
+    `, [user.id]);
+
+    // =========================
+    // ARMAR LISTA COMPLETA
+    // =========================
+    const sedesPermitidas = [
+      user.sede,
+      ...extras.map(e => e.sede)
+    ];
+
+    console.log("👤 Usuario:", user.usuario);
+
+    console.log(
+      "📍 Sedes permitidas:",
+      sedesPermitidas
+    );
+
+    console.log(
+      "➡️ Sede solicitada:",
+      sede
+    );
+
+    // =========================
+    // VALIDAR ACCESO
+    // =========================
+    if (!sedesPermitidas.includes(sede)) {
+
+      return res
+        .status(403)
+        .send("No autorizado");
+
+    }
+
+    // =========================
+    // GUARDAR EN SESIÓN
+    // =========================
     req.session.sedeSeleccionada = sede;
-    return res.redirect(req.get("Referrer") || "/dashboard");
+
+    console.log(
+      `✅ ${user.usuario} cambió a ${sede}`
+    );
+
+    // =========================
+    // REDIRECT
+    // =========================
+    return res.redirect("/dashboard");
+
+  } catch (error) {
+
+    console.error(
+      "❌ Error cambiar sede:",
+      error
+    );
+
+    return res
+      .status(500)
+      .send("Error cambiando sede");
+
   }
 
-  return res.status(403).send("No autorizado");
 });
 
 module.exports = router;

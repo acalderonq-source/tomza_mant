@@ -44,11 +44,18 @@ router.post("/admin/regenerar-agenda", async (req, res) => {
     }
 
    // sede que se va a programar
-const sede = req.session.user.sede; // 'La Cruz' o 'Cartago'
+const sede =
+  req.session.sedeSeleccionada ||
+  req.session.user.sede;
 
 // obtener solo unidades de esa sede
 const [unidades] = await pool.query(
-  "SELECT id FROM unidades WHERE sede = ? ORDER BY id",
+  `
+  SELECT id, sede
+  FROM unidades
+  WHERE sede = ?
+  ORDER BY id
+  `,
   [sede]
 );
 

@@ -8,18 +8,38 @@ function requireAuth(req, res, next) {
 }
 
 function obtenerSedeFiltro(req) {
-  if (!req.session.user) return null;
 
-  if (req.session.user.rol === "ADMIN") {
-    if (req.session.sedeSeleccionada && req.session.sedeSeleccionada !== "TODAS") {
-      return req.session.sedeSeleccionada;
-    }
+  if (!req.session.user) {
     return null;
   }
 
-  return req.session.user.sede;
-}
+  // =========================
+  // ADMIN
+  // =========================
+  if (req.session.user.rol === "ADMIN") {
 
+    if (
+      req.session.sedeSeleccionada &&
+      req.session.sedeSeleccionada !== "TODAS"
+    ) {
+
+      return req.session.sedeSeleccionada;
+
+    }
+
+    return null;
+
+  }
+
+  // =========================
+  // MULTI-SEDE
+  // =========================
+  return (
+    req.session.sedeSeleccionada ||
+    req.session.user.sede
+  );
+
+}
 // =========================
 // LISTADO DEKRA
 // =========================

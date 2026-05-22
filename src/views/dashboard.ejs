@@ -14,7 +14,8 @@
 
 <div class="container mt-4">
 
-  <!-- ================== SELECTOR DE SEDE ADMIN ================== -->
+  <!-- ================== SELECTOR ADMIN ================== -->
+
 <% if (user.rol === 'ADMIN') { %>
 
 <div class="mb-3">
@@ -24,108 +25,69 @@
     <%= sedeSeleccionada || user.sede || 'TODAS' %>
   </span>
 
-  <!-- CARTAGO -->
-  <form method="POST" action="/cambiar-sede" class="d-inline">
-    <button class="btn btn-sm btn-primary" name="sede" value="Cartago">
-      Cartago
-    </button>
-  </form>
+  <% [
+    'Cartago',
+    'Guapiles',
+    'La Cruz',
+    'Alajuela',
+    'San Carlos',
+    'Rio Claro',
+    'Perez Zeledon',
+    'Nicoya',
+    'Tecnicos',
+    'Taller',
+    'Transportadora',
+    'Granel'
+  ].forEach(sede => { %>
 
-  <!-- GUAPILES -->
-  <form method="POST" action="/cambiar-sede" class="d-inline">
-    <button class="btn btn-sm btn-primary" name="sede" value="Guapiles">
-      Guápiles
-    </button>
-  </form>
+    <form method="POST" action="/cambiar-sede" class="d-inline">
 
-  <!-- LA CRUZ -->
-  <form method="POST" action="/cambiar-sede" class="d-inline">
-    <button class="btn btn-sm btn-success" name="sede" value="La Cruz">
-      La Cruz
-    </button>
-  </form>
+      <button
+        class="btn btn-sm btn-outline-primary"
+        name="sede"
+        value="<%= sede %>">
 
-  <!-- ALAJUELA -->
-  <form method="POST" action="/cambiar-sede" class="d-inline">
-    <button class="btn btn-sm btn-success" name="sede" value="Alajuela">
-      Alajuela
-    </button>
-  </form><% if (user.usuario === 'pesados') { %>
+        <%= sede %>
 
-  <!-- SAN CARLOS -->
-  <form method="POST" action="/cambiar-sede" class="d-inline">
-    <button class="btn btn-sm btn-warning text-dark" name="sede" value="San Carlos">
-      San Carlos
-    </button>
-  </form>
+      </button>
 
-  <!-- RIO CLARO -->
-  <form method="POST" action="/cambiar-sede" class="d-inline">
-    <button class="btn btn-sm btn-secondary" name="sede" value="Rio Claro">
-      Río Claro
-    </button>
-  </form>
+    </form>
 
-  <!-- PEREZ ZELEDON -->
-  <form method="POST" action="/cambiar-sede" class="d-inline">
-    <button class="btn btn-sm btn-info text-white" name="sede" value="Perez Zeledon">
-      Pérez Zeledón
-    </button>
-  </form>
+  <% }) %>
 
-  <!-- NICOYA -->
   <form method="POST" action="/cambiar-sede" class="d-inline">
-    <button class="btn btn-sm btn-danger" name="sede" value="Nicoya">
-      Nicoya
-    </button>
-  </form>
 
-  <!-- TECNICOS -->
-  <form method="POST" action="/cambiar-sede" class="d-inline">
-    <button class="btn btn-sm btn-dark" name="sede" value="Tecnicos">
-      Técnicos
-    </button>
-  </form>
+    <button
+      class="btn btn-sm btn-dark"
+      name="sede"
+      value="TODAS">
 
-  <!-- TALLER -->
-  <form method="POST" action="/cambiar-sede" class="d-inline">
-    <button class="btn btn-sm btn-outline-dark" name="sede" value="Taller">
-      Taller
-    </button>
-  </form>
+      TODAS
 
-  <!-- TRANSPORTADORA -->
-  <form method="POST" action="/cambiar-sede" class="d-inline">
-    <button class="btn btn-sm btn-outline-primary" name="sede" value="Transportadora">
-      Transportadora
     </button>
-  </form>
 
-  <!-- GRANEL -->
-  <form method="POST" action="/cambiar-sede" class="d-inline">
-    <button class="btn btn-sm btn-outline-success" name="sede" value="Granel">
-      Granel
-    </button>
-  </form>
-
-  <!-- TODAS -->
-  <form method="POST" action="/cambiar-sede" class="d-inline">
-    <button class="btn btn-sm btn-dark" name="sede" value="TODAS">
-      Todo
-    </button>
   </form>
 
 </div>
 
 <% } %>
-  <!-- ================== SELECTOR USUARIO PESADOS ================== -->
-  <% if (sedesMultiples && sedesMultiples.length > 0) { %>
+
+
+<!-- ================== MULTI-SEDE ================== -->
+
+<% if (
+  user.rol !== 'ADMIN' &&
+  sedesMultiples &&
+  sedesMultiples.length > 1
+) { %>
 
 <div class="mb-3">
 
   <span class="badge bg-secondary me-2">
+
     Vista actual:
     <%= sedeSeleccionada || sedesMultiples[0] %>
+
   </span>
 
   <% sedesMultiples.forEach(sede => { %>
@@ -148,25 +110,6 @@
 </div>
 
 <% } %>
-    <div class="mb-3">
-      <span class="badge bg-secondary me-2">
-        Vista actual: <%= sedeSeleccionada || 'Transportadora' %>
-      </span>
-
-      <form method="POST" action="/cambiar-sede" class="d-inline">
-        <button class="btn btn-sm btn-outline-primary" name="sede" value="Transportadora">
-          Transportadora
-        </button>
-      </form>
-
-      <form method="POST" action="/cambiar-sede" class="d-inline">
-        <button class="btn btn-sm btn-outline-success" name="sede" value="Granel">
-          Granel
-        </button>
-      </form>
-    </div>
-  <% } %>
-
   <!-- ================== BIENVENIDA ================== -->
   <h3>Bienvenido, <strong><%= user.usuario %></strong></h3>
   <p>Rol: <strong><%= user.rol %></strong></p>

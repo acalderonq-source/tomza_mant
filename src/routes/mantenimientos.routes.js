@@ -7,23 +7,38 @@ const ExcelJS = require("exceljs");
 // 🔧 FUNCIÓN AUXILIAR PARA OBTENER SEDE SEGÚN USUARIO
 // =====================================================
 function obtenerSedeFiltro(req) {
-  let sedeFiltro = null;
 
+  if (!req.session.user) {
+    return null;
+  }
+
+  // =========================
+  // ADMIN
+  // =========================
   if (req.session.user.rol === "ADMIN") {
+
     if (
       req.session.sedeSeleccionada &&
       req.session.sedeSeleccionada !== "TODAS"
     ) {
-      sedeFiltro = req.session.sedeSeleccionada;
+
+      return req.session.sedeSeleccionada;
+
     }
-  } else {
-    sedeFiltro = req.session.user.sede;
+
+    return null;
+
   }
 
-  if (!sedeFiltro) sedeFiltro = req.session.user.sede;
-  return sedeFiltro;
-}
+  // =========================
+  // MULTI-SEDE
+  // =========================
+  return (
+    req.session.sedeSeleccionada ||
+    req.session.user.sede
+  );
 
+}
 ////////////////////////////////////////////////////////
 // ================== CORRECTIVOS =====================
 ////////////////////////////////////////////////////////
