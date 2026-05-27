@@ -21,36 +21,53 @@ function siguienteDiaHabil(fechaBase) {
   return f.toISOString().slice(0, 10);
 }
 
-// ================= AGENDA HOY =================
+// ================= AGENDA HOY (preventivos + correctivos) =================
 router.get("/", async (req, res) => {
   try {
     if (!req.session.user) return res.redirect("/login");
 
     const fecha = hoy();
-    const sedesPermitidas = await getSedesPermitidas(req); // ✅ await
+    const sedesPermitidas = await getSedesPermitidas(req);
 
     let sql = `
       SELECT 
-        m.id,
+        'PREVENTIVO' AS tipo_registro,
+        m.id AS id,
         u.placa,
         u.sede,
-        m.tipo,
+        m.tipo AS subtipo,
         m.estado,
-        m.plan,
-        DATE_FORMAT(m.fecha_programada,'%d/%m/%Y') AS fecha
+        m.plan AS descripcion,
+        DATE_FORMAT(m.fecha_programada, '%d/%m/%Y') AS fecha_mostrar
       FROM mantenimientos m
       JOIN unidades u ON u.id = m.unidad_id
       WHERE m.fecha_programada = ?
         AND m.tipo = 'PREVENTIVO'
+
+      UNION ALL
+
+      SELECT 
+        'CORRECTIVO' AS tipo_registro,
+        c.id AS id,
+        u.placa,
+        u.sede,
+        NULL AS subtipo,
+        'REALIZADO' AS estado,
+        c.trabajo_realizado AS descripcion,
+        DATE_FORMAT(c.fecha, '%d/%m/%Y') AS fecha_mostrar
+      FROM correctivos c
+      JOIN unidades u ON u.id = c.unidad_id
+      WHERE DATE(c.fecha) = ?
     `;
-    const params = [fecha];
+
+    const params = [fecha, fecha];
 
     if (sedesPermitidas.length) {
       sql += " AND u.sede IN (?)";
       params.push(sedesPermitidas);
     }
 
-    sql += " ORDER BY m.id";
+    sql += " ORDER BY fecha_mostrar, placa";
 
     const [agenda] = await pool.query(sql, params);
 
@@ -66,35 +83,53 @@ router.get("/", async (req, res) => {
   }
 });
 
-// ================= AGENDA MAÑANA =================
+// ================= AGENDA MAÑANA (preventivos + correctivos) =================
 router.get("/manana", async (req, res) => {
   try {
     if (!req.session.user) return res.redirect("/login");
 
     const manana = siguienteDiaHabil(new Date());
-    const sedesPermitidas = await getSedesPermitidas(req); // ✅ await
+    const sedesPermitidas = await getSedesPermitidas(req);
 
     let sql = `
       SELECT 
-        m.id,
+        'PREVENTIVO' AS tipo_registro,
+        m.id AS id,
         u.placa,
         u.sede,
-        m.tipo,
+        m.tipo AS subtipo,
         m.estado,
-        m.plan,
-        DATE_FORMAT(m.fecha_programada,'%d/%m/%Y') AS fecha
+        m.plan AS descripcion,
+        DATE_FORMAT(m.fecha_programada, '%d/%m/%Y') AS fecha_mostrar
       FROM mantenimientos m
       JOIN unidades u ON u.id = m.unidad_id
       WHERE m.fecha_programada = ?
+        AND m.tipo = 'PREVENTIVO'
+
+      UNION ALL
+
+      SELECT 
+        'CORRECTIVO' AS tipo_registro,
+        c.id AS id,
+        u.placa,
+        u.sede,
+        NULL AS subtipo,
+        'REALIZADO' AS estado,
+        c.trabajo_realizado AS descripcion,
+        DATE_FORMAT(c.fecha, '%d/%m/%Y') AS fecha_mostrar
+      FROM correctivos c
+      JOIN unidades u ON u.id = c.unidad_id
+      WHERE DATE(c.fecha) = ?
     `;
-    const params = [manana];
+
+    const params = [manana, manana];
 
     if (sedesPermitidas.length) {
       sql += " AND u.sede IN (?)";
       params.push(sedesPermitidas);
     }
 
-    sql += " ORDER BY m.id";
+    sql += " ORDER BY fecha_mostrar, placa";
 
     const [agenda] = await pool.query(sql, params);
 
@@ -110,7 +145,7 @@ router.get("/manana", async (req, res) => {
   }
 });
 
-// ================= FORM NUEVO =================
+// ================= FORM NUEVO MANTENIMIENTO PREVENTIVO =================
 router.get("/nuevo", async (req, res) => {
   try {
     if (!req.session.user) return res.redirect("/login");
@@ -119,18 +154,15 @@ router.get("/nuevo", async (req, res) => {
       return res.status(403).send("No autorizado");
     }
 
-    // Obtenemos la(s) sede(s) permitidas para el usuario
     const sedesPermitidas = await getSedesPermitidas(req);
 
-    // Si el usuario tiene varias sedes, debemos permitir elegir? Por simplicidad,
-    // tomamos la primera o usamos la sede de sesión. Ajusta según tu lógica.
     let sedeFiltro = null;
     if (sedesPermitidas.length === 1) {
       sedeFiltro = sedesPermitidas[0];
     } else if (req.session.sedeSeleccionada && sedesPermitidas.includes(req.session.sedeSeleccionada)) {
       sedeFiltro = req.session.sedeSeleccionada;
     } else {
-      sedeFiltro = req.session.user.sede; // puede ser undefined si el usuario no tiene sede fija
+      sedeFiltro = req.session.user.sede;
     }
 
     if (!sedeFiltro) {
@@ -152,7 +184,7 @@ router.get("/nuevo", async (req, res) => {
   }
 });
 
-// ================= GUARDAR =================
+// ================= GUARDAR NUEVO MANTENIMIENTO PREVENTIVO =================
 router.post("/nuevo", async (req, res) => {
   try {
     if (!req.session.user) return res.redirect("/login");
@@ -167,7 +199,6 @@ router.post("/nuevo", async (req, res) => {
       return res.status(400).send("Datos incompletos");
     }
 
-    // Obtener la sede de la unidad seleccionada (más seguro que usar la sede de sesión)
     const [[unidad]] = await pool.query("SELECT sede FROM unidades WHERE id = ?", [unidad_id]);
     if (!unidad) return res.status(404).send("Unidad no encontrada");
 
