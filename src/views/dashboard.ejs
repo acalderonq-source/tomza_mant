@@ -2,11 +2,19 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
   <title>Dashboard - Gas Tomza</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <style>
     .card-stats { border-radius: 12px; border: none; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
     .stat-number { font-size: 2.2rem; font-weight: bold; }
+    /* Ajustes para móvil */
+    @media (max-width: 576px) {
+      .stat-number { font-size: 1.8rem; }
+      .btn { font-size: 0.9rem; padding: 0.5rem 0.75rem; }
+      .table-responsive { font-size: 0.85rem; }
+      .card-header { font-size: 1rem; }
+    }
   </style>
 </head>
 <body class="bg-light">
@@ -20,16 +28,18 @@
 
   <!-- ================== SELECTOR DE SEDE (solo ADMIN) ================== -->
   <% if (user.rol === 'ADMIN') { %>
-    <div class="mb-3">
+    <div class="mb-3 overflow-auto">
       <span class="me-2 fw-bold">Sede actual: <%= sedeSeleccionada || user.sede || 'TODAS' %></span>
-      <% ['Cartago', 'Guapiles', 'La Cruz', 'Alajuela', 'San Carlos', 'Rio Claro', 'Perez Zeledon', 'Nicoya', 'Tecnicos', 'Taller', 'Transportadora', 'Granel'].forEach(sede => { %>
+      <div class="d-flex flex-wrap gap-1 mt-1">
+        <% ['Cartago', 'Guapiles', 'La Cruz', 'Alajuela', 'San Carlos', 'Rio Claro', 'Perez Zeledon', 'Nicoya', 'Tecnicos', 'Taller', 'Transportadora', 'Granel'].forEach(sede => { %>
+          <form method="POST" action="/cambiar-sede" class="d-inline">
+            <button class="btn btn-sm btn-outline-primary" name="sede" value="<%= sede %>"><%= sede %></button>
+          </form>
+        <% }) %>
         <form method="POST" action="/cambiar-sede" class="d-inline">
-          <button class="btn btn-sm btn-outline-primary" name="sede" value="<%= sede %>"><%= sede %></button>
+          <button class="btn btn-sm btn-dark" name="sede" value="TODAS">TODAS</button>
         </form>
-      <% }) %>
-      <form method="POST" action="/cambiar-sede" class="d-inline">
-        <button class="btn btn-sm btn-dark" name="sede" value="TODAS">TODAS</button>
-      </form>
+      </div>
     </div>
   <% } %>
 
@@ -37,11 +47,13 @@
   <% if (user.rol !== 'ADMIN' && sedesMultiples && sedesMultiples.length > 1) { %>
     <div class="mb-3">
       <span class="badge bg-secondary me-2">Vista actual: <%= sedeSeleccionada || sedesMultiples[0] %></span>
-      <% sedesMultiples.forEach(sede => { %>
-        <form method="POST" action="/cambiar-sede" class="d-inline">
-          <button class="btn btn-sm btn-outline-primary" name="sede" value="<%= sede %>"><%= sede %></button>
-        </form>
-      <% }) %>
+      <div class="d-flex flex-wrap gap-1 mt-1">
+        <% sedesMultiples.forEach(sede => { %>
+          <form method="POST" action="/cambiar-sede" class="d-inline">
+            <button class="btn btn-sm btn-outline-primary" name="sede" value="<%= sede %>"><%= sede %></button>
+          </form>
+        <% }) %>
+      </div>
     </div>
   <% } %>
 
@@ -55,7 +67,7 @@
   <% if (user.rol === 'TRAMITES') { %>
     <!-- DASHBOARD PARA TRAMITES: estadísticas y opciones MINAE -->
     <div class="row mb-4">
-      <div class="col-md-4">
+      <div class="col-12 col-md-4 mb-3 mb-md-0">
         <div class="card card-stats bg-primary text-white">
           <div class="card-body">
             <h5 class="card-title">📋 Trámites pendientes</h5>
@@ -63,7 +75,7 @@
           </div>
         </div>
       </div>
-      <div class="col-md-4">
+      <div class="col-12 col-md-4 mb-3 mb-md-0">
         <div class="card card-stats bg-warning text-dark">
           <div class="card-body">
             <h5 class="card-title">⚠️ Por vencer (15 días)</h5>
@@ -71,7 +83,7 @@
           </div>
         </div>
       </div>
-      <div class="col-md-4">
+      <div class="col-12 col-md-4">
         <div class="card card-stats bg-info text-white">
           <div class="card-body">
             <h5 class="card-title">📅 Citas próximas</h5>
@@ -82,52 +94,58 @@
     </div>
 
     <!-- Botones principales para trámites -->
-    <div class="d-grid gap-2 col-md-4 mb-4">
+    <div class="d-grid gap-2 col-12 col-md-4 mb-4">
       <a href="/minae" class="btn btn-warning">🏛️ Control MINAE</a>
       <a href="/minae/nuevo" class="btn btn-success">➕ Nuevo trámite</a>
     </div>
 
-    <!-- Tabla de citas próximas -->
+    <!-- Tabla de citas próximas (responsive) -->
     <div class="card mt-4">
       <div class="card-header bg-dark text-white">📅 Próximas citas MINAE</div>
-      <div class="card-body">
-        <table class="table table-sm table-striped">
-          <thead>
-            <tr><th>Placa</th><th>CR#</th><th>Fecha cita</th><th>Lugar</th></tr>
-          </thead>
-          <tbody>
-            <% citasProximas.forEach(c => { %>
-              <tr>
-                <td><%= c.placa %></td>
-                <td><%= c.cr || '-' %></td>
-                <td><%= c.fecha_cita %></td>
-                <td><%= c.lugar_cita || '-' %></td>
-              </tr>
-            <% }); %>
-            <% if (citasProximas.length === 0) { %>
-              <tr><td colspan="4" class="text-center">No hay citas próximas</td></tr>
-            <% } %>
-          </tbody>
-        </table>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-sm table-striped mb-0">
+            <thead>
+              <tr><th>Placa</th><th>CR#</th><th>Fecha cita</th><th>Lugar</th></tr>
+            </thead>
+            <tbody>
+              <% citasProximas.forEach(c => { %>
+                <tr>
+                  <td><%= c.placa %></td>
+                  <td><%= c.cr || '-' %></td>
+                  <td><%= c.fecha_cita %></td>
+                  <td><%= c.lugar_cita || '-' %></td>
+                </tr>
+              <% }); %>
+              <% if (citasProximas.length === 0) { %>
+                <tr><td colspan="4" class="text-center">No hay citas próximas</td></tr>
+              <% } %>
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
 
-    <!-- Tabla de últimos trámites -->
+    <!-- Tabla de últimos trámites (responsive) -->
     <div class="card mt-4">
       <div class="card-header bg-dark text-white">🕒 Últimos trámites ingresados</div>
-      <div class="card-body">
-        <table class="table table-sm table-striped">
-          <thead><tr><th>Placa</th><th>CR#</th><th>Estado</th></tr></thead>
-          <tbody>
-            <% ultimosTramites.forEach(t => { %>
-              <tr>
-                <td><%= t.placa %></td>
-                <td><%= t.cr || '-' %></td>
-                <td><%= t.estado %></td>
-              </tr>
-            <% }); %>
-          </tbody>
-        </table>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-sm table-striped mb-0">
+            <thead>
+              <tr><th>Placa</th><th>CR#</th><th>Estado</th></tr>
+            </thead>
+            <tbody>
+              <% ultimosTramites.forEach(t => { %>
+                <tr>
+                  <td><%= t.placa %></td>
+                  <td><%= t.cr || '-' %></td>
+                  <td><%= t.estado %></td>
+                </tr>
+              <% }); %>
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
 
@@ -136,7 +154,7 @@
 
     <!-- KPIs de mantenimientos -->
     <div class="row mb-4">
-      <div class="col-md-6">
+      <div class="col-12 col-md-6 mb-3 mb-md-0">
         <div class="card text-white bg-success">
           <div class="card-body">
             <h5 class="card-title">✅ Mantenimientos realizados</h5>
@@ -144,7 +162,7 @@
           </div>
         </div>
       </div>
-      <div class="col-md-6">
+      <div class="col-12 col-md-6">
         <div class="card text-white bg-danger">
           <div class="card-body">
             <h5 class="card-title">⏳ Mantenimientos pendientes</h5>
@@ -154,33 +172,37 @@
       </div>
     </div>
 
-    <!-- Lista de mantenimientos de hoy -->
+    <!-- Lista de mantenimientos de hoy (responsive) -->
     <div class="card mb-4">
       <div class="card-header bg-dark text-white">🔧 Mantenimientos programados para hoy</div>
-      <div class="card-body">
+      <div class="card-body p-0">
         <% if (hoy.length === 0) { %>
-          <p class="text-muted">No hay mantenimientos programados para hoy.</p>
+          <div class="p-3 text-muted">No hay mantenimientos programados para hoy.</div>
         <% } else { %>
-          <table class="table table-sm">
-            <thead><tr><th>Placa</th><th>Sede</th><th>Tipo</th><th>Estado</th><th>Plan</th></tr></thead>
-            <tbody>
-              <% hoy.forEach(m => { %>
-                <tr>
-                  <td><%= m.placa %></td>
-                  <td><%= m.sede %></td>
-                  <td><%= m.tipo %></td>
-                  <td><%= m.estado %></td>
-                  <td><%= m.plan || '-' %></td>
-                </tr>
-              <% }) %>
-            </tbody>
-          </table>
+          <div class="table-responsive">
+            <table class="table table-sm mb-0">
+              <thead>
+                <tr><th>Placa</th><th>Sede</th><th>Tipo</th><th>Estado</th><th>Plan</th></tr>
+              </thead>
+              <tbody>
+                <% hoy.forEach(m => { %>
+                  <tr>
+                    <td><%= m.placa %></td>
+                    <td><%= m.sede %></td>
+                    <td><%= m.tipo %></td>
+                    <td><%= m.estado %></td>
+                    <td><%= m.plan || '-' %></td>
+                  </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
         <% } %>
       </div>
     </div>
 
     <!-- Botones de acceso a módulos -->
-    <div class="d-grid gap-2 col-md-4">
+    <div class="d-grid gap-2 col-12 col-md-4">
       <a href="/mantenimientos" class="btn btn-primary">🔧 Ir a mantenimientos</a>
       <a href="/agenda" class="btn btn-secondary">📅 Ir a agenda</a>
       <a href="/unidades" class="btn btn-info text-white">🚛 Ir a unidades</a>
