@@ -1,0 +1,274 @@
+const express = require("express");
+const router = express.Router();
+const pool = require("../db");
+const { enviarConfirmacionCita } = require("../utils/emailService");
+
+// =====================================================
+// MIDDLEWARES DE AUTENTICACIÓN Y ROLES
+// =====================================================
+function requireAuth(req, res, next) {
+  if (!req.session.user) {
+    return res.redirect("/login");
+  }
+  next();
+}
+
+function allowRoles(...roles) {
+  return (req, res, next) => {
+    if (!req.session.user) return res.redirect("/login");
+    if (roles.includes(req.session.user.rol)) return next();
+    return res.status(403).send("Acceso denegado: no tienes permisos para esta sección.");
+  };
+}
+
+// Aplicar a todas las rutas de este router
+router.use(requireAuth);
+router.use(allowRoles("ADMIN", "TRAMITES"));
+
+// =====================================================
+// OBTENER SEDE FILTRO (nunca retorna undefined)
+// =====================================================
+function obtenerSedeFiltro(req) {
+  if (req.session.user.rol === "ADMIN") {
+    if (
+      req.session.sedeSeleccionada &&
+      req.session.sedeSeleccionada !== "TODAS"
+    ) {
+      return req.session.sedeSeleccionada;
+    }
+    return null;
+  }
+  const sede = req.session.sedeSeleccionada || req.session.user.sede;
+  return sede || null;
+}
+
+// =====================================================
+// LISTADO MINAE
+// =====================================================
+router.get("/", async (req, res) => {
+  try {
+    const fecha = req.query.fecha || "";
+    const negocio = req.query.negocio || "";
+    const sede = req.query.sede || "";
+    const estado = req.query.estado || "";
+    const cita = req.query.cita || "";
+
+    const sedeFiltro = obtenerSedeFiltro(req);
+
+    let sql = `
+      SELECT 
+        mt.*,
+        u.placa
+      FROM minae_tramites mt
+      JOIN unidades u ON u.id = mt.unidad_id
+      WHERE 1=1
+    `;
+    const params = [];
+
+    if (sedeFiltro !== null) {
+      sql += ` AND mt.sede = ?`;
+      params.push(sedeFiltro);
+    }
+
+    if (sede && req.session.user.rol === "ADMIN" && sedeFiltro === null) {
+      sql += ` AND mt.sede = ?`;
+      params.push(sede);
+    }
+
+    if (negocio) {
+      sql += ` AND mt.negocio = ?`;
+      params.push(negocio);
+    }
+
+    if (estado) {
+      sql += ` AND mt.estado = ?`;
+      params.push(estado);
+    }
+
+    if (cita !== "") {
+      sql += ` AND mt.tiene_cita = ?`;
+      params.push(cita === "1" ? 1 : 0);
+    }
+
+    if (fecha) {
+      sql += ` AND DATE_FORMAT(mt.vencimiento, '%Y-%m') = ?`;
+      params.push(fecha);
+    }
+
+    sql += ` ORDER BY mt.vencimiento ASC, u.placa ASC`;
+
+    const [tramites] = await pool.query(sql, params);
+
+    res.render("minae", {
+      tramites,
+      user: req.session.user,
+      sedeSeleccionada: sedeFiltro || "TODAS",
+      fechaSeleccionada: fecha,
+      negocioSeleccionado: negocio,
+      estadoSeleccionado: estado,
+      sedeManualSeleccionada: sede,
+      citaSeleccionada: cita,
+    });
+  } catch (error) {
+    console.error("❌ Error MINAE:", error);
+    res.status(500).send("Error cargando MINAE");
+  }
+});
+
+// =====================================================
+// FORM NUEVO TRÁMITE
+// =====================================================
+router.get("/nuevo", async (req, res) => {
+  try {
+    const sedeFiltro = obtenerSedeFiltro(req);
+    let sql = `SELECT id, placa, sede, negocio FROM unidades WHERE activa = 1`;
+    const params = [];
+    if (sedeFiltro !== null) {
+      sql += ` AND sede = ?`;
+      params.push(sedeFiltro);
+    }
+    sql += ` ORDER BY sede, placa`;
+    const [unidades] = await pool.query(sql, params);
+    res.render("minae_nuevo", { unidades, user: req.session.user });
+  } catch (error) {
+    console.error("❌ Error nuevo MINAE:", error);
+    res.status(500).send("Error cargando formulario MINAE");
+  }
+});
+
+// =====================================================
+// GUARDAR NUEVO TRÁMITE
+// =====================================================
+router.post("/nuevo", async (req, res) => {
+  try {
+    const {
+      unidad_id,
+      tipo,
+      cr,
+      estado,
+      fecha_envio,
+      vencimiento,
+      presentacion,
+      subsane,
+      ot,
+      empresa,
+      lugar,
+      hora,
+      observacion,
+      tiene_cita,
+      fecha_cita,
+      hora_cita,
+      lugar_cita,
+    } = req.body;
+
+    if (!unidad_id || isNaN(parseInt(unidad_id))) {
+      return res.status(400).send("ID de unidad inválido");
+    }
+    if (!tipo) {
+      return res.status(400).send("El campo 'tipo' es obligatorio");
+    }
+
+    const fechaRegex = /^\d{4}-\d{2}-\d{2}$/;
+    if (fecha_envio && !fechaRegex.test(fecha_envio)) {
+      return res.status(400).send("Formato de fecha_envio inválido (YYYY-MM-DD)");
+    }
+    if (vencimiento && !fechaRegex.test(vencimiento)) {
+      return res.status(400).send("Formato de vencimiento inválido (YYYY-MM-DD)");
+    }
+    if (fecha_cita && !fechaRegex.test(fecha_cita)) {
+      return res.status(400).send("Formato de fecha_cita inválido (YYYY-MM-DD)");
+    }
+
+    const [[unidad]] = await pool.query(
+      `SELECT id, sede, negocio FROM unidades WHERE id = ? LIMIT 1`,
+      [unidad_id]
+    );
+    if (!unidad) return res.status(404).send("Unidad no encontrada");
+
+    const tieneCitaValue = tiene_cita === "on" || tiene_cita === "true" || tiene_cita === true ? 1 : 0;
+
+    await pool.query(
+      `INSERT INTO minae_tramites (
+        unidad_id, sede, negocio,
+        tipo, cr, estado,
+        fecha_envio, vencimiento, presentacion, subsane,
+        ot, empresa, lugar, hora,
+        observacion,
+        tiene_cita, fecha_cita, hora_cita, lugar_cita,
+        creado_por
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        unidad.id, unidad.sede, unidad.negocio,
+        tipo, cr || null, estado || "PENDIENTE",
+        fecha_envio || null, vencimiento || null, presentacion || null, subsane || null,
+        ot || null, empresa || null, lugar || null, hora || null,
+        observacion || null,
+        tieneCitaValue, fecha_cita || null, hora_cita || null, lugar_cita || null,
+        req.session.user.id,
+      ]
+    );
+    res.redirect("/minae");
+  } catch (error) {
+    console.error("❌ Error guardando MINAE:", error);
+    res.status(500).send("Error guardando MINAE");
+  }
+});
+
+// =====================================================
+// FORMULARIO PARA EDITAR CITA DE UN TRÁMITE
+// =====================================================
+router.get("/:id/cita", async (req, res) => {
+  try {
+    const [rows] = await pool.query("SELECT * FROM minae_tramites WHERE id = ?", [req.params.id]);
+    if (rows.length === 0) {
+      return res.status(404).send("Trámite no encontrado");
+    }
+    res.render("minae_cita", { tramite: rows[0], user: req.session.user });
+  } catch (error) {
+    console.error("❌ Error cargando formulario de cita:", error);
+    res.status(500).send("Error interno");
+  }
+});
+
+// =====================================================
+// GUARDAR CITA DEL TRÁMITE (con correo adicional)
+// =====================================================
+router.post("/:id/cita", async (req, res) => {
+  try {
+    const { fecha_cita, hora_cita, lugar_cita, email_notificacion } = req.body;
+    const id = req.params.id;
+
+    // Actualizar la cita y reiniciar flags de recordatorios
+    await pool.query(
+      `UPDATE minae_tramites 
+       SET tiene_cita = 1, 
+           fecha_cita = ?, 
+           hora_cita = ?, 
+           lugar_cita = ?,
+           email_notificacion = ?,
+           recordatorio_15d_enviado = 0,
+           recordatorio_2d_enviado = 0
+       WHERE id = ?`,
+      [fecha_cita || null, hora_cita || null, lugar_cita || null, email_notificacion || null, id]
+    );
+
+    // Obtener datos completos del trámite (incluyendo placa)
+    const [[tramite]] = await pool.query(
+      `SELECT mt.*, u.placa 
+       FROM minae_tramites mt 
+       JOIN unidades u ON u.id = mt.unidad_id 
+       WHERE mt.id = ?`,
+      [id]
+    );
+
+    // Enviar confirmación a dmartinez.s@tomza.com + email adicional
+    await enviarConfirmacionCita(tramite, fecha_cita, hora_cita, lugar_cita, email_notificacion);
+
+    res.redirect("/minae");
+  } catch (error) {
+    console.error("❌ Error guardando cita:", error);
+    res.status(500).send("Error guardando la cita");
+  }
+});
+
+module.exports = router;

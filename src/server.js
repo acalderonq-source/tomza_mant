@@ -1,5 +1,5 @@
 require("dotenv").config();
-
+require("./cronJobs");
 const express = require("express");
 const path = require("path");
 const session = require("express-session");
@@ -32,6 +32,8 @@ app.use(session({
     httpOnly: true
   }
 }));
+const minaeRoutes = require("./routes/minae.routes");
+app.use("/minae", minaeRoutes);
 app.use("/dekra", dekraRoutes);
 // ===================== VISTAS =====================
 app.set("view engine", "ejs");

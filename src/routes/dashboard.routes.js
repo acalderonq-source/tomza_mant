@@ -21,9 +21,7 @@ router.get("/", async (req, res) => {
     // FECHA HOY
     // =========================
     const hoy = new Date();
-
-    const fechaHoy =
-      hoy.toISOString().split("T")[0];
+    const fechaHoy = hoy.toISOString().split("T")[0];
 
     // =========================
     // TRAER SEDES EXTRA
@@ -51,87 +49,36 @@ router.get("/", async (req, res) => {
 
     // ADMIN
     if (req.session.user.rol === "ADMIN") {
-
-      if (
-        req.session.sedeSeleccionada &&
-        req.session.sedeSeleccionada !== "TODAS"
-      ) {
-
-        sedeFiltro =
-          req.session.sedeSeleccionada;
-
+      if (req.session.sedeSeleccionada && req.session.sedeSeleccionada !== "TODAS") {
+        sedeFiltro = req.session.sedeSeleccionada;
       }
-
     } else {
-
       // MULTI-SEDE
-      if (
-        req.session.sedeSeleccionada &&
-        sedesPermitidas.includes(
-          req.session.sedeSeleccionada
-        )
-      ) {
-
-        sedeFiltro =
-          req.session.sedeSeleccionada;
-
+      if (req.session.sedeSeleccionada && sedesPermitidas.includes(req.session.sedeSeleccionada)) {
+        sedeFiltro = req.session.sedeSeleccionada;
       } else {
-
-        sedeFiltro =
-          req.session.user.sede;
-
+        sedeFiltro = req.session.user.sede;
       }
-
     }
 
-    console.log(
-      "👤 Usuario:",
-      req.session.user.usuario
-    );
-
-    console.log(
-      "📍 Sedes permitidas:",
-      sedesPermitidas
-    );
-
-    console.log(
-      "📍 Sede actual:",
-      sedeFiltro
-    );
+    console.log("👤 Usuario:", req.session.user.usuario);
+    console.log("📍 Sedes permitidas:", sedesPermitidas);
+    console.log("📍 Sede actual:", sedeFiltro);
 
     // =========================
     // QUERY HOY
     // =========================
-    let condicionesHoy = [
-      "m.fecha_programada = ?"
-    ];
-
+    let condicionesHoy = ["m.fecha_programada = ?"];
     let paramsHoy = [fechaHoy];
 
-    // =========================
-    // QUERY KPIS
-    // =========================
     let condicionesStats = ["1=1"];
-
     let paramsStats = [];
 
-    // =========================
-    // FILTRO SEDE
-    // =========================
     if (sedeFiltro) {
-
-      condicionesHoy.push(
-        "u.sede = ?"
-      );
-
+      condicionesHoy.push("u.sede = ?");
       paramsHoy.push(sedeFiltro);
-
-      condicionesStats.push(
-        "u.sede = ?"
-      );
-
+      condicionesStats.push("u.sede = ?");
       paramsStats.push(sedeFiltro);
-
     }
 
     // =========================
@@ -145,98 +92,47 @@ router.get("/", async (req, res) => {
         m.tipo,
         m.estado,
         m.plan,
-        DATE_FORMAT(
-          m.fecha_programada,
-          '%d/%m/%Y'
-        ) AS fecha
-
+        DATE_FORMAT(m.fecha_programada, '%d/%m/%Y') AS fecha
       FROM mantenimientos m
-
-      JOIN unidades u
-        ON u.id = m.unidad_id
-
+      JOIN unidades u ON u.id = m.unidad_id
       WHERE ${condicionesHoy.join(" AND ")}
-
       ORDER BY m.id
     `;
-
-    const [hoyMantenimientos] =
-      await pool.query(
-        sqlHoy,
-        paramsHoy
-      );
+    const [hoyMantenimientos] = await pool.query(sqlHoy, paramsHoy);
 
     // =========================
     // KPIs
     // =========================
     const sqlStats = `
       SELECT 
-
-        SUM(
-          CASE
-            WHEN m.estado = 'CERRADO'
-            THEN 1
-            ELSE 0
-          END
-        ) AS realizados,
-
-        SUM(
-          CASE
-            WHEN m.estado != 'CERRADO'
-            THEN 1
-            ELSE 0
-          END
-        ) AS pendientes
-
+        SUM(CASE WHEN m.estado = 'CERRADO' THEN 1 ELSE 0 END) AS realizados,
+        SUM(CASE WHEN m.estado != 'CERRADO' THEN 1 ELSE 0 END) AS pendientes
       FROM mantenimientos m
-
-      JOIN unidades u
-        ON u.id = m.unidad_id
-
+      JOIN unidades u ON u.id = m.unidad_id
       WHERE ${condicionesStats.join(" AND ")}
     `;
-
-    const [statsRows] =
-      await pool.query(
-        sqlStats,
-        paramsStats
-      );
-
-    const stats = statsRows[0] || {
-      realizados: 0,
-      pendientes: 0
-    };
+    const [statsRows] = await pool.query(sqlStats, paramsStats);
+    const stats = statsRows[0] || { realizados: 0, pendientes: 0 };
 
     // =========================
-    // RENDER
+    // RENDER (se pasan TODAS las variables que la vista pueda esperar)
     // =========================
     res.render("dashboard", {
-
       user: req.session.user,
-
       hoy: hoyMantenimientos,
-
       stats,
-
-      sedeSeleccionada:
-        sedeFiltro || "TODAS",
-
-      sedesMultiples:
-        sedesPermitidas
-
+      sedeSeleccionada: sedeFiltro || "TODAS",
+      sedesMultiples: sedesPermitidas,
+      // Variables para evitar errores si la vista tiene bloques de trámites
+      totalPendientes: 0,
+      porVencer: 0,
+      citasProximas: [],
+      ultimosTramites: []
     });
 
   } catch (error) {
-
-    console.error(
-      "❌ ERROR dashboard:",
-      error
-    );
-
-    res
-      .status(500)
-      .send("Internal Server Error");
-
+    console.error("❌ ERROR dashboard:", error);
+    res.status(500).send("Internal Server Error");
   }
 
 });

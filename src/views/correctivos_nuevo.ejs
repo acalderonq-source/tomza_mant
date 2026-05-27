@@ -4,12 +4,40 @@
   <meta charset="UTF-8">
   <title>Nuevo Correctivo</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body {
+      background: #f4f6f9;
+    }
+    .card {
+      border: none;
+      border-radius: 14px;
+      box-shadow: 0 2px 12px rgba(0,0,0,.08);
+    }
+    .table td, .table th {
+      vertical-align: middle;
+    }
+    textarea {
+      resize: none;
+    }
+    .titulo-seccion {
+      font-weight: 700;
+      color: #1f2937;
+    }
+    .table thead th {
+      background: #1f2937;
+      color: white;
+      border-color: #1f2937;
+    }
+    .mec-label {
+      font-weight: 600;
+      color: #111827;
+    }
+  </style>
 </head>
-
-<body class="bg-light">
+<body>
 
 <nav class="navbar navbar-dark bg-dark px-3">
-  <span class="navbar-brand">Tomza - Nuevo Correctivo</span>
+  <span class="navbar-brand">🔧 Tomza - Nuevo Correctivo</span>
   <div class="text-white">
     <%= user.usuario %> (<%= user.rol %>)
     <a href="/mantenimientos" class="btn btn-secondary btn-sm ms-2">Volver</a>
@@ -17,60 +45,101 @@
 </nav>
 
 <div class="container mt-4">
+  <div class="card p-4">
+    <form id="formCorrectivo" method="POST" action="/mantenimientos/correctivos">
 
-  <div class="card p-3">
-    <form method="POST" action="/mantenimientos/correctivos">
-      
-      <label class="form-label">Placa</label>
-      <select name="unidad_id" class="form-select" required>
-        <% unidades.forEach(u => { %>
-          <option value="<%= u.id %>"><%= u.placa %></option>
-        <% }) %>
-      </select>
-
-      <label class="form-label mt-3">Mecánicos que realizaron el trabajo</label>
-
-      <div class="row">
-        <% mecanicos.forEach(m => { %>
-          <div class="col-12 col-md-6">
-            <div class="form-check">
-              <input
-                class="form-check-input"
-                type="checkbox"
-                name="mecanicos[]"
-                value="<%= m.id %>"
-                id="mec_<%= m.id %>"
-              >
-              <label class="form-check-label" for="mec_<%= m.id %>">
-                <%= m.nombre %>
-              </label>
-            </div>
-          </div>
-        <% }) %>
+      <!-- UNIDAD -->
+      <div class="mb-4">
+        <label class="form-label fw-bold">🚛 Unidad</label>
+        <select name="unidad_id" class="form-select" required>
+          <% unidades.forEach(u => { %>
+            <option value="<%= u.id %>"><%= u.placa %></option>
+          <% }) %>
+        </select>
       </div>
 
-      <label class="form-label mt-3">Trabajo realizado</label>
-      <textarea name="trabajo_realizado" class="form-control" rows="4" required></textarea>
+      <!-- EJECUCIÓN POR MECÁNICO -->
+      <div class="mb-4">
+        <h4 class="titulo-seccion">🔧 Ejecución por mecánico</h4>
+        <div class="alert alert-primary mt-3">
+          Seleccione los mecánicos que trabajaron y detalle qué realizó cada uno.
+        </div>
+        <div class="table-responsive">
+          <table class="table table-bordered align-middle">
+            <thead>
+              <tr>
+                <th style="width:70px;" class="text-center">✔</th>
+                <th style="width:280px;">Mecánico</th>
+                <th>Trabajo realizado</th>
+                <th>Repuestos usados</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% mecanicos.forEach(m => { %>
+                <tr>
+                  <td class="text-center">
+                    <input class="form-check-input mec-check" type="checkbox" name="mecanicos[]" value="<%= m.id %>" id="mec_<%= m.id %>">
+                  </td>
+                  <td>
+                    <label class="mec-label" for="mec_<%= m.id %>"><%= m.nombre %></label>
+                  </td>
+                  <td>
+                    <textarea name="trabajos[<%= m.id %>]" class="form-control trabajo-text" rows="2" placeholder="Detalle del trabajo realizado"></textarea>
+                  </td>
+                  <td>
+                    <input type="text" name="repuestos[<%= m.id %>]" class="form-control" placeholder="Ej: coolant, abrazaderas, manguera">
+                  </td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      </div>
 
-      <label class="form-label mt-3">Pendiente</label>
-      <textarea name="pendiente" class="form-control" rows="3"></textarea>
+      <!-- PENDIENTE GENERAL -->
+      <div class="mb-4">
+        <label class="form-label fw-bold">⚠ Pendiente general</label>
+        <textarea name="pendiente" class="form-control" rows="4" placeholder="Pendientes del vehículo..."></textarea>
+      </div>
 
-      <button class="btn btn-danger mt-3">Guardar Correctivo</button>
-
+      <!-- BOTONES -->
+      <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-success">💾 Guardar Correctivo</button>
+        <a href="/mantenimientos" class="btn btn-secondary">Cancelar</a>
+      </div>
     </form>
   </div>
-
 </div>
 
 <script>
-  document.querySelector("form").addEventListener("submit", function(e) {
-    const checkboxes = document.querySelectorAll("input[name='mecanicos[]']");
-    const algunoSeleccionado = Array.from(checkboxes).some(cb => cb.checked);
+  // Esperar a que el DOM esté listo
+  document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('formCorrectivo');
 
-    if (!algunoSeleccionado) {
-      e.preventDefault();
-      alert("Debe seleccionar al menos un mecánico.");
-    }
+    form.addEventListener('submit', function(e) {
+      // 1. Validar que al menos un mecánico esté seleccionado
+      const checks = document.querySelectorAll('.mec-check');
+      const algunoSeleccionado = Array.from(checks).some(cb => cb.checked);
+      if (!algunoSeleccionado) {
+        e.preventDefault();
+        alert('Debe seleccionar al menos un mecánico.');
+        return;
+      }
+
+      // 2. Validar que al menos un trabajo tenga texto
+      const trabajos = document.querySelectorAll('.trabajo-text');
+      let tieneTrabajo = false;
+      trabajos.forEach(t => {
+        if (t.value && t.value.trim().length > 0) {
+          tieneTrabajo = true;
+        }
+      });
+      if (!tieneTrabajo) {
+        e.preventDefault();
+        alert('Debe escribir al menos un trabajo.');
+        return;
+      }
+    });
   });
 </script>
 

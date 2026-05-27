@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+
+  <title>Nuevo trámite MINAE</title>
+
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+
+<body class="bg-dark text-light">
+
+<div class="container mt-5">
+
+  <div class="card bg-secondary border-0 shadow-lg">
+
+    <div class="card-header bg-warning text-dark fw-bold">
+      🏛️ Nuevo trámite MINAE
+    </div>
+
+    <div class="card-body">
+
+      <form method="POST" action="/minae/nuevo">
+
+        <!-- UNIDAD -->
+        <div class="mb-3">
+
+          <label class="form-label">
+            Unidad
+          </label>
+
+          <select name="unidad_id" class="form-select" required>
+
+            <option value="">
+              Seleccione unidad
+            </option>
+
+            <% unidades.forEach(u => { %>
+
+              <option value="<%= u.id %>">
+
+                <%= u.placa %> -
+                <%= u.sede %>
+
+              </option>
+
+            <% }) %>
+
+          </select>
+
+        </div>
+
+        <!-- TIPO -->
+        <div class="mb-3">
+
+          <label class="form-label">
+            Tipo trámite
+          </label>
+
+          <input
+            type="text"
+            name="tipo"
+            class="form-control"
+            required>
+
+        </div>
+
+        <!-- CR -->
+        <div class="mb-3">
+
+          <label class="form-label">
+            CR#
+          </label>
+
+          <input
+            type="text"
+            name="cr"
+            class="form-control">
+
+        </div>
+
+        <!-- ESTADO -->
+        <div class="mb-3">
+
+          <label class="form-label">
+            Estado
+          </label>
+
+          <select
+            name="estado"
+            class="form-select">
+
+            <option value="PENDIENTE">
+              PENDIENTE
+            </option>
+
+            <option value="EN PROCESO">
+              EN PROCESO
+            </option>
+
+            <option value="FINALIZADO">
+              FINALIZADO
+            </option>
+
+          </select>
+
+        </div>
+
+        <!-- VENCIMIENTO -->
+        <div class="mb-3">
+
+          <label class="form-label">
+            Vencimiento
+          </label>
+
+          <input
+            type="date"
+            name="vencimiento"
+            class="form-control">
+
+        </div>
+
+        <!-- EMPRESA -->
+        <div class="mb-3">
+
+          <label class="form-label">
+            Empresa
+          </label>
+
+          <input
+            type="text"
+            name="empresa"
+            class="form-control">
+
+        </div>
+
+        <!-- LUGAR -->
+        <div class="mb-3">
+
+          <label class="form-label">
+            Lugar
+          </label>
+
+          <input
+            type="text"
+            name="lugar"
+            class="form-control">
+
+        </div>
+
+        <!-- HORA -->
+        <div class="mb-3">
+
+          <label class="form-label">
+            Hora
+          </label>
+
+          <input
+            type="text"
+            name="hora"
+            class="form-control">
+
+        </div>
+
+        <!-- OT -->
+        <div class="mb-3">
+
+          <label class="form-label">
+            OT
+          </label>
+
+          <input
+            type="text"
+            name="ot"
+            class="form-control">
+
+        </div>
+
+        <!-- OBS -->
+        <div class="mb-3">
+
+          <label class="form-label">
+            Observación
+          </label>
+
+          <textarea
+            name="observacion"
+            rows="4"
+            class="form-control"></textarea>
+
+        </div>
+
+        <div class="d-flex justify-content-between">
+
+          <a href="/minae" class="btn btn-secondary">
+            Volver
+          </a>
+
+          <button class="btn btn-warning fw-bold">
+            Guardar trámite
+          </button>
+
+        </div>
+
+      </form>
+
+    </div>
+
+  </div>
+
+</div>
+
+</body>
+</html>

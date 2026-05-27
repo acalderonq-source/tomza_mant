@@ -25,11 +25,11 @@ router.post("/login", async (req, res) => {
       });
     }
 
-    // 🔥 QUERY CORREGIDO
+    // Buscar usuario en la base de datos
     const [rows] = await pool.query(
-  "SELECT * FROM usuarios WHERE usuario = ? LIMIT 1",
-  [usuario]
-);
+      "SELECT * FROM usuarios WHERE usuario = ? LIMIT 1",
+      [usuario]
+    );
 
     console.log("Usuario recibido:", usuario);
     console.log("Rows encontradas:", rows);
@@ -66,12 +66,12 @@ router.post("/login", async (req, res) => {
       sede: user.sede
     };
 
-    // Redirigir
-    res.redirect("/dashboard");
+    // Todos los roles van al dashboard principal
+    res.redirect('/dashboard');
 
   } catch (error) {
     console.error("❌ ERROR LOGIN COMPLETO:", error);
-    return res.send(error.message); // 🔥 para ver el error real
+    return res.status(500).send(error.message);
   }
 });
 
