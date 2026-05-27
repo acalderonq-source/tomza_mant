@@ -55,9 +55,7 @@
     <%= user.nombre || user.usuario %> (<%= user.rol %>)
   </span>
 
-  <a href="/logout" class="btn btn-warning btn-sm">
-    Salir
-  </a>
+  <a href="/logout" class="btn btn-warning btn-sm">Salir</a>
 </nav>
 
 <div class="container mt-4">
@@ -66,14 +64,12 @@
   <div class="mb-3">
     <label class="fw-bold text-warning">📍 Filtrar por sede:</label>
     <div class="d-flex flex-wrap gap-2 mt-1">
-      <!-- Si es ADMIN, muestra botón "TODAS" -->
       <% if (user.rol === 'ADMIN') { %>
         <form method="POST" action="/cambiar-sede" class="d-inline">
           <button class="btn btn-sm <%= sedeSeleccionada === 'TODAS' ? 'btn-warning' : 'btn-outline-light' %>" name="sede" value="TODAS">TODAS</button>
         </form>
       <% } %>
 
-      <!-- Mostrar cada sede permitida -->
       <% sedesPermitidas.forEach(sede => { %>
         <form method="POST" action="/cambiar-sede" class="d-inline">
           <button class="btn btn-sm <%= sedeSeleccionada === sede ? 'btn-warning' : 'btn-outline-light' %>" name="sede" value="<%= sede %>"><%= sede %></button>
@@ -133,31 +129,22 @@
             <td data-label="Estado">
               <span class="badge bg-secondary"><%= item.estado %></span>
             </td>
-            <td data-label="Sede"><%= item.sede %><\/td>
+            <td data-label="Sede"><%= item.sede %></td>
             <td data-label="Acciones" class="text-end">
               <% if (item.tipo_registro === 'PREVENTIVO') { %>
-                <a href="/mantenimientos/<%= item.id %>" class="btn btn-warning btn-sm">
-                  Ver
-                </a>
+                <a href="/mantenimientos/<%= item.id %>" class="btn btn-warning btn-sm">Ver</a>
               <% } else { %>
                 <span class="text-muted small">—</span>
               <% } %>
-            <\/td>
-            
+            </td>
+          </tr>
         <% }) %>
-
         <% if (agenda.length === 0) { %>
-            
-            <td colspan="6" class="text-center text-muted">
-              No hay mantenimientos preventivos ni correctivos en esta fecha para la sede seleccionada
-              
-            
+          <tr><td colspan="6" class="text-center text-muted">No hay registros para esta fecha y sede</td></tr>
         <% } %>
       </tbody>
-      
+    </table>
   </div>
-
 </div>
-
 </body>
 </html>
