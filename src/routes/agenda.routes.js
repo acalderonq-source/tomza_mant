@@ -1,18 +1,15 @@
 const express = require("express");
 const router = express.Router();
 const pool = require("../db");
-const { getSedesPermitidas } = require("../utils/sedes");
 
 // ================= FUNCIONES =================
 
-// fecha hoy YYYY-MM-DD
 function hoy() {
   const f = new Date();
   f.setHours(0, 0, 0, 0);
   return f.toISOString().slice(0, 10);
 }
 
-// siguiente día hábil
 function siguienteDiaHabil(fechaBase) {
   const f = new Date(fechaBase);
   do {
@@ -21,13 +18,46 @@ function siguienteDiaHabil(fechaBase) {
   return f.toISOString().slice(0, 10);
 }
 
-// ================= AGENDA HOY (preventivos + correctivos) =================
+// Obtener sedes permitidas del usuario (igual que en dashboard)
+async function obtenerSedesPermitidas(req) {
+  const [extras] = await pool.query(
+    `SELECT sede FROM usuarios_sedes WHERE usuario_id = ?`,
+    [req.session.user.id]
+  );
+  const sedes = [
+    ...new Set([
+      req.session.user.sede,
+      ...extras.map(e => e.sede)
+    ])
+  ].filter(Boolean);
+  return sedes;
+}
+
+// Determinar la sede actual (filtro)
+function obtenerSedeFiltro(req, sedesPermitidas) {
+  if (req.session.user.rol === "ADMIN") {
+    if (req.session.sedeSeleccionada && req.session.sedeSeleccionada !== "TODAS") {
+      return req.session.sedeSeleccionada;
+    }
+    return null; // null = todas las sedes
+  } else {
+    // Usuarios normales: si tiene varias sedes, usa la seleccionada; si no, la primera
+    if (req.session.sedeSeleccionada && sedesPermitidas.includes(req.session.sedeSeleccionada)) {
+      return req.session.sedeSeleccionada;
+    } else {
+      return sedesPermitidas[0] || null;
+    }
+  }
+}
+
+// ================= AGENDA HOY =================
 router.get("/", async (req, res) => {
   try {
     if (!req.session.user) return res.redirect("/login");
 
     const fecha = hoy();
-    const sedesPermitidas = await getSedesPermitidas(req);
+    const sedesPermitidas = await obtenerSedesPermitidas(req);
+    const sedeFiltro = obtenerSedeFiltro(req, sedesPermitidas);
 
     let sql = `
       SELECT 
@@ -62,7 +92,11 @@ router.get("/", async (req, res) => {
 
     const params = [fecha, fecha];
 
-    if (sedesPermitidas.length) {
+    if (sedeFiltro) {
+      sql += " AND u.sede = ?";
+      params.push(sedeFiltro);
+    } else if (sedesPermitidas.length && req.session.user.rol !== "ADMIN") {
+      // Si no es ADMIN y no hay sede específica, mostrar solo las sedes permitidas
       sql += " AND u.sede IN (?)";
       params.push(sedesPermitidas);
     }
@@ -75,7 +109,9 @@ router.get("/", async (req, res) => {
       agenda,
       fecha,
       user: req.session.user,
-      vista: "hoy"
+      vista: "hoy",
+      sedeSeleccionada: sedeFiltro || "TODAS",
+      sedesPermitidas
     });
   } catch (err) {
     console.error("🔥 ERROR REAL:", err);
@@ -83,13 +119,14 @@ router.get("/", async (req, res) => {
   }
 });
 
-// ================= AGENDA MAÑANA (preventivos + correctivos) =================
+// ================= AGENDA MAÑANA =================
 router.get("/manana", async (req, res) => {
   try {
     if (!req.session.user) return res.redirect("/login");
 
     const manana = siguienteDiaHabil(new Date());
-    const sedesPermitidas = await getSedesPermitidas(req);
+    const sedesPermitidas = await obtenerSedesPermitidas(req);
+    const sedeFiltro = obtenerSedeFiltro(req, sedesPermitidas);
 
     let sql = `
       SELECT 
@@ -124,7 +161,10 @@ router.get("/manana", async (req, res) => {
 
     const params = [manana, manana];
 
-    if (sedesPermitidas.length) {
+    if (sedeFiltro) {
+      sql += " AND u.sede = ?";
+      params.push(sedeFiltro);
+    } else if (sedesPermitidas.length && req.session.user.rol !== "ADMIN") {
       sql += " AND u.sede IN (?)";
       params.push(sedesPermitidas);
     }
@@ -137,7 +177,9 @@ router.get("/manana", async (req, res) => {
       agenda,
       fecha: manana,
       user: req.session.user,
-      vista: "manana"
+      vista: "manana",
+      sedeSeleccionada: sedeFiltro || "TODAS",
+      sedesPermitidas
     });
   } catch (err) {
     console.error("Error agenda mañana:", err);
@@ -145,7 +187,7 @@ router.get("/manana", async (req, res) => {
   }
 });
 
-// ================= FORM NUEVO MANTENIMIENTO PREVENTIVO =================
+// ================= FORM NUEVO =================
 router.get("/nuevo", async (req, res) => {
   try {
     if (!req.session.user) return res.redirect("/login");
@@ -154,29 +196,22 @@ router.get("/nuevo", async (req, res) => {
       return res.status(403).send("No autorizado");
     }
 
-    const sedesPermitidas = await getSedesPermitidas(req);
+    const sedesPermitidas = await obtenerSedesPermitidas(req);
+    let sedeFiltro = req.session.sedeSeleccionada && sedesPermitidas.includes(req.session.sedeSeleccionada)
+      ? req.session.sedeSeleccionada
+      : sedesPermitidas[0];
 
-    let sedeFiltro = null;
-    if (sedesPermitidas.length === 1) {
-      sedeFiltro = sedesPermitidas[0];
-    } else if (req.session.sedeSeleccionada && sedesPermitidas.includes(req.session.sedeSeleccionada)) {
-      sedeFiltro = req.session.sedeSeleccionada;
-    } else {
-      sedeFiltro = req.session.user.sede;
-    }
-
-    if (!sedeFiltro) {
-      return res.status(400).send("No se ha definido una sede para el usuario.");
-    }
+    if (!sedeFiltro) return res.status(400).send("No hay sedes disponibles");
 
     const [unidades] = await pool.query(
-      `SELECT id, placa, sede FROM unidades WHERE sede = ? ORDER BY placa`,
+      `SELECT id, placa FROM unidades WHERE sede = ? ORDER BY placa`,
       [sedeFiltro]
     );
 
     res.render("agenda_nuevo", {
       unidades,
-      user: req.session.user
+      user: req.session.user,
+      sedeSeleccionada: sedeFiltro
     });
   } catch (err) {
     console.error("Error form agenda:", err);
@@ -184,7 +219,7 @@ router.get("/nuevo", async (req, res) => {
   }
 });
 
-// ================= GUARDAR NUEVO MANTENIMIENTO PREVENTIVO =================
+// ================= GUARDAR =================
 router.post("/nuevo", async (req, res) => {
   try {
     if (!req.session.user) return res.redirect("/login");
@@ -194,10 +229,7 @@ router.post("/nuevo", async (req, res) => {
     }
 
     const { unidad_id, tipo, plan, fecha } = req.body;
-
-    if (!unidad_id || !tipo || !fecha) {
-      return res.status(400).send("Datos incompletos");
-    }
+    if (!unidad_id || !tipo || !fecha) return res.status(400).send("Datos incompletos");
 
     const [[unidad]] = await pool.query("SELECT sede FROM unidades WHERE id = ?", [unidad_id]);
     if (!unidad) return res.status(404).send("Unidad no encontrada");
