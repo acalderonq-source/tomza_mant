@@ -17,7 +17,6 @@
 </nav>
 
 <div class="container mt-4">
-
   <h4 class="mb-3">📕 Historial de Correctivos</h4>
 
   <table class="table table-bordered table-hover">
@@ -27,28 +26,33 @@
         <th>Placa</th>
         <th>Trabajo realizado</th>
         <th>Pendiente</th>
-        <th>Mecánico</th>
+        <th>Mecánico(s)</th>
+        <th>Acciones</th>
       </tr>
     </thead>
     <tbody>
       <% if (correctivos.length === 0) { %>
         <tr>
-          <td colspan="5" class="text-center">No hay correctivos</td>
+          <td colspan="6" class="text-center">No hay correctivos</td>
         </tr>
+      <% } else { %>
+        <% correctivos.forEach(c => { %>
+          <tr>
+            <td><%= c.fecha_formato %></td>
+            <td><strong><%= c.placa %></strong></td>
+            <td><%= c.trabajo_realizado %></td>
+            <td><%= c.pendiente || '—' %></td>
+            <td><%= c.mecanicos %></td>
+            <td>
+              <a href="/mantenimientos/correctivos/<%= c.id %>/agregar" class="btn btn-sm btn-primary">
+                ➕ Agregar más
+              </a>
+            </td>
+          </tr>
+        <% }) %>
       <% } %>
-
-      <% correctivos.forEach(c => { %>
-        <tr>
-          <td><%= c.fecha_formato %></td>
-          <td><strong><%= c.placa %></strong></td>
-          <td><%= c.trabajo_realizado %></td>
-          <td><%= c.pendiente || '—' %></td>
-          <td><%= c.mecanicos %></td>
-        </tr>
-      <% }) %>
     </tbody>
   </table>
-
 </div>
 </body>
 </html>
