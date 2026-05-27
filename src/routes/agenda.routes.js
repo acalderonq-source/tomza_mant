@@ -27,8 +27,7 @@ router.get("/", async (req, res) => {
     if (!req.session.user) return res.redirect("/login");
 
     const fecha = hoy();
-    const sedesPermitidas =
-  await getSedesPermitidas(req);
+    const sedesPermitidas = await getSedesPermitidas(req); // ✅ await
 
     let sql = `
       SELECT 
@@ -42,9 +41,8 @@ router.get("/", async (req, res) => {
       FROM mantenimientos m
       JOIN unidades u ON u.id = m.unidad_id
       WHERE m.fecha_programada = ?
-AND m.tipo = 'PREVENTIVO'
+        AND m.tipo = 'PREVENTIVO'
     `;
-
     const params = [fecha];
 
     if (sedesPermitidas.length) {
@@ -62,11 +60,10 @@ AND m.tipo = 'PREVENTIVO'
       user: req.session.user,
       vista: "hoy"
     });
-
-  }catch (err) {
-  console.error("🔥 ERROR REAL:", err);
-  return res.send(err.message);
-}
+  } catch (err) {
+    console.error("🔥 ERROR REAL:", err);
+    return res.status(500).send(err.message);
+  }
 });
 
 // ================= AGENDA MAÑANA =================
@@ -75,7 +72,7 @@ router.get("/manana", async (req, res) => {
     if (!req.session.user) return res.redirect("/login");
 
     const manana = siguienteDiaHabil(new Date());
-    const sedesPermitidas = getSedesPermitidas(req);
+    const sedesPermitidas = await getSedesPermitidas(req); // ✅ await
 
     let sql = `
       SELECT 
@@ -90,7 +87,6 @@ router.get("/manana", async (req, res) => {
       JOIN unidades u ON u.id = m.unidad_id
       WHERE m.fecha_programada = ?
     `;
-
     const params = [manana];
 
     if (sedesPermitidas.length) {
@@ -108,7 +104,6 @@ router.get("/manana", async (req, res) => {
       user: req.session.user,
       vista: "manana"
     });
-
   } catch (err) {
     console.error("Error agenda mañana:", err);
     res.status(500).send("Error interno");
@@ -124,22 +119,33 @@ router.get("/nuevo", async (req, res) => {
       return res.status(403).send("No autorizado");
     }
 
-    const sedesPermitidas = getSedesPermitidas(req);
+    // Obtenemos la(s) sede(s) permitidas para el usuario
+    const sedesPermitidas = await getSedesPermitidas(req);
+
+    // Si el usuario tiene varias sedes, debemos permitir elegir? Por simplicidad,
+    // tomamos la primera o usamos la sede de sesión. Ajusta según tu lógica.
+    let sedeFiltro = null;
+    if (sedesPermitidas.length === 1) {
+      sedeFiltro = sedesPermitidas[0];
+    } else if (req.session.sedeSeleccionada && sedesPermitidas.includes(req.session.sedeSeleccionada)) {
+      sedeFiltro = req.session.sedeSeleccionada;
+    } else {
+      sedeFiltro = req.session.user.sede; // puede ser undefined si el usuario no tiene sede fija
+    }
+
+    if (!sedeFiltro) {
+      return res.status(400).send("No se ha definido una sede para el usuario.");
+    }
 
     const [unidades] = await pool.query(
-  `
-  SELECT id, sede
-  FROM unidades
-  WHERE sede = ?
-  ORDER BY id
-  `,
-  [sede]
-);
+      `SELECT id, placa, sede FROM unidades WHERE sede = ? ORDER BY placa`,
+      [sedeFiltro]
+    );
+
     res.render("agenda_nuevo", {
       unidades,
       user: req.session.user
     });
-
   } catch (err) {
     console.error("Error form agenda:", err);
     res.status(500).send("Error interno");
@@ -161,21 +167,18 @@ router.post("/nuevo", async (req, res) => {
       return res.status(400).send("Datos incompletos");
     }
 
-    await pool.query(`
-  INSERT INTO mantenimientos 
-  (unidad_id, sede, tipo, plan, estado, fecha_programada, creado_por)
-  VALUES (?, ?, ?, ?, 'PENDIENTE', ?, ?)
-`, [
-  unidad_id,
-  req.session.user.sede, // 🔥 AQUÍ ESTÁ LA CLAVE
-  tipo,
-  plan || null,
-  fecha,
-  req.session.user.id
-]);
+    // Obtener la sede de la unidad seleccionada (más seguro que usar la sede de sesión)
+    const [[unidad]] = await pool.query("SELECT sede FROM unidades WHERE id = ?", [unidad_id]);
+    if (!unidad) return res.status(404).send("Unidad no encontrada");
+
+    await pool.query(
+      `INSERT INTO mantenimientos 
+       (unidad_id, sede, tipo, plan, estado, fecha_programada, creado_por)
+       VALUES (?, ?, ?, ?, 'PENDIENTE', ?, ?)`,
+      [unidad_id, unidad.sede, tipo, plan || null, fecha, req.session.user.id]
+    );
 
     res.redirect("/agenda");
-
   } catch (err) {
     console.error("Error guardando agenda:", err);
     res.status(500).send("Error interno");
