@@ -86,6 +86,9 @@ app.get("/logout", (req, res) => {
 });
 
 // ===================== SERVER =====================
-app.listen(PORT, () => {
-  console.log("🚀 Servidor corriendo en puerto", PORT);
+const PORT = process.env.PORT || 3000;
+
+// El segundo parámetro '0.0.0.0' es la clave
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`🚀 Servidor corriendo en puerto ${PORT}`);
 });
