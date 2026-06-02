@@ -122,25 +122,23 @@
         </tr>
       </thead>
       <tbody>
-        <% tramites.forEach(t => { %>
-          <%
-            // Determinar color según vencimiento
-            let color = '';
-            if (t.vencimiento) {
-              const hoy = new Date();
-              const vence = new Date(t.vencimiento);
-              const diferencia = Math.ceil((vence - hoy) / (1000 * 60 * 60 * 24));
-              if (diferencia < 0) color = 'table-danger';
-              else if (diferencia <= 15) color = 'table-warning';
-              else color = 'table-success';
-            }
-          %>
+        <% tramites.forEach(t => { 
+          let color = '';
+          if (t.vencimiento) {
+            const hoy = new Date();
+            const vence = new Date(t.vencimiento);
+            const dif = Math.ceil((vence - hoy) / (1000 * 60 * 60 * 24));
+            if (dif < 0) color = 'table-danger';
+            else if (dif <= 15) color = 'table-warning';
+            else color = 'table-success';
+          }
+        %>
           <tr class="<%= color %>">
             <td data-label="Placa"><strong><%= t.placa %></strong></td>
             <td data-label="Tipo"><%= t.tipo || '-' %></td>
             <td data-label="CR#"><%= t.cr || '-' %></td>
             <td data-label="Estado"><%= t.estado || '-' %></td>
-            <td data-label="Vencimiento"><% if (t.vencimiento) { %><%= new Date(t.vencimiento).toLocaleDateString('es-CR') %><% } else { %>-<% } %></td>
+            <td data-label="Vencimiento"><%= t.vencimiento ? new Date(t.vencimiento).toLocaleDateString('es-CR') : '-' %></td>
             <td data-label="Empresa"><%= t.empresa || '-' %></td>
             <td data-label="Lugar"><%= t.lugar || '-' %></td>
             <td data-label="Hora"><%= t.hora || '-' %></td>
@@ -156,7 +154,7 @@
           </tr>
         <% }) %>
         <% if (tramites.length === 0) { %>
-          <tr><td colspan="13" class="text-center">No hay trámites registrados</td></tr>
+          <td><td colspan="13" class="text-center">No hay trámites registrados</td></tr>
         <% } %>
       </tbody>
     </table>
