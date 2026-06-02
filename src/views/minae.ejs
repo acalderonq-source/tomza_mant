@@ -119,11 +119,12 @@
           <th>Hora cita</th>
           <th>Lugar cita</th>
           <th>Acciones</th>
-        </table>
+        </tr>
       </thead>
       <tbody>
         <% tramites.forEach(t => { %>
           <%
+            // Determinar color según vencimiento
             let color = '';
             if (t.vencimiento) {
               const hoy = new Date();
