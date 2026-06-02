@@ -68,7 +68,20 @@
       <button class="btn btn-warning w-100">Filtrar</button>
     </div>
   </form>
-
+<thead class="table-warning text-dark">
+  <tr>
+    <th>Placa</th>
+    <th>Tipo</th>
+    <th>CR#</th>
+    <th>Estado</th>
+    <th>Vencimiento</th>
+    <th>Empresa</th>
+    <th>Lugar</th>
+    <th>Hora</th>
+    <th>OT</th>
+    <th>Acciones</th>
+  </tr>
+</thead>
   <!-- TABLA -->
   <div class="table-responsive">
     <table class="table table-dark table-hover table-bordered align-middle">
@@ -89,6 +102,15 @@
       <tbody>
         <% tramites.forEach(t => { %>
           <%
+          <td data-label="Fecha cita">
+  <%= t.fecha_cita ? new Date(t.fecha_cita).toLocaleDateString('es-CR') : '—' %>
+</td>
+<td data-label="Hora cita">
+  <%= t.hora_cita || '—' %>
+</td>
+<td data-label="Lugar cita">
+  <%= t.lugar_cita || '—' %>
+</td>
             let color = '';
             if (t.vencimiento) {
               const hoy = new Date();
@@ -123,6 +145,22 @@
     </table>
   </div>
 </div>
-
+<thead class="table-warning text-dark">
+  <tr>
+    <th>Placa</th>
+    <th>Tipo</th>
+    <th>CR#</th>
+    <th>Estado</th>
+    <th>Vencimiento</th>
+    <th>Empresa</th>
+    <th>Lugar</th>
+    <th>Hora</th>
+    <th>OT</th>
+    <th>Fecha cita</th>   <!-- nueva -->
+    <th>Hora cita</th>   <!-- nueva -->
+    <th>Lugar cita</th>  <!-- nueva -->
+    <th>Acciones</th>
+  </table>
+</thead>
 </body>
 </html>
