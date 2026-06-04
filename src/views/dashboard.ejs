@@ -215,7 +215,9 @@
       <a href="/dekra" class="btn" style="background:#8e44ad; color:white;">📋 Control DEKRA</a>
       <a href="/minae" class="btn btn-warning">🏛️ Control MINAE</a>
     </div>
-
+<% if (user.rol === 'ADMIN' || user.rol === 'TALLER' || user.rol === 'PROVEEDURIA_TALLER') { %>
+  <a href="/compras/ordenes" class="btn btn-primary">🛒 Órdenes de Compra</a>
+<% } %>
   <% } %>
 
 </div>

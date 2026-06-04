@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Órdenes de Compra</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body {
+      background: #f4f6f9;
+    }
+    .card {
+      border: none;
+      border-radius: 14px;
+      box-shadow: 0 2px 12px rgba(0,0,0,.08);
+    }
+    @media (max-width: 768px) {
+      .table thead { display: none; }
+      .table, .table tbody, .table tr, .table td {
+        display: block;
+        width: 100%;
+      }
+      .table tr {
+        margin-bottom: 1rem;
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+        padding: 0.5rem;
+        background: white;
+      }
+      .table td {
+        text-align: right;
+        padding-left: 50%;
+        position: relative;
+        border: none;
+        border-bottom: 1px solid #eee;
+      }
+      .table td::before {
+        content: attr(data-label);
+        position: absolute;
+        left: 1rem;
+        width: 45%;
+        font-weight: bold;
+        text-align: left;
+      }
+    }
+  </style>
+</head>
+<body>
+
+<nav class="navbar navbar-dark bg-dark px-3">
+  <span class="navbar-brand">🛒 Órdenes de Compra</span>
+  <div class="text-white">
+    <%= user.usuario %> (<%= user.rol %>)
+    <a href="/dashboard" class="btn btn-secondary btn-sm ms-2">Volver</a>
+  </div>
+</nav>
+
+<div class="container mt-4">
+  <div class="card p-3">
+    <div class="d-flex justify-content-between mb-3">
+      <h3>📋 Listado de Órdenes</h3>
+      <a href="/compras/ordenes/nueva" class="btn btn-primary">➕ Nueva orden</a>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-bordered table-hover">
+        <thead class="table-dark">
+          <tr>
+            <th>PO Número</th>
+            <th>Fecha</th>
+            <th>Proveedor</th>
+            <th>Moneda</th>
+            <th>Total</th>
+            <th>Estado</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% ordenes.forEach(orden => { %>
+            <tr>
+              <td data-label="PO Número"><strong><%= orden.po_numero %></strong></td>
+              <td data-label="Fecha"><%= new Date(orden.fecha).toLocaleDateString('es-CR') %></td>
+              <td data-label="Proveedor"><%= orden.proveedor_nombre %></td>
+              <td data-label="Moneda"><%= orden.moneda %></td>
+              <td data-label="Total"><%= parseFloat(orden.total).toLocaleString('es-CR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %></td>
+              <td data-label="Estado">
+                <span class="badge <%= 
+                  orden.estado === 'BORRADOR' ? 'bg-secondary' :
+                  orden.estado === 'ENVIADA' ? 'bg-info' :
+                  orden.estado === 'RECIBIDA_PARCIAL' ? 'bg-warning' :
+                  orden.estado === 'RECIBIDA_TOTAL' ? 'bg-success' : 'bg-danger'
+                %>">
+                  <%= orden.estado.replace('_', ' ') %>
+                </span>
+              </td>
+              <td data-label="Acciones">
+                <a href="/compras/ordenes/<%= orden.id %>/detalle" class="btn btn-sm btn-info">Ver</a>
+                <a href="/compras/ordenes/<%= orden.id %>/pdf" class="btn btn-sm btn-primary">PDF</a>
+                <% if (orden.estado !== 'RECIBIDA_TOTAL' && orden.estado !== 'RECIBIDA_PARCIAL') { %>
+                  <form method="POST" action="/compras/ordenes/<%= orden.id %>/recibir" class="d-inline">
+                    <button type="submit" class="btn btn-sm btn-success" onclick="return confirm('¿Marcar esta orden como recibida?')">
+                      ✅ Recibido
+                    </button>
+                  </form>
+                <% } else { %>
+                  <span class="badge bg-success">Recibido</span>
+                <% } %>
+              </td>
+            </tr>
+          <% }) %>
+          <% if (ordenes.length === 0) { %>
+            <tr><td colspan="7" class="text-center">No hay órdenes registradas</td></tr>
+          <% } %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

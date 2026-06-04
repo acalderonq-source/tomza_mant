@@ -1,0 +1,25 @@
+<form method="POST">
+  <input type="hidden" name="id" value="<%= proveedor ? proveedor.id : '' %>">
+  <div class="mb-3">
+    <label>Nombre</label>
+    <input type="text" name="nombre" class="form-control" value="<%= proveedor ? proveedor.nombre : '' %>" required>
+  </div>
+  <div class="mb-3">
+    <label>Dirección</label>
+    <textarea name="direccion" class="form-control"><%= proveedor ? proveedor.direccion : '' %></textarea>
+  </div>
+  <div class="mb-3">
+    <label>Teléfono</label>
+    <input type="text" name="telefono" class="form-control" value="<%= proveedor ? proveedor.telefono : '' %>">
+  </div>
+  <div class="mb-3">
+    <label>Email</label>
+    <input type="email" name="email" class="form-control" value="<%= proveedor ? proveedor.email : '' %>">
+  </div>
+  <div class="mb-3">
+    <label>Contacto</label>
+    <input type="text" name="contacto" class="form-control" value="<%= proveedor ? proveedor.contacto : '' %>">
+  </div>
+  <button type="submit" class="btn btn-success">Guardar</button>
+  <a href="/compras/proveedores" class="btn btn-secondary">Cancelar</a>
+</form>

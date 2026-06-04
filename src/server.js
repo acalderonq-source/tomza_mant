@@ -41,6 +41,7 @@ const kpisRoutes = require("./routes/kpis.routes");
 const aceiteRoutes = require("./routes/aceite.routes");
 const dekraRoutes = require("./routes/dekra.routes");
 const minaeRoutes = require("./routes/minae.routes");
+const comprasRoutes = require("./routes/compras.routes"); // ✅ NUEVO: Módulo de órdenes de compra
 
 // ===================== USAR RUTAS =====================
 // Rutas base
@@ -57,6 +58,7 @@ app.use("/kpis", kpisRoutes);
 app.use("/aceite", aceiteRoutes);
 app.use("/dekra", dekraRoutes);
 app.use("/minae", minaeRoutes);
+app.use("/compras", comprasRoutes); // ✅ NUEVO: Prefijo para todas las rutas de compras
 
 // ===================== CRON JOBS =====================
 cron.schedule("0 7 * * *", async () => {
