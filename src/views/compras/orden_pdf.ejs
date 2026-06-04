@@ -3,189 +3,354 @@
 <head>
 <meta charset="UTF-8">
 <title>Orden de Compra <%= orden.po_numero %></title>
+
 <style>
-  body {
-    font-family: Arial, sans-serif;
-    background: #f3f3f3;
+*{box-sizing:border-box}
+
+@page{
+  size:A4;
+  margin:8mm;
+}
+
+body{
+  margin:0;
+  background:#e5e5e5;
+  font-family:Arial, Helvetica, sans-serif;
+  font-size:9px;
+  color:#000;
+}
+
+.po{
+  width:740px;
+  background:#fff;
+  margin:10px auto;
+  padding:8px;
+  overflow:hidden;
+}
+
+.header{
+  display:grid;
+  grid-template-columns:180px 1fr 180px;
+  gap:8px;
+  align-items:start;
+  margin-bottom:6px;
+}
+
+.logo{
+  width:170px;
+  height:65px;
+  object-fit:contain;
+}
+
+.title{
+  text-align:center;
+  font-size:18px;
+  font-weight:800;
+  padding-top:22px;
+  white-space:nowrap;
+}
+
+table{
+  width:100%;
+  border-collapse:collapse;
+  table-layout:fixed;
+}
+
+.po-box{
+  font-size:8px;
+  margin-top:24px;
+}
+
+.po-box th{
+  background:#2F5597;
+  color:white;
+  padding:2px;
+  border:1px solid #ccc;
+}
+
+.po-box td{
+  height:17px;
+  padding:2px;
+  text-align:center;
+  border:1px solid #ccc;
+  font-weight:bold;
+}
+
+.section-title{
+  background:#2F5597;
+  color:white;
+  text-align:center;
+  font-weight:bold;
+  padding:3px;
+  font-size:10px;
+}
+
+.info td{
+  width:50%;
+  vertical-align:top;
+}
+
+.label{
+  background:#E2EFDA;
+  font-weight:bold;
+  padding:2px 4px;
+}
+
+.value{
+  padding:2px 4px;
+  height:16px;
+  line-height:1.15;
+  border-bottom:1px solid #eee;
+  word-break:break-word;
+}
+
+.mini-header{
+  margin-top:5px;
+}
+
+.mini-header td{
+  border:1px solid #ccc;
+  padding:3px;
+}
+
+.mini-header tr:first-child td{
+  background:#2F5597;
+  color:white;
+  font-weight:bold;
+}
+
+.items{
+  margin-top:5px;
+}
+
+.items th{
+  background:#2F5597;
+  color:white;
+  border:1px solid #ccc;
+  padding:3px;
+  font-size:9px;
+}
+
+.items td{
+  border:1px solid #ddd;
+  padding:3px;
+  height:20px;
+  line-height:1.1;
+  word-wrap:break-word;
+}
+
+.bottom{
+  display:grid;
+  grid-template-columns:55% 45%;
+  margin-top:4px;
+}
+
+.note-box{
+  border:1px solid #ddd;
+  min-height:55px;
+}
+
+.note-header{
+  background:#2F5597;
+  color:white;
+  padding:3px;
+  font-weight:bold;
+}
+
+.note-content{
+  padding:4px;
+}
+
+.totals{
+  font-size:9px;
+}
+
+.totals td{
+  padding:2px 4px;
+  border-bottom:1px solid #eee;
+}
+
+.amount{
+  text-align:right;
+  font-weight:bold;
+}
+
+.percent{
+  display:inline-block;
+  width:45px;
+  background:#E2EFDA;
+  font-weight:bold;
+  text-align:center;
+  margin-left:6px;
+}
+
+.total-final td{
+  font-size:10px;
+  font-weight:bold;
+  border-top:1px solid #2F5597;
+}
+
+.text-center{text-align:center}
+.text-right{text-align:right}
+
+@media print{
+  body{
+    background:white;
   }
-  .po {
-    width: 680px;
-    background: white;
-    padding: 8px;
-    margin: 20px auto;
+
+  .po{
+    width:100%;
+    margin:0;
+    padding:0;
   }
-  .header {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-  }
-  .logo {
-    width: 300px;
-    height: 95px;
-    object-fit: contain;
-  }
-  .title {
-    font-size: 28px;
-    font-weight: bold;
-    margin-top: 10px;
-  }
-  .po-box {
-    width: 220px;
-    margin-top: 55px;
-    border-collapse: collapse;
-    font-size: 14px;
-  }
-  .po-box th {
-    background: #2f5597;
-    color: white;
-    text-align: left;
-    padding: 2px 5px;
-  }
-  .po-box td {
-    height: 18px;
-    border: 1px solid #ccc;
-  }
-  table {
-    border-collapse: collapse;
-    width: 100%;
-  }
-  .section-title {
-    background: #2f5597;
-    color: white;
-    font-weight: bold;
-    text-align: center;
-  }
-  .label {
-    background: #e2f0d9;
-    font-weight: bold;
-    padding: 2px;
-  }
-  .value {
-    padding: 3px;
-    height: 18px;
-  }
-  .info td {
-    width: 50%;
-    vertical-align: top;
-  }
-  .mini-header td {
-    background: #2f5597;
-    color: white;
-    font-weight: bold;
-    padding: 4px;
-    border: 1px solid #ccc;
-  }
-  .items th {
-    background: #2f5597;
-    color: white;
-    padding: 4px;
-    border: 1px solid #ccc;
-  }
-  .items td {
-    height: 21px;
-    border: 1px solid #ddd;
-  }
-  .note-total {
-    margin-top: 0;
-  }
-  .note {
-    background: #2f5597;
-    color: white;
-    font-weight: bold;
-    width: 52%;
-    padding: 4px;
-  }
-  /* Tabla de totales alineada a la derecha */
-  .totals {
-    width: 48%;
-    float: right;
-    font-size: 14px;
-    margin-top: 10px;
-  }
-  .totals td {
-    padding: 4px;
-  }
-  .totals .green {
-    background: #e2f0d9;
-    text-align: center;
-    font-weight: bold;
-  }
-  .totals .amount {
-    text-align: right;
-    font-weight: bold;
-  }
-  .bold {
-    font-weight: bold;
-  }
-  .clear {
-    clear: both;
-  }
+}
 </style>
 </head>
+
 <body>
 
 <div class="po">
 
   <div class="header">
     <img src="https://www.tomzasureste.com/img/grp_tomza.png" class="logo">
+
     <div class="title">ORDEN DE COMPRA (PO)</div>
+
     <table class="po-box">
-      <tr><th>P.O. NÚMERO</th><th>FECHA</th></tr>
-      <tr><td><%= orden.po_numero %></td><td><%= new Date(orden.fecha).toLocaleDateString('es-CR') %></td></tr>
+      <tr>
+        <th>P.O. NÚMERO</th>
+        <th>FECHA</th>
+      </tr>
+      <tr>
+        <td><%= orden.po_numero %></td>
+        <td><%= new Date(orden.fecha).toLocaleDateString('es-CR') %></td>
+      </tr>
     </table>
   </div>
 
   <table class="info">
-    <tr><td colspan="2" class="section-title">PROVEEDOR</td></tr>
-    <tr><td class="label">NOMBRE</td><td class="label">NOMBRE</td></tr>
-    <tr><td class="value">GAS TOMZA DE COSTA RICA S.A</td><td class="value"><%= proveedor.nombre %></td></tr>
-    <tr><td class="label">NOMBRE DE LA EMPRESA</td><td class="label">NOMBRE DE LA EMPRESA</td></tr>
-    <tr><td class="value">GAS TOMZA DE COSTA RICA S.A</td><td class="value"><%= proveedor.nombre %></td></tr>
-    <tr><td class="label">DIRECCIÓN</td><td class="label">DIRECCIÓN</td></tr>
-    <tr><td class="value">Autopista Florencio del castillo, contiguo a Agrotico, La Lima.</td><td class="value"><%= proveedor.direccion || '-' %></td></tr>
-    <tr><td class="label">TELÉFONO</td><td class="label">TELÉFONO</td></tr>
-    <tr><td class="value">2201-6000</td><td class="value"><%= proveedor.telefono || '-' %></td></tr>
-    <tr><td class="label">EMAIL</td><td class="label">EMAIL</td></tr>
-    <tr><td class="value">facelectronica@tomza.com</td><td class="value"><%= proveedor.email || '-' %></td></tr>
+    <tr>
+      <td colspan="2" class="section-title">PROVEEDOR</td>
+    </tr>
+
+    <tr>
+      <td class="label">NOMBRE</td>
+      <td class="label">NOMBRE</td>
+    </tr>
+    <tr>
+      <td class="value">GAS TOMZA DE COSTA RICA S.A</td>
+      <td class="value"><%= proveedor.nombre %></td>
+    </tr>
+
+    <tr>
+      <td class="label">NOMBRE DE LA EMPRESA</td>
+      <td class="label">NOMBRE DE LA EMPRESA</td>
+    </tr>
+    <tr>
+      <td class="value">GAS TOMZA DE COSTA RICA S.A</td>
+      <td class="value"><%= proveedor.nombre %></td>
+    </tr>
+
+    <tr>
+      <td class="label">DIRECCIÓN</td>
+      <td class="label">DIRECCIÓN</td>
+    </tr>
+    <tr>
+      <td class="value">
+        Autopista Florencio del Castillo, contiguo a Agrotico, La Lima.
+      </td>
+      <td class="value"><%= proveedor.direccion || '-' %></td>
+    </tr>
+
+    <tr>
+      <td class="label">TELÉFONO</td>
+      <td class="label">TELÉFONO</td>
+    </tr>
+    <tr>
+      <td class="value">2201-6000</td>
+      <td class="value"><%= proveedor.telefono || '-' %></td>
+    </tr>
+
+    <tr>
+      <td class="label">EMAIL</td>
+      <td class="label">EMAIL</td>
+    </tr>
+    <tr>
+      <td class="value">facelectronica@tomza.com</td>
+      <td class="value"><%= proveedor.email || '-' %></td>
+    </tr>
   </table>
 
-  <br>
-
   <table class="mini-header">
-    <tr><td>Cotizacion</td><td>Forma de Pago</td><td>Fecha Envío</td></tr>
-    <tr><td style="height:28px;"><%= orden.cotizacion || '-' %></td><td><%= orden.forma_pago || 'crédito' %></td><td><%= orden.fecha_envio ? new Date(orden.fecha_envio).toLocaleDateString('es-CR') : '-' %></td></tr>
+    <tr>
+      <td>Cotización</td>
+      <td>Forma de Pago</td>
+      <td>Fecha Envío</td>
+    </tr>
+    <tr>
+      <td><%= orden.cotizacion || '-' %></td>
+      <td><%= orden.forma_pago || 'Crédito' %></td>
+      <td>
+        <%= orden.fecha_envio 
+          ? new Date(orden.fecha_envio).toLocaleDateString('es-CR') 
+          : '-' 
+        %>
+      </td>
+    </tr>
   </table>
 
   <table class="items">
+    <colgroup>
+      <col style="width:15%">
+      <col style="width:40%">
+      <col style="width:10%">
+      <col style="width:17%">
+      <col style="width:18%">
+    </colgroup>
+
     <thead>
-      <tr><th style="width:13%;">Codigo</th><th style="width:39%;">Descripción</th><th style="width:15%;">Cantidad</th><th style="width:15%;">Precio Unitario</th><th style="width:18%;">Subtotal</th></tr>
+      <tr>
+        <th>Código</th>
+        <th>Descripción</th>
+        <th>Cantidad</th>
+        <th>Precio Unitario</th>
+        <th>Subtotal</th>
+      </tr>
     </thead>
+
     <tbody>
       <% lineas.forEach(lin => { %>
-      <tr>
-        <td><%= lin.codigo || '-' %></td>
-        <td><%= lin.descripcion %></td>
-        <td style="text-align:center;"><%= lin.cantidad %></td>
-        <td style="text-align:right;"><%= lin.precio_unitario.toLocaleString('es-CR') %></td>
-        <td style="text-align:right;"><%= lin.subtotal.toLocaleString('es-CR') %></td>
-      </tr>
+        <tr>
+          <td><%= lin.codigo || '-' %></td>
+          <td><%= lin.descripcion %></td>
+          <td class="text-center"><%= lin.cantidad %></td>
+          <td class="text-right">
+            <%= Number(lin.precio_unitario).toLocaleString('es-CR') %>
+          </td>
+          <td class="text-right">
+            <%= Number(lin.subtotal).toLocaleString('es-CR') %>
+          </td>
+        </tr>
       <% }) %>
-      <% if (lineas.length === 0) { %>
-      <tr><td colspan="5" style="text-align:center;">Sin productos registrados</td></tr>
+
+      <% for(let i = lineas.length; i < 6; i++) { %>
+        <tr>
+          <td></td>
+          <td></td>
+          <td></td>
+          <td></td>
+          <td></td>
+        </tr>
       <% } %>
     </tbody>
   </table>
 
-  <table class="note-total">
-    <tr><td class="note">Nota:</td><td style="width:48%;"><%= orden.observaciones || orden.cliente_nombre || '-' %></td></tr>
-  </table>
-
-  <!-- Cálculo de totales -->
   <% 
-    const subtotal = parseFloat(orden.subtotal);
+    const subtotal = parseFloat(orden.subtotal) || 0;
     const descuentoPorc = parseFloat(orden.descuento) || 0;
     const transporte = parseFloat(orden.transporte) || 0;
     const ivaPorc = parseFloat(orden.iva) || 13;
+
     const montoDescuento = subtotal * descuentoPorc / 100;
     const subtotalConDescuento = subtotal - montoDescuento;
     const totalConTransporte = subtotalConDescuento + transporte;
@@ -193,16 +358,49 @@
     const total = totalConTransporte + montoIVA;
   %>
 
-  <table class="totals">
-    <tr><td class="bold">Subtotal colones</td><td class="amount"><%= subtotal.toLocaleString('es-CR') %></td></tr>
-    <tr><td>Descuento (%) <span class="green" style="display:inline-block;width:70px;"><%= descuentoPorc %></span></td><td class="amount"><%= montoDescuento.toLocaleString('es-CR') %></td></tr>
-    <tr><td>Transporte</td><td class="amount"><%= transporte.toLocaleString('es-CR') %></td></tr>
-    <tr><td>Subtotal ($)</td><td class="amount"><%= totalConTransporte.toLocaleString('es-CR') %></td></tr>
-    <tr><td>IVA (%) <span class="green" style="display:inline-block;width:70px;"><%= ivaPorc %></span></td><td class="amount"><%= montoIVA.toLocaleString('es-CR') %></td></tr>
-    <tr class="bold"><td>Total Monto</td><td class="amount"><%= total.toLocaleString('es-CR') %></td></tr>
-  </table>
+  <div class="bottom">
 
-  <div class="clear"></div>
+    <div class="note-box">
+      <div class="note-header">Nota:</div>
+      <div class="note-content">
+        <%= orden.observaciones || orden.cliente_nombre || '-' %>
+      </div>
+    </div>
+
+    <table class="totals">
+      <tr>
+        <td>Subtotal colones</td>
+        <td class="amount"><%= subtotal.toLocaleString('es-CR') %></td>
+      </tr>
+
+      <tr>
+        <td>Descuento (%) <span class="percent"><%= descuentoPorc %></span></td>
+        <td class="amount"><%= montoDescuento.toLocaleString('es-CR') %></td>
+      </tr>
+
+      <tr>
+        <td>Transporte</td>
+        <td class="amount"><%= transporte.toLocaleString('es-CR') %></td>
+      </tr>
+
+      <tr>
+        <td>Subtotal ($)</td>
+        <td class="amount"><%= totalConTransporte.toLocaleString('es-CR') %></td>
+      </tr>
+
+      <tr>
+        <td>IVA (%) <span class="percent"><%= ivaPorc %></span></td>
+        <td class="amount"><%= montoIVA.toLocaleString('es-CR') %></td>
+      </tr>
+
+      <tr class="total-final">
+        <td>Total Monto</td>
+        <td class="amount"><%= total.toLocaleString('es-CR') %></td>
+      </tr>
+    </table>
+
+  </div>
+
 </div>
 
 </body>
