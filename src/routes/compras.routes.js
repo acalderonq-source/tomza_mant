@@ -18,12 +18,6 @@ function allowRoles(...roles) {
   };
 }
 
-// Opcional: Middleware para depurar (muestra todas las peticiones que llegan a este router)
-// router.use((req, res, next) => {
-//   console.log(`🔍 [COMPRAS] ${req.method} ${req.originalUrl}`);
-//   next();
-// });
-
 // ===================== FUNCIÓN PARA GENERAR NÚMERO DE PO =====================
 async function generarNumeroPO() {
   const año = new Date().getFullYear();
@@ -144,15 +138,53 @@ router.post("/ordenes", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_
   }
 });
 
+// ===================== LISTADO DE ÓRDENES CON FILTROS =====================
 router.get("/ordenes", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER"), async (req, res) => {
   try {
-    const [ordenes] = await pool.query(`
+    const { proveedor_id, fecha_desde, fecha_hasta, po_numero, estado } = req.query;
+
+    let sql = `
       SELECT o.*, p.nombre as proveedor_nombre 
       FROM ordenes_compra o
       JOIN proveedores p ON p.id = o.proveedor_id
-      ORDER BY o.fecha DESC, o.id DESC
-    `);
-    res.render("compras/ordenes", { ordenes, user: req.session.user });
+      WHERE 1=1
+    `;
+    const params = [];
+
+    if (proveedor_id && proveedor_id !== '') {
+      sql += ` AND o.proveedor_id = ?`;
+      params.push(proveedor_id);
+    }
+    if (fecha_desde && fecha_desde !== '') {
+      sql += ` AND o.fecha >= ?`;
+      params.push(fecha_desde);
+    }
+    if (fecha_hasta && fecha_hasta !== '') {
+      sql += ` AND o.fecha <= ?`;
+      params.push(fecha_hasta);
+    }
+    if (po_numero && po_numero !== '') {
+      sql += ` AND o.po_numero LIKE ?`;
+      params.push(`%${po_numero}%`);
+    }
+    if (estado && estado !== '') {
+      sql += ` AND o.estado = ?`;
+      params.push(estado);
+    }
+
+    sql += ` ORDER BY o.fecha DESC, o.id DESC`;
+
+    const [ordenes] = await pool.query(sql, params);
+    const [proveedores] = await pool.query("SELECT id, nombre FROM proveedores ORDER BY nombre");
+    const estados = ['BORRADOR', 'ENVIADA', 'RECIBIDA_PARCIAL', 'RECIBIDA_TOTAL'];
+
+    res.render("compras/ordenes", { 
+      ordenes, 
+      user: req.session.user,
+      proveedores,
+      estados,
+      filtros: { proveedor_id, fecha_desde, fecha_hasta, po_numero, estado }
+    });
   } catch (error) {
     console.error(error);
     res.status(500).send("Error");
@@ -205,23 +237,89 @@ router.post("/ordenes/:id/recibir", requireAuth, allowRoles("ADMIN", "TALLER", "
   }
 });
 
-// ===================== ELIMINAR ORDEN (agregada) =====================
+// ===================== ELIMINAR ORDEN =====================
 router.post("/ordenes/:id/eliminar", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER"), async (req, res) => {
   try {
     const id = req.params.id;
-    // Verificar que la orden existe
     const [[orden]] = await pool.query("SELECT * FROM ordenes_compra WHERE id = ?", [id]);
     if (!orden) return res.status(404).send("Orden no encontrada");
-    
-    // Eliminar detalles (si no hay ON DELETE CASCADE)
     await pool.query("DELETE FROM ordenes_compra_detalle WHERE orden_compra_id = ?", [id]);
-    // Eliminar cabecera
     await pool.query("DELETE FROM ordenes_compra WHERE id = ?", [id]);
-    
     res.redirect("/compras/ordenes");
   } catch (error) {
     console.error("❌ Error al eliminar orden:", error);
     res.status(500).send("Error al eliminar la orden");
+  }
+});
+
+// ===================== DASHBOARD DE ANÁLISIS =====================
+router.get("/dashboard", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER"), async (req, res) => {
+  try {
+    // 1. Gasto total
+    const [[totalGasto]] = await pool.query("SELECT SUM(total) as total FROM ordenes_compra");
+    
+    // 2. Top 5 proveedores por gasto
+    const [topProveedores] = await pool.query(`
+      SELECT p.nombre, SUM(o.total) as total_gastado
+      FROM ordenes_compra o
+      JOIN proveedores p ON p.id = o.proveedor_id
+      GROUP BY o.proveedor_id
+      ORDER BY total_gastado DESC
+      LIMIT 5
+    `);
+    
+    // 3. Evolución mensual (últimos 12 meses)
+    const [gastoMensual] = await pool.query(`
+      SELECT 
+        DATE_FORMAT(o.fecha, '%Y-%m') as mes,
+        SUM(o.total) as total
+      FROM ordenes_compra o
+      WHERE o.fecha >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH)
+      GROUP BY mes
+      ORDER BY mes ASC
+    `);
+    
+    // 4. Top 5 productos más comprados (por cantidad)
+    const [topProductos] = await pool.query(`
+      SELECT 
+        d.descripcion,
+        SUM(d.cantidad) as total_cantidad,
+        SUM(d.subtotal) as total_monto
+      FROM ordenes_compra_detalle d
+      GROUP BY d.descripcion
+      ORDER BY total_cantidad DESC
+      LIMIT 5
+    `);
+    
+    // 5. Órdenes por estado
+    const [ordenesPorEstado] = await pool.query(`
+      SELECT estado, COUNT(*) as cantidad
+      FROM ordenes_compra
+      GROUP BY estado
+    `);
+    
+    // 6. Gasto por proveedor (top 10) - opcional
+    const [gastoPorProveedor] = await pool.query(`
+      SELECT p.nombre, SUM(o.total) as total_gastado
+      FROM ordenes_compra o
+      JOIN proveedores p ON p.id = o.proveedor_id
+      GROUP BY o.proveedor_id
+      ORDER BY total_gastado DESC
+      LIMIT 10
+    `);
+    
+    res.render("compras/dashboard_compras", {
+      user: req.session.user,
+      totalGasto: totalGasto.total || 0,
+      topProveedores: topProveedores || [],
+      gastoMensual: gastoMensual || [],
+      topProductos: topProductos || [],
+      ordenesPorEstado: ordenesPorEstado || [],
+      gastoPorProveedor: gastoPorProveedor || []
+    });
+  } catch (error) {
+    console.error("Error en dashboard de compras:", error);
+    res.status(500).send("Error cargando estadísticas");
   }
 });
 

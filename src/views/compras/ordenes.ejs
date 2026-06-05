@@ -2,68 +2,199 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
   <title>Órdenes de Compra</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
   <style>
     body {
-      background: #f4f6f9;
+      background: #f0f2f5;
+      font-family: 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
     }
-    .card {
+    .card-modern {
       border: none;
-      border-radius: 14px;
-      box-shadow: 0 2px 12px rgba(0,0,0,.08);
+      border-radius: 20px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.05);
+      transition: all 0.2s;
+      background: white;
+    }
+    .card-header-modern {
+      background: white;
+      border-bottom: 1px solid #eef2f6;
+      padding: 1.2rem 1.5rem;
+      font-weight: 600;
+      font-size: 1.2rem;
+      border-radius: 20px 20px 0 0 !important;
+    }
+    .filtros-card {
+      background: white;
+      border-radius: 20px;
+      box-shadow: 0 5px 15px rgba(0,0,0,0.03);
+      padding: 1.5rem;
+      margin-bottom: 1.8rem;
+    }
+    .btn-filtrar {
+      background: #1f2937;
+      border: none;
+      padding: 0.5rem 1.8rem;
+      font-weight: 500;
+    }
+    .btn-filtrar:hover {
+      background: #2d3a4f;
+    }
+    .btn-limpiar {
+      background: #6c757d;
+      border: none;
+      color: white;
+      padding: 0.5rem 1.8rem;
+    }
+    .btn-limpiar:hover {
+      background: #5a6268;
+    }
+    .table-ordenes {
+      margin-bottom: 0;
+    }
+    .table-ordenes thead th {
+      background: #f8fafc;
+      border-bottom: 2px solid #e2e8f0;
+      color: #1e293b;
+      font-weight: 600;
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      padding: 1rem;
+    }
+    .table-ordenes tbody td {
+      padding: 1rem;
+      vertical-align: middle;
+      border-bottom: 1px solid #edf2f7;
+      font-size: 0.9rem;
+    }
+    .table-ordenes tbody tr:hover {
+      background: #fafcff;
+    }
+    .badge-estado {
+      font-size: 0.75rem;
+      font-weight: 500;
+      padding: 0.35em 0.7em;
+      border-radius: 30px;
+    }
+    .btn-accion {
+      margin: 0.15rem;
+      padding: 0.3rem 0.7rem;
+      font-size: 0.75rem;
+      border-radius: 30px;
+    }
+    .btn-accion i {
+      margin-right: 4px;
     }
     @media (max-width: 768px) {
-      .table thead { display: none; }
-      .table, .table tbody, .table tr, .table td {
+      .table-ordenes thead {
+        display: none;
+      }
+      .table-ordenes, .table-ordenes tbody, .table-ordenes tr, .table-ordenes td {
         display: block;
         width: 100%;
       }
-      .table tr {
+      .table-ordenes tr {
         margin-bottom: 1rem;
-        border: 1px solid #dee2e6;
-        border-radius: 8px;
-        padding: 0.5rem;
+        border: 1px solid #e2e8f0;
+        border-radius: 16px;
+        padding: 0.8rem;
         background: white;
       }
-      .table td {
+      .table-ordenes td {
         text-align: right;
         padding-left: 50%;
         position: relative;
         border: none;
-        border-bottom: 1px solid #eee;
+        border-bottom: 1px solid #eef2f6;
       }
-      .table td::before {
+      .table-ordenes td::before {
         content: attr(data-label);
         position: absolute;
-        left: 1rem;
+        left: 0.8rem;
         width: 45%;
-        font-weight: bold;
+        font-weight: 600;
         text-align: left;
+        color: #1e293b;
+      }
+      .btn-accion {
+        margin: 0.2rem;
       }
     }
   </style>
 </head>
 <body>
 
-<nav class="navbar navbar-dark bg-dark px-3">
-  <span class="navbar-brand">🛒 Órdenes de Compra</span>
+<nav class="navbar navbar-dark bg-dark px-3 py-2">
+  <span class="navbar-brand fw-semibold">🛒 Órdenes de Compra</span>
   <div class="text-white">
     <%= user.usuario %> (<%= user.rol %>)
-    <a href="/dashboard" class="btn btn-secondary btn-sm ms-2">Volver</a>
+    <a href="/dashboard" class="btn btn-sm btn-outline-light ms-2">Volver</a>
   </div>
 </nav>
 
-<div class="container mt-4">
-  <div class="card p-3">
-    <div class="d-flex justify-content-between mb-3">
-      <h3>📋 Listado de Órdenes</h3>
-      <a href="/compras/ordenes/nueva" class="btn btn-primary">➕ Nueva orden</a>
+<div class="container py-4">
+  <!-- Filtros card mejorada -->
+  <div class="filtros-card">
+    <h5 class="mb-3 fw-semibold"><i class="bi bi-funnel me-2"></i>Filtrar órdenes</h5>
+    <form method="GET" action="/compras/ordenes" class="row g-3">
+      <div class="col-md-3">
+        <label class="form-label small fw-semibold text-secondary">Proveedor</label>
+        <select name="proveedor_id" class="form-select form-select-sm">
+          <option value="">Todos</option>
+          <% proveedores.forEach(p => { %>
+            <option value="<%= p.id %>" <%= filtros.proveedor_id == p.id ? 'selected' : '' %>><%= p.nombre %></option>
+          <% }) %>
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label small fw-semibold text-secondary">Fecha desde</label>
+        <input type="date" name="fecha_desde" class="form-control form-control-sm" value="<%= filtros.fecha_desde || '' %>">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label small fw-semibold text-secondary">Fecha hasta</label>
+        <input type="date" name="fecha_hasta" class="form-control form-control-sm" value="<%= filtros.fecha_hasta || '' %>">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label small fw-semibold text-secondary">PO Número</label>
+        <input type="text" name="po_numero" class="form-control form-control-sm" placeholder="Ej: 2026-260" value="<%= filtros.po_numero || '' %>">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label small fw-semibold text-secondary">Estado</label>
+        <select name="estado" class="form-select form-select-sm">
+          <option value="">Todos</option>
+          <% estados.forEach(est => { %>
+            <option value="<%= est %>" <%= filtros.estado === est ? 'selected' : '' %>><%= est.replace('_', ' ') %></option>
+          <% }) %>
+        </select>
+      </div>
+      <div class="col-md-1 d-flex align-items-end">
+        <button type="submit" class="btn btn-filtrar btn-sm w-100">Filtrar</button>
+      </div>
+      <div class="col-md-1 d-flex align-items-end">
+        <a href="/compras/ordenes" class="btn btn-limpiar btn-sm w-100">Limpiar</a>
+      </div>
+    </form>
+  </div>
+
+  <!-- Listado de órdenes -->
+  <div class="card-modern">
+    <div class="card-header-modern d-flex justify-content-between align-items-center flex-wrap">
+      <span><i class="bi bi-receipt me-2"></i>Listado de Órdenes</span>
+      <div>
+        <a href="/compras/dashboard" class="btn btn-outline-dark btn-sm me-2">
+          <i class="bi bi-graph-up"></i> Dashboard de análisis
+        </a>
+        <a href="/compras/ordenes/nueva" class="btn btn-dark btn-sm">
+          <i class="bi bi-plus-lg"></i> Nueva orden
+        </a>
+      </div>
     </div>
     <div class="table-responsive">
-      <table class="table table-bordered table-hover">
-        <thead class="table-dark">
+      <table class="table table-ordenes">
+        <thead>
           <tr>
             <th>PO Número</th>
             <th>Fecha</th>
@@ -83,7 +214,7 @@
               <td data-label="Moneda"><%= orden.moneda %></td>
               <td data-label="Total"><%= parseFloat(orden.total).toLocaleString('es-CR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %></td>
               <td data-label="Estado">
-                <span class="badge <%= 
+                <span class="badge badge-estado <%= 
                   orden.estado === 'BORRADOR' ? 'bg-secondary' :
                   orden.estado === 'ENVIADA' ? 'bg-info' :
                   orden.estado === 'RECIBIDA_PARCIAL' ? 'bg-warning' :
@@ -92,33 +223,29 @@
                   <%= orden.estado.replace('_', ' ') %>
                 </span>
               </td>
-              <td data-label="Acciones">
-                <a href="/compras/ordenes/<%= orden.id %>/detalle" class="btn btn-sm btn-info">Ver</a>
-                <a href="/compras/ordenes/<%= orden.id %>/pdf" class="btn btn-sm btn-primary">PDF</a>
+              <td data-label="Acciones" class="text-nowrap">
+                <a href="/compras/ordenes/<%= orden.id %>/detalle" class="btn btn-outline-secondary btn-accion"><i class="bi bi-eye"></i> Ver</a>
+                <a href="/compras/ordenes/<%= orden.id %>/pdf" class="btn btn-outline-primary btn-accion"><i class="bi bi-file-pdf"></i> PDF</a>
                 
                 <% if (orden.estado !== 'RECIBIDA_TOTAL' && orden.estado !== 'RECIBIDA_PARCIAL') { %>
                   <form method="POST" action="/compras/ordenes/<%= orden.id %>/recibir" class="d-inline">
-                    <button type="submit" class="btn btn-sm btn-success" onclick="return confirm('¿Marcar esta orden como recibida?')">
-                      ✅ Recibido
+                    <button type="submit" class="btn btn-outline-success btn-accion" onclick="return confirm('¿Marcar esta orden como recibida?')">
+                      <i class="bi bi-check-circle"></i> Recibido
+                    </button>
+                  </form>
+                  <form method="POST" action="/compras/ordenes/<%= orden.id %>/eliminar" class="d-inline" onsubmit="return confirm('¿Eliminar esta orden permanentemente?')">
+                    <button type="submit" class="btn btn-outline-danger btn-accion">
+                      <i class="bi bi-trash"></i> Eliminar
                     </button>
                   </form>
                 <% } else { %>
                   <span class="badge bg-success">Recibido</span>
                 <% } %>
-
-                <!-- Botón Eliminar (solo para órdenes no recibidas) -->
-                <% if (orden.estado !== 'RECIBIDA_TOTAL' && orden.estado !== 'RECIBIDA_PARCIAL') { %>
-                  <form method="POST" action="/compras/ordenes/<%= orden.id %>/eliminar" class="d-inline" onsubmit="return confirm('¿Eliminar esta orden permanentemente? Esta acción no se puede deshacer.');">
-                    <button type="submit" class="btn btn-sm btn-danger">
-                      🗑️ Eliminar
-                    </button>
-                  </form>
-                <% } %>
               </td>
             </tr>
           <% }) %>
           <% if (ordenes.length === 0) { %>
-            <td><td colspan="7" class="text-center">No hay órdenes registradas</td></tr>
+            <td><td colspan="7" class="text-center text-muted py-4">No hay órdenes con los filtros seleccionados</td></tr>
           <% } %>
         </tbody>
       </table>
