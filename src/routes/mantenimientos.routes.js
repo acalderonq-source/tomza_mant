@@ -197,20 +197,25 @@ router.post("/ordenes/:id/recibir", requireAuth, allowRoles("ADMIN", "TALLER", "
 });
 
 // ===================== ELIMINAR ORDEN =====================
+// ===================== ELIMINAR ORDEN =====================
 router.post("/ordenes/:id/eliminar", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER"), async (req, res) => {
   try {
     const id = req.params.id;
-    // Verificar que la orden existe
-    const [[orden]] = await pool.query("SELECT * FROM ordenes_compra WHERE id = ?", [id]);
-    if (!orden) return res.status(404).send("Orden no encontrada");
+    console.log(`🗑️ Eliminando orden ID ${id}`);
     
     // Eliminar detalles (si no hay ON DELETE CASCADE)
     await pool.query("DELETE FROM ordenes_compra_detalle WHERE orden_compra_id = ?", [id]);
-    await pool.query("DELETE FROM ordenes_compra WHERE id = ?", [id]);
+    // Eliminar cabecera
+    const [result] = await pool.query("DELETE FROM ordenes_compra WHERE id = ?", [id]);
+    
+    if (result.affectedRows === 0) {
+      return res.status(404).send("Orden no encontrada");
+    }
+    
     res.redirect("/compras/ordenes");
   } catch (error) {
-    console.error(error);
-    res.status(500).send("Error al eliminar la orden");
+    console.error("❌ Error al eliminar orden:", error);
+    res.status(500).send("Error interno al eliminar la orden");
   }
 });
 
