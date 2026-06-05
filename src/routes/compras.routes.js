@@ -18,6 +18,12 @@ function allowRoles(...roles) {
   };
 }
 
+// Opcional: Middleware para depurar (muestra todas las peticiones que llegan a este router)
+// router.use((req, res, next) => {
+//   console.log(`🔍 [COMPRAS] ${req.method} ${req.originalUrl}`);
+//   next();
+// });
+
 // ===================== FUNCIÓN PARA GENERAR NÚMERO DE PO =====================
 async function generarNumeroPO() {
   const año = new Date().getFullYear();
@@ -37,7 +43,6 @@ async function generarNumeroPO() {
 // ===================== PROVEEDORES (solo ADMIN) =====================
 router.get("/proveedores", requireAuth, allowRoles("ADMIN"), async (req, res) => {
   try {
-    // Nota: si no existe columna 'activo', omítela o usa otra lógica
     const [proveedores] = await pool.query("SELECT * FROM proveedores ORDER BY nombre");
     res.render("compras/proveedores", { proveedores, user: req.session.user });
   } catch (error) {
@@ -73,7 +78,6 @@ router.post("/proveedores", requireAuth, allowRoles("ADMIN"), async (req, res) =
 
 router.get("/proveedores/eliminar/:id", requireAuth, allowRoles("ADMIN"), async (req, res) => {
   try {
-    // Eliminación lógica: si tienes columna 'activo', úsala; si no, elimina físicamente (pero mejor lógico)
     await pool.query("DELETE FROM proveedores WHERE id = ?", [req.params.id]);
     res.redirect("/compras/proveedores");
   } catch (error) {
@@ -201,4 +205,25 @@ router.post("/ordenes/:id/recibir", requireAuth, allowRoles("ADMIN", "TALLER", "
   }
 });
 
+// ===================== ELIMINAR ORDEN (agregada) =====================
+router.post("/ordenes/:id/eliminar", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER"), async (req, res) => {
+  try {
+    const id = req.params.id;
+    // Verificar que la orden existe
+    const [[orden]] = await pool.query("SELECT * FROM ordenes_compra WHERE id = ?", [id]);
+    if (!orden) return res.status(404).send("Orden no encontrada");
+    
+    // Eliminar detalles (si no hay ON DELETE CASCADE)
+    await pool.query("DELETE FROM ordenes_compra_detalle WHERE orden_compra_id = ?", [id]);
+    // Eliminar cabecera
+    await pool.query("DELETE FROM ordenes_compra WHERE id = ?", [id]);
+    
+    res.redirect("/compras/ordenes");
+  } catch (error) {
+    console.error("❌ Error al eliminar orden:", error);
+    res.status(500).send("Error al eliminar la orden");
+  }
+});
+
+console.log("✅ Rutas de compras cargadas correctamente");
 module.exports = router;
