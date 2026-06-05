@@ -353,5 +353,21 @@ router.post("/:id/ejecucion", requireAuth, async (req, res) => {
     res.status(500).send("Error interno");
   }
 });
+// ===================== ELIMINAR ORDEN =====================
+router.post("/ordenes/:id/eliminar", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER"), async (req, res) => {
+  try {
+    const id = req.params.id;
+    // Verificar que la orden existe (opcional)
+    const [[orden]] = await pool.query("SELECT * FROM ordenes_compra WHERE id = ?", [id]);
+    if (!orden) return res.status(404).send("Orden no encontrada");
+    
+    // Eliminar la orden (las líneas se eliminarán en cascada si la FK tiene ON DELETE CASCADE)
+    await pool.query("DELETE FROM ordenes_compra WHERE id = ?", [id]);
+    res.redirect("/compras/ordenes");
+  } catch (error) {
+    console.error(error);
+    res.status(500).send("Error al eliminar la orden");
+  }
+});
 
 module.exports = router;

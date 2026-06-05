@@ -95,6 +95,7 @@
               <td data-label="Acciones">
                 <a href="/compras/ordenes/<%= orden.id %>/detalle" class="btn btn-sm btn-info">Ver</a>
                 <a href="/compras/ordenes/<%= orden.id %>/pdf" class="btn btn-sm btn-primary">PDF</a>
+                
                 <% if (orden.estado !== 'RECIBIDA_TOTAL' && orden.estado !== 'RECIBIDA_PARCIAL') { %>
                   <form method="POST" action="/compras/ordenes/<%= orden.id %>/recibir" class="d-inline">
                     <button type="submit" class="btn btn-sm btn-success" onclick="return confirm('¿Marcar esta orden como recibida?')">
@@ -104,11 +105,20 @@
                 <% } else { %>
                   <span class="badge bg-success">Recibido</span>
                 <% } %>
+
+                <!-- Botón Eliminar (solo para órdenes no recibidas) -->
+                <% if (orden.estado !== 'RECIBIDA_TOTAL' && orden.estado !== 'RECIBIDA_PARCIAL') { %>
+                  <form method="POST" action="/compras/ordenes/<%= orden.id %>/eliminar" class="d-inline" onsubmit="return confirm('¿Eliminar esta orden permanentemente? Esta acción no se puede deshacer.');">
+                    <button type="submit" class="btn btn-sm btn-danger">
+                      🗑️ Eliminar
+                    </button>
+                  </form>
+                <% } %>
               </td>
             </tr>
           <% }) %>
           <% if (ordenes.length === 0) { %>
-            <tr><td colspan="7" class="text-center">No hay órdenes registradas</td></tr>
+            <td><td colspan="7" class="text-center">No hay órdenes registradas</td></tr>
           <% } %>
         </tbody>
       </table>
