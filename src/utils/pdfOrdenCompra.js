@@ -1,11 +1,10 @@
-const pdf = require('html-pdf');
+const puppeteer = require('puppeteer');
 const ejs = require('ejs');
 const path = require('path');
 
 async function generarPDFOrden(orden, proveedor, lineas) {
-  // Datos de la empresa según destino
+  // Datos de la empresa según el destino
   let empresa = {};
-  let logoSuperGasURL = '';
   if (orden.empresa_destino === 'SUPER GAS') {
     empresa = {
       nombre: 'ENVASADORA SUPER GAS GLP SOCIEDAD ANÓNIMA',
@@ -15,8 +14,6 @@ async function generarPDFOrden(orden, proveedor, lineas) {
       email: 'supergasfe@tomza.com',
       cedula: '3-101-044021'
     };
-    // ✅ URL directa del logo (jpeg)
-    logoSuperGasURL = 'https://i.imgur.com/VlaV7Fk.jpeg';
   } else {
     empresa = {
       nombre: 'GAS TOMZA DE COSTA RICA S.A.',
@@ -27,15 +24,19 @@ async function generarPDFOrden(orden, proveedor, lineas) {
     };
   }
 
+  // Ruta a la plantilla EJS
   const templatePath = path.join(__dirname, '../views/compras/orden_pdf.ejs');
-  const html = await ejs.renderFile(templatePath, { orden, proveedor, lineas, empresa, logoSuperGasURL });
+  const html = await ejs.renderFile(templatePath, { orden, proveedor, lineas, empresa });
 
-  return new Promise((resolve, reject) => {
-    pdf.create(html, { format: 'Letter' }).toBuffer((err, buffer) => {
-      if (err) reject(err);
-      else resolve(buffer);
-    });
+  // Lanzar Puppeteer (con opciones necesarias para entornos como Render)
+  const browser = await puppeteer.launch({
+    args: ['--no-sandbox', '--disable-setuid-sandbox']
   });
+  const page = await browser.newPage();
+  await page.setContent(html, { waitUntil: 'networkidle0' }); // Espera a que cargue la imagen
+  const pdfBuffer = await page.pdf({ format: 'Letter', printBackground: true });
+  await browser.close();
+  return pdfBuffer;
 }
 
 module.exports = { generarPDFOrden };
