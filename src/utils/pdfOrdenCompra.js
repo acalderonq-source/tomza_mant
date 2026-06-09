@@ -3,8 +3,9 @@ const ejs = require('ejs');
 const path = require('path');
 
 async function generarPDFOrden(orden, proveedor, lineas) {
-  // Determinar los datos de la empresa compradora según el campo empresa_destino
+  // Datos de la empresa según destino
   let empresa = {};
+  let logoSuperGasURL = '';
   if (orden.empresa_destino === 'SUPER GAS') {
     empresa = {
       nombre: 'ENVASADORA SUPER GAS GLP SOCIEDAD ANÓNIMA',
@@ -14,6 +15,8 @@ async function generarPDFOrden(orden, proveedor, lineas) {
       email: 'supergasfe@tomza.com',
       cedula: '3-101-044021'
     };
+    // ✅ URL directa del logo (jpeg)
+    logoSuperGasURL = 'https://i.imgur.com/VlaV7Fk.jpeg';
   } else {
     empresa = {
       nombre: 'GAS TOMZA DE COSTA RICA S.A.',
@@ -25,7 +28,7 @@ async function generarPDFOrden(orden, proveedor, lineas) {
   }
 
   const templatePath = path.join(__dirname, '../views/compras/orden_pdf.ejs');
-  const html = await ejs.renderFile(templatePath, { orden, proveedor, lineas, empresa });
+  const html = await ejs.renderFile(templatePath, { orden, proveedor, lineas, empresa, logoSuperGasURL });
 
   return new Promise((resolve, reject) => {
     pdf.create(html, { format: 'Letter' }).toBuffer((err, buffer) => {

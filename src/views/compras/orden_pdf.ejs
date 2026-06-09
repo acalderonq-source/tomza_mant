@@ -212,7 +212,13 @@ table{
 <div class="po">
 
   <div class="header">
-    <img src="https://www.tomzasureste.com/img/grp_tomza.png" class="logo">
+    <!-- Logo condicional según la empresa destinataria -->
+    <% if (orden.empresa_destino === 'SUPER GAS') { %>
+      <!-- URL directa del logo de Super Gas (JPEG) -->
+      <img src="https://i.imgur.com/VlaV7Fk.jpeg" class="logo" alt="Super Gas">
+    <% } else { %>
+      <img src="https://www.tomzasureste.com/img/grp_tomza.png" class="logo" alt="Gas Tomza">
+    <% } %>
 
     <div class="title">ORDEN DE COMPRA (PO)</div>
 
@@ -344,11 +350,11 @@ table{
 
       <% for(let i = lineas.length; i < 6; i++) { %>
         <tr>
-          <td></td>
-          <td></td>
-          <td></td>
-          <td></td>
-          <td></td>
+          <td>&nbsp;</td>
+          <td>&nbsp;</td>
+          <td>&nbsp;</td>
+          <td>&nbsp;</td>
+          <td>&nbsp;</td>
         </tr>
       <% } %>
     </tbody>

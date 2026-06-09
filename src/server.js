@@ -12,7 +12,8 @@ const app = express();
 // ===================== MIDDLEWARES =====================
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
-app.use(express.static(path.join(__dirname, "public")));
+// ✅ CORREGIDO: Apunta a la carpeta public en la raíz del proyecto
+app.use(express.static(path.join(__dirname, "..", "public")));
 
 // ===================== SESSION =====================
 app.use(session({
@@ -20,7 +21,7 @@ app.use(session({
   resave: false,
   saveUninitialized: false,
   cookie: {
-    secure: false, // true solo si usas https
+    secure: false,
     httpOnly: true
   }
 }));
@@ -41,15 +42,12 @@ const kpisRoutes = require("./routes/kpis.routes");
 const aceiteRoutes = require("./routes/aceite.routes");
 const dekraRoutes = require("./routes/dekra.routes");
 const minaeRoutes = require("./routes/minae.routes");
-const comprasRoutes = require("./routes/compras.routes"); // ✅ NUEVO: Módulo de órdenes de compra
+const comprasRoutes = require("./routes/compras.routes");
 
 // ===================== USAR RUTAS =====================
-// Rutas base
 app.use("/", authRoutes);
 app.use("/", sedeRoutes);
 app.use("/", adminRoutes);
-
-// Módulos
 app.use("/dashboard", dashboardRoutes);
 app.use("/agenda", agendaRoutes);
 app.use("/mantenimientos", mantenimientosRoutes);
@@ -58,7 +56,7 @@ app.use("/kpis", kpisRoutes);
 app.use("/aceite", aceiteRoutes);
 app.use("/dekra", dekraRoutes);
 app.use("/minae", minaeRoutes);
-app.use("/compras", comprasRoutes); // ✅ NUEVO: Prefijo para todas las rutas de compras
+app.use("/compras", comprasRoutes);
 
 // ===================== CRON JOBS =====================
 cron.schedule("0 7 * * *", async () => {
@@ -75,17 +73,13 @@ app.get("/", (req, res) => {
   res.redirect("/dashboard");
 });
 
-// ===================== LOGOUT =====================
 app.get("/logout", (req, res) => {
   req.session.destroy(() => {
     res.redirect("/login");
   });
 });
 
-// ===================== SERVIDOR =====================
 const PORT = process.env.PORT || 3000;
-
-// Escuchar en todas las interfaces (necesario para Render)
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Servidor corriendo en puerto ${PORT}`);
   console.log("ENTORNO:", process.env.NODE_ENV || "development");
