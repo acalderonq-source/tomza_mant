@@ -238,7 +238,7 @@ table{
       <td class="label">NOMBRE</td>
     </tr>
     <tr>
-      <td class="value">GAS TOMZA DE COSTA RICA S.A</td>
+      <td class="value"><%= empresa.nombre %></td>
       <td class="value"><%= proveedor.nombre %></td>
     </tr>
 
@@ -247,7 +247,7 @@ table{
       <td class="label">NOMBRE DE LA EMPRESA</td>
     </tr>
     <tr>
-      <td class="value">GAS TOMZA DE COSTA RICA S.A</td>
+      <td class="value"><%= empresa.nombreEmpresa || empresa.nombre %></td>
       <td class="value"><%= proveedor.nombre %></td>
     </tr>
 
@@ -256,9 +256,7 @@ table{
       <td class="label">DIRECCIÓN</td>
     </tr>
     <tr>
-      <td class="value">
-        Autopista Florencio del Castillo, contiguo a Agrotico, La Lima.
-      </td>
+      <td class="value"><%= empresa.direccion %></td>
       <td class="value"><%= proveedor.direccion || '-' %></td>
     </tr>
 
@@ -267,7 +265,7 @@ table{
       <td class="label">TELÉFONO</td>
     </tr>
     <tr>
-      <td class="value">2201-6000</td>
+      <td class="value"><%= empresa.telefono %></td>
       <td class="value"><%= proveedor.telefono || '-' %></td>
     </tr>
 
@@ -276,9 +274,20 @@ table{
       <td class="label">EMAIL</td>
     </tr>
     <tr>
-      <td class="value">facelectronica@tomza.com</td>
+      <td class="value"><%= empresa.email %></td>
       <td class="value"><%= proveedor.email || '-' %></td>
     </tr>
+
+    <% if (empresa.cedula) { %>
+    <tr>
+      <td class="label">CÉDULA JURÍDICA</td>
+      <td class="label">CÉDULA JURÍDICA</td>
+    </tr>
+    <tr>
+      <td class="value"><%= empresa.cedula %></td>
+      <td class="value">-</td>
+    </tr>
+    <% } %>
   </table>
 
   <table class="mini-header">
@@ -372,27 +381,22 @@ table{
         <td>Subtotal colones</td>
         <td class="amount"><%= subtotal.toLocaleString('es-CR') %></td>
       </tr>
-
       <tr>
         <td>Descuento (%) <span class="percent"><%= descuentoPorc %></span></td>
         <td class="amount"><%= montoDescuento.toLocaleString('es-CR') %></td>
       </tr>
-
       <tr>
         <td>Transporte</td>
         <td class="amount"><%= transporte.toLocaleString('es-CR') %></td>
       </tr>
-
       <tr>
         <td>Subtotal ($)</td>
         <td class="amount"><%= totalConTransporte.toLocaleString('es-CR') %></td>
       </tr>
-
       <tr>
         <td>IVA (%) <span class="percent"><%= ivaPorc %></span></td>
         <td class="amount"><%= montoIVA.toLocaleString('es-CR') %></td>
       </tr>
-
       <tr class="total-final">
         <td>Total Monto</td>
         <td class="amount"><%= total.toLocaleString('es-CR') %></td>

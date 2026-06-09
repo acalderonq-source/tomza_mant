@@ -46,6 +46,13 @@
             <option value="USD">Dólares (USD)</option>
           </select>
         </div>
+        <div class="col-md-4">
+          <label>🏢 Empresa destinataria</label>
+          <select name="empresa_destino" class="form-select" required>
+            <option value="GAS TOMZA" selected>Gas Tomza de Costa Rica S.A.</option>
+            <option value="SUPER GAS">Envasadora Super Gas GLP S.A.</option>
+          </select>
+        </div>
       </div>
 
       <hr>
@@ -60,7 +67,7 @@
           </tbody>
           <tfoot>
             <tr><td colspan="4" class="text-end"><strong>Subtotal</strong></td><td><input type="text" id="subtotal" name="subtotal" readonly class="form-control-plaintext"></td><td></td></tr>
-            <tr><td colspan="4" class="text-end"><strong>Descuento (%)</strong></td><td><input type="number" id="descuento" name="descuento" step="0.01" value="0" class="form-control"></td><td></td></tr>
+            <tr><td colspan="4" class="text-end"><strong>Descuento (%)</strong></td><td><input type="number" id="descuento" name="descuento" step="0.01" value="0" class="form-control"></td><td>\n</td></td>
             <tr><td colspan="4" class="text-end"><strong>Transporte</strong></td><td><input type="number" id="transporte" name="transporte" step="0.01" value="0" class="form-control"></td><td></td></tr>
             <tr><td colspan="4" class="text-end"><strong>IVA (%)</strong></td><td><input type="number" id="iva" name="iva" step="0.01" value="13" class="form-control"></td><td></td></tr>
             <tr><td colspan="4" class="text-end"><strong>Total</strong></td><td><input type="text" id="total" name="total" readonly class="form-control-plaintext fw-bold"></td><td></td></tr>

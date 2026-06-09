@@ -106,13 +106,13 @@ router.post("/ordenes", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_
     const po_numero = await generarNumeroPO();
     const fecha = new Date().toISOString().slice(0, 10);
 
-    const { proveedor_id, forma_pago, moneda, lineas, subtotal, descuento, transporte, iva, total, observaciones } = req.body;
-
+    const { proveedor_id, forma_pago, moneda, lineas, subtotal, descuento, transporte, iva, total, observaciones, empresa_destino } = req.body;
+console.log("📌 [POST] empresa_destino recibida:", empresa_destino);
     const [result] = await connection.query(
       `INSERT INTO ordenes_compra 
-       (po_numero, fecha, proveedor_id, forma_pago, moneda, subtotal, descuento, transporte, iva, total, observaciones, creado_por, estado) 
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?, 'BORRADOR')`,
-      [po_numero, fecha, proveedor_id, forma_pago, moneda, subtotal, descuento, transporte, iva, total, observaciones || null, req.session.user.id]
+       (po_numero, fecha, proveedor_id, forma_pago, moneda, subtotal, descuento, transporte, iva, total, observaciones, creado_por, estado, empresa_destino) 
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?, 'BORRADOR', ?)`,
+      [po_numero, fecha, proveedor_id, forma_pago, moneda, subtotal, descuento, transporte, iva, total, observaciones || null, req.session.user.id, empresa_destino || 'GAS TOMZA']
     );
     const ordenId = result.insertId;
 
@@ -178,12 +178,17 @@ router.get("/ordenes", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_T
     const [proveedores] = await pool.query("SELECT id, nombre FROM proveedores ORDER BY nombre");
     const estados = ['BORRADOR', 'ENVIADA', 'RECIBIDA_PARCIAL', 'RECIBIDA_TOTAL'];
 
+    // Calcular total filtrado
+    let totalFiltrado = 0;
+    ordenes.forEach(o => totalFiltrado += parseFloat(o.total) || 0);
+
     res.render("compras/ordenes", { 
       ordenes, 
       user: req.session.user,
       proveedores,
       estados,
-      filtros: { proveedor_id, fecha_desde, fecha_hasta, po_numero, estado }
+      filtros: { proveedor_id, fecha_desde, fecha_hasta, po_numero, estado },
+      totalFiltrado
     });
   } catch (error) {
     console.error(error);
@@ -225,7 +230,7 @@ router.get("/ordenes/:id/pdf", requireAuth, allowRoles("ADMIN", "TALLER", "PROVE
   }
 });
 
-// ===================== RECIBIR ORDEN (marcar como recibida) =====================
+// ===================== RECIBIR ORDEN =====================
 router.post("/ordenes/:id/recibir", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER"), async (req, res) => {
   try {
     const id = req.params.id;
@@ -255,59 +260,34 @@ router.post("/ordenes/:id/eliminar", requireAuth, allowRoles("ADMIN", "TALLER", 
 // ===================== DASHBOARD DE ANÁLISIS =====================
 router.get("/dashboard", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER"), async (req, res) => {
   try {
-    // 1. Gasto total
     const [[totalGasto]] = await pool.query("SELECT SUM(total) as total FROM ordenes_compra");
-    
-    // 2. Top 5 proveedores por gasto
     const [topProveedores] = await pool.query(`
       SELECT p.nombre, SUM(o.total) as total_gastado
       FROM ordenes_compra o
       JOIN proveedores p ON p.id = o.proveedor_id
       GROUP BY o.proveedor_id
-      ORDER BY total_gastado DESC
-      LIMIT 5
+      ORDER BY total_gastado DESC LIMIT 5
     `);
-    
-    // 3. Evolución mensual (últimos 12 meses)
     const [gastoMensual] = await pool.query(`
-      SELECT 
-        DATE_FORMAT(o.fecha, '%Y-%m') as mes,
-        SUM(o.total) as total
+      SELECT DATE_FORMAT(o.fecha, '%Y-%m') as mes, SUM(o.total) as total
       FROM ordenes_compra o
       WHERE o.fecha >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH)
-      GROUP BY mes
-      ORDER BY mes ASC
+      GROUP BY mes ORDER BY mes ASC
     `);
-    
-    // 4. Top 5 productos más comprados (por cantidad)
     const [topProductos] = await pool.query(`
-      SELECT 
-        d.descripcion,
-        SUM(d.cantidad) as total_cantidad,
-        SUM(d.subtotal) as total_monto
+      SELECT d.descripcion, SUM(d.cantidad) as total_cantidad, SUM(d.subtotal) as total_monto
       FROM ordenes_compra_detalle d
-      GROUP BY d.descripcion
-      ORDER BY total_cantidad DESC
-      LIMIT 5
+      GROUP BY d.descripcion ORDER BY total_cantidad DESC LIMIT 5
     `);
-    
-    // 5. Órdenes por estado
     const [ordenesPorEstado] = await pool.query(`
-      SELECT estado, COUNT(*) as cantidad
-      FROM ordenes_compra
-      GROUP BY estado
+      SELECT estado, COUNT(*) as cantidad FROM ordenes_compra GROUP BY estado
     `);
-    
-    // 6. Gasto por proveedor (top 10) - opcional
     const [gastoPorProveedor] = await pool.query(`
       SELECT p.nombre, SUM(o.total) as total_gastado
       FROM ordenes_compra o
       JOIN proveedores p ON p.id = o.proveedor_id
-      GROUP BY o.proveedor_id
-      ORDER BY total_gastado DESC
-      LIMIT 10
+      GROUP BY o.proveedor_id ORDER BY total_gastado DESC LIMIT 10
     `);
-    
     res.render("compras/dashboard_compras", {
       user: req.session.user,
       totalGasto: totalGasto.total || 0,
