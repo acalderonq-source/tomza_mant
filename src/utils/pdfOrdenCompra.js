@@ -1,9 +1,8 @@
-const puppeteer = require('puppeteer');
+const pdf = require('html-pdf');
 const ejs = require('ejs');
 const path = require('path');
 
 async function generarPDFOrden(orden, proveedor, lineas) {
-  // Datos de la empresa según el destino
   let empresa = {};
   if (orden.empresa_destino === 'SUPER GAS') {
     empresa = {
@@ -24,19 +23,15 @@ async function generarPDFOrden(orden, proveedor, lineas) {
     };
   }
 
-  // Ruta a la plantilla EJS
   const templatePath = path.join(__dirname, '../views/compras/orden_pdf.ejs');
   const html = await ejs.renderFile(templatePath, { orden, proveedor, lineas, empresa });
 
-  // Lanzar Puppeteer (con opciones necesarias para entornos como Render)
-  const browser = await puppeteer.launch({
-    args: ['--no-sandbox', '--disable-setuid-sandbox']
+  return new Promise((resolve, reject) => {
+    pdf.create(html, { format: 'Letter' }).toBuffer((err, buffer) => {
+      if (err) reject(err);
+      else resolve(buffer);
+    });
   });
-  const page = await browser.newPage();
-  await page.setContent(html, { waitUntil: 'networkidle0' }); // Espera a que cargue la imagen
-  const pdfBuffer = await page.pdf({ format: 'Letter', printBackground: true });
-  await browser.close();
-  return pdfBuffer;
 }
 
 module.exports = { generarPDFOrden };
