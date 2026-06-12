@@ -107,7 +107,7 @@ router.post("/ordenes", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_
     const fecha = new Date().toISOString().slice(0, 10);
 
     const { proveedor_id, forma_pago, moneda, lineas, subtotal, descuento, transporte, iva, total, observaciones, empresa_destino } = req.body;
-console.log("📌 [POST] empresa_destino recibida:", empresa_destino);
+    console.log("📌 [POST] empresa_destino recibida:", empresa_destino);
     const [result] = await connection.query(
       `INSERT INTO ordenes_compra 
        (po_numero, fecha, proveedor_id, forma_pago, moneda, subtotal, descuento, transporte, iva, total, observaciones, creado_por, estado, empresa_destino) 
@@ -257,37 +257,122 @@ router.post("/ordenes/:id/eliminar", requireAuth, allowRoles("ADMIN", "TALLER", 
   }
 });
 
-// ===================== DASHBOARD DE ANÁLISIS =====================
+// ===================== DASHBOARD DE ANÁLISIS CON FILTROS (CORREGIDO) =====================
 router.get("/dashboard", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER"), async (req, res) => {
   try {
-    const [[totalGasto]] = await pool.query("SELECT SUM(total) as total FROM ordenes_compra");
+    const { proveedor_id, fecha_desde, fecha_hasta, estado } = req.query;
+
+    // Construir condiciones dinámicas
+    const condiciones = [];
+    const params = [];
+
+    if (proveedor_id && proveedor_id !== '') {
+      condiciones.push("o.proveedor_id = ?");
+      params.push(proveedor_id);
+    }
+    if (fecha_desde && fecha_desde !== '') {
+      condiciones.push("o.fecha >= ?");
+      params.push(fecha_desde);
+    }
+    if (fecha_hasta && fecha_hasta !== '') {
+      condiciones.push("o.fecha <= ?");
+      params.push(fecha_hasta);
+    }
+    if (estado && estado !== '') {
+      condiciones.push("o.estado = ?");
+      params.push(estado);
+    }
+
+    // Construir WHERE clause correctamente
+    let whereClause = "";
+    if (condiciones.length) {
+      whereClause = "WHERE " + condiciones.join(" AND ");
+    }
+
+    // 1. Gasto total filtrado
+    const [[totalGasto]] = await pool.query(`
+      SELECT COALESCE(SUM(o.total), 0) as total
+      FROM ordenes_compra o
+      ${whereClause}
+    `, params);
+
+    // 2. Top 5 proveedores por gasto
     const [topProveedores] = await pool.query(`
       SELECT p.nombre, SUM(o.total) as total_gastado
       FROM ordenes_compra o
       JOIN proveedores p ON p.id = o.proveedor_id
+      ${whereClause}
       GROUP BY o.proveedor_id
-      ORDER BY total_gastado DESC LIMIT 5
-    `);
+      ORDER BY total_gastado DESC
+      LIMIT 5
+    `, params);
+
+    // 3. Evolución mensual (últimos 12 meses) - construir WHERE con la condición de fecha
+    let mensualWhere = "";
+    if (condiciones.length) {
+      mensualWhere = "WHERE " + condiciones.join(" AND ") + " AND o.fecha >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH)";
+    } else {
+      mensualWhere = "WHERE o.fecha >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH)";
+    }
     const [gastoMensual] = await pool.query(`
-      SELECT DATE_FORMAT(o.fecha, '%Y-%m') as mes, SUM(o.total) as total
+      SELECT 
+        DATE_FORMAT(o.fecha, '%Y-%m') as mes,
+        SUM(o.total) as total
       FROM ordenes_compra o
-      WHERE o.fecha >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH)
-      GROUP BY mes ORDER BY mes ASC
-    `);
+      ${mensualWhere}
+      GROUP BY mes
+      ORDER BY mes ASC
+    `, params);
+
+    // 4. Top 5 productos más comprados
+    let productosWhere = "";
+    if (condiciones.length) {
+      productosWhere = "WHERE " + condiciones.join(" AND ");
+    }
     const [topProductos] = await pool.query(`
-      SELECT d.descripcion, SUM(d.cantidad) as total_cantidad, SUM(d.subtotal) as total_monto
+      SELECT 
+        d.descripcion,
+        SUM(d.cantidad) as total_cantidad,
+        SUM(d.subtotal) as total_monto
       FROM ordenes_compra_detalle d
-      GROUP BY d.descripcion ORDER BY total_cantidad DESC LIMIT 5
-    `);
+      JOIN ordenes_compra o ON o.id = d.orden_compra_id
+      ${productosWhere}
+      GROUP BY d.descripcion
+      ORDER BY total_cantidad DESC
+      LIMIT 5
+    `, params);
+
+    // 5. Órdenes por estado
+    let estadosWhere = "";
+    if (condiciones.length) {
+      estadosWhere = "WHERE " + condiciones.join(" AND ");
+    }
     const [ordenesPorEstado] = await pool.query(`
-      SELECT estado, COUNT(*) as cantidad FROM ordenes_compra GROUP BY estado
-    `);
+      SELECT estado, COUNT(*) as cantidad
+      FROM ordenes_compra o
+      ${estadosWhere}
+      GROUP BY estado
+    `, params);
+
+    // 6. Gasto por proveedor (top 10)
+    let gastoProvWhere = "";
+    if (condiciones.length) {
+      gastoProvWhere = "WHERE " + condiciones.join(" AND ");
+    }
     const [gastoPorProveedor] = await pool.query(`
       SELECT p.nombre, SUM(o.total) as total_gastado
       FROM ordenes_compra o
       JOIN proveedores p ON p.id = o.proveedor_id
-      GROUP BY o.proveedor_id ORDER BY total_gastado DESC LIMIT 10
-    `);
+      ${gastoProvWhere}
+      GROUP BY o.proveedor_id
+      ORDER BY total_gastado DESC
+      LIMIT 10
+    `, params);
+
+    // Proveedores para el selector
+    const [proveedores] = await pool.query("SELECT id, nombre FROM proveedores ORDER BY nombre");
+    const estadosList = ['BORRADOR', 'ENVIADA', 'RECIBIDA_PARCIAL', 'RECIBIDA_TOTAL'];
+
     res.render("compras/dashboard_compras", {
       user: req.session.user,
       totalGasto: totalGasto.total || 0,
@@ -295,7 +380,10 @@ router.get("/dashboard", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA
       gastoMensual: gastoMensual || [],
       topProductos: topProductos || [],
       ordenesPorEstado: ordenesPorEstado || [],
-      gastoPorProveedor: gastoPorProveedor || []
+      gastoPorProveedor: gastoPorProveedor || [],
+      proveedores: proveedores,
+      estados: estadosList,
+      filtros: { proveedor_id, fecha_desde, fecha_hasta, estado }
     });
   } catch (error) {
     console.error("Error en dashboard de compras:", error);

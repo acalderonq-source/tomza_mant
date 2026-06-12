@@ -93,9 +93,17 @@
       font-weight: 600;
     }
 
+    /* Filtros card */
+    .filtros-card {
+      background: white;
+      border-radius: 20px;
+      box-shadow: 0 5px 15px rgba(0,0,0,0.03);
+      padding: 1.2rem 1.5rem;
+      margin-bottom: 1.8rem;
+    }
+
     @media (max-width: 768px) {
       .stat-number { font-size: 1.4rem; }
-
       .navbar .text-white {
         flex-direction: column;
         align-items: flex-start !important;
@@ -120,23 +128,20 @@
   const productoTop = safeTopProductos[0] || {};
 
   const gastoProveedorTop = Number(proveedorTop.total_gastado || 0);
+  const vecesProveedorTop = gastoProveedorTop > 0 ? (safeTotalGasto / gastoProveedorTop).toFixed(1) : '0.0';
 
-  const vecesProveedorTop = gastoProveedorTop > 0
-    ? (safeTotalGasto / gastoProveedorTop).toFixed(1)
-    : '0.0';
+  // Proveedores para el selector de filtros (debe venir desde la ruta)
+  const proveedoresList = Array.isArray(proveedores) ? proveedores : [];
+  const estadosList = Array.isArray(estados) ? estados : ['BORRADOR', 'ENVIADA', 'RECIBIDA_PARCIAL', 'RECIBIDA_TOTAL'];
+  const filtrosActuales = filtros || {};
 %>
 
 <nav class="navbar navbar-dark bg-dark px-4 py-3">
   <span class="navbar-brand fw-semibold fs-5">
     <i class="bi bi-graph-up"></i> Dashboard de Compras
   </span>
-
   <div class="text-white d-flex align-items-center gap-3">
-    <span>
-      <i class="bi bi-person-circle me-1"></i>
-      <%= safeUser.usuario || 'Usuario' %> (<%= safeUser.rol || 'Sin rol' %>)
-    </span>
-
+    <span><i class="bi bi-person-circle me-1"></i> <%= safeUser.usuario || 'Usuario' %> (<%= safeUser.rol || 'Sin rol' %>)</span>
     <a href="/compras/ordenes" class="btn btn-sm btn-outline-light rounded-pill px-3">
       <i class="bi bi-arrow-left me-1"></i> Volver
     </a>
@@ -145,67 +150,90 @@
 
 <div class="container py-4">
 
-  <div class="row g-4 mb-5">
+  <!-- Formulario de filtros -->
+  <div class="filtros-card">
+    <h5 class="mb-3 fw-semibold"><i class="bi bi-funnel me-2"></i>Filtrar dashboard</h5>
+    <form method="GET" action="/compras/dashboard" class="row g-3">
+      <div class="col-md-3">
+        <label class="form-label small fw-semibold">Proveedor</label>
+        <select name="proveedor_id" class="form-select form-select-sm">
+          <option value="">Todos</option>
+          <% proveedoresList.forEach(p => { %>
+            <option value="<%= p.id %>" <%= filtrosActuales.proveedor_id == p.id ? 'selected' : '' %>><%= p.nombre %></option>
+          <% }) %>
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label small fw-semibold">Fecha desde</label>
+        <input type="date" name="fecha_desde" class="form-control form-control-sm" value="<%= filtrosActuales.fecha_desde || '' %>">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label small fw-semibold">Fecha hasta</label>
+        <input type="date" name="fecha_hasta" class="form-control form-control-sm" value="<%= filtrosActuales.fecha_hasta || '' %>">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label small fw-semibold">Estado</label>
+        <select name="estado" class="form-select form-select-sm">
+          <option value="">Todos</option>
+          <% estadosList.forEach(est => { %>
+            <option value="<%= est %>" <%= filtrosActuales.estado === est ? 'selected' : '' %>><%= est.replace('_', ' ') %></option>
+          <% }) %>
+        </select>
+      </div>
+      <div class="col-md-2 d-flex align-items-end">
+        <button type="submit" class="btn btn-primary btn-sm w-100">Filtrar</button>
+      </div>
+      <div class="col-md-1 d-flex align-items-end">
+        <a href="/compras/dashboard" class="btn btn-secondary btn-sm w-100">Limpiar</a>
+      </div>
+    </form>
+  </div>
 
+  <!-- KPIs -->
+  <div class="row g-4 mb-5">
     <div class="col-md-3 col-sm-6">
       <div class="stat-card d-flex align-items-center justify-content-between gap-3">
         <div>
           <div class="stat-number">₡<%= safeTotalGasto.toLocaleString('es-CR') %></div>
           <div class="stat-label mt-1">Gasto total</div>
         </div>
-        <div class="stat-icon">
-          <i class="bi bi-cash-stack text-success"></i>
-        </div>
+        <div class="stat-icon"><i class="bi bi-cash-stack text-success"></i></div>
       </div>
     </div>
-
     <div class="col-md-3 col-sm-6">
       <div class="stat-card d-flex align-items-center justify-content-between gap-3">
         <div>
           <div class="stat-number"><%= proveedorTop.nombre || '—' %></div>
           <div class="stat-label mt-1">Principal proveedor</div>
         </div>
-        <div class="stat-icon">
-          <i class="bi bi-building text-primary"></i>
-        </div>
+        <div class="stat-icon"><i class="bi bi-building text-primary"></i></div>
       </div>
     </div>
-
     <div class="col-md-3 col-sm-6">
       <div class="stat-card d-flex align-items-center justify-content-between gap-3">
         <div>
-          <div class="stat-number">
-            <%= Number(productoTop.total_cantidad || 0).toLocaleString('es-CR') %>
-          </div>
+          <div class="stat-number"><%= Number(productoTop.total_cantidad || 0).toLocaleString('es-CR') %></div>
           <div class="stat-label mt-1">Unidades del artículo top</div>
         </div>
-        <div class="stat-icon">
-          <i class="bi bi-box-seam text-warning"></i>
-        </div>
+        <div class="stat-icon"><i class="bi bi-box-seam text-warning"></i></div>
       </div>
     </div>
-
     <div class="col-md-3 col-sm-6">
       <div class="stat-card d-flex align-items-center justify-content-between gap-3">
         <div>
           <div class="stat-number"><%= vecesProveedorTop %>x</div>
           <div class="stat-label mt-1">Veces al proveedor top</div>
         </div>
-        <div class="stat-icon">
-          <i class="bi bi-receipt text-info"></i>
-        </div>
+        <div class="stat-icon"><i class="bi bi-receipt text-info"></i></div>
       </div>
     </div>
-
   </div>
 
+  <!-- Gráficos fila 1 -->
   <div class="row g-4 mb-4">
-
     <div class="col-md-6">
       <div class="chart-card">
-        <div class="card-header">
-          <i class="bi bi-bar-chart-steps me-2"></i> Top 5 proveedores por gasto
-        </div>
+        <div class="card-header"><i class="bi bi-bar-chart-steps me-2"></i> Top 5 proveedores por gasto</div>
         <div class="card-body">
           <% if (safeTopProveedores.length) { %>
             <canvas id="chartProveedores"></canvas>
@@ -215,12 +243,9 @@
         </div>
       </div>
     </div>
-
     <div class="col-md-6">
       <div class="chart-card">
-        <div class="card-header">
-          <i class="bi bi-calendar-week me-2"></i> Evolución mensual del gasto
-        </div>
+        <div class="card-header"><i class="bi bi-calendar-week me-2"></i> Evolución mensual del gasto</div>
         <div class="card-body">
           <% if (safeGastoMensual.length) { %>
             <canvas id="chartMensual"></canvas>
@@ -230,16 +255,13 @@
         </div>
       </div>
     </div>
-
   </div>
 
+  <!-- Gráficos fila 2 -->
   <div class="row g-4">
-
     <div class="col-md-6">
       <div class="chart-card">
-        <div class="card-header">
-          <i class="bi bi-box me-2"></i> Top 5 productos más comprados
-        </div>
+        <div class="card-header"><i class="bi bi-box me-2"></i> Top 5 productos más comprados</div>
         <div class="card-body">
           <% if (safeTopProductos.length) { %>
             <canvas id="chartProductos"></canvas>
@@ -249,12 +271,9 @@
         </div>
       </div>
     </div>
-
     <div class="col-md-6">
       <div class="chart-card">
-        <div class="card-header">
-          <i class="bi bi-pie-chart me-2"></i> Órdenes por estado
-        </div>
+        <div class="card-header"><i class="bi bi-pie-chart me-2"></i> Órdenes por estado</div>
         <div class="card-body">
           <% if (safeOrdenesPorEstado.length) { %>
             <canvas id="chartEstados"></canvas>
@@ -264,7 +283,6 @@
         </div>
       </div>
     </div>
-
   </div>
 
 </div>
@@ -277,11 +295,7 @@
 <script>
   const leerJSON = (id) => {
     const elemento = document.getElementById(id);
-
-    if (!elemento) {
-      return [];
-    }
-
+    if (!elemento) return [];
     try {
       return JSON.parse(elemento.textContent || '[]');
     } catch (error) {
@@ -305,8 +319,8 @@
     return texto.length > largo ? texto.substring(0, largo - 3) + '...' : texto;
   };
 
+  // Gráfico: Top proveedores
   const canvasProveedores = document.getElementById('chartProveedores');
-
   if (canvasProveedores && topProveedores.length) {
     new Chart(canvasProveedores, {
       type: 'bar',
@@ -321,27 +335,14 @@
       },
       options: {
         responsive: true,
-        plugins: {
-          legend: { display: false },
-          tooltip: {
-            callbacks: {
-              label: ctx => formatCurrency(ctx.raw)
-            }
-          }
-        },
-        scales: {
-          y: {
-            ticks: {
-              callback: value => formatCurrency(value)
-            }
-          }
-        }
+        plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => formatCurrency(ctx.raw) } } },
+        scales: { y: { ticks: { callback: value => formatCurrency(value) } } }
       }
     });
   }
 
+  // Gráfico: Evolución mensual
   const canvasMensual = document.getElementById('chartMensual');
-
   if (canvasMensual && gastoMensual.length) {
     new Chart(canvasMensual, {
       type: 'line',
@@ -358,27 +359,14 @@
       },
       options: {
         responsive: true,
-        plugins: {
-          legend: { display: false },
-          tooltip: {
-            callbacks: {
-              label: ctx => formatCurrency(ctx.raw)
-            }
-          }
-        },
-        scales: {
-          y: {
-            ticks: {
-              callback: value => formatCurrency(value)
-            }
-          }
-        }
+        plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => formatCurrency(ctx.raw) } } },
+        scales: { y: { ticks: { callback: value => formatCurrency(value) } } }
       }
     });
   }
 
+  // Gráfico: Top productos
   const canvasProductos = document.getElementById('chartProductos');
-
   if (canvasProductos && topProductos.length) {
     new Chart(canvasProductos, {
       type: 'bar',
@@ -394,20 +382,13 @@
       options: {
         indexAxis: 'y',
         responsive: true,
-        plugins: {
-          legend: { display: false },
-          tooltip: {
-            callbacks: {
-              label: ctx => `${ctx.raw} unidades`
-            }
-          }
-        }
+        plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => `${ctx.raw} unidades` } } }
       }
     });
   }
 
+  // Gráfico: Órdenes por estado
   const canvasEstados = document.getElementById('chartEstados');
-
   if (canvasEstados && ordenesPorEstado.length) {
     const colores = {
       BORRADOR: '#6c757d',
@@ -416,7 +397,6 @@
       RECIBIDA_TOTAL: '#198754',
       ANULADA: '#dc3545'
     };
-
     new Chart(canvasEstados, {
       type: 'pie',
       data: {
@@ -431,11 +411,7 @@
         responsive: true,
         plugins: {
           legend: { position: 'right' },
-          tooltip: {
-            callbacks: {
-              label: ctx => `${ctx.label}: ${ctx.raw} órdenes`
-            }
-          }
+          tooltip: { callbacks: { label: ctx => `${ctx.label}: ${ctx.raw} órdenes` } }
         }
       }
     });
