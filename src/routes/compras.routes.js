@@ -228,34 +228,58 @@ router.get("/ordenes/:id/pdf", requireAuth, allowRoles("ADMIN", "TALLER", "PROVE
   }
 });
 
-// ===================== RECIBIR ORDEN =====================
+// ===================== RECIBIR ORDEN (con preservación de filtros) =====================
 router.post("/ordenes/:id/recibir", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER"), async (req, res) => {
   try {
     const id = req.params.id;
+    const { proveedor_id, fecha_desde, fecha_hasta, po_numero, estado, facturada } = req.body;
+
     await pool.query("UPDATE ordenes_compra SET estado = 'RECIBIDA_TOTAL' WHERE id = ?", [id]);
-    res.redirect("/compras/ordenes");
+
+    // Reconstruir URL con filtros
+    const queryParams = [];
+    if (proveedor_id) queryParams.push(`proveedor_id=${encodeURIComponent(proveedor_id)}`);
+    if (fecha_desde) queryParams.push(`fecha_desde=${encodeURIComponent(fecha_desde)}`);
+    if (fecha_hasta) queryParams.push(`fecha_hasta=${encodeURIComponent(fecha_hasta)}`);
+    if (po_numero) queryParams.push(`po_numero=${encodeURIComponent(po_numero)}`);
+    if (estado) queryParams.push(`estado=${encodeURIComponent(estado)}`);
+    if (facturada !== undefined && facturada !== '') queryParams.push(`facturada=${encodeURIComponent(facturada)}`);
+    const redirectUrl = "/compras/ordenes" + (queryParams.length ? "?" + queryParams.join("&") : "");
+    res.redirect(redirectUrl);
   } catch (error) {
     console.error(error);
     res.status(500).send("Error al marcar orden como recibida");
   }
 });
 
-// ===================== ELIMINAR ORDEN =====================
+// ===================== ELIMINAR ORDEN (con preservación de filtros) =====================
 router.post("/ordenes/:id/eliminar", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER"), async (req, res) => {
   try {
     const id = req.params.id;
+    const { proveedor_id, fecha_desde, fecha_hasta, po_numero, estado, facturada } = req.body;
+
     const [[orden]] = await pool.query("SELECT * FROM ordenes_compra WHERE id = ?", [id]);
     if (!orden) return res.status(404).send("Orden no encontrada");
     await pool.query("DELETE FROM ordenes_compra_detalle WHERE orden_compra_id = ?", [id]);
     await pool.query("DELETE FROM ordenes_compra WHERE id = ?", [id]);
-    res.redirect("/compras/ordenes");
+
+    // Reconstruir URL con filtros
+    const queryParams = [];
+    if (proveedor_id) queryParams.push(`proveedor_id=${encodeURIComponent(proveedor_id)}`);
+    if (fecha_desde) queryParams.push(`fecha_desde=${encodeURIComponent(fecha_desde)}`);
+    if (fecha_hasta) queryParams.push(`fecha_hasta=${encodeURIComponent(fecha_hasta)}`);
+    if (po_numero) queryParams.push(`po_numero=${encodeURIComponent(po_numero)}`);
+    if (estado) queryParams.push(`estado=${encodeURIComponent(estado)}`);
+    if (facturada !== undefined && facturada !== '') queryParams.push(`facturada=${encodeURIComponent(facturada)}`);
+    const redirectUrl = "/compras/ordenes" + (queryParams.length ? "?" + queryParams.join("&") : "");
+    res.redirect(redirectUrl);
   } catch (error) {
     console.error("❌ Error al eliminar orden:", error);
     res.status(500).send("Error al eliminar la orden");
   }
 });
 
-// ===================== REGISTRAR FACTURA (con fecha de vencimiento y preservación de filtros) =====================
+// ===================== REGISTRAR FACTURA (con preservación de filtros) =====================
 router.post("/ordenes/:id/factura", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER"), async (req, res) => {
   try {
     const id = req.params.id;
@@ -273,7 +297,7 @@ router.post("/ordenes/:id/factura", requireAuth, allowRoles("ADMIN", "TALLER", "
       [factura || null, fechaVencimientoStr, id]
     );
 
-    // Construir la URL de redirección con los filtros
+    // Reconstruir URL con filtros
     const queryParams = [];
     if (proveedor_id) queryParams.push(`proveedor_id=${encodeURIComponent(proveedor_id)}`);
     if (fecha_desde) queryParams.push(`fecha_desde=${encodeURIComponent(fecha_desde)}`);
@@ -291,6 +315,7 @@ router.post("/ordenes/:id/factura", requireAuth, allowRoles("ADMIN", "TALLER", "
 
 // ===================== LISTADO DE FACTURAS CON FILTROS =====================
 router.get("/facturas", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER"), async (req, res) => {
+  // ... (igual que antes, sin cambios)
   try {
     const { proveedor_id, fecha_desde, fecha_hasta, pagada, vencida } = req.query;
 
@@ -370,7 +395,6 @@ router.post("/facturas/pagar-multiple", requireAuth, allowRoles("ADMIN", "TALLER
     const fechaPago = new Date().toISOString().slice(0, 10);
     const placeholders = facturas_ids.map(() => '?').join(',');
 
-    // Obtener los datos de las facturas antes de actualizar
     const [facturas] = await pool.query(`
       SELECT o.id, o.po_numero, o.total, o.factura, o.fecha_vencimiento_factura, p.nombre as proveedor_nombre
       FROM ordenes_compra o
@@ -382,7 +406,6 @@ router.post("/facturas/pagar-multiple", requireAuth, allowRoles("ADMIN", "TALLER
       return res.redirect("/compras/facturas");
     }
 
-    // Marcar como pagadas
     await pool.query(
       `UPDATE ordenes_compra SET pagada = 1, fecha_pago = ? WHERE id IN (${placeholders})`,
       [fechaPago, ...facturas_ids]
@@ -390,7 +413,6 @@ router.post("/facturas/pagar-multiple", requireAuth, allowRoles("ADMIN", "TALLER
 
     const totalPagado = facturas.reduce((sum, f) => sum + parseFloat(f.total), 0);
 
-    // Generar PDF de recibo
     const ejs = require('ejs');
     const path = require('path');
     const pdf = require('html-pdf');
@@ -413,6 +435,7 @@ router.post("/facturas/pagar-multiple", requireAuth, allowRoles("ADMIN", "TALLER
 
 // ===================== DASHBOARD DE ANÁLISIS =====================
 router.get("/dashboard", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER"), async (req, res) => {
+  // ... (sin cambios)
   try {
     const { proveedor_id, fecha_desde, fecha_hasta, estado } = req.query;
 
