@@ -3,6 +3,7 @@ const router = express.Router();
 const pool = require("../db");
 const { generarPDFOrden } = require('../utils/pdfOrdenCompra');
 
+// ===================== MIDDLEWARES =====================
 function requireAuth(req, res, next) {
   if (!req.session.user) return res.redirect("/login");
   next();
@@ -16,6 +17,7 @@ function allowRoles(...roles) {
   };
 }
 
+// ===================== FUNCIÓN PARA GENERAR NÚMERO DE PO =====================
 async function generarNumeroPO() {
   const año = new Date().getFullYear();
   const [rows] = await pool.query(
@@ -315,7 +317,6 @@ router.post("/ordenes/:id/factura", requireAuth, allowRoles("ADMIN", "TALLER", "
 
 // ===================== LISTADO DE FACTURAS CON FILTROS =====================
 router.get("/facturas", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER"), async (req, res) => {
-  // ... (igual que antes, sin cambios)
   try {
     const { proveedor_id, fecha_desde, fecha_hasta, pagada, vencida } = req.query;
 
@@ -435,7 +436,6 @@ router.post("/facturas/pagar-multiple", requireAuth, allowRoles("ADMIN", "TALLER
 
 // ===================== DASHBOARD DE ANÁLISIS =====================
 router.get("/dashboard", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER"), async (req, res) => {
-  // ... (sin cambios)
   try {
     const { proveedor_id, fecha_desde, fecha_hasta, estado } = req.query;
 

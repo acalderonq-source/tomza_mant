@@ -7,6 +7,7 @@
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
   <style>
+    /* ========== ESTILOS GLOBALES ========== */
     body {
       background: #f0f2f5;
       font-family: 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
@@ -35,7 +36,6 @@
     .btn-filtrar {
       background: #1f2937;
       border: none;
-      padding: 0.5rem 1.8rem;
       font-weight: 500;
     }
     .btn-filtrar:hover {
@@ -56,7 +56,6 @@
       font-weight: 600;
       font-size: 0.85rem;
       text-transform: uppercase;
-      letter-spacing: 0.5px;
       padding: 1rem;
     }
     .table-ordenes tbody td {
@@ -79,9 +78,6 @@
       padding: 0.3rem 0.7rem;
       font-size: 0.75rem;
       border-radius: 30px;
-    }
-    .btn-accion i {
-      margin-right: 4px;
     }
     .input-factura {
       width: 90px;
@@ -139,7 +135,7 @@
 
 <div class="container py-4">
 
-  <!-- Filtros -->
+  <!-- ===================== FILTROS ===================== -->
   <div class="filtros-card">
     <h5 class="mb-3 fw-semibold"><i class="bi bi-funnel me-2"></i>Filtrar órdenes</h5>
     <form method="GET" action="/compras/ordenes" class="row g-3">
@@ -190,17 +186,17 @@
     </form>
   </div>
 
-  <!-- Total filtrado -->
+  <!-- ===================== TOTAL FILTRADO ===================== -->
   <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
     <div class="alert alert-success py-2 px-4 rounded-pill shadow-sm mb-0">
       <i class="bi bi-calculator-fill me-2"></i>
-      <strong>💰 Total de órdenes filtradas:</strong> 
+      <strong>💰 Total de órdenes filtradas:</strong>
       ₡<%= typeof totalFiltrado !== 'undefined' ? parseFloat(totalFiltrado).toLocaleString('es-CR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0,00' %>
     </div>
     <div><small class="text-muted"><%= ordenes.length %> órdenes encontradas</small></div>
   </div>
 
-  <!-- Listado de órdenes -->
+  <!-- ===================== LISTADO DE ÓRDENES ===================== -->
   <div class="card-modern">
     <div class="card-header-modern d-flex justify-content-between align-items-center flex-wrap">
       <span><i class="bi bi-receipt me-2"></i>Listado de Órdenes</span>
@@ -228,10 +224,19 @@
             <th>Factura</th>
             <th>Estado</th>
             <th>Acciones</th>
-          </tr>
+          </table>
         </thead>
         <tbody>
           <% ordenes.forEach(orden => { %>
+            <%
+              const filtrosActuales = filtros || {};
+              const proveedor_id = filtrosActuales.proveedor_id || '';
+              const fecha_desde = filtrosActuales.fecha_desde || '';
+              const fecha_hasta = filtrosActuales.fecha_hasta || '';
+              const po_numero = filtrosActuales.po_numero || '';
+              const estado = filtrosActuales.estado || '';
+              const facturada = filtrosActuales.facturada || '';
+            %>
             <tr>
               <td data-label="PO Número"><strong><%= orden.po_numero %></strong></td>
               <td data-label="Fecha"><%= new Date(orden.fecha).toLocaleDateString('es-CR') %></td>
@@ -250,47 +255,47 @@
                 </span>
               </td>
               <td data-label="Acciones" class="text-nowrap">
+                <!-- Ver y PDF (sin filtros) -->
                 <a href="/compras/ordenes/<%= orden.id %>/detalle" class="btn btn-outline-secondary btn-accion"><i class="bi bi-eye"></i> Ver</a>
                 <a href="/compras/ordenes/<%= orden.id %>/pdf" class="btn btn-outline-primary btn-accion"><i class="bi bi-file-pdf"></i> PDF</a>
-                
+
                 <!-- Facturar -->
                 <% if (!orden.facturada) { %>
                   <form method="POST" action="/compras/ordenes/<%= orden.id %>/factura" class="d-inline-flex align-items-center" style="gap: 2px;">
                     <input type="text" name="factura" class="form-control form-control-sm input-factura" placeholder="N° factura" required>
-                    <input type="hidden" name="proveedor_id" value="<%= filtros.proveedor_id || '' %>">
-                    <input type="hidden" name="fecha_desde" value="<%= filtros.fecha_desde || '' %>">
-                    <input type="hidden" name="fecha_hasta" value="<%= filtros.fecha_hasta || '' %>">
-                    <input type="hidden" name="po_numero" value="<%= filtros.po_numero || '' %>">
-                    <input type="hidden" name="estado" value="<%= filtros.estado || '' %>">
-                    <input type="hidden" name="facturada" value="<%= filtros.facturada || '' %>">
+                    <input type="hidden" name="proveedor_id" value="<%= proveedor_id %>">
+                    <input type="hidden" name="fecha_desde" value="<%= fecha_desde %>">
+                    <input type="hidden" name="fecha_hasta" value="<%= fecha_hasta %>">
+                    <input type="hidden" name="po_numero" value="<%= po_numero %>">
+                    <input type="hidden" name="estado" value="<%= estado %>">
+                    <input type="hidden" name="facturada" value="<%= facturada %>">
                     <button type="submit" class="btn btn-outline-primary btn-accion"><i class="bi bi-receipt"></i> Facturar</button>
                   </form>
                 <% } else { %>
                   <span class="badge bg-success">Facturada</span>
                 <% } %>
 
-                <!-- Recibir -->
+                <!-- Recibir y Eliminar (solo si no está recibida) -->
                 <% if (orden.estado !== 'RECIBIDA_TOTAL' && orden.estado !== 'RECIBIDA_PARCIAL') { %>
                   <form method="POST" action="/compras/ordenes/<%= orden.id %>/recibir" class="d-inline">
-                    <input type="hidden" name="proveedor_id" value="<%= filtros.proveedor_id || '' %>">
-                    <input type="hidden" name="fecha_desde" value="<%= filtros.fecha_desde || '' %>">
-                    <input type="hidden" name="fecha_hasta" value="<%= filtros.fecha_hasta || '' %>">
-                    <input type="hidden" name="po_numero" value="<%= filtros.po_numero || '' %>">
-                    <input type="hidden" name="estado" value="<%= filtros.estado || '' %>">
-                    <input type="hidden" name="facturada" value="<%= filtros.facturada || '' %>">
+                    <input type="hidden" name="proveedor_id" value="<%= proveedor_id %>">
+                    <input type="hidden" name="fecha_desde" value="<%= fecha_desde %>">
+                    <input type="hidden" name="fecha_hasta" value="<%= fecha_hasta %>">
+                    <input type="hidden" name="po_numero" value="<%= po_numero %>">
+                    <input type="hidden" name="estado" value="<%= estado %>">
+                    <input type="hidden" name="facturada" value="<%= facturada %>">
                     <button type="submit" class="btn btn-outline-success btn-accion" onclick="return confirm('¿Marcar esta orden como recibida?')">
                       <i class="bi bi-check-circle"></i> Recibido
                     </button>
                   </form>
 
-                  <!-- Eliminar -->
                   <form method="POST" action="/compras/ordenes/<%= orden.id %>/eliminar" class="d-inline">
-                    <input type="hidden" name="proveedor_id" value="<%= filtros.proveedor_id || '' %>">
-                    <input type="hidden" name="fecha_desde" value="<%= filtros.fecha_desde || '' %>">
-                    <input type="hidden" name="fecha_hasta" value="<%= filtros.fecha_hasta || '' %>">
-                    <input type="hidden" name="po_numero" value="<%= filtros.po_numero || '' %>">
-                    <input type="hidden" name="estado" value="<%= filtros.estado || '' %>">
-                    <input type="hidden" name="facturada" value="<%= filtros.facturada || '' %>">
+                    <input type="hidden" name="proveedor_id" value="<%= proveedor_id %>">
+                    <input type="hidden" name="fecha_desde" value="<%= fecha_desde %>">
+                    <input type="hidden" name="fecha_hasta" value="<%= fecha_hasta %>">
+                    <input type="hidden" name="po_numero" value="<%= po_numero %>">
+                    <input type="hidden" name="estado" value="<%= estado %>">
+                    <input type="hidden" name="facturada" value="<%= facturada %>">
                     <button type="submit" class="btn btn-outline-danger btn-accion" onclick="return confirm('¿Eliminar esta orden permanentemente?')">
                       <i class="bi bi-trash"></i> Eliminar
                     </button>
@@ -298,17 +303,17 @@
                 <% } else { %>
                   <span class="badge bg-success">Recibido</span>
                 <% } %>
-              </table>
+              </td>
             </tr>
           <% }) %>
           <% if (ordenes.length === 0) { %>
-            <tr><td colspan="8" class="text-center text-muted py-4">No hay órdenes con los filtros seleccionados</td>
-          </tr>
+            <tr><td colspan="8" class="text-center text-muted py-4">No hay órdenes con los filtros seleccionados</td></tr>
           <% } %>
         </tbody>
       </table>
     </div>
   </div>
 </div>
+
 </body>
 </html>
