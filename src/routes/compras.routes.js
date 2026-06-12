@@ -255,11 +255,11 @@ router.post("/ordenes/:id/eliminar", requireAuth, allowRoles("ADMIN", "TALLER", 
   }
 });
 
-// ===================== REGISTRAR FACTURA (con fecha de vencimiento) =====================
+// ===================== REGISTRAR FACTURA (con fecha de vencimiento y preservación de filtros) =====================
 router.post("/ordenes/:id/factura", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER"), async (req, res) => {
   try {
     const id = req.params.id;
-    const { factura } = req.body;
+    const { factura, proveedor_id, fecha_desde, fecha_hasta, po_numero, estado, facturada } = req.body;
 
     const [[orden]] = await pool.query("SELECT fecha FROM ordenes_compra WHERE id = ?", [id]);
     if (!orden) return res.status(404).send("Orden no encontrada");
@@ -272,7 +272,17 @@ router.post("/ordenes/:id/factura", requireAuth, allowRoles("ADMIN", "TALLER", "
       "UPDATE ordenes_compra SET factura = ?, facturada = 1, fecha_vencimiento_factura = ?, pagada = 0 WHERE id = ?",
       [factura || null, fechaVencimientoStr, id]
     );
-    res.redirect("/compras/ordenes");
+
+    // Construir la URL de redirección con los filtros
+    const queryParams = [];
+    if (proveedor_id) queryParams.push(`proveedor_id=${encodeURIComponent(proveedor_id)}`);
+    if (fecha_desde) queryParams.push(`fecha_desde=${encodeURIComponent(fecha_desde)}`);
+    if (fecha_hasta) queryParams.push(`fecha_hasta=${encodeURIComponent(fecha_hasta)}`);
+    if (po_numero) queryParams.push(`po_numero=${encodeURIComponent(po_numero)}`);
+    if (estado) queryParams.push(`estado=${encodeURIComponent(estado)}`);
+    if (facturada !== undefined && facturada !== '') queryParams.push(`facturada=${encodeURIComponent(facturada)}`);
+    const redirectUrl = "/compras/ordenes" + (queryParams.length ? "?" + queryParams.join("&") : "");
+    res.redirect(redirectUrl);
   } catch (error) {
     console.error("❌ Error al registrar factura:", error);
     res.status(500).send("Error al registrar factura");

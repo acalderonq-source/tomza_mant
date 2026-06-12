@@ -83,7 +83,6 @@
     .btn-accion i {
       margin-right: 4px;
     }
-    /* Estilo compacto para el input de factura */
     .input-factura {
       width: 90px;
       display: inline-block;
@@ -257,6 +256,13 @@
                 <% if (!orden.facturada) { %>
                   <form method="POST" action="/compras/ordenes/<%= orden.id %>/factura" class="d-inline-flex align-items-center" style="gap: 2px;">
                     <input type="text" name="factura" class="form-control form-control-sm input-factura" placeholder="N° factura" required>
+                    <!-- Campos ocultos para mantener los filtros -->
+                    <input type="hidden" name="proveedor_id" value="<%= filtros.proveedor_id || '' %>">
+                    <input type="hidden" name="fecha_desde" value="<%= filtros.fecha_desde || '' %>">
+                    <input type="hidden" name="fecha_hasta" value="<%= filtros.fecha_hasta || '' %>">
+                    <input type="hidden" name="po_numero" value="<%= filtros.po_numero || '' %>">
+                    <input type="hidden" name="estado" value="<%= filtros.estado || '' %>">
+                    <input type="hidden" name="facturada" value="<%= filtros.facturada || '' %>">
                     <button type="submit" class="btn btn-outline-primary btn-accion"><i class="bi bi-receipt"></i> Facturar</button>
                   </form>
                 <% } else { %>
@@ -281,13 +287,13 @@
             </tr>
           <% }) %>
           <% if (ordenes.length === 0) { %>
-            <tr><td colspan="8" class="text-center text-muted py-4">No hay órdenes con los filtros seleccionados</td></tr>
+            <tr><td colspan="8" class="text-center text-muted py-4">No hay órdenes con los filtros seleccionados</td>
+          </table>
           <% } %>
         </tbody>
       </table>
     </div>
   </div>
 </div>
-
 </body>
 </html>
