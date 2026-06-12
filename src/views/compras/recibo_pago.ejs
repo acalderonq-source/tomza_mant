@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Recibo de Pago</title>
+<style>
+  *{box-sizing:border-box}
+  @page{ size:A4; margin:8mm; }
+  body{ margin:0; background:#e5e5e5; font-family:Arial, Helvetica, sans-serif; font-size:9px; color:#000; }
+  .recibo{ width:740px; background:#fff; margin:10px auto; padding:8px; overflow:hidden; }
+  .header{ display:grid; grid-template-columns:180px 1fr 180px; gap:8px; align-items:start; margin-bottom:6px; }
+  .logo{ width:170px; height:65px; object-fit:contain; }
+  .title{ text-align:center; font-size:18px; font-weight:800; padding-top:22px; white-space:nowrap; }
+  table{ width:100%; border-collapse:collapse; table-layout:fixed; }
+  .po-box{ font-size:8px; margin-top:24px; }
+  .po-box th{ background:#2F5597; color:white; padding:2px; border:1px solid #ccc; }
+  .po-box td{ height:17px; padding:2px; text-align:center; border:1px solid #ccc; font-weight:bold; }
+  .section-title{ background:#2F5597; color:white; text-align:center; font-weight:bold; padding:3px; font-size:10px; }
+  .info td{ width:50%; vertical-align:top; }
+  .label{ background:#E2EFDA; font-weight:bold; padding:2px 4px; }
+  .value{ padding:2px 4px; height:16px; border-bottom:1px solid #eee; word-break:break-word; }
+  .items{ margin-top:5px; }
+  .items th{ background:#2F5597; color:white; border:1px solid #ccc; padding:3px; font-size:9px; }
+  .items td{ border:1px solid #ddd; padding:3px; height:20px; }
+  .totals{ margin-top:20px; text-align:right; }
+  .totals table{ width:300px; margin-left:auto; }
+  .totals td{ padding:4px; }
+  .total-final{ font-weight:bold; background-color:#f0f0f0; }
+  .text-right{ text-align:right; }
+  .text-center{ text-align:center; }
+  @media print{ body{ background:white; } .recibo{ width:100%; margin:0; padding:0; } }
+</style>
+</head>
+<body>
+<div class="recibo">
+  <div class="header">
+    <img src="https://www.tomzasureste.com/img/grp_tomza.png" class="logo">
+    <div class="title">RECIBO DE PAGO DE FACTURAS</div>
+    <table class="po-box">
+      <tr><th>FECHA</th></tr>
+      <tr><td class="text-center"><%= new Date().toLocaleDateString('es-CR') %></td></tr>
+    </table>
+  </div>
+
+  <table class="info">
+    <tr><td colspan="2" class="section-title">INFORMACIÓN DEL PAGO</td></tr>
+    <tr><td class="label">EMPRESA</td><td class="value">GAS TOMZA DE COSTA RICA S.A.</td></tr>
+    <tr><td class="label">FECHA DE PAGO</td><td class="value"><%= new Date(fechaPago).toLocaleDateString('es-CR') %></td></tr>
+    <tr><td class="label">FACTURAS PAGADAS</td><td class="value"><%= facturas.length %></td></tr>
+    <tr><td class="label">MONTO TOTAL PAGADO</td><td class="value">₡<%= totalPagado.toLocaleString('es-CR') %></td></tr>
+  </table>
+
+  <table class="items">
+    <thead>
+      <tr>
+        <th>PO Número</th>
+        <th>Proveedor</th>
+        <th>N° Factura</th>
+        <th>Monto</th>
+        <th>Fecha Vencimiento</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% facturas.forEach(f => { %>
+      <tr>
+        <td><%= f.po_numero %></td>
+        <td><%= f.proveedor_nombre %></td>
+        <td><%= f.factura %></td>
+        <td class="text-right">₡<%= parseFloat(f.total).toLocaleString('es-CR') %></td>
+        <td><%= f.fecha_vencimiento_factura ? new Date(f.fecha_vencimiento_factura).toLocaleDateString('es-CR') : '—' %></td>
+      </tr>
+      <% }) %>
+    </tbody>
+  </table>
+
+  <div class="totals">
+    <table>
+      <tr><td><strong>SUBTOTAL</strong></td><td class="text-right">₡<%= totalPagado.toLocaleString('es-CR') %></td></tr>
+      <tr class="total-final"><td><strong>TOTAL PAGADO</strong></td><td class="text-right">₡<%= totalPagado.toLocaleString('es-CR') %></td></td>
+    </table>
+  </div>
+
+  <div style="margin-top:30px; text-align:center; font-size:8px;">
+    Documento generado automáticamente por el sistema de compras de Gas Tomza.
+  </div>
+</div>
+</body>
+</html>

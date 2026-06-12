@@ -15,7 +15,6 @@
       border: none;
       border-radius: 20px;
       box-shadow: 0 10px 30px rgba(0,0,0,0.05);
-      transition: all 0.2s;
       background: white;
     }
     .card-header-modern {
@@ -24,7 +23,7 @@
       padding: 1.2rem 1.5rem;
       font-weight: 600;
       font-size: 1.2rem;
-      border-radius: 20px 20px 0 0 !important;
+      border-radius: 20px 20px 0 0;
     }
     .filtros-card {
       background: white;
@@ -46,10 +45,6 @@
       background: #6c757d;
       border: none;
       color: white;
-      padding: 0.5rem 1.8rem;
-    }
-    .btn-limpiar:hover {
-      background: #5a6268;
     }
     .table-ordenes {
       margin-bottom: 0;
@@ -88,6 +83,14 @@
     .btn-accion i {
       margin-right: 4px;
     }
+    /* Estilo compacto para el input de factura */
+    .input-factura {
+      width: 90px;
+      display: inline-block;
+      margin-right: 4px;
+      font-size: 0.75rem;
+      padding: 0.25rem 0.5rem;
+    }
     @media (max-width: 768px) {
       .table-ordenes thead {
         display: none;
@@ -119,8 +122,8 @@
         text-align: left;
         color: #1e293b;
       }
-      .btn-accion {
-        margin: 0.2rem;
+      .input-factura {
+        width: 70px;
       }
     }
   </style>
@@ -136,11 +139,12 @@
 </nav>
 
 <div class="container py-4">
-  <!-- Filtros card mejorada -->
+
+  <!-- Filtros -->
   <div class="filtros-card">
     <h5 class="mb-3 fw-semibold"><i class="bi bi-funnel me-2"></i>Filtrar órdenes</h5>
     <form method="GET" action="/compras/ordenes" class="row g-3">
-      <div class="col-md-3">
+      <div class="col-md-2">
         <label class="form-label small fw-semibold text-secondary">Proveedor</label>
         <select name="proveedor_id" class="form-select form-select-sm">
           <option value="">Todos</option>
@@ -170,6 +174,14 @@
           <% }) %>
         </select>
       </div>
+      <div class="col-md-2">
+        <label class="form-label small fw-semibold text-secondary">Facturada</label>
+        <select name="facturada" class="form-select form-select-sm">
+          <option value="">Todas</option>
+          <option value="1" <%= filtros.facturada == '1' ? 'selected' : '' %>>Facturadas</option>
+          <option value="0" <%= filtros.facturada == '0' ? 'selected' : '' %>>No facturadas</option>
+        </select>
+      </div>
       <div class="col-md-1 d-flex align-items-end">
         <button type="submit" class="btn btn-filtrar btn-sm w-100">Filtrar</button>
       </div>
@@ -179,16 +191,14 @@
     </form>
   </div>
 
-  <!-- Total filtrado y contador de órdenes -->
+  <!-- Total filtrado -->
   <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
     <div class="alert alert-success py-2 px-4 rounded-pill shadow-sm mb-0">
       <i class="bi bi-calculator-fill me-2"></i>
       <strong>💰 Total de órdenes filtradas:</strong> 
       ₡<%= typeof totalFiltrado !== 'undefined' ? parseFloat(totalFiltrado).toLocaleString('es-CR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0,00' %>
     </div>
-    <div>
-      <small class="text-muted"><%= ordenes.length %> órdenes encontradas</small>
-    </div>
+    <div><small class="text-muted"><%= ordenes.length %> órdenes encontradas</small></div>
   </div>
 
   <!-- Listado de órdenes -->
@@ -197,7 +207,10 @@
       <span><i class="bi bi-receipt me-2"></i>Listado de Órdenes</span>
       <div>
         <a href="/compras/dashboard" class="btn btn-outline-dark btn-sm me-2">
-          <i class="bi bi-graph-up"></i> Dashboard de análisis
+          <i class="bi bi-graph-up"></i> Dashboard
+        </a>
+        <a href="/compras/facturas" class="btn btn-outline-info btn-sm me-2">
+          <i class="bi bi-receipt"></i> Facturas
         </a>
         <a href="/compras/ordenes/nueva" class="btn btn-dark btn-sm">
           <i class="bi bi-plus-lg"></i> Nueva orden
@@ -213,6 +226,7 @@
             <th>Proveedor</th>
             <th>Moneda</th>
             <th>Total</th>
+            <th>Factura</th>
             <th>Estado</th>
             <th>Acciones</th>
           </tr>
@@ -225,6 +239,7 @@
               <td data-label="Proveedor"><%= orden.proveedor_nombre %></td>
               <td data-label="Moneda"><%= orden.moneda %></td>
               <td data-label="Total"><%= parseFloat(orden.total).toLocaleString('es-CR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %></td>
+              <td data-label="Factura"><%= orden.factura || '—' %></td>
               <td data-label="Estado">
                 <span class="badge badge-estado <%= 
                   orden.estado === 'BORRADOR' ? 'bg-secondary' :
@@ -239,6 +254,15 @@
                 <a href="/compras/ordenes/<%= orden.id %>/detalle" class="btn btn-outline-secondary btn-accion"><i class="bi bi-eye"></i> Ver</a>
                 <a href="/compras/ordenes/<%= orden.id %>/pdf" class="btn btn-outline-primary btn-accion"><i class="bi bi-file-pdf"></i> PDF</a>
                 
+                <% if (!orden.facturada) { %>
+                  <form method="POST" action="/compras/ordenes/<%= orden.id %>/factura" class="d-inline-flex align-items-center" style="gap: 2px;">
+                    <input type="text" name="factura" class="form-control form-control-sm input-factura" placeholder="N° factura" required>
+                    <button type="submit" class="btn btn-outline-primary btn-accion"><i class="bi bi-receipt"></i> Facturar</button>
+                  </form>
+                <% } else { %>
+                  <span class="badge bg-success">Facturada</span>
+                <% } %>
+
                 <% if (orden.estado !== 'RECIBIDA_TOTAL' && orden.estado !== 'RECIBIDA_PARCIAL') { %>
                   <form method="POST" action="/compras/ordenes/<%= orden.id %>/recibir" class="d-inline">
                     <button type="submit" class="btn btn-outline-success btn-accion" onclick="return confirm('¿Marcar esta orden como recibida?')">
@@ -257,7 +281,7 @@
             </tr>
           <% }) %>
           <% if (ordenes.length === 0) { %>
-            <td><td colspan="7" class="text-center text-muted py-4">No hay órdenes con los filtros seleccionados</td>%
+            <tr><td colspan="8" class="text-center text-muted py-4">No hay órdenes con los filtros seleccionados</td></tr>
           <% } %>
         </tbody>
       </table>

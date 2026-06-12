@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+  <title>Gestión de Facturas</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <style>
+    body { background: #f0f2f5; font-family: 'Segoe UI', Roboto, sans-serif; }
+    .card { border: none; border-radius: 20px; box-shadow: 0 8px 20px rgba(0,0,0,0.04); }
+    .filtros-card { background: white; border-radius: 20px; padding: 1.5rem; margin-bottom: 1.8rem; }
+    .table-facturas th { background: #f8fafc; }
+    .badge-vencida { background-color: #dc3545; color: white; }
+    .badge-pagada { background-color: #198754; }
+    .badge-pendiente { background-color: #ffc107; color: #000; }
+    .total-seleccion { font-size: 1.2rem; font-weight: bold; margin-top: 1rem; text-align: right; }
+    @media (max-width: 768px) {
+      .table-facturas thead { display: none; }
+      .table-facturas, .table-facturas tbody, .table-facturas tr, .table-facturas td {
+        display: block;
+        width: 100%;
+      }
+      .table-facturas tr { margin-bottom: 1rem; border: 1px solid #dee2e6; border-radius: 16px; padding: 0.8rem; background: white; }
+      .table-facturas td { text-align: right; padding-left: 50%; position: relative; border-bottom: 1px solid #eee; }
+      .table-facturas td::before { content: attr(data-label); position: absolute; left: 0.8rem; width: 45%; font-weight: 600; text-align: left; }
+    }
+  </style>
+</head>
+<body>
+
+<nav class="navbar navbar-dark bg-dark px-3 py-2">
+  <span class="navbar-brand fw-semibold"><i class="bi bi-receipt"></i> Gestión de Facturas</span>
+  <div class="text-white">
+    <%= user.usuario %> (<%= user.rol %>)
+    <a href="/compras/ordenes" class="btn btn-sm btn-outline-light ms-2">← Órdenes</a>
+    <a href="/dashboard" class="btn btn-sm btn-outline-light ms-2">Dashboard</a>
+  </div>
+</nav>
+
+<div class="container py-4">
+
+  <!-- Mensajes flash corregidos -->
+  <% if (typeof success !== 'undefined' && success) { %>
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+      <%= success %>
+      <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+  <% } %>
+  <% if (typeof error !== 'undefined' && error) { %>
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+      <%= error %>
+      <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+  <% } %>
+
+  <!-- Filtros -->
+  <div class="filtros-card">
+    <h5 class="mb-3 fw-semibold"><i class="bi bi-funnel me-2"></i>Filtrar facturas</h5>
+    <form method="GET" action="/compras/facturas" class="row g-3">
+      <div class="col-md-3">
+        <label class="form-label small fw-semibold">Proveedor</label>
+        <select name="proveedor_id" class="form-select form-select-sm">
+          <option value="">Todos</option>
+          <% proveedores.forEach(p => { %>
+            <option value="<%= p.id %>" <%= filtros.proveedor_id == p.id ? 'selected' : '' %>><%= p.nombre %></option>
+          <% }) %>
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label small fw-semibold">Fecha desde</label>
+        <input type="date" name="fecha_desde" class="form-control form-control-sm" value="<%= filtros.fecha_desde || '' %>">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label small fw-semibold">Fecha hasta</label>
+        <input type="date" name="fecha_hasta" class="form-control form-control-sm" value="<%= filtros.fecha_hasta || '' %>">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label small fw-semibold">Estado de pago</label>
+        <select name="pagada" class="form-select form-select-sm">
+          <option value="">Todos</option>
+          <option value="1" <%= filtros.pagada == '1' ? 'selected' : '' %>>Pagadas</option>
+          <option value="0" <%= filtros.pagada == '0' ? 'selected' : '' %>>Pendientes</option>
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label small fw-semibold">Solo vencidas</label>
+        <select name="vencida" class="form-select form-select-sm">
+          <option value="">No</option>
+          <option value="1" <%= filtros.vencida == '1' ? 'selected' : '' %>>Sí</option>
+        </select>
+      </div>
+      <div class="col-md-1 d-flex align-items-end">
+        <button type="submit" class="btn btn-primary btn-sm w-100">Filtrar</button>
+      </div>
+      <div class="col-md-1 d-flex align-items-end">
+        <a href="/compras/facturas" class="btn btn-secondary btn-sm w-100">Limpiar</a>
+      </div>
+    </form>
+  </div>
+
+  <!-- Listado de facturas -->
+  <div class="card p-3">
+    <h3 class="mb-3">📄 Facturas de Compras</h3>
+    <form method="POST" action="/compras/facturas/pagar-multiple" id="multiplePagoForm">
+      <div class="table-responsive">
+        <table class="table table-bordered table-hover table-facturas">
+          <thead class="table-light">
+            <tr>
+              <th style="width: 40px;"><input type="checkbox" id="seleccionarTodos"></th>
+              <th>PO Número</th>
+              <th>Proveedor</th>
+              <th>Fecha Orden</th>
+              <th>N° Factura</th>
+              <th>Monto</th>
+              <th>Fecha Vencimiento</th>
+              <th>Estado</th>
+              <th>Acciones individuales</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% facturas.forEach(f => { %>
+              <tr class="<%= f.vencida ? 'table-danger' : '' %>">
+                <td class="text-center">
+                  <% if (!f.pagada) { %>
+                    <input type="checkbox" name="facturas_ids" value="<%= f.id %>" class="check-factura" data-monto="<%= f.total %>">
+                  <% } %>
+                </td>
+                <td data-label="PO Número"><strong><%= f.po_numero %></strong></td>
+                <td data-label="Proveedor"><%= f.proveedor_nombre %></td>
+                <td data-label="Fecha Orden"><%= new Date(f.fecha).toLocaleDateString('es-CR') %></td>
+                <td data-label="N° Factura"><%= f.factura || '—' %></td>
+                <td data-label="Monto" class="monto-factura" data-val="<%= f.total %>">₡<%= parseFloat(f.total).toLocaleString('es-CR') %></td>
+                <td data-label="Fecha Vencimiento">
+                  <%= f.fecha_vencimiento_factura ? new Date(f.fecha_vencimiento_factura).toLocaleDateString('es-CR') : '—' %>
+                  <% if (f.vencida) { %>
+                    <span class="badge badge-vencida ms-1">Vencida</span>
+                  <% } %>
+                </td>
+                <td data-label="Estado">
+                  <% if (f.pagada) { %>
+                    <span class="badge badge-pagada">Pagada el <%= new Date(f.fecha_pago).toLocaleDateString('es-CR') %></span>
+                  <% } else { %>
+                    <span class="badge badge-pendiente">Pendiente</span>
+                  <% } %>
+                </td>
+                <td data-label="Acciones">
+                  <% if (!f.pagada) { %>
+                    <form method="POST" action="/compras/facturas/<%= f.id %>/pagar" class="d-inline" onsubmit="return confirm('¿Marcar esta factura como pagada?')">
+                      <button type="submit" class="btn btn-sm btn-success">
+                        <i class="bi bi-check-circle"></i> Pagar
+                      </button>
+                    </form>
+                  <% } else { %>
+                    <span class="text-muted">Pagada</span>
+                  <% } %>
+                </td>
+              </tr>
+            <% }) %>
+            <% if (facturas.length === 0) { %>
+              <tr><td colspan="9" class="text-center py-4">No hay facturas con los filtros seleccionados</td></tr>
+            <% } %>
+          </tbody>
+        </table>
+      </div>
+      <div class="d-flex justify-content-between align-items-center mt-3">
+        <div>
+          <button type="submit" class="btn btn-success" id="btnPagarSeleccionadas" disabled>
+            <i class="bi bi-check2-circle"></i> Pagar seleccionadas
+          </button>
+        </div>
+        <div class="total-seleccion">
+          <strong>Total seleccionado:</strong> <span id="totalSeleccionado">₡0,00</span>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+  const checkboxes = document.querySelectorAll('.check-factura');
+  const btnPagar = document.getElementById('btnPagarSeleccionadas');
+  const totalSpan = document.getElementById('totalSeleccionado');
+  const selectTodos = document.getElementById('seleccionarTodos');
+
+  function actualizarTotal() {
+    let total = 0;
+    checkboxes.forEach(cb => {
+      if (cb.checked) {
+        total += parseFloat(cb.dataset.monto || 0);
+      }
+    });
+    totalSpan.innerText = '₡' + total.toLocaleString('es-CR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    btnPagar.disabled = (total === 0);
+  }
+
+  function marcarTodos() {
+    const checked = selectTodos.checked;
+    checkboxes.forEach(cb => {
+      cb.checked = checked;
+    });
+    actualizarTotal();
+  }
+
+  if (selectTodos) {
+    selectTodos.addEventListener('change', marcarTodos);
+  }
+  checkboxes.forEach(cb => {
+    cb.addEventListener('change', actualizarTotal);
+  });
+  actualizarTotal();
+</script>
+
+</body>
+</html>

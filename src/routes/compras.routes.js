@@ -3,13 +3,11 @@ const router = express.Router();
 const pool = require("../db");
 const { generarPDFOrden } = require('../utils/pdfOrdenCompra');
 
-// Middleware de autenticación
 function requireAuth(req, res, next) {
   if (!req.session.user) return res.redirect("/login");
   next();
 }
 
-// Permitir solo los roles especificados
 function allowRoles(...roles) {
   return (req, res, next) => {
     if (!req.session.user) return res.redirect("/login");
@@ -18,7 +16,6 @@ function allowRoles(...roles) {
   };
 }
 
-// ===================== FUNCIÓN PARA GENERAR NÚMERO DE PO =====================
 async function generarNumeroPO() {
   const año = new Date().getFullYear();
   const [rows] = await pool.query(
@@ -85,12 +82,12 @@ router.get("/ordenes/nueva", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEED
   try {
     const [proveedores] = await pool.query("SELECT id, nombre FROM proveedores ORDER BY nombre");
     const siguientePO = await generarNumeroPO();
-    res.render("compras/orden_form", { 
-      orden: null, 
-      proveedores, 
+    res.render("compras/orden_form", {
+      orden: null,
+      proveedores,
       user: req.session.user,
       siguientePO,
-      fechaActual: new Date().toISOString().slice(0,10)
+      fechaActual: new Date().toISOString().slice(0, 10)
     });
   } catch (error) {
     console.error(error);
@@ -107,7 +104,6 @@ router.post("/ordenes", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_
     const fecha = new Date().toISOString().slice(0, 10);
 
     const { proveedor_id, forma_pago, moneda, lineas, subtotal, descuento, transporte, iva, total, observaciones, empresa_destino } = req.body;
-    console.log("📌 [POST] empresa_destino recibida:", empresa_destino);
     const [result] = await connection.query(
       `INSERT INTO ordenes_compra 
        (po_numero, fecha, proveedor_id, forma_pago, moneda, subtotal, descuento, transporte, iva, total, observaciones, creado_por, estado, empresa_destino) 
@@ -141,7 +137,7 @@ router.post("/ordenes", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_
 // ===================== LISTADO DE ÓRDENES CON FILTROS =====================
 router.get("/ordenes", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER"), async (req, res) => {
   try {
-    const { proveedor_id, fecha_desde, fecha_hasta, po_numero, estado } = req.query;
+    const { proveedor_id, fecha_desde, fecha_hasta, po_numero, estado, facturada } = req.query;
 
     let sql = `
       SELECT o.*, p.nombre as proveedor_nombre 
@@ -171,6 +167,10 @@ router.get("/ordenes", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_T
       sql += ` AND o.estado = ?`;
       params.push(estado);
     }
+    if (facturada !== undefined && facturada !== '') {
+      sql += ` AND o.facturada = ?`;
+      params.push(facturada === '1' ? 1 : 0);
+    }
 
     sql += ` ORDER BY o.fecha DESC, o.id DESC`;
 
@@ -178,16 +178,15 @@ router.get("/ordenes", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_T
     const [proveedores] = await pool.query("SELECT id, nombre FROM proveedores ORDER BY nombre");
     const estados = ['BORRADOR', 'ENVIADA', 'RECIBIDA_PARCIAL', 'RECIBIDA_TOTAL'];
 
-    // Calcular total filtrado
     let totalFiltrado = 0;
     ordenes.forEach(o => totalFiltrado += parseFloat(o.total) || 0);
 
-    res.render("compras/ordenes", { 
-      ordenes, 
+    res.render("compras/ordenes", {
+      ordenes,
       user: req.session.user,
       proveedores,
       estados,
-      filtros: { proveedor_id, fecha_desde, fecha_hasta, po_numero, estado },
+      filtros: { proveedor_id, fecha_desde, fecha_hasta, po_numero, estado, facturada },
       totalFiltrado
     });
   } catch (error) {
@@ -219,7 +218,6 @@ router.get("/ordenes/:id/pdf", requireAuth, allowRoles("ADMIN", "TALLER", "PROVE
     if (!orden) return res.status(404).send("Orden no encontrada");
     const [[proveedor]] = await pool.query("SELECT * FROM proveedores WHERE id = ?", [orden.proveedor_id]);
     const [lineas] = await pool.query("SELECT * FROM ordenes_compra_detalle WHERE orden_compra_id = ?", [ordenId]);
-
     const pdfBuffer = await generarPDFOrden(orden, proveedor, lineas);
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename=PO_${orden.po_numero}.pdf`);
@@ -257,12 +255,157 @@ router.post("/ordenes/:id/eliminar", requireAuth, allowRoles("ADMIN", "TALLER", 
   }
 });
 
-// ===================== DASHBOARD DE ANÁLISIS CON FILTROS (CORREGIDO) =====================
+// ===================== REGISTRAR FACTURA (con fecha de vencimiento) =====================
+router.post("/ordenes/:id/factura", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER"), async (req, res) => {
+  try {
+    const id = req.params.id;
+    const { factura } = req.body;
+
+    const [[orden]] = await pool.query("SELECT fecha FROM ordenes_compra WHERE id = ?", [id]);
+    if (!orden) return res.status(404).send("Orden no encontrada");
+
+    const fechaVencimiento = new Date(orden.fecha);
+    fechaVencimiento.setDate(fechaVencimiento.getDate() + 30);
+    const fechaVencimientoStr = fechaVencimiento.toISOString().slice(0, 10);
+
+    await pool.query(
+      "UPDATE ordenes_compra SET factura = ?, facturada = 1, fecha_vencimiento_factura = ?, pagada = 0 WHERE id = ?",
+      [factura || null, fechaVencimientoStr, id]
+    );
+    res.redirect("/compras/ordenes");
+  } catch (error) {
+    console.error("❌ Error al registrar factura:", error);
+    res.status(500).send("Error al registrar factura");
+  }
+});
+
+// ===================== LISTADO DE FACTURAS CON FILTROS =====================
+router.get("/facturas", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER"), async (req, res) => {
+  try {
+    const { proveedor_id, fecha_desde, fecha_hasta, pagada, vencida } = req.query;
+
+    let sql = `
+      SELECT 
+        o.id, 
+        o.po_numero, 
+        o.fecha, 
+        o.total, 
+        o.factura, 
+        o.fecha_vencimiento_factura, 
+        o.pagada, 
+        o.fecha_pago,
+        p.nombre as proveedor_nombre
+      FROM ordenes_compra o
+      JOIN proveedores p ON p.id = o.proveedor_id
+      WHERE o.facturada = 1
+    `;
+    const params = [];
+
+    if (proveedor_id && proveedor_id !== '') {
+      sql += ` AND o.proveedor_id = ?`;
+      params.push(proveedor_id);
+    }
+    if (fecha_desde && fecha_desde !== '') {
+      sql += ` AND o.fecha >= ?`;
+      params.push(fecha_desde);
+    }
+    if (fecha_hasta && fecha_hasta !== '') {
+      sql += ` AND o.fecha <= ?`;
+      params.push(fecha_hasta);
+    }
+    if (pagada !== undefined && pagada !== '') {
+      sql += ` AND o.pagada = ?`;
+      params.push(pagada === '1' ? 1 : 0);
+    }
+
+    sql += ` ORDER BY o.fecha_vencimiento_factura ASC, o.fecha DESC`;
+
+    const [facturas] = await pool.query(sql, params);
+
+    const hoy = new Date();
+    hoy.setHours(0, 0, 0, 0);
+    const facturasConEstado = facturas.map(f => ({
+      ...f,
+      vencida: (!f.pagada && f.fecha_vencimiento_factura && new Date(f.fecha_vencimiento_factura) < hoy)
+    }));
+
+    let facturasFiltradas = facturasConEstado;
+    if (vencida === '1') {
+      facturasFiltradas = facturasConEstado.filter(f => f.vencida);
+    }
+
+    const [proveedores] = await pool.query("SELECT id, nombre FROM proveedores ORDER BY nombre");
+
+    res.render("compras/facturas", {
+      facturas: facturasFiltradas,
+      user: req.session.user,
+      proveedores,
+      filtros: { proveedor_id, fecha_desde, fecha_hasta, pagada, vencida },
+      hoy: hoy.toISOString().slice(0, 10)
+    });
+  } catch (error) {
+    console.error("Error al cargar facturas:", error);
+    res.status(500).send("Error interno");
+  }
+});
+
+// ===================== MARCAR MÚLTIPLES FACTURAS COMO PAGADAS Y GENERAR RECIBO PDF =====================
+router.post("/facturas/pagar-multiple", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER"), async (req, res) => {
+  try {
+    const { facturas_ids } = req.body;
+    if (!facturas_ids || !facturas_ids.length) {
+      req.session.error = "No seleccionó ninguna factura.";
+      return res.redirect("/compras/facturas");
+    }
+    const fechaPago = new Date().toISOString().slice(0, 10);
+    const placeholders = facturas_ids.map(() => '?').join(',');
+
+    // Obtener los datos de las facturas antes de actualizar
+    const [facturas] = await pool.query(`
+      SELECT o.id, o.po_numero, o.total, o.factura, o.fecha_vencimiento_factura, p.nombre as proveedor_nombre
+      FROM ordenes_compra o
+      JOIN proveedores p ON p.id = o.proveedor_id
+      WHERE o.id IN (${placeholders}) AND o.facturada = 1 AND o.pagada = 0
+    `, facturas_ids);
+    if (facturas.length === 0) {
+      req.session.error = "Las facturas seleccionadas ya estaban pagadas o no existen.";
+      return res.redirect("/compras/facturas");
+    }
+
+    // Marcar como pagadas
+    await pool.query(
+      `UPDATE ordenes_compra SET pagada = 1, fecha_pago = ? WHERE id IN (${placeholders})`,
+      [fechaPago, ...facturas_ids]
+    );
+
+    const totalPagado = facturas.reduce((sum, f) => sum + parseFloat(f.total), 0);
+
+    // Generar PDF de recibo
+    const ejs = require('ejs');
+    const path = require('path');
+    const pdf = require('html-pdf');
+    const templatePath = path.join(__dirname, '../views/compras/recibo_pago.ejs');
+    const html = await ejs.renderFile(templatePath, { facturas, fechaPago, totalPagado });
+    pdf.create(html, { format: 'Letter' }).toBuffer((err, buffer) => {
+      if (err) {
+        console.error("Error generando PDF:", err);
+        return res.status(500).send("Error al generar el recibo");
+      }
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename=recibo_pago_${new Date().toISOString().slice(0,19).replace(/:/g, '-')}.pdf`);
+      res.send(buffer);
+    });
+  } catch (error) {
+    console.error("Error al procesar pago múltiple:", error);
+    res.status(500).send("Error al procesar el pago múltiple");
+  }
+});
+
+// ===================== DASHBOARD DE ANÁLISIS =====================
 router.get("/dashboard", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER"), async (req, res) => {
   try {
     const { proveedor_id, fecha_desde, fecha_hasta, estado } = req.query;
 
-    // Construir condiciones dinámicas
     const condiciones = [];
     const params = [];
 
@@ -283,20 +426,17 @@ router.get("/dashboard", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA
       params.push(estado);
     }
 
-    // Construir WHERE clause correctamente
     let whereClause = "";
     if (condiciones.length) {
       whereClause = "WHERE " + condiciones.join(" AND ");
     }
 
-    // 1. Gasto total filtrado
     const [[totalGasto]] = await pool.query(`
       SELECT COALESCE(SUM(o.total), 0) as total
       FROM ordenes_compra o
       ${whereClause}
     `, params);
 
-    // 2. Top 5 proveedores por gasto
     const [topProveedores] = await pool.query(`
       SELECT p.nombre, SUM(o.total) as total_gastado
       FROM ordenes_compra o
@@ -307,7 +447,6 @@ router.get("/dashboard", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA
       LIMIT 5
     `, params);
 
-    // 3. Evolución mensual (últimos 12 meses) - construir WHERE con la condición de fecha
     let mensualWhere = "";
     if (condiciones.length) {
       mensualWhere = "WHERE " + condiciones.join(" AND ") + " AND o.fecha >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH)";
@@ -324,7 +463,6 @@ router.get("/dashboard", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA
       ORDER BY mes ASC
     `, params);
 
-    // 4. Top 5 productos más comprados
     let productosWhere = "";
     if (condiciones.length) {
       productosWhere = "WHERE " + condiciones.join(" AND ");
@@ -342,7 +480,6 @@ router.get("/dashboard", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA
       LIMIT 5
     `, params);
 
-    // 5. Órdenes por estado
     let estadosWhere = "";
     if (condiciones.length) {
       estadosWhere = "WHERE " + condiciones.join(" AND ");
@@ -354,7 +491,6 @@ router.get("/dashboard", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA
       GROUP BY estado
     `, params);
 
-    // 6. Gasto por proveedor (top 10)
     let gastoProvWhere = "";
     if (condiciones.length) {
       gastoProvWhere = "WHERE " + condiciones.join(" AND ");
@@ -369,7 +505,6 @@ router.get("/dashboard", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA
       LIMIT 10
     `, params);
 
-    // Proveedores para el selector
     const [proveedores] = await pool.query("SELECT id, nombre FROM proveedores ORDER BY nombre");
     const estadosList = ['BORRADOR', 'ENVIADA', 'RECIBIDA_PARCIAL', 'RECIBIDA_TOTAL'];
 
