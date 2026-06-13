@@ -34,7 +34,7 @@ async function generarNumeroPO() {
 }
 
 // ===================== PROVEEDORES (solo ADMIN) =====================
-router.get("/proveedores", requireAuth, allowRoles("ADMIN"), async (req, res) => {
+router.get("/proveedores", requireAuth, allowRoles("ADMIN", "PROVEEDURIA_TALLER"), async (req, res) => {
   try {
     const [proveedores] = await pool.query("SELECT * FROM proveedores ORDER BY nombre");
     res.render("compras/proveedores", { proveedores, user: req.session.user });
@@ -44,11 +44,11 @@ router.get("/proveedores", requireAuth, allowRoles("ADMIN"), async (req, res) =>
   }
 });
 
-router.get("/proveedores/nuevo", requireAuth, allowRoles("ADMIN"), (req, res) => {
+router.get("/proveedores/nuevo", requireAuth, allowRoles("ADMIN", "PROVEEDURIA_TALLER"), (req, res) => {
   res.render("compras/proveedor_form", { proveedor: null, user: req.session.user });
 });
 
-router.post("/proveedores", requireAuth, allowRoles("ADMIN"), async (req, res) => {
+router.post("/proveedores", requireAuth, allowRoles("ADMIN", "PROVEEDURIA_TALLER"), async (req, res) => {
   try {
     const { id, nombre, direccion, telefono, email, contacto } = req.body;
     if (id) {
@@ -69,7 +69,7 @@ router.post("/proveedores", requireAuth, allowRoles("ADMIN"), async (req, res) =
   }
 });
 
-router.get("/proveedores/eliminar/:id", requireAuth, allowRoles("ADMIN"), async (req, res) => {
+router.get("/proveedores/eliminar/:id", requireAuth, allowRoles("ADMIN", "PROVEEDURIA_TALLER"), async (req, res) => {
   try {
     await pool.query("DELETE FROM proveedores WHERE id = ?", [req.params.id]);
     res.redirect("/compras/proveedores");
@@ -238,7 +238,6 @@ router.post("/ordenes/:id/recibir", requireAuth, allowRoles("ADMIN", "TALLER", "
 
     await pool.query("UPDATE ordenes_compra SET estado = 'RECIBIDA_TOTAL' WHERE id = ?", [id]);
 
-    // Reconstruir URL con filtros
     const queryParams = [];
     if (proveedor_id) queryParams.push(`proveedor_id=${encodeURIComponent(proveedor_id)}`);
     if (fecha_desde) queryParams.push(`fecha_desde=${encodeURIComponent(fecha_desde)}`);
@@ -265,7 +264,6 @@ router.post("/ordenes/:id/eliminar", requireAuth, allowRoles("ADMIN", "TALLER", 
     await pool.query("DELETE FROM ordenes_compra_detalle WHERE orden_compra_id = ?", [id]);
     await pool.query("DELETE FROM ordenes_compra WHERE id = ?", [id]);
 
-    // Reconstruir URL con filtros
     const queryParams = [];
     if (proveedor_id) queryParams.push(`proveedor_id=${encodeURIComponent(proveedor_id)}`);
     if (fecha_desde) queryParams.push(`fecha_desde=${encodeURIComponent(fecha_desde)}`);
@@ -281,7 +279,7 @@ router.post("/ordenes/:id/eliminar", requireAuth, allowRoles("ADMIN", "TALLER", 
   }
 });
 
-// ===================== REGISTRAR FACTURA (con preservación de filtros) =====================
+// ===================== REGISTRAR FACTURA (desde el listado de órdenes, con preservación de filtros) =====================
 router.post("/ordenes/:id/factura", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER"), async (req, res) => {
   try {
     const id = req.params.id;
@@ -299,7 +297,6 @@ router.post("/ordenes/:id/factura", requireAuth, allowRoles("ADMIN", "TALLER", "
       [factura || null, fechaVencimientoStr, id]
     );
 
-    // Reconstruir URL con filtros
     const queryParams = [];
     if (proveedor_id) queryParams.push(`proveedor_id=${encodeURIComponent(proveedor_id)}`);
     if (fecha_desde) queryParams.push(`fecha_desde=${encodeURIComponent(fecha_desde)}`);
@@ -315,54 +312,135 @@ router.post("/ordenes/:id/factura", requireAuth, allowRoles("ADMIN", "TALLER", "
   }
 });
 
-// ===================== LISTADO DE FACTURAS CON FILTROS =====================
+// ===================== AGREGAR FACTURA MANUAL (con o sin PO, proveedor desde selector) =====================
+router.post("/facturas/agregar", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER"), async (req, res) => {
+  try {
+    const { po_numero, factura, fecha_factura, monto, proveedor_id } = req.body;
+    if (!factura || !fecha_factura) {
+      req.session.error = "Debe completar número de factura y fecha.";
+      return res.redirect("/compras/facturas");
+    }
+
+    // Caso 1: Se ingresó PO y la orden existe (y no está facturada)
+    if (po_numero && po_numero.trim() !== '') {
+      const [[orden]] = await pool.query(
+        "SELECT id, fecha, facturada FROM ordenes_compra WHERE po_numero = ?",
+        [po_numero]
+      );
+      if (orden && !orden.facturada) {
+        const fechaVencimiento = new Date(orden.fecha);
+        fechaVencimiento.setDate(fechaVencimiento.getDate() + 30);
+        const fechaVencimientoStr = fechaVencimiento.toISOString().slice(0, 10);
+        await pool.query(
+          `UPDATE ordenes_compra 
+           SET factura = ?, facturada = 1, fecha_vencimiento_factura = ?, pagada = 0 
+           WHERE id = ?`,
+          [factura, fechaVencimientoStr, orden.id]
+        );
+        req.session.success = `Factura ${factura} asociada a la orden ${po_numero}.`;
+        return res.redirect("/compras/facturas");
+      } else if (orden && orden.facturada) {
+        req.session.error = `La orden ${po_numero} ya está facturada.`;
+        return res.redirect("/compras/facturas");
+      }
+      // Si el PO no existe, continuamos para crear factura independiente
+    }
+
+    // Caso 2: Factura independiente (sin PO válido)
+    if (!proveedor_id || proveedor_id === '') {
+      req.session.error = "Debe seleccionar un proveedor para facturas sin orden de compra.";
+      return res.redirect("/compras/facturas");
+    }
+
+    // Obtener el nombre del proveedor para guardarlo también
+    const [[proveedor]] = await pool.query("SELECT nombre FROM proveedores WHERE id = ?", [proveedor_id]);
+    if (!proveedor) {
+      req.session.error = "Proveedor no válido.";
+      return res.redirect("/compras/facturas");
+    }
+
+    await pool.query(
+      `INSERT INTO facturas (numero_factura, fecha, monto, proveedor_id, proveedor_nombre, pagada, creado_por)
+       VALUES (?, ?, ?, ?, ?, 0, ?)`,
+      [factura, fecha_factura, monto || 0, proveedor_id, proveedor.nombre, req.session.user.id]
+    );
+    req.session.success = `Factura independiente ${factura} agregada correctamente.`;
+    res.redirect("/compras/facturas");
+  } catch (error) {
+    console.error("Error al agregar factura:", error);
+    req.session.error = "Error interno al agregar la factura.";
+    res.redirect("/compras/facturas");
+  }
+});
+
+// ===================== LISTADO DE FACTURAS (unificado: órdenes + independientes) =====================
 router.get("/facturas", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER"), async (req, res) => {
   try {
     const { proveedor_id, fecha_desde, fecha_hasta, pagada, vencida } = req.query;
 
-    let sql = `
+    let sqlOrdenes = `
       SELECT 
         o.id, 
         o.po_numero, 
         o.fecha, 
-        o.total, 
-        o.factura, 
+        o.total as monto, 
+        o.factura as numero_factura, 
         o.fecha_vencimiento_factura, 
         o.pagada, 
         o.fecha_pago,
-        p.nombre as proveedor_nombre
+        p.nombre as proveedor_nombre,
+        'orden' as tipo
       FROM ordenes_compra o
       JOIN proveedores p ON p.id = o.proveedor_id
       WHERE o.facturada = 1
     `;
+    let sqlIndependientes = `
+      SELECT 
+        f.id, 
+        NULL as po_numero, 
+        f.fecha, 
+        f.monto, 
+        f.numero_factura, 
+        NULL as fecha_vencimiento_factura, 
+        f.pagada, 
+        f.fecha_pago,
+        f.proveedor_nombre,
+        'independiente' as tipo
+      FROM facturas f
+      WHERE 1=1
+    `;
     const params = [];
 
     if (proveedor_id && proveedor_id !== '') {
-      sql += ` AND o.proveedor_id = ?`;
-      params.push(proveedor_id);
+      sqlOrdenes += ` AND o.proveedor_id = ?`;
+      sqlIndependientes += ` AND f.proveedor_id = ?`;
+      params.push(proveedor_id, proveedor_id);
     }
     if (fecha_desde && fecha_desde !== '') {
-      sql += ` AND o.fecha >= ?`;
-      params.push(fecha_desde);
+      sqlOrdenes += ` AND o.fecha >= ?`;
+      sqlIndependientes += ` AND f.fecha >= ?`;
+      params.push(fecha_desde, fecha_desde);
     }
     if (fecha_hasta && fecha_hasta !== '') {
-      sql += ` AND o.fecha <= ?`;
-      params.push(fecha_hasta);
+      sqlOrdenes += ` AND o.fecha <= ?`;
+      sqlIndependientes += ` AND f.fecha <= ?`;
+      params.push(fecha_hasta, fecha_hasta);
     }
     if (pagada !== undefined && pagada !== '') {
-      sql += ` AND o.pagada = ?`;
-      params.push(pagada === '1' ? 1 : 0);
+      const pagadaVal = pagada === '1' ? 1 : 0;
+      sqlOrdenes += ` AND o.pagada = ?`;
+      sqlIndependientes += ` AND f.pagada = ?`;
+      params.push(pagadaVal, pagadaVal);
     }
 
-    sql += ` ORDER BY o.fecha_vencimiento_factura ASC, o.fecha DESC`;
-
-    const [facturas] = await pool.query(sql, params);
+    const finalSql = `(${sqlOrdenes}) UNION ALL (${sqlIndependientes}) ORDER BY fecha DESC`;
+    const [facturasUnidas] = await pool.query(finalSql, params);
 
     const hoy = new Date();
     hoy.setHours(0, 0, 0, 0);
-    const facturasConEstado = facturas.map(f => ({
+    const facturasConEstado = facturasUnidas.map(f => ({
       ...f,
-      vencida: (!f.pagada && f.fecha_vencimiento_factura && new Date(f.fecha_vencimiento_factura) < hoy)
+      vencida: (f.tipo === 'orden' && !f.pagada && f.fecha_vencimiento_factura && new Date(f.fecha_vencimiento_factura) < hoy)
     }));
 
     let facturasFiltradas = facturasConEstado;
@@ -385,7 +463,27 @@ router.get("/facturas", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_
   }
 });
 
-// ===================== MARCAR MÚLTIPLES FACTURAS COMO PAGADAS Y GENERAR RECIBO PDF =====================
+// ===================== MARCAR UNA FACTURA COMO PAGADA (individual, para ambos tipos) =====================
+router.post("/facturas/:id/pagar", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER"), async (req, res) => {
+  try {
+    const id = req.params.id;
+    const fechaPago = new Date().toISOString().slice(0, 10);
+    // Determinar si el id pertenece a ordenes_compra o facturas
+    const [[orden]] = await pool.query("SELECT id FROM ordenes_compra WHERE id = ? AND facturada = 1", [id]);
+    if (orden) {
+      await pool.query("UPDATE ordenes_compra SET pagada = 1, fecha_pago = ? WHERE id = ?", [fechaPago, id]);
+    } else {
+      await pool.query("UPDATE facturas SET pagada = 1, fecha_pago = ? WHERE id = ?", [fechaPago, id]);
+    }
+    req.session.success = "Factura marcada como pagada.";
+    res.redirect("/compras/facturas");
+  } catch (error) {
+    console.error("Error al pagar factura:", error);
+    res.status(500).send("Error interno");
+  }
+});
+
+// ===================== MARCAR MÚLTIPLES FACTURAS COMO PAGADAS (solo órdenes) =====================
 router.post("/facturas/pagar-multiple", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER"), async (req, res) => {
   try {
     const { facturas_ids } = req.body;

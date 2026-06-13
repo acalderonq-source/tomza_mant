@@ -45,7 +45,6 @@
       border: none;
       color: white;
     }
-    /* Tabla responsiva mejorada */
     .table-responsive {
       overflow-x: auto;
       -webkit-overflow-scrolling: touch;
@@ -148,7 +147,7 @@
 
 <div class="container py-4">
 
-  <!-- ===================== FILTROS ===================== -->
+  <!-- Filtros -->
   <div class="filtros-card">
     <h5 class="mb-3 fw-semibold"><i class="bi bi-funnel me-2"></i>Filtrar órdenes</h5>
     <form method="GET" action="/compras/ordenes" class="row g-3">
@@ -199,7 +198,7 @@
     </form>
   </div>
 
-  <!-- ===================== TOTAL FILTRADO ===================== -->
+  <!-- Total filtrado -->
   <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
     <div class="alert alert-success py-2 px-4 rounded-pill shadow-sm mb-0">
       <i class="bi bi-calculator-fill me-2"></i>
@@ -209,7 +208,7 @@
     <div><small class="text-muted"><%= ordenes.length %> órdenes encontradas</small></div>
   </div>
 
-  <!-- ===================== LISTADO DE ÓRDENES ===================== -->
+  <!-- Listado de órdenes -->
   <div class="card-modern">
     <div class="card-header-modern d-flex justify-content-between align-items-center flex-wrap">
       <span><i class="bi bi-receipt me-2"></i>Listado de Órdenes</span>
@@ -220,6 +219,11 @@
         <a href="/compras/facturas" class="btn btn-outline-info btn-sm me-2">
           <i class="bi bi-receipt"></i> Facturas
         </a>
+        <% if (user.rol === 'ADMIN' || user.rol === 'PROVEEDURIA_TALLER') { %>
+          <a href="/compras/proveedores" class="btn btn-outline-secondary btn-sm me-2">
+            <i class="bi bi-building"></i> Gestionar Proveedores
+          </a>
+        <% } %>
         <a href="/compras/ordenes/nueva" class="btn btn-dark btn-sm">
           <i class="bi bi-plus-lg"></i> Nueva orden
         </a>
@@ -268,11 +272,9 @@
                 </span>
               </td>
               <td data-label="Acciones" class="text-nowrap">
-                <!-- Ver y PDF -->
                 <a href="/compras/ordenes/<%= orden.id %>/detalle" class="btn btn-outline-secondary btn-accion"><i class="bi bi-eye"></i> Ver</a>
                 <a href="/compras/ordenes/<%= orden.id %>/pdf" class="btn btn-outline-primary btn-accion"><i class="bi bi-file-pdf"></i> PDF</a>
-
-                <!-- Facturar -->
+                
                 <% if (!orden.facturada) { %>
                   <form method="POST" action="/compras/ordenes/<%= orden.id %>/factura" class="d-inline-flex align-items-center" style="gap: 2px;">
                     <input type="text" name="factura" class="form-control form-control-sm input-factura" placeholder="N°" required>
@@ -288,7 +290,6 @@
                   <span class="badge bg-success">Facturada</span>
                 <% } %>
 
-                <!-- Recibir y Eliminar (solo si no está recibida) -->
                 <% if (orden.estado !== 'RECIBIDA_TOTAL' && orden.estado !== 'RECIBIDA_PARCIAL') { %>
                   <form method="POST" action="/compras/ordenes/<%= orden.id %>/recibir" class="d-inline">
                     <input type="hidden" name="proveedor_id" value="<%= proveedor_id %>">
@@ -320,7 +321,8 @@
             </tr>
           <% }) %>
           <% if (ordenes.length === 0) { %>
-            <tr><td colspan="8" class="text-center text-muted py-4">No hay órdenes con los filtros seleccionados</td></tr>
+            <td><td colspan="8" class="text-center text-muted py-4">No hay órdenes con los filtros seleccionados</td>
+          </tr>
           <% } %>
         </tbody>
       </table>
@@ -328,5 +330,6 @@
   </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

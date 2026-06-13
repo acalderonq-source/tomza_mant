@@ -40,7 +40,7 @@
 
 <div class="container py-4">
 
-  <!-- Mensajes flash corregidos -->
+  <!-- Mensajes flash -->
   <% if (typeof success !== 'undefined' && success) { %>
     <div class="alert alert-success alert-dismissible fade show" role="alert">
       <%= success %>
@@ -99,9 +99,15 @@
     </form>
   </div>
 
-  <!-- Listado de facturas -->
+  <!-- Botón para agregar factura manual y listado -->
   <div class="card p-3">
-    <h3 class="mb-3">📄 Facturas de Compras</h3>
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h3>📄 Facturas de Compras</h3>
+      <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#agregarFacturaModal">
+        <i class="bi bi-plus-circle"></i> Agregar Factura
+      </button>
+    </div>
+
     <form method="POST" action="/compras/facturas/pagar-multiple" id="multiplePagoForm">
       <div class="table-responsive">
         <table class="table table-bordered table-hover table-facturas">
@@ -110,12 +116,12 @@
               <th style="width: 40px;"><input type="checkbox" id="seleccionarTodos"></th>
               <th>PO Número</th>
               <th>Proveedor</th>
-              <th>Fecha Orden</th>
+              <th>Fecha</th>
               <th>N° Factura</th>
               <th>Monto</th>
               <th>Fecha Vencimiento</th>
               <th>Estado</th>
-              <th>Acciones individuales</th>
+              <th>Acciones</th>
             </tr>
           </thead>
           <tbody>
@@ -123,14 +129,14 @@
               <tr class="<%= f.vencida ? 'table-danger' : '' %>">
                 <td class="text-center">
                   <% if (!f.pagada) { %>
-                    <input type="checkbox" name="facturas_ids" value="<%= f.id %>" class="check-factura" data-monto="<%= f.total %>">
+                    <input type="checkbox" name="facturas_ids" value="<%= f.id %>" class="check-factura" data-monto="<%= f.monto %>">
                   <% } %>
                 </td>
-                <td data-label="PO Número"><strong><%= f.po_numero %></strong></td>
+                <td data-label="PO Número"><%= f.po_numero ? f.po_numero : '—' %></td>
                 <td data-label="Proveedor"><%= f.proveedor_nombre %></td>
-                <td data-label="Fecha Orden"><%= new Date(f.fecha).toLocaleDateString('es-CR') %></td>
-                <td data-label="N° Factura"><%= f.factura || '—' %></td>
-                <td data-label="Monto" class="monto-factura" data-val="<%= f.total %>">₡<%= parseFloat(f.total).toLocaleString('es-CR') %></td>
+                <td data-label="Fecha"><%= new Date(f.fecha).toLocaleDateString('es-CR') %></td>
+                <td data-label="N° Factura"><%= f.numero_factura %></td>
+                <td data-label="Monto" class="monto-factura" data-val="<%= f.monto %>">₡<%= parseFloat(f.monto).toLocaleString('es-CR') %></td>
                 <td data-label="Fecha Vencimiento">
                   <%= f.fecha_vencimiento_factura ? new Date(f.fecha_vencimiento_factura).toLocaleDateString('es-CR') : '—' %>
                   <% if (f.vencida) { %>
@@ -177,6 +183,53 @@
   </div>
 </div>
 
+<!-- Modal para agregar factura manualmente (PO opcional, proveedor desde selector) -->
+<div class="modal fade" id="agregarFacturaModal" tabindex="-1" aria-labelledby="agregarFacturaModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="agregarFacturaModalLabel">➕ Agregar nueva factura</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form method="POST" action="/compras/facturas/agregar">
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label">Número de PO (opcional)</label>
+            <input type="text" name="po_numero" class="form-control" placeholder="Ej: 2026-381">
+            <small class="text-muted">Si tiene orden de compra, ingrésela; si no, deje vacío.</small>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Número de Factura</label>
+            <input type="text" name="factura" class="form-control" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Fecha de la Factura</label>
+            <input type="date" name="fecha_factura" class="form-control" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Proveedor</label>
+            <select name="proveedor_id" class="form-select" required>
+              <option value="">Seleccione un proveedor</option>
+              <% proveedores.forEach(p => { %>
+                <option value="<%= p.id %>"><%= p.nombre %></option>
+              <% }) %>
+            </select>
+            <small class="text-muted">Obligatorio si no ingresa PO.</small>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Monto (opcional)</label>
+            <input type="number" step="0.01" name="monto" class="form-control" placeholder="0.00">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Guardar Factura</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
 <script>
   const checkboxes = document.querySelectorAll('.check-factura');
   const btnPagar = document.getElementById('btnPagarSeleccionadas');
@@ -211,5 +264,6 @@
   actualizarTotal();
 </script>
 
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

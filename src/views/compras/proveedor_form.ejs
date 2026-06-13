@@ -1,25 +1,77 @@
-<form method="POST">
-  <input type="hidden" name="id" value="<%= proveedor ? proveedor.id : '' %>">
-  <div class="mb-3">
-    <label>Nombre</label>
-    <input type="text" name="nombre" class="form-control" value="<%= proveedor ? proveedor.nombre : '' %>" required>
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+  <title><%= proveedor ? 'Editar Proveedor' : 'Nuevo Proveedor' %></title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <style>
+    body {
+      background: #f0f2f5;
+      font-family: 'Segoe UI', Roboto, sans-serif;
+    }
+    .card {
+      border: none;
+      border-radius: 20px;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.04);
+    }
+  </style>
+</head>
+<body>
+
+<nav class="navbar navbar-dark bg-dark px-3 py-2">
+  <span class="navbar-brand fw-semibold"><i class="bi bi-building"></i> <%= proveedor ? 'Editar Proveedor' : 'Nuevo Proveedor' %></span>
+  <div class="text-white">
+    <%= user.usuario %> (<%= user.rol %>)
+    <a href="/compras/proveedores" class="btn btn-sm btn-outline-light ms-2">← Volver</a>
   </div>
-  <div class="mb-3">
-    <label>Dirección</label>
-    <textarea name="direccion" class="form-control"><%= proveedor ? proveedor.direccion : '' %></textarea>
+</nav>
+
+<div class="container py-4">
+  <div class="card p-4">
+    <form method="POST" action="/compras/proveedores">
+      <input type="hidden" name="id" value="<%= proveedor ? proveedor.id : '' %>">
+      
+      <div class="mb-3">
+        <label class="form-label">Nombre del Proveedor *</label>
+        <input type="text" name="nombre" class="form-control" value="<%= proveedor ? proveedor.nombre : '' %>" required>
+      </div>
+      
+      <div class="row">
+        <div class="col-md-6 mb-3">
+          <label class="form-label">Teléfono</label>
+          <input type="text" name="telefono" class="form-control" value="<%= proveedor ? proveedor.telefono : '' %>">
+        </div>
+        <div class="col-md-6 mb-3">
+          <label class="form-label">Email</label>
+          <input type="email" name="email" class="form-control" value="<%= proveedor ? proveedor.email : '' %>">
+        </div>
+      </div>
+      
+      <div class="mb-3">
+        <label class="form-label">Dirección</label>
+        <textarea name="direccion" class="form-control" rows="2"><%= proveedor ? proveedor.direccion : '' %></textarea>
+      </div>
+      
+      <div class="mb-3">
+        <label class="form-label">Cédula Jurídica / Identificación</label>
+        <input type="text" name="cedula_juridica" class="form-control" value="<%= proveedor ? proveedor.cedula_juridica : '' %>">
+      </div>
+      
+      <div class="mb-3">
+        <label class="form-label">Contacto (persona de referencia)</label>
+        <input type="text" name="contacto" class="form-control" value="<%= proveedor ? proveedor.contacto : '' %>">
+      </div>
+      
+      <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-success">Guardar Proveedor</button>
+        <a href="/compras/proveedores" class="btn btn-secondary">Cancelar</a>
+      </div>
+    </form>
   </div>
-  <div class="mb-3">
-    <label>Teléfono</label>
-    <input type="text" name="telefono" class="form-control" value="<%= proveedor ? proveedor.telefono : '' %>">
-  </div>
-  <div class="mb-3">
-    <label>Email</label>
-    <input type="email" name="email" class="form-control" value="<%= proveedor ? proveedor.email : '' %>">
-  </div>
-  <div class="mb-3">
-    <label>Contacto</label>
-    <input type="text" name="contacto" class="form-control" value="<%= proveedor ? proveedor.contacto : '' %>">
-  </div>
-  <button type="submit" class="btn btn-success">Guardar</button>
-  <a href="/compras/proveedores" class="btn btn-secondary">Cancelar</a>
-</form>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
