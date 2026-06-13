@@ -558,16 +558,21 @@ router.get("/dashboard", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA
     }
 
     let whereClause = "";
+    let joinConditions = "";
     if (condiciones.length) {
       whereClause = "WHERE " + condiciones.join(" AND ");
+      // Para el LEFT JOIN con todos los proveedores, las condiciones deben ir en el ON
+      joinConditions = "AND " + condiciones.join(" AND ");
     }
 
+    // Gasto total filtrado
     const [[totalGasto]] = await pool.query(`
       SELECT COALESCE(SUM(o.total), 0) as total
       FROM ordenes_compra o
       ${whereClause}
     `, params);
 
+    // Top 5 proveedores por gasto (para el gráfico principal)
     const [topProveedores] = await pool.query(`
       SELECT p.nombre, SUM(o.total) as total_gastado
       FROM ordenes_compra o
@@ -578,6 +583,7 @@ router.get("/dashboard", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA
       LIMIT 5
     `, params);
 
+    // Evolución mensual (últimos 12 meses)
     let mensualWhere = "";
     if (condiciones.length) {
       mensualWhere = "WHERE " + condiciones.join(" AND ") + " AND o.fecha >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH)";
@@ -594,6 +600,7 @@ router.get("/dashboard", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA
       ORDER BY mes ASC
     `, params);
 
+    // Top 5 productos más comprados
     let productosWhere = "";
     if (condiciones.length) {
       productosWhere = "WHERE " + condiciones.join(" AND ");
@@ -611,6 +618,7 @@ router.get("/dashboard", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA
       LIMIT 5
     `, params);
 
+    // Órdenes por estado
     let estadosWhere = "";
     if (condiciones.length) {
       estadosWhere = "WHERE " + condiciones.join(" AND ");
@@ -622,6 +630,7 @@ router.get("/dashboard", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA
       GROUP BY estado
     `, params);
 
+    // Gasto por proveedor (top 10) – para otro gráfico
     let gastoProvWhere = "";
     if (condiciones.length) {
       gastoProvWhere = "WHERE " + condiciones.join(" AND ");
@@ -636,6 +645,15 @@ router.get("/dashboard", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA
       LIMIT 10
     `, params);
 
+    // ========== NUEVO: TODOS LOS PROVEEDORES CON SU GASTO (con condiciones en el ON) ==========
+    const [todosProveedoresGasto] = await pool.query(`
+      SELECT p.id, p.nombre, COALESCE(SUM(o.total), 0) as total_gastado
+      FROM proveedores p
+      LEFT JOIN ordenes_compra o ON o.proveedor_id = p.id ${joinConditions}
+      GROUP BY p.id
+      ORDER BY total_gastado DESC
+    `, params);
+
     const [proveedores] = await pool.query("SELECT id, nombre FROM proveedores ORDER BY nombre");
     const estadosList = ['BORRADOR', 'ENVIADA', 'RECIBIDA_PARCIAL', 'RECIBIDA_TOTAL'];
 
@@ -647,6 +665,7 @@ router.get("/dashboard", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA
       topProductos: topProductos || [],
       ordenesPorEstado: ordenesPorEstado || [],
       gastoPorProveedor: gastoPorProveedor || [],
+      todosProveedoresGasto: todosProveedoresGasto || [], // <-- nueva variable
       proveedores: proveedores,
       estados: estadosList,
       filtros: { proveedor_id, fecha_desde, fecha_hasta, estado }

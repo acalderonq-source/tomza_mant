@@ -123,6 +123,7 @@
   const safeGastoMensual = Array.isArray(gastoMensual) ? gastoMensual : [];
   const safeTopProductos = Array.isArray(topProductos) ? topProductos : [];
   const safeOrdenesPorEstado = Array.isArray(ordenesPorEstado) ? ordenesPorEstado : [];
+  const safeTodosProveedores = Array.isArray(todosProveedoresGasto) ? todosProveedoresGasto : [];
 
   const proveedorTop = safeTopProveedores[0] || {};
   const productoTop = safeTopProductos[0] || {};
@@ -130,7 +131,7 @@
   const gastoProveedorTop = Number(proveedorTop.total_gastado || 0);
   const vecesProveedorTop = gastoProveedorTop > 0 ? (safeTotalGasto / gastoProveedorTop).toFixed(1) : '0.0';
 
-  // Proveedores para el selector de filtros (debe venir desde la ruta)
+  // Proveedores para el selector de filtros
   const proveedoresList = Array.isArray(proveedores) ? proveedores : [];
   const estadosList = Array.isArray(estados) ? estados : ['BORRADOR', 'ENVIADA', 'RECIBIDA_PARCIAL', 'RECIBIDA_TOTAL'];
   const filtrosActuales = filtros || {};
@@ -258,7 +259,7 @@
   </div>
 
   <!-- Gráficos fila 2 -->
-  <div class="row g-4">
+  <div class="row g-4 mb-4">
     <div class="col-md-6">
       <div class="chart-card">
         <div class="card-header"><i class="bi bi-box me-2"></i> Top 5 productos más comprados</div>
@@ -285,12 +286,61 @@
     </div>
   </div>
 
+  <!-- ===================== NUEVA SECCIÓN: TODOS LOS PROVEEDORES Y GASTO ===================== -->
+  <div class="row g-4 mt-2">
+    <div class="col-12">
+      <div class="chart-card">
+        <div class="card-header">
+          <i class="bi bi-bar-chart-steps me-2"></i> Todos los proveedores por gasto (gráfico)
+        </div>
+        <div class="card-body">
+          <% if (safeTodosProveedores.length) { %>
+            <canvas id="chartTodosProveedores" style="max-height: 400px;"></canvas>
+          <% } else { %>
+            <div class="empty-msg">No hay datos de proveedores.</div>
+          <% } %>
+        </div>
+      </div>
+    </div>
+    <div class="col-12">
+      <div class="chart-card">
+        <div class="card-header">
+          <i class="bi bi-table me-2"></i> Detalle de gasto por proveedor
+        </div>
+        <div class="card-body p-0">
+          <div class="table-responsive">
+            <table class="table table-striped table-hover mb-0">
+              <thead class="table-light">
+                <tr>
+                  <th>Proveedor</th>
+                  <th class="text-end">Total gastado (₡)</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% safeTodosProveedores.forEach(p => { %>
+                  <tr>
+                    <td><%= p.nombre %></td>
+                    <td class="text-end"><%= parseFloat(p.total_gastado).toLocaleString('es-CR') %></td>
+                  </tr>
+                <% }) %>
+                <% if (safeTodosProveedores.length === 0) { %>
+                  <tr><td colspan="2" class="text-center">No hay datos de proveedores</td></tr>
+                <% } %>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
 </div>
 
 <script type="application/json" id="data-top-proveedores"><%- JSON.stringify(safeTopProveedores) %></script>
 <script type="application/json" id="data-gasto-mensual"><%- JSON.stringify(safeGastoMensual) %></script>
 <script type="application/json" id="data-top-productos"><%- JSON.stringify(safeTopProductos) %></script>
 <script type="application/json" id="data-ordenes-estado"><%- JSON.stringify(safeOrdenesPorEstado) %></script>
+<script type="application/json" id="data-todos-proveedores"><%- JSON.stringify(safeTodosProveedores) %></script>
 
 <script>
   const leerJSON = (id) => {
@@ -308,6 +358,7 @@
   const gastoMensual = leerJSON('data-gasto-mensual');
   const topProductos = leerJSON('data-top-productos');
   const ordenesPorEstado = leerJSON('data-ordenes-estado');
+  const todosProveedores = leerJSON('data-todos-proveedores');
 
   const formatCurrency = (value) => {
     const number = Number(value || 0);
@@ -412,6 +463,36 @@
         plugins: {
           legend: { position: 'right' },
           tooltip: { callbacks: { label: ctx => `${ctx.label}: ${ctx.raw} órdenes` } }
+        }
+      }
+    });
+  }
+
+  // ========== NUEVO GRÁFICO: Todos los proveedores (barras horizontales) ==========
+  const canvasTodos = document.getElementById('chartTodosProveedores');
+  if (canvasTodos && todosProveedores.length) {
+    // Mostramos solo los primeros 20 para no saturar el gráfico
+    const datosGrafico = todosProveedores.slice(0, 20);
+    new Chart(canvasTodos, {
+      type: 'bar',
+      data: {
+        labels: datosGrafico.map(p => cortaTexto(p.nombre, 30)),
+        datasets: [{
+          label: 'Monto gastado (₡)',
+          data: datosGrafico.map(p => Number(p.total_gastado || 0)),
+          backgroundColor: '#1f2937',
+          borderRadius: 8
+        }]
+      },
+      options: {
+        indexAxis: 'y',
+        responsive: true,
+        plugins: {
+          legend: { position: 'top' },
+          tooltip: { callbacks: { label: ctx => formatCurrency(ctx.raw) } }
+        },
+        scales: {
+          x: { ticks: { callback: val => formatCurrency(val) } }
         }
       }
     });
