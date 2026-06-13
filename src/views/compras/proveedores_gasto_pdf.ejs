@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Reporte de Gasto por Proveedor - Gas Tomza</title>
+  <style>
+    body { font-family: 'Helvetica', Arial, sans-serif; margin: 30px; color: #1f2937; }
+    .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 3px solid #f39c12; padding-bottom: 15px; margin-bottom: 20px; }
+    .logo-area { display: flex; align-items: center; gap: 15px; }
+    .logo img { width: 60px; height: auto; }
+    .company h2 { margin: 0; font-size: 20px; }
+    .company p { margin: 0; font-size: 11px; color: #64748b; }
+    .report-title { font-size: 24px; font-weight: 800; }
+    .filtros { background: #f8fafc; border-left: 4px solid #f39c12; padding: 12px; margin-bottom: 20px; font-size: 12px; }
+    table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+    th { background: #1f2937; color: white; padding: 10px; text-align: left; }
+    td { padding: 8px 10px; border-bottom: 1px solid #e2e8f0; }
+    .total { text-align: right; font-weight: bold; margin-top: 20px; }
+    .footer { text-align: center; font-size: 10px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 15px; margin-top: 30px; }
+  </style>
+</head>
+<body>
+<div class="header">
+  <div class="logo-area">
+    <div class="logo">
+      <!-- Logo exacto de Gas Tomza desde URL pública -->
+      <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcR9qK-CO-kzcoED9ZpqEJMEouyd90DFzyXsxQ&s" alt="Gas Tomza">
+    </div>
+    <div class="company">
+      <h2>Gas Tomza</h2>
+      <p>Sistema de Compras</p>
+    </div>
+  </div>
+  <div class="report-info">
+    <div class="report-title">Reporte de Gasto por Proveedor</div>
+    <div><%= fechaGeneracion %></div>
+  </div>
+</div>
+<div class="filtros">
+  <strong>Filtros:</strong> Proveedor: <%= filtros.proveedor_nombre || 'Todos' %> | 
+  Desde: <%= filtros.fecha_desde || '—' %> | Hasta: <%= filtros.fecha_hasta || '—' %> | 
+  Estado: <%= filtros.estado || 'Todos' %>
+</div>
+<table>
+  <thead><tr><th>Proveedor</th><th>Total gastado (₡)</th></tr></thead>
+  <tbody>
+    <% proveedores.forEach(p => { %>
+      <tr>
+        <td><%= p.nombre %></td>
+        <td style="text-align:right"><%= parseFloat(p.total_gastado).toLocaleString('es-CR') %></td>
+      </tr>
+    <% }) %>
+    <% if(proveedores.length === 0) { %>
+      <tr><td colspan="2">No hay proveedores con gasto registrado</td></tr>
+    <% } %>
+  </tbody>
+</table>
+<div class="total">Total general: ₡ <%= totalGeneral.toLocaleString('es-CR') %></div>
+<div class="footer">Documento generado automáticamente por el sistema de compras de Gas Tomza</div>
+</body>
+</html>

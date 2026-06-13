@@ -33,7 +33,7 @@ async function generarNumeroPO() {
   return `${año}-${consecutivo.toString().padStart(3, '0')}`;
 }
 
-// ===================== PROVEEDORES (solo ADMIN) =====================
+// ===================== PROVEEDORES =====================
 router.get("/proveedores", requireAuth, allowRoles("ADMIN", "PROVEEDURIA_TALLER"), async (req, res) => {
   try {
     const [proveedores] = await pool.query("SELECT * FROM proveedores ORDER BY nombre");
@@ -136,7 +136,6 @@ router.post("/ordenes", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_
   }
 });
 
-// ===================== LISTADO DE ÓRDENES CON FILTROS =====================
 router.get("/ordenes", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER"), async (req, res) => {
   try {
     const { proveedor_id, fecha_desde, fecha_hasta, po_numero, estado, facturada } = req.query;
@@ -197,7 +196,6 @@ router.get("/ordenes", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_T
   }
 });
 
-// Detalle de la orden
 router.get("/ordenes/:id/detalle", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER"), async (req, res) => {
   try {
     const id = req.params.id;
@@ -212,7 +210,6 @@ router.get("/ordenes/:id/detalle", requireAuth, allowRoles("ADMIN", "TALLER", "P
   }
 });
 
-// ===================== PDF – Descargar orden =====================
 router.get("/ordenes/:id/pdf", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER"), async (req, res) => {
   try {
     const ordenId = req.params.id;
@@ -230,14 +227,11 @@ router.get("/ordenes/:id/pdf", requireAuth, allowRoles("ADMIN", "TALLER", "PROVE
   }
 });
 
-// ===================== RECIBIR ORDEN (con preservación de filtros) =====================
 router.post("/ordenes/:id/recibir", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER"), async (req, res) => {
   try {
     const id = req.params.id;
     const { proveedor_id, fecha_desde, fecha_hasta, po_numero, estado, facturada } = req.body;
-
     await pool.query("UPDATE ordenes_compra SET estado = 'RECIBIDA_TOTAL' WHERE id = ?", [id]);
-
     const queryParams = [];
     if (proveedor_id) queryParams.push(`proveedor_id=${encodeURIComponent(proveedor_id)}`);
     if (fecha_desde) queryParams.push(`fecha_desde=${encodeURIComponent(fecha_desde)}`);
@@ -253,17 +247,14 @@ router.post("/ordenes/:id/recibir", requireAuth, allowRoles("ADMIN", "TALLER", "
   }
 });
 
-// ===================== ELIMINAR ORDEN (con preservación de filtros) =====================
 router.post("/ordenes/:id/eliminar", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER"), async (req, res) => {
   try {
     const id = req.params.id;
     const { proveedor_id, fecha_desde, fecha_hasta, po_numero, estado, facturada } = req.body;
-
     const [[orden]] = await pool.query("SELECT * FROM ordenes_compra WHERE id = ?", [id]);
     if (!orden) return res.status(404).send("Orden no encontrada");
     await pool.query("DELETE FROM ordenes_compra_detalle WHERE orden_compra_id = ?", [id]);
     await pool.query("DELETE FROM ordenes_compra WHERE id = ?", [id]);
-
     const queryParams = [];
     if (proveedor_id) queryParams.push(`proveedor_id=${encodeURIComponent(proveedor_id)}`);
     if (fecha_desde) queryParams.push(`fecha_desde=${encodeURIComponent(fecha_desde)}`);
@@ -279,24 +270,19 @@ router.post("/ordenes/:id/eliminar", requireAuth, allowRoles("ADMIN", "TALLER", 
   }
 });
 
-// ===================== REGISTRAR FACTURA (desde el listado de órdenes, con preservación de filtros) =====================
 router.post("/ordenes/:id/factura", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER"), async (req, res) => {
   try {
     const id = req.params.id;
     const { factura, proveedor_id, fecha_desde, fecha_hasta, po_numero, estado, facturada } = req.body;
-
     const [[orden]] = await pool.query("SELECT fecha FROM ordenes_compra WHERE id = ?", [id]);
     if (!orden) return res.status(404).send("Orden no encontrada");
-
     const fechaVencimiento = new Date(orden.fecha);
     fechaVencimiento.setDate(fechaVencimiento.getDate() + 30);
     const fechaVencimientoStr = fechaVencimiento.toISOString().slice(0, 10);
-
     await pool.query(
       "UPDATE ordenes_compra SET factura = ?, facturada = 1, fecha_vencimiento_factura = ?, pagada = 0 WHERE id = ?",
       [factura || null, fechaVencimientoStr, id]
     );
-
     const queryParams = [];
     if (proveedor_id) queryParams.push(`proveedor_id=${encodeURIComponent(proveedor_id)}`);
     if (fecha_desde) queryParams.push(`fecha_desde=${encodeURIComponent(fecha_desde)}`);
@@ -312,7 +298,6 @@ router.post("/ordenes/:id/factura", requireAuth, allowRoles("ADMIN", "TALLER", "
   }
 });
 
-// ===================== AGREGAR FACTURA MANUAL (con o sin PO, proveedor desde selector) =====================
 router.post("/facturas/agregar", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER"), async (req, res) => {
   try {
     const { po_numero, factura, fecha_factura, monto, proveedor_id } = req.body;
@@ -320,8 +305,6 @@ router.post("/facturas/agregar", requireAuth, allowRoles("ADMIN", "TALLER", "PRO
       req.session.error = "Debe completar número de factura y fecha.";
       return res.redirect("/compras/facturas");
     }
-
-    // Caso 1: Se ingresó PO y la orden existe (y no está facturada)
     if (po_numero && po_numero.trim() !== '') {
       const [[orden]] = await pool.query(
         "SELECT id, fecha, facturada FROM ordenes_compra WHERE po_numero = ?",
@@ -343,22 +326,16 @@ router.post("/facturas/agregar", requireAuth, allowRoles("ADMIN", "TALLER", "PRO
         req.session.error = `La orden ${po_numero} ya está facturada.`;
         return res.redirect("/compras/facturas");
       }
-      // Si el PO no existe, continuamos para crear factura independiente
     }
-
-    // Caso 2: Factura independiente (sin PO válido)
     if (!proveedor_id || proveedor_id === '') {
       req.session.error = "Debe seleccionar un proveedor para facturas sin orden de compra.";
       return res.redirect("/compras/facturas");
     }
-
-    // Obtener el nombre del proveedor para guardarlo también
     const [[proveedor]] = await pool.query("SELECT nombre FROM proveedores WHERE id = ?", [proveedor_id]);
     if (!proveedor) {
       req.session.error = "Proveedor no válido.";
       return res.redirect("/compras/facturas");
     }
-
     await pool.query(
       `INSERT INTO facturas (numero_factura, fecha, monto, proveedor_id, proveedor_nombre, pagada, creado_por)
        VALUES (?, ?, ?, ?, ?, 0, ?)`,
@@ -373,11 +350,9 @@ router.post("/facturas/agregar", requireAuth, allowRoles("ADMIN", "TALLER", "PRO
   }
 });
 
-// ===================== LISTADO DE FACTURAS (unificado: órdenes + independientes) =====================
 router.get("/facturas", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER"), async (req, res) => {
   try {
     const { proveedor_id, fecha_desde, fecha_hasta, pagada, vencida } = req.query;
-
     let sqlOrdenes = `
       SELECT 
         o.id, 
@@ -410,7 +385,6 @@ router.get("/facturas", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_
       WHERE 1=1
     `;
     const params = [];
-
     if (proveedor_id && proveedor_id !== '') {
       sqlOrdenes += ` AND o.proveedor_id = ?`;
       sqlIndependientes += ` AND f.proveedor_id = ?`;
@@ -432,24 +406,19 @@ router.get("/facturas", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_
       sqlIndependientes += ` AND f.pagada = ?`;
       params.push(pagadaVal, pagadaVal);
     }
-
     const finalSql = `(${sqlOrdenes}) UNION ALL (${sqlIndependientes}) ORDER BY fecha DESC`;
     const [facturasUnidas] = await pool.query(finalSql, params);
-
     const hoy = new Date();
     hoy.setHours(0, 0, 0, 0);
     const facturasConEstado = facturasUnidas.map(f => ({
       ...f,
       vencida: (f.tipo === 'orden' && !f.pagada && f.fecha_vencimiento_factura && new Date(f.fecha_vencimiento_factura) < hoy)
     }));
-
     let facturasFiltradas = facturasConEstado;
     if (vencida === '1') {
       facturasFiltradas = facturasConEstado.filter(f => f.vencida);
     }
-
     const [proveedores] = await pool.query("SELECT id, nombre FROM proveedores ORDER BY nombre");
-
     res.render("compras/facturas", {
       facturas: facturasFiltradas,
       user: req.session.user,
@@ -463,12 +432,10 @@ router.get("/facturas", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_
   }
 });
 
-// ===================== MARCAR UNA FACTURA COMO PAGADA (individual, para ambos tipos) =====================
 router.post("/facturas/:id/pagar", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER"), async (req, res) => {
   try {
     const id = req.params.id;
     const fechaPago = new Date().toISOString().slice(0, 10);
-    // Determinar si el id pertenece a ordenes_compra o facturas
     const [[orden]] = await pool.query("SELECT id FROM ordenes_compra WHERE id = ? AND facturada = 1", [id]);
     if (orden) {
       await pool.query("UPDATE ordenes_compra SET pagada = 1, fecha_pago = ? WHERE id = ?", [fechaPago, id]);
@@ -483,7 +450,6 @@ router.post("/facturas/:id/pagar", requireAuth, allowRoles("ADMIN", "TALLER", "P
   }
 });
 
-// ===================== MARCAR MÚLTIPLES FACTURAS COMO PAGADAS (solo órdenes) =====================
 router.post("/facturas/pagar-multiple", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER"), async (req, res) => {
   try {
     const { facturas_ids } = req.body;
@@ -493,7 +459,6 @@ router.post("/facturas/pagar-multiple", requireAuth, allowRoles("ADMIN", "TALLER
     }
     const fechaPago = new Date().toISOString().slice(0, 10);
     const placeholders = facturas_ids.map(() => '?').join(',');
-
     const [facturas] = await pool.query(`
       SELECT o.id, o.po_numero, o.total, o.factura, o.fecha_vencimiento_factura, p.nombre as proveedor_nombre
       FROM ordenes_compra o
@@ -504,14 +469,11 @@ router.post("/facturas/pagar-multiple", requireAuth, allowRoles("ADMIN", "TALLER
       req.session.error = "Las facturas seleccionadas ya estaban pagadas o no existen.";
       return res.redirect("/compras/facturas");
     }
-
     await pool.query(
       `UPDATE ordenes_compra SET pagada = 1, fecha_pago = ? WHERE id IN (${placeholders})`,
       [fechaPago, ...facturas_ids]
     );
-
     const totalPagado = facturas.reduce((sum, f) => sum + parseFloat(f.total), 0);
-
     const ejs = require('ejs');
     const path = require('path');
     const pdf = require('html-pdf');
@@ -536,10 +498,8 @@ router.post("/facturas/pagar-multiple", requireAuth, allowRoles("ADMIN", "TALLER
 router.get("/dashboard", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER"), async (req, res) => {
   try {
     const { proveedor_id, fecha_desde, fecha_hasta, estado } = req.query;
-
     const condiciones = [];
     const params = [];
-
     if (proveedor_id && proveedor_id !== '') {
       condiciones.push("o.proveedor_id = ?");
       params.push(proveedor_id);
@@ -556,23 +516,17 @@ router.get("/dashboard", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA
       condiciones.push("o.estado = ?");
       params.push(estado);
     }
-
     let whereClause = "";
     let joinConditions = "";
     if (condiciones.length) {
       whereClause = "WHERE " + condiciones.join(" AND ");
-      // Para el LEFT JOIN con todos los proveedores, las condiciones deben ir en el ON
       joinConditions = "AND " + condiciones.join(" AND ");
     }
-
-    // Gasto total filtrado
     const [[totalGasto]] = await pool.query(`
       SELECT COALESCE(SUM(o.total), 0) as total
       FROM ordenes_compra o
       ${whereClause}
     `, params);
-
-    // Top 5 proveedores por gasto (para el gráfico principal)
     const [topProveedores] = await pool.query(`
       SELECT p.nombre, SUM(o.total) as total_gastado
       FROM ordenes_compra o
@@ -582,8 +536,6 @@ router.get("/dashboard", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA
       ORDER BY total_gastado DESC
       LIMIT 5
     `, params);
-
-    // Evolución mensual (últimos 12 meses)
     let mensualWhere = "";
     if (condiciones.length) {
       mensualWhere = "WHERE " + condiciones.join(" AND ") + " AND o.fecha >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH)";
@@ -599,8 +551,6 @@ router.get("/dashboard", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA
       GROUP BY mes
       ORDER BY mes ASC
     `, params);
-
-    // Top 5 productos más comprados
     let productosWhere = "";
     if (condiciones.length) {
       productosWhere = "WHERE " + condiciones.join(" AND ");
@@ -617,8 +567,6 @@ router.get("/dashboard", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA
       ORDER BY total_cantidad DESC
       LIMIT 5
     `, params);
-
-    // Órdenes por estado
     let estadosWhere = "";
     if (condiciones.length) {
       estadosWhere = "WHERE " + condiciones.join(" AND ");
@@ -629,8 +577,6 @@ router.get("/dashboard", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA
       ${estadosWhere}
       GROUP BY estado
     `, params);
-
-    // Gasto por proveedor (top 10) – para otro gráfico
     let gastoProvWhere = "";
     if (condiciones.length) {
       gastoProvWhere = "WHERE " + condiciones.join(" AND ");
@@ -644,19 +590,17 @@ router.get("/dashboard", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA
       ORDER BY total_gastado DESC
       LIMIT 10
     `, params);
-
-    // ========== NUEVO: TODOS LOS PROVEEDORES CON SU GASTO (con condiciones en el ON) ==========
+    // SOLO PROVEEDORES CON GASTO > 0
     const [todosProveedoresGasto] = await pool.query(`
       SELECT p.id, p.nombre, COALESCE(SUM(o.total), 0) as total_gastado
       FROM proveedores p
       LEFT JOIN ordenes_compra o ON o.proveedor_id = p.id ${joinConditions}
       GROUP BY p.id
+      HAVING total_gastado > 0
       ORDER BY total_gastado DESC
     `, params);
-
     const [proveedores] = await pool.query("SELECT id, nombre FROM proveedores ORDER BY nombre");
     const estadosList = ['BORRADOR', 'ENVIADA', 'RECIBIDA_PARCIAL', 'RECIBIDA_TOTAL'];
-
     res.render("compras/dashboard_compras", {
       user: req.session.user,
       totalGasto: totalGasto.total || 0,
@@ -665,7 +609,7 @@ router.get("/dashboard", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA
       topProductos: topProductos || [],
       ordenesPorEstado: ordenesPorEstado || [],
       gastoPorProveedor: gastoPorProveedor || [],
-      todosProveedoresGasto: todosProveedoresGasto || [], // <-- nueva variable
+      todosProveedoresGasto: todosProveedoresGasto || [],
       proveedores: proveedores,
       estados: estadosList,
       filtros: { proveedor_id, fecha_desde, fecha_hasta, estado }
@@ -673,6 +617,74 @@ router.get("/dashboard", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA
   } catch (error) {
     console.error("Error en dashboard de compras:", error);
     res.status(500).send("Error cargando estadísticas");
+  }
+});
+
+// ===================== PDF: REPORTE DE GASTO POR PROVEEDOR (SOLO GASTO >0, FUERZA DESCARGA) =====================
+router.get("/dashboard/proveedores/pdf", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER"), async (req, res) => {
+  try {
+    const { proveedor_id, fecha_desde, fecha_hasta, estado } = req.query;
+    const condiciones = [];
+    const params = [];
+    if (proveedor_id && proveedor_id !== '') {
+      condiciones.push("o.proveedor_id = ?");
+      params.push(proveedor_id);
+    }
+    if (fecha_desde && fecha_desde !== '') {
+      condiciones.push("o.fecha >= ?");
+      params.push(fecha_desde);
+    }
+    if (fecha_hasta && fecha_hasta !== '') {
+      condiciones.push("o.fecha <= ?");
+      params.push(fecha_hasta);
+    }
+    if (estado && estado !== '') {
+      condiciones.push("o.estado = ?");
+      params.push(estado);
+    }
+    let joinConditions = "";
+    if (condiciones.length) {
+      joinConditions = "AND " + condiciones.join(" AND ");
+    }
+    const [todosProveedoresGasto] = await pool.query(`
+      SELECT p.id, p.nombre, COALESCE(SUM(o.total), 0) as total_gastado
+      FROM proveedores p
+      LEFT JOIN ordenes_compra o ON o.proveedor_id = p.id ${joinConditions}
+      GROUP BY p.id
+      HAVING total_gastado > 0
+      ORDER BY total_gastado DESC
+    `, params);
+    let proveedorNombreFiltro = null;
+    if (proveedor_id && proveedor_id !== '') {
+      const [[prov]] = await pool.query("SELECT nombre FROM proveedores WHERE id = ?", [proveedor_id]);
+      if (prov) proveedorNombreFiltro = prov.nombre;
+    }
+    let totalGeneral = 0;
+    todosProveedoresGasto.forEach(p => totalGeneral += parseFloat(p.total_gastado) || 0);
+    const ejs = require('ejs');
+    const path = require('path');
+    const pdf = require('html-pdf');
+    const templatePath = path.join(__dirname, '../views/compras/proveedores_gasto_pdf.ejs');
+    const html = await ejs.renderFile(templatePath, {
+      proveedores: todosProveedoresGasto,
+      totalGeneral: totalGeneral,
+      filtros: { proveedor_id, proveedor_nombre: proveedorNombreFiltro, fecha_desde, fecha_hasta, estado },
+      fechaGeneracion: new Date().toLocaleString('es-CR')
+    });
+    const options = { format: 'Letter', orientation: 'portrait' };
+    pdf.create(html, options).toBuffer((err, buffer) => {
+      if (err) {
+        console.error("Error generando PDF de proveedores:", err);
+        return res.status(500).send("Error al generar el PDF");
+      }
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename=reporte_gasto_proveedores_${new Date().toISOString().slice(0,19).replace(/:/g, '-')}.pdf`);
+      res.setHeader('Content-Length', buffer.length);
+      res.end(buffer);
+    });
+  } catch (error) {
+    console.error("Error en PDF de proveedores:", error);
+    res.status(500).send("Error generando el reporte");
   }
 });
 

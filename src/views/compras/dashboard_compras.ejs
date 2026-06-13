@@ -304,8 +304,11 @@
     </div>
     <div class="col-12">
       <div class="chart-card">
-        <div class="card-header">
-          <i class="bi bi-table me-2"></i> Detalle de gasto por proveedor
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <span><i class="bi bi-table me-2"></i> Detalle de gasto por proveedor</span>
+          <a href="/compras/dashboard/proveedores/pdf?proveedor_id=<%= encodeURIComponent(filtrosActuales.proveedor_id || '') %>&fecha_desde=<%= encodeURIComponent(filtrosActuales.fecha_desde || '') %>&fecha_hasta=<%= encodeURIComponent(filtrosActuales.fecha_hasta || '') %>&estado=<%= encodeURIComponent(filtrosActuales.estado || '') %>" class="btn btn-sm btn-outline-primary">
+            <i class="bi bi-download"></i> Descargar PDF
+          </a>
         </div>
         <div class="card-body p-0">
           <div class="table-responsive">
