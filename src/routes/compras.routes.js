@@ -350,9 +350,11 @@ router.post("/facturas/agregar", requireAuth, allowRoles("ADMIN", "TALLER", "PRO
   }
 });
 
+// ===================== LISTADO DE FACTURAS (unificado) =====================
 router.get("/facturas", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER"), async (req, res) => {
   try {
     const { proveedor_id, fecha_desde, fecha_hasta, pagada, vencida } = req.query;
+
     let sqlOrdenes = `
       SELECT 
         o.id, 
@@ -385,6 +387,7 @@ router.get("/facturas", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_
       WHERE 1=1
     `;
     const params = [];
+
     if (proveedor_id && proveedor_id !== '') {
       sqlOrdenes += ` AND o.proveedor_id = ?`;
       sqlIndependientes += ` AND f.proveedor_id = ?`;
@@ -406,19 +409,25 @@ router.get("/facturas", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_
       sqlIndependientes += ` AND f.pagada = ?`;
       params.push(pagadaVal, pagadaVal);
     }
-    const finalSql = `(${sqlOrdenes}) UNION ALL (${sqlIndependientes}) ORDER BY fecha DESC`;
+
+    // 🔥 CAMBIO AQUÍ: ORDER BY fecha ASC (más antigua primero)
+    const finalSql = `(${sqlOrdenes}) UNION ALL (${sqlIndependientes}) ORDER BY fecha ASC`;
     const [facturasUnidas] = await pool.query(finalSql, params);
+
     const hoy = new Date();
     hoy.setHours(0, 0, 0, 0);
     const facturasConEstado = facturasUnidas.map(f => ({
       ...f,
       vencida: (f.tipo === 'orden' && !f.pagada && f.fecha_vencimiento_factura && new Date(f.fecha_vencimiento_factura) < hoy)
     }));
+
     let facturasFiltradas = facturasConEstado;
     if (vencida === '1') {
       facturasFiltradas = facturasConEstado.filter(f => f.vencida);
     }
+
     const [proveedores] = await pool.query("SELECT id, nombre FROM proveedores ORDER BY nombre");
+
     res.render("compras/facturas", {
       facturas: facturasFiltradas,
       user: req.session.user,

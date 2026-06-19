@@ -58,7 +58,7 @@
   <div class="filtros-card">
     <h5 class="mb-3 fw-semibold"><i class="bi bi-funnel me-2"></i>Filtrar facturas</h5>
     <form method="GET" action="/compras/facturas" class="row g-3">
-      <div class="col-md-3">
+      <div class="col-md-2">
         <label class="form-label small fw-semibold">Proveedor</label>
         <select name="proveedor_id" class="form-select form-select-sm">
           <option value="">Todos</option>
@@ -88,6 +88,13 @@
         <select name="vencida" class="form-select form-select-sm">
           <option value="">No</option>
           <option value="1" <%= filtros.vencida == '1' ? 'selected' : '' %>>Sí</option>
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label small fw-semibold">Orden</label>
+        <select name="orden" class="form-select form-select-sm">
+          <option value="asc" <%= filtros.orden === 'asc' ? 'selected' : '' %>>Más antigua primero</option>
+          <option value="desc" <%= filtros.orden === 'desc' || !filtros.orden ? 'selected' : '' %>>Más reciente primero</option>
         </select>
       </div>
       <div class="col-md-1 d-flex align-items-end">
