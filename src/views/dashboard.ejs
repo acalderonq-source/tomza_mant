@@ -5,261 +5,442 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
   <title>Dashboard - Gas Tomza</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
   <style>
-    .card-stats { border-radius: 12px; border: none; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
-    .stat-number { font-size: 2.2rem; font-weight: bold; }
+    body {
+      background:
+        radial-gradient(circle at top left, rgba(220, 38, 38, 0.12), transparent 28rem),
+        linear-gradient(135deg, #f8fafc 0%, #eef2f7 100%);
+      color: #1f2937;
+      font-family: "Segoe UI", Roboto, Arial, sans-serif;
+    }
+    .navbar {
+      background: #111827 !important;
+      box-shadow: 0 12px 28px rgba(15,23,42,.16);
+    }
+    .app-shell {
+      max-width: 1320px;
+    }
+    .hero {
+      background: #111827;
+      border-radius: 18px;
+      box-shadow: 0 18px 45px rgba(15,23,42,.18);
+      color: white;
+      overflow: hidden;
+      padding: 1.35rem;
+      position: relative;
+    }
+    .hero::after {
+      background: radial-gradient(circle, rgba(220,38,38,.35), transparent 65%);
+      content: "";
+      height: 260px;
+      position: absolute;
+      right: -80px;
+      top: -100px;
+      width: 260px;
+    }
+    .hero-content {
+      position: relative;
+      z-index: 1;
+    }
+    .hero-title {
+      font-size: clamp(1.45rem, 3vw, 2.4rem);
+      font-weight: 900;
+      margin: 0;
+    }
+    .hero-copy {
+      color: #cbd5e1;
+      margin: .4rem 0 0;
+    }
+    .surface-card,
+    .module-card,
+    .summary-card {
+      background: white;
+      border: 1px solid #e2e8f0;
+      border-radius: 16px;
+      box-shadow: 0 12px 28px rgba(15,23,42,.06);
+    }
+    .summary-grid {
+      display: grid;
+      gap: .85rem;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+    .summary-card {
+      padding: 1rem;
+    }
+    .summary-label {
+      color: #64748b;
+      font-size: .75rem;
+      font-weight: 850;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+    }
+    .summary-value {
+      color: #111827;
+      font-size: 1.75rem;
+      font-weight: 900;
+      line-height: 1.1;
+    }
+    .section-title {
+      color: #111827;
+      font-size: 1.05rem;
+      font-weight: 850;
+      margin: 0;
+    }
+    .section-subtitle {
+      color: #64748b;
+      font-size: .88rem;
+      margin: .2rem 0 0;
+    }
+    .sede-button {
+      border-radius: 999px;
+      font-weight: 700;
+    }
+    .module-grid {
+      display: grid;
+      gap: .85rem;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+    .module-card {
+      color: #111827;
+      display: block;
+      padding: 1rem;
+      text-decoration: none;
+      transition: transform .16s ease, box-shadow .16s ease;
+    }
+    .module-card:hover {
+      box-shadow: 0 18px 38px rgba(15,23,42,.12);
+      color: #111827;
+      transform: translateY(-2px);
+    }
+    .module-icon {
+      align-items: center;
+      background: #fee2e2;
+      border-radius: 14px;
+      color: #b91c1c;
+      display: inline-flex;
+      font-size: 1.3rem;
+      height: 44px;
+      justify-content: center;
+      margin-bottom: .75rem;
+      width: 44px;
+    }
+    .module-title {
+      font-weight: 850;
+      margin-bottom: .2rem;
+    }
+    .module-copy {
+      color: #64748b;
+      font-size: .86rem;
+      margin: 0;
+    }
+    .table thead th {
+      background: #f8fafc;
+      border-bottom: 1px solid #e2e8f0;
+      color: #475569;
+      font-size: .75rem;
+      font-weight: 850;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+    }
+    .table tbody td {
+      border-bottom: 1px solid #eef2f7;
+      vertical-align: middle;
+    }
+    .badge-soft {
+      background: #e2e8f0;
+      border-radius: 999px;
+      color: #334155;
+      font-weight: 750;
+      padding: .4em .7em;
+    }
+    .badge-ok {
+      background: #dcfce7;
+      color: #166534;
+    }
+    .badge-warn {
+      background: #fef3c7;
+      color: #92400e;
+    }
+    .empty-state {
+      color: #64748b;
+      font-weight: 700;
+      padding: 1.5rem;
+      text-align: center;
+    }
+    @media (max-width: 992px) {
+      .summary-grid,
+      .module-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
     @media (max-width: 576px) {
-      .stat-number { font-size: 1.8rem; }
-      .btn { font-size: 0.9rem; padding: 0.5rem 0.75rem; }
-      .table-responsive { font-size: 0.85rem; }
-      .card-header { font-size: 1rem; }
+      .summary-grid,
+      .module-grid {
+        grid-template-columns: 1fr;
+      }
+      .hero {
+        border-radius: 0 0 18px 18px;
+        margin-left: -12px;
+        margin-right: -12px;
+      }
     }
   </style>
 </head>
-<body class="bg-light">
+<body>
 
-<nav class="navbar navbar-dark bg-dark px-3">
-  <span class="navbar-brand">Gas Tomza</span>
-  <a href="/logout" class="btn btn-warning btn-sm">Salir</a>
+<%
+  const safeStats = stats || {};
+  const mantenimientosHoy = Array.isArray(hoy) ? hoy : [];
+  const sedeActual = sedeSeleccionada || user.sede || 'TODAS';
+  const citas = Array.isArray(citasProximas) ? citasProximas : [];
+  const tramites = Array.isArray(ultimosTramites) ? ultimosTramites : [];
+%>
+
+<nav class="navbar navbar-dark px-3 py-2">
+  <span class="navbar-brand fw-semibold"><i class="bi bi-fuel-pump"></i> Gas Tomza</span>
+  <a href="/logout" class="btn btn-warning btn-sm rounded-pill px-3">Salir</a>
 </nav>
 
-<div class="container mt-4">
-
-  <% if (user.rol === 'ADMIN') { %>
-    <div class="mb-3 overflow-auto">
-      <span class="me-2 fw-bold">Sede actual: <%= sedeSeleccionada || user.sede || 'TODAS' %></span>
-
-      <div class="d-flex flex-wrap gap-1 mt-1">
-        <% ['Cartago', 'Guapiles', 'La Cruz', 'Alajuela', 'San Carlos', 'Rio Claro', 'Perez Zeledon', 'Nicoya', 'Tecnicos', 'Taller', 'Transportadora', 'Granel'].forEach(sede => { %>
-          <form method="POST" action="/cambiar-sede" class="d-inline">
-            <button class="btn btn-sm btn-outline-primary" name="sede" value="<%= sede %>"><%= sede %></button>
-          </form>
-        <% }) %>
-
-        <form method="POST" action="/cambiar-sede" class="d-inline">
-          <button class="btn btn-sm btn-dark" name="sede" value="TODAS">TODAS</button>
-        </form>
+<div class="container app-shell py-4">
+  <section class="hero mb-4">
+    <div class="hero-content d-flex justify-content-between align-items-start flex-wrap gap-3">
+      <div>
+        <h1 class="hero-title">Bienvenido, <%= user.usuario %></h1>
+        <p class="hero-copy">Rol: <strong><%= user.rol %></strong> · Vista actual: <strong><%= sedeActual %></strong></p>
+      </div>
+      <div class="text-end">
+        <div class="small text-white-50">Panel principal</div>
+        <div class="fw-bold"><%= new Date().toLocaleDateString('es-CR') %></div>
       </div>
     </div>
+  </section>
+
+  <% if (user.rol === 'ADMIN') { %>
+    <section class="surface-card p-3 mb-4">
+      <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+        <div>
+          <h2 class="section-title">Selector de sede</h2>
+          <p class="section-subtitle">Actual: <strong><%= sedeActual %></strong></p>
+        </div>
+      </div>
+      <div class="d-flex flex-wrap gap-2">
+        <% ['Cartago', 'Guapiles', 'La Cruz', 'Alajuela', 'San Carlos', 'Rio Claro', 'Perez Zeledon', 'Nicoya', 'Tecnicos', 'Taller', 'Transportadora', 'Granel'].forEach(sede => { %>
+          <form method="POST" action="/cambiar-sede" class="d-inline">
+            <button class="btn btn-sm sede-button <%= sedeActual === sede ? 'btn-dark' : 'btn-outline-primary' %>" name="sede" value="<%= sede %>"><%= sede %></button>
+          </form>
+        <% }) %>
+        <form method="POST" action="/cambiar-sede" class="d-inline">
+          <button class="btn btn-sm sede-button <%= sedeActual === 'TODAS' ? 'btn-dark' : 'btn-outline-dark' %>" name="sede" value="TODAS">TODAS</button>
+        </form>
+      </div>
+    </section>
   <% } %>
 
   <% if (user.rol !== 'ADMIN' && sedesMultiples && sedesMultiples.length > 1) { %>
-    <div class="mb-3">
-      <span class="badge bg-secondary me-2">Vista actual: <%= sedeSeleccionada || sedesMultiples[0] %></span>
-
-      <div class="d-flex flex-wrap gap-1 mt-1">
+    <section class="surface-card p-3 mb-4">
+      <h2 class="section-title">Selector de sede</h2>
+      <p class="section-subtitle">Vista actual: <strong><%= sedeActual %></strong></p>
+      <div class="d-flex flex-wrap gap-2 mt-2">
         <% sedesMultiples.forEach(sede => { %>
           <form method="POST" action="/cambiar-sede" class="d-inline">
-            <button class="btn btn-sm btn-outline-primary" name="sede" value="<%= sede %>"><%= sede %></button>
+            <button class="btn btn-sm sede-button <%= sedeActual === sede ? 'btn-dark' : 'btn-outline-primary' %>" name="sede" value="<%= sede %>"><%= sede %></button>
           </form>
         <% }) %>
       </div>
-    </div>
+    </section>
   <% } %>
 
-  <h3>Bienvenido, <strong><%= user.usuario %></strong></h3>
-  <p>Rol: <strong><%= user.rol %></strong></p>
-  <hr>
-
   <% if (user.rol === 'CONTABILIDAD') { %>
-
-    <div class="card shadow-sm mb-4">
-      <div class="card-header bg-primary text-white">
-        💼 Panel de Contabilidad
+    <section class="summary-grid mb-4">
+      <div class="summary-card">
+        <div class="summary-label">Acceso</div>
+        <div class="summary-value">Compras</div>
       </div>
-
-      <div class="card-body">
-        <h5>Órdenes de compra</h5>
-        <p class="text-muted">
-          Acceso únicamente para revisar órdenes de compra.
-        </p>
-
-        <a href="/compras/ordenes" class="btn btn-primary">
-          🛒 Ver Órdenes de Compra
-        </a>
+      <div class="summary-card">
+        <div class="summary-label">Rol</div>
+        <div class="summary-value fs-4"><%= user.rol %></div>
       </div>
-    </div>
+    </section>
+
+    <section class="surface-card p-4">
+      <h2 class="section-title">Panel de Contabilidad</h2>
+      <p class="section-subtitle mb-3">Revisión de órdenes de compra y facturación.</p>
+      <a href="/compras/ordenes" class="btn btn-primary rounded-pill px-4"><i class="bi bi-cart-check"></i> Ver órdenes de compra</a>
+    </section>
 
   <% } else if (user.rol === 'TRAMITES') { %>
+    <section class="summary-grid mb-4">
+      <div class="summary-card">
+        <div class="summary-label">Trámites pendientes</div>
+        <div class="summary-value"><%= totalPendientes || 0 %></div>
+      </div>
+      <div class="summary-card">
+        <div class="summary-label">Por vencer</div>
+        <div class="summary-value"><%= porVencer || 0 %></div>
+      </div>
+      <div class="summary-card">
+        <div class="summary-label">Citas próximas</div>
+        <div class="summary-value"><%= citas.length %></div>
+      </div>
+    </section>
 
-    <div class="row mb-4">
-      <div class="col-12 col-md-4 mb-3 mb-md-0">
-        <div class="card card-stats bg-primary text-white">
-          <div class="card-body">
-            <h5 class="card-title">📋 Trámites pendientes</h5>
-            <p class="stat-number"><%= totalPendientes || 0 %></p>
+    <section class="module-grid mb-4">
+      <a href="/minae" class="module-card">
+        <span class="module-icon"><i class="bi bi-bank"></i></span>
+        <div class="module-title">Control MINAE</div>
+        <p class="module-copy">Revisar trámites y vencimientos.</p>
+      </a>
+      <a href="/minae/nuevo" class="module-card">
+        <span class="module-icon"><i class="bi bi-plus-circle"></i></span>
+        <div class="module-title">Nuevo trámite</div>
+        <p class="module-copy">Registrar un trámite nuevo.</p>
+      </a>
+    </section>
+
+    <div class="row g-4">
+      <div class="col-lg-6">
+        <section class="surface-card">
+          <div class="p-3 border-bottom">
+            <h2 class="section-title">Próximas citas MINAE</h2>
           </div>
-        </div>
-      </div>
-
-      <div class="col-12 col-md-4 mb-3 mb-md-0">
-        <div class="card card-stats bg-warning text-dark">
-          <div class="card-body">
-            <h5 class="card-title">⚠️ Por vencer (15 días)</h5>
-            <p class="stat-number"><%= porVencer || 0 %></p>
+          <div class="table-responsive">
+            <table class="table table-sm mb-0">
+              <thead><tr><th>Placa</th><th>CR#</th><th>Fecha</th><th>Lugar</th></tr></thead>
+              <tbody>
+                <% citas.forEach(c => { %>
+                  <tr><td><%= c.placa %></td><td><%= c.cr || '-' %></td><td><%= c.fecha_cita %></td><td><%= c.lugar_cita || '-' %></td></tr>
+                <% }) %>
+                <% if (!citas.length) { %><tr><td colspan="4" class="empty-state">No hay citas próximas</td></tr><% } %>
+              </tbody>
+            </table>
           </div>
-        </div>
+        </section>
       </div>
-
-      <div class="col-12 col-md-4">
-        <div class="card card-stats bg-info text-white">
-          <div class="card-body">
-            <h5 class="card-title">📅 Citas próximas</h5>
-            <p class="stat-number"><%= (citasProximas || []).length %></p>
+      <div class="col-lg-6">
+        <section class="surface-card">
+          <div class="p-3 border-bottom">
+            <h2 class="section-title">Últimos trámites</h2>
           </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="d-grid gap-2 col-12 col-md-4 mb-4">
-      <a href="/minae" class="btn btn-warning">🏛️ Control MINAE</a>
-      <a href="/minae/nuevo" class="btn btn-success">➕ Nuevo trámite</a>
-    </div>
-
-    <div class="card mt-4">
-      <div class="card-header bg-dark text-white">📅 Próximas citas MINAE</div>
-      <div class="card-body p-0">
-        <div class="table-responsive">
-          <table class="table table-sm table-striped mb-0">
-            <thead>
-              <tr>
-                <th>Placa</th>
-                <th>CR#</th>
-                <th>Fecha cita</th>
-                <th>Lugar</th>
-              </tr>
-            </thead>
-
-            <tbody>
-              <% (citasProximas || []).forEach(c => { %>
-                <tr>
-                  <td><%= c.placa %></td>
-                  <td><%= c.cr || '-' %></td>
-                  <td><%= c.fecha_cita %></td>
-                  <td><%= c.lugar_cita || '-' %></td>
-                </tr>
-              <% }) %>
-
-              <% if (!(citasProximas || []).length) { %>
-                <tr>
-                  <td colspan="4" class="text-center">No hay citas próximas</td>
-                </tr>
-              <% } %>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-
-    <div class="card mt-4">
-      <div class="card-header bg-dark text-white">🕒 Últimos trámites ingresados</div>
-      <div class="card-body p-0">
-        <div class="table-responsive">
-          <table class="table table-sm table-striped mb-0">
-            <thead>
-              <tr>
-                <th>Placa</th>
-                <th>CR#</th>
-                <th>Estado</th>
-              </tr>
-            </thead>
-
-            <tbody>
-              <% (ultimosTramites || []).forEach(t => { %>
-                <tr>
-                  <td><%= t.placa %></td>
-                  <td><%= t.cr || '-' %></td>
-                  <td><%= t.estado %></td>
-                </tr>
-              <% }) %>
-            </tbody>
-          </table>
-        </div>
+          <div class="table-responsive">
+            <table class="table table-sm mb-0">
+              <thead><tr><th>Placa</th><th>CR#</th><th>Estado</th></tr></thead>
+              <tbody>
+                <% tramites.forEach(t => { %>
+                  <tr><td><%= t.placa %></td><td><%= t.cr || '-' %></td><td><span class="badge-soft"><%= t.estado %></span></td></tr>
+                <% }) %>
+                <% if (!tramites.length) { %><tr><td colspan="3" class="empty-state">No hay trámites recientes</td></tr><% } %>
+              </tbody>
+            </table>
+          </div>
+        </section>
       </div>
     </div>
 
   <% } else { %>
-
-    <div class="row mb-4">
-      <div class="col-12 col-md-6 mb-3 mb-md-0">
-        <div class="card text-white bg-success">
-          <div class="card-body">
-            <h5 class="card-title">✅ Mantenimientos realizados</h5>
-            <p class="card-text display-4"><%= stats.realizados || 0 %></p>
-          </div>
-        </div>
+    <section class="summary-grid mb-4">
+      <div class="summary-card">
+        <div class="summary-label">Realizados</div>
+        <div class="summary-value"><%= safeStats.realizados || 0 %></div>
       </div>
-
-      <div class="col-12 col-md-6">
-        <div class="card text-white bg-danger">
-          <div class="card-body">
-            <h5 class="card-title">⏳ Mantenimientos pendientes</h5>
-            <p class="card-text display-4"><%= stats.pendientes || 0 %></p>
-          </div>
-        </div>
+      <div class="summary-card">
+        <div class="summary-label">Pendientes</div>
+        <div class="summary-value"><%= safeStats.pendientes || 0 %></div>
       </div>
-    </div>
+      <div class="summary-card">
+        <div class="summary-label">Programados hoy</div>
+        <div class="summary-value"><%= mantenimientosHoy.length %></div>
+      </div>
+      <div class="summary-card">
+        <div class="summary-label">Sede</div>
+        <div class="summary-value fs-4"><%= sedeActual %></div>
+      </div>
+    </section>
 
-    <div class="card mb-4">
-      <div class="card-header bg-dark text-white">🔧 Mantenimientos programados para hoy</div>
-
-      <div class="card-body p-0">
-        <% if (!hoy || hoy.length === 0) { %>
-          <div class="p-3 text-muted">No hay mantenimientos programados para hoy.</div>
+    <section class="surface-card mb-4">
+      <div class="p-3 border-bottom d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <div>
+          <h2 class="section-title">Mantenimientos programados para hoy</h2>
+          <p class="section-subtitle">Trabajo operativo del día.</p>
+        </div>
+        <a href="/mantenimientos" class="btn btn-sm btn-dark rounded-pill px-3">Ver todos</a>
+      </div>
+      <div class="table-responsive">
+        <% if (!mantenimientosHoy.length) { %>
+          <div class="empty-state">No hay mantenimientos programados para hoy.</div>
         <% } else { %>
-          <div class="table-responsive">
-            <table class="table table-sm mb-0">
-              <thead>
+          <table class="table table-sm mb-0">
+            <thead>
+              <tr><th>Placa</th><th>Sede</th><th>Tipo</th><th>Estado</th><th>Plan</th><th></th></tr>
+            </thead>
+            <tbody>
+              <% mantenimientosHoy.forEach(m => { %>
                 <tr>
-                  <th>Placa</th>
-                  <th>Sede</th>
-                  <th>Tipo</th>
-                  <th>Estado</th>
-                  <th>Plan</th>
+                  <td><strong><%= m.placa %></strong></td>
+                  <td><%= m.sede %></td>
+                  <td><%= m.tipo %></td>
+                  <td><span class="badge-soft <%= m.estado === 'CERRADO' ? 'badge-ok' : 'badge-warn' %>"><%= m.estado %></span></td>
+                  <td><%= m.plan || '-' %></td>
+                  <td class="text-end"><a href="/mantenimientos/<%= m.id %>" class="btn btn-sm btn-outline-dark rounded-pill">Abrir</a></td>
                 </tr>
-              </thead>
-
-              <tbody>
-                <% hoy.forEach(m => { %>
-                  <tr>
-                    <td><%= m.placa %></td>
-                    <td><%= m.sede %></td>
-                    <td><%= m.tipo %></td>
-                    <td><%= m.estado %></td>
-                    <td><%= m.plan || '-' %></td>
-                  </tr>
-                <% }) %>
-              </tbody>
-            </table>
-          </div>
+              <% }) %>
+            </tbody>
+          </table>
         <% } %>
       </div>
-    </div>
+    </section>
 
-    <div class="d-grid gap-2 col-12 col-md-4">
-      <a href="/mantenimientos" class="btn btn-primary">🔧 Ir a mantenimientos</a>
-      <a href="/agenda" class="btn btn-secondary">📅 Ir a agenda</a>
-      <a href="/unidades" class="btn btn-info text-white">🚛 Ir a unidades</a>
-
+    <section class="module-grid">
+      <a href="/mantenimientos" class="module-card">
+        <span class="module-icon"><i class="bi bi-tools"></i></span>
+        <div class="module-title">Mantenimientos</div>
+        <p class="module-copy">Preventivos, cierre y pendientes.</p>
+      </a>
+      <a href="/agenda" class="module-card">
+        <span class="module-icon"><i class="bi bi-calendar-week"></i></span>
+        <div class="module-title">Agenda</div>
+        <p class="module-copy">Programación diaria por sede.</p>
+      </a>
+      <a href="/unidades" class="module-card">
+        <span class="module-icon"><i class="bi bi-truck"></i></span>
+        <div class="module-title">Unidades</div>
+        <p class="module-copy">Listado de placas y sedes.</p>
+      </a>
       <% if (['ADMIN','MECANICO'].includes(user.rol)) { %>
-        <a href="/aceite" class="btn btn-success">🛢️ Cambios de Aceite</a>
+        <a href="/aceite" class="module-card">
+          <span class="module-icon"><i class="bi bi-droplet-half"></i></span>
+          <div class="module-title">Cambios de aceite</div>
+          <p class="module-copy">Control de servicios de aceite.</p>
+        </a>
       <% } %>
-
       <% if (user.rol === 'ADMIN') { %>
-        <a href="/kpis/mecanicos" class="btn btn-dark">📊 KPIs Mecánicos</a>
+        <a href="/kpis/mecanicos" class="module-card">
+          <span class="module-icon"><i class="bi bi-bar-chart"></i></span>
+          <div class="module-title">KPIs mecánicos</div>
+          <p class="module-copy">Rendimiento y puntos por mecánico.</p>
+        </a>
       <% } %>
-
-      <a href="/dekra" class="btn" style="background:#8e44ad; color:white;">📋 Control DEKRA</a>
-      <a href="/minae" class="btn btn-warning">🏛️ Control MINAE</a>
-
+      <a href="/dekra" class="module-card">
+        <span class="module-icon"><i class="bi bi-clipboard-check"></i></span>
+        <div class="module-title">Control DEKRA</div>
+        <p class="module-copy">Seguimiento de revisión técnica.</p>
+      </a>
+      <a href="/minae" class="module-card">
+        <span class="module-icon"><i class="bi bi-bank"></i></span>
+        <div class="module-title">Control MINAE</div>
+        <p class="module-copy">Trámites, citas y vencimientos.</p>
+      </a>
       <% if (user.rol === 'ADMIN' || user.rol === 'TALLER' || user.rol === 'PROVEEDURIA_TALLER') { %>
-        <a href="/compras/ordenes" class="btn btn-primary">🛒 Órdenes de Compra</a>
+        <a href="/compras/ordenes" class="module-card">
+          <span class="module-icon"><i class="bi bi-cart-check"></i></span>
+          <div class="module-title">Órdenes de compra</div>
+          <p class="module-copy">Compras, facturas y proveedores.</p>
+        </a>
       <% } %>
-    </div>
-
+    </section>
   <% } %>
-
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
