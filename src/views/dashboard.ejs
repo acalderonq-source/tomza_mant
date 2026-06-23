@@ -63,6 +63,7 @@
   <hr>
 
   <!-- ================== CONTENIDO SEGÚN ROL ================== -->
+
 <% if (user.rol === 'CONTABILIDAD') { %>
 
   <div class="card shadow-sm mb-4">
@@ -83,82 +84,186 @@
   </div>
 
 <% } else if (user.rol === 'TRAMITES') { %>
-  <% if (user.rol === 'CONTABILIDAD') { %>
 
-  <div class="card shadow-sm mb-4">
-    <div class="card-header bg-primary text-white">
-      💼 Panel de Contabilidad
+  <!-- DASHBOARD PARA TRAMITES -->
+  <div class="row mb-4">
+    <div class="col-12 col-md-4 mb-3 mb-md-0">
+      <div class="card card-stats bg-primary text-white">
+        <div class="card-body">
+          <h5 class="card-title">📋 Trámites pendientes</h5>
+          <p class="stat-number"><%= totalPendientes %></p>
+        </div>
+      </div>
     </div>
 
-    <div class="card-body">
-      <h5>Órdenes de compra</h5>
-      <p class="text-muted">
-        Acceso únicamente para revisar órdenes de compra.
-      </p>
+    <div class="col-12 col-md-4 mb-3 mb-md-0">
+      <div class="card card-stats bg-warning text-dark">
+        <div class="card-body">
+          <h5 class="card-title">⚠️ Por vencer (15 días)</h5>
+          <p class="stat-number"><%= porVencer %></p>
+        </div>
+      </div>
+    </div>
 
-      <a href="/compras/ordenes" class="btn btn-primary">
-        🛒 Ver Órdenes de Compra
-      </a>
+    <div class="col-12 col-md-4">
+      <div class="card card-stats bg-info text-white">
+        <div class="card-body">
+          <h5 class="card-title">📅 Citas próximas</h5>
+          <p class="stat-number"><%= citasProximas.length %></p>
+        </div>
+      </div>
     </div>
   </div>
 
-<% } else if (user.rol === 'TRAMITES') { %>
-    <!-- Botones principales para trámites -->
-    <div class="d-grid gap-2 col-12 col-md-4 mb-4">
-      <a href="/minae" class="btn btn-warning">🏛️ Control MINAE</a>
-      <a href="/minae/nuevo" class="btn btn-success">➕ Nuevo trámite</a>
-    </div>
+  <div class="d-grid gap-2 col-12 col-md-4 mb-4">
+    <a href="/minae" class="btn btn-warning">🏛️ Control MINAE</a>
+    <a href="/minae/nuevo" class="btn btn-success">➕ Nuevo trámite</a>
+  </div>
 
-    <!-- Tabla de citas próximas (responsive) -->
-    <div class="card mt-4">
-      <div class="card-header bg-dark text-white">📅 Próximas citas MINAE</div>
-      <div class="card-body p-0">
-        <div class="table-responsive">
-          <table class="table table-sm table-striped mb-0">
-            <thead>
-              <tr><th>Placa</th><th>CR#</th><th>Fecha cita</th><th>Lugar</th></tr>
-            </thead>
-            <tbody>
-              <% citasProximas.forEach(c => { %>
-                <tr>
-                  <td><%= c.placa %></td>
-                  <td><%= c.cr || '-' %></td>
-                  <td><%= c.fecha_cita %></td>
-                  <td><%= c.lugar_cita || '-' %></td>
-                </tr>
-              <% }); %>
-              <% if (citasProximas.length === 0) { %>
-                <tr><td colspan="4" class="text-center">No hay citas próximas</td></tr>
-              <% } %>
-            </tbody>
-          </table>
+  <div class="card mt-4">
+    <div class="card-header bg-dark text-white">📅 Próximas citas MINAE</div>
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-sm table-striped mb-0">
+          <thead>
+            <tr>
+              <th>Placa</th>
+              <th>CR#</th>
+              <th>Fecha cita</th>
+              <th>Lugar</th>
+            </tr>
+          </thead>
+
+          <tbody>
+            <% citasProximas.forEach(c => { %>
+              <tr>
+                <td><%= c.placa %></td>
+                <td><%= c.cr || '-' %></td>
+                <td><%= c.fecha_cita %></td>
+                <td><%= c.lugar_cita || '-' %></td>
+              </tr>
+            <% }); %>
+
+            <% if (citasProximas.length === 0) { %>
+              <tr>
+                <td colspan="4" class="text-center">No hay citas próximas</td>
+              </tr>
+            <% } %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="card mt-4">
+    <div class="card-header bg-dark text-white">🕒 Últimos trámites ingresados</div>
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-sm table-striped mb-0">
+          <thead>
+            <tr>
+              <th>Placa</th>
+              <th>CR#</th>
+              <th>Estado</th>
+            </tr>
+          </thead>
+
+          <tbody>
+            <% ultimosTramites.forEach(t => { %>
+              <tr>
+                <td><%= t.placa %></td>
+                <td><%= t.cr || '-' %></td>
+                <td><%= t.estado %></td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+<% } else { %>
+
+  <!-- DASHBOARD PARA ADMIN, MECANICO, TALLER -->
+
+  <div class="row mb-4">
+    <div class="col-12 col-md-6 mb-3 mb-md-0">
+      <div class="card text-white bg-success">
+        <div class="card-body">
+          <h5 class="card-title">✅ Mantenimientos realizados</h5>
+          <p class="card-text display-4"><%= stats.realizados %></p>
         </div>
       </div>
     </div>
 
-    <!-- Tabla de últimos trámites (responsive) -->
-    <div class="card mt-4">
-      <div class="card-header bg-dark text-white">🕒 Últimos trámites ingresados</div>
-      <div class="card-body p-0">
-        <div class="table-responsive">
-          <table class="table table-sm table-striped mb-0">
-            <thead>
-              <tr><th>Placa</th><th>CR#</th><th>Estado</th></tr>
-            </thead>
-            <tbody>
-              <% ultimosTramites.forEach(t => { %>
-                <tr>
-                  <td><%= t.placa %></td>
-                  <td><%= t.cr || '-' %></td>
-                  <td><%= t.estado %></td>
-                </tr>
-              <% }); %>
-            </tbody>
-          </table>
+    <div class="col-12 col-md-6">
+      <div class="card text-white bg-danger">
+        <div class="card-body">
+          <h5 class="card-title">⏳ Mantenimientos pendientes</h5>
+          <p class="card-text display-4"><%= stats.pendientes %></p>
         </div>
       </div>
     </div>
+  </div>
 
+  <div class="card mb-4">
+    <div class="card-header bg-dark text-white">🔧 Mantenimientos programados para hoy</div>
+
+    <div class="card-body p-0">
+      <% if (hoy.length === 0) { %>
+        <div class="p-3 text-muted">No hay mantenimientos programados para hoy.</div>
+      <% } else { %>
+        <div class="table-responsive">
+          <table class="table table-sm mb-0">
+            <thead>
+              <tr>
+                <th>Placa</th>
+                <th>Sede</th>
+                <th>Tipo</th>
+                <th>Estado</th>
+                <th>Plan</th>
+              </tr>
+            </thead>
+
+            <tbody>
+              <% hoy.forEach(m => { %>
+                <tr>
+                  <td><%= m.placa %></td>
+                  <td><%= m.sede %></td>
+                  <td><%= m.tipo %></td>
+                  <td><%= m.estado %></td>
+                  <td><%= m.plan || '-' %></td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
+    </div>
+  </div>
+
+  <div class="d-grid gap-2 col-12 col-md-4">
+    <a href="/mantenimientos" class="btn btn-primary">🔧 Ir a mantenimientos</a>
+    <a href="/agenda" class="btn btn-secondary">📅 Ir a agenda</a>
+    <a href="/unidades" class="btn btn-info text-white">🚛 Ir a unidades</a>
+
+    <% if (['ADMIN','MECANICO'].includes(user.rol)) { %>
+      <a href="/aceite" class="btn btn-success">🛢️ Cambios de Aceite</a>
+    <% } %>
+
+    <% if (user.rol === 'ADMIN') { %>
+      <a href="/kpis/mecanicos" class="btn btn-dark">📊 KPIs Mecánicos</a>
+    <% } %>
+
+    <a href="/dekra" class="btn" style="background:#8e44ad; color:white;">📋 Control DEKRA</a>
+    <a href="/minae" class="btn btn-warning">🏛️ Control MINAE</a>
+
+    <% if (user.rol === 'ADMIN' || user.rol === 'TALLER' || user.rol === 'PROVEEDURIA_TALLER') { %>
+      <a href="/compras/ordenes" class="btn btn-primary">🛒 Órdenes de Compra</a>
+    <% } %>
+  </div>
+
+<% } %>
   <% } else { %>
     <!-- DASHBOARD PARA ADMIN, MECANICO, TALLER (contenido original) -->
 
