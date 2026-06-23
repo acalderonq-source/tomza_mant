@@ -31,9 +31,16 @@ function obtenerSedeFiltro(req) {
 router.get("/correctivos", requireAuth, async (req, res) => {
   try {
     const sedeFiltro = obtenerSedeFiltro(req);
+    const condiciones = [];
+    const params = [];
+    if (sedeFiltro) {
+      condiciones.push("c.sede = ?");
+      params.push(sedeFiltro);
+    }
+    const where = condiciones.length ? "WHERE " + condiciones.join(" AND ") : "";
     const [rows] = await pool.query(
       `
-      SELECT 
+      SELECT
         c.id,
         DATE_FORMAT(c.fecha, '%d/%m/%Y %H:%i') AS fecha_formato,
         u.placa,
@@ -44,11 +51,11 @@ router.get("/correctivos", requireAuth, async (req, res) => {
       JOIN unidades u ON u.id = c.unidad_id
       LEFT JOIN correctivo_trabajos ct ON ct.correctivo_id = c.id
       LEFT JOIN mecanicos m ON m.id = ct.mecanico_id
-      WHERE c.sede = ?
-      GROUP BY c.id
+      ${where}
+      GROUP BY c.id, c.fecha, u.placa, c.trabajo_realizado, c.pendiente
       ORDER BY c.fecha DESC
       `,
-      [sedeFiltro]
+      params
     );
     res.render("correctivos", { correctivos: rows, user: req.session.user });
   } catch (error) {
@@ -260,10 +267,40 @@ router.post("/correctivos/:id/agregar", requireAuth, async (req, res) => {
 // =====================================================
 router.get("/", requireAuth, async (req, res) => {
   try {
-    const filtro = req.query.filtro;
+    const { filtro, placa, tipo, prioridad, fecha_desde, fecha_hasta, mecanico_id } = req.query;
     let condiciones = [], params = [];
     if (filtro === "pendientes") condiciones.push("m.estado != 'CERRADO'");
     else if (filtro === "realizados") condiciones.push("m.estado = 'CERRADO'");
+
+    if (placa && placa.trim() !== "") {
+      condiciones.push("u.placa LIKE ?");
+      params.push(`%${placa.trim()}%`);
+    }
+    if (tipo && tipo !== "") {
+      condiciones.push("m.tipo = ?");
+      params.push(tipo);
+    }
+    if (prioridad && prioridad !== "") {
+      condiciones.push("m.prioridad = ?");
+      params.push(prioridad);
+    }
+    if (fecha_desde && fecha_desde !== "") {
+      condiciones.push("m.fecha_programada >= ?");
+      params.push(fecha_desde);
+    }
+    if (fecha_hasta && fecha_hasta !== "") {
+      condiciones.push("m.fecha_programada <= ?");
+      params.push(fecha_hasta);
+    }
+    if (mecanico_id && mecanico_id !== "") {
+      condiciones.push(`EXISTS (
+        SELECT 1
+        FROM mantenimiento_mecanicos mm
+        WHERE mm.mantenimiento_id = m.id AND mm.mecanico_id = ?
+      )`);
+      params.push(mecanico_id);
+    }
+
     const sedeFiltro = obtenerSedeFiltro(req);
     if (sedeFiltro) {
       condiciones.push("u.sede = ?");
@@ -275,13 +312,48 @@ router.get("/", requireAuth, async (req, res) => {
     const where = condiciones.length ? "WHERE " + condiciones.join(" AND ") : "";
     const [mantenimientos] = await pool.query(
       `
-      SELECT m.id, u.placa, u.sede, m.tipo, m.estado, DATE_FORMAT(m.fecha_programada, '%d/%m/%Y') AS fecha_formato, m.ejecucion, m.pendiente
-      FROM mantenimientos m JOIN unidades u ON u.id = m.unidad_id ${where}
+      SELECT
+        m.id,
+        u.placa,
+        u.sede,
+        m.tipo,
+        m.estado,
+        m.prioridad,
+        m.fecha_programada,
+        DATE_FORMAT(m.fecha_programada, '%d/%m/%Y') AS fecha_formato,
+        m.ejecucion,
+        m.pendiente,
+        COALESCE(GROUP_CONCAT(DISTINCT mec.nombre ORDER BY mec.nombre SEPARATOR ', '), '—') AS mecanicos
+      FROM mantenimientos m
+      JOIN unidades u ON u.id = m.unidad_id
+      LEFT JOIN mantenimiento_mecanicos mm ON mm.mantenimiento_id = m.id
+      LEFT JOIN mecanicos mec ON mec.id = mm.mecanico_id
+      ${where}
+      GROUP BY m.id, u.placa, u.sede, m.tipo, m.estado, m.prioridad, m.fecha_programada, m.ejecucion, m.pendiente
       ORDER BY m.fecha_programada DESC, m.id DESC
       `,
       params
     );
-    res.render("mantenimientos", { mantenimientos, user: req.session.user, filtro, sedeSeleccionada: sedeFiltro || "TODAS" });
+
+    let sqlMecanicos = "SELECT id, nombre FROM mecanicos WHERE activo = 1";
+    const paramsMecanicos = [];
+    if (sedeFiltro === "Transportadora" || sedeFiltro === "Granel") {
+      sqlMecanicos += " AND sede = 'Transportadora'";
+    } else if (sedeFiltro) {
+      sqlMecanicos += " AND sede = ?";
+      paramsMecanicos.push(sedeFiltro);
+    }
+    sqlMecanicos += " ORDER BY nombre";
+    const [mecanicos] = await pool.query(sqlMecanicos, paramsMecanicos);
+
+    res.render("mantenimientos", {
+      mantenimientos,
+      user: req.session.user,
+      filtro,
+      filtros: { filtro, placa, tipo, prioridad, fecha_desde, fecha_hasta, mecanico_id },
+      mecanicos,
+      sedeSeleccionada: sedeFiltro || "TODAS"
+    });
   } catch (error) {
     console.error("❌ ERROR listado mantenimientos:", error);
     res.status(500).send("Error interno");

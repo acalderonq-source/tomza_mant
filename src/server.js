@@ -30,6 +30,50 @@ app.use(session({
 app.set("view engine", "ejs");
 app.set("views", path.join(__dirname, "views"));
 
+// ===================== PWA / APP INSTALABLE =====================
+function injectPwaAssets(html) {
+  if (typeof html !== "string") return html;
+
+  let output = html;
+  const pwaHead = `
+  <meta name="theme-color" content="#111827">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Tomza Taller">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/img/app-icon.svg" type="image/svg+xml">`;
+  const pwaScript = `\n<script src="/js/pwa.js" defer></script>`;
+
+  if (!output.includes('href="/manifest.webmanifest"') && output.includes("</head>")) {
+    output = output.replace("</head>", `${pwaHead}\n</head>`);
+  }
+
+  if (!output.includes('src="/js/pwa.js"') && output.includes("</body>")) {
+    output = output.replace("</body>", `${pwaScript}\n</body>`);
+  }
+
+  return output;
+}
+
+app.use((req, res, next) => {
+  const originalRender = res.render.bind(res);
+
+  res.render = (view, options, callback) => {
+    if (typeof options === "function") {
+      callback = options;
+      options = {};
+    }
+
+    originalRender(view, options, (err, html) => {
+      if (callback) return callback(err, err ? html : injectPwaAssets(html));
+      if (err) return next(err);
+      res.send(injectPwaAssets(html));
+    });
+  };
+
+  next();
+});
+
 // ===================== IMPORTAR RUTAS =====================
 const authRoutes = require("./routes/auth.routes");
 const adminRoutes = require("./routes/admin.routes");

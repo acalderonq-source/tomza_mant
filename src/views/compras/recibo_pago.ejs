@@ -63,7 +63,7 @@
     <tbody>
       <% facturas.forEach(f => { %>
       <tr>
-        <td><%= f.po_numero %></td>
+        <td><%= f.po_numero || '—' %></td>
         <td><%= f.proveedor_nombre %></td>
         <td><%= f.factura %></td>
         <td class="text-right">₡<%= parseFloat(f.total).toLocaleString('es-CR') %></td>
@@ -76,7 +76,7 @@
   <div class="totals">
     <table>
       <tr><td><strong>SUBTOTAL</strong></td><td class="text-right">₡<%= totalPagado.toLocaleString('es-CR') %></td></tr>
-      <tr class="total-final"><td><strong>TOTAL PAGADO</strong></td><td class="text-right">₡<%= totalPagado.toLocaleString('es-CR') %></td></td>
+      <tr class="total-final"><td><strong>TOTAL PAGADO</strong></td><td class="text-right">₡<%= totalPagado.toLocaleString('es-CR') %></td></tr>
     </table>
   </div>
 

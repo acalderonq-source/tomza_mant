@@ -26,6 +26,7 @@
       .table-facturas td::before { content: attr(data-label); position: absolute; left: 0.8rem; width: 45%; font-weight: 600; text-align: left; }
     }
   </style>
+  <link rel="stylesheet" href="/css/compras.css">
 </head>
 <body>
 
@@ -39,6 +40,15 @@
 </nav>
 
 <div class="container py-4">
+  <div class="page-heading">
+    <div>
+      <h1 class="page-title">Facturas de compras</h1>
+      <p class="page-subtitle">Controla facturas pendientes, vencidas y pagos múltiples.</p>
+    </div>
+    <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#agregarFacturaModal">
+      <i class="bi bi-plus-circle"></i> Agregar factura
+    </button>
+  </div>
 
   <!-- Mensajes flash -->
   <% if (typeof success !== 'undefined' && success) { %>
@@ -106,13 +116,38 @@
     </form>
   </div>
 
+  <%
+    const totalFacturas = facturas.reduce((sum, f) => sum + (parseFloat(f.monto) || 0), 0);
+    const facturasPagadas = facturas.filter(f => f.pagada).length;
+    const facturasPendientes = facturas.filter(f => !f.pagada).length;
+    const facturasVencidas = facturas.filter(f => f.vencida).length;
+  %>
+  <div class="summary-grid">
+    <div class="summary-card">
+      <div class="summary-label">Facturas</div>
+      <div class="summary-value"><%= facturas.length %></div>
+    </div>
+    <div class="summary-card">
+      <div class="summary-label">Monto listado</div>
+      <div class="summary-value">₡<%= totalFacturas.toLocaleString('es-CR', { maximumFractionDigits: 0 }) %></div>
+    </div>
+    <div class="summary-card">
+      <div class="summary-label">Pendientes</div>
+      <div class="summary-value"><%= facturasPendientes %></div>
+    </div>
+    <div class="summary-card">
+      <div class="summary-label">Vencidas</div>
+      <div class="summary-value"><%= facturasVencidas %></div>
+    </div>
+  </div>
+
   <!-- Botón para agregar factura manual y listado -->
   <div class="card p-3">
     <div class="d-flex justify-content-between align-items-center mb-3">
-      <h3>📄 Facturas de Compras</h3>
-      <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#agregarFacturaModal">
-        <i class="bi bi-plus-circle"></i> Agregar Factura
-      </button>
+      <div>
+        <h3 class="page-title fs-5">Listado de facturas</h3>
+        <p class="page-subtitle">Pagadas: <%= facturasPagadas %> · Pendientes: <%= facturasPendientes %></p>
+      </div>
     </div>
 
     <form method="POST" action="/compras/facturas/pagar-multiple" id="multiplePagoForm">
@@ -136,14 +171,14 @@
               <tr class="<%= f.vencida ? 'table-danger' : '' %>">
                 <td class="text-center">
                   <% if (!f.pagada) { %>
-                    <input type="checkbox" name="facturas_ids" value="<%= f.id %>" class="check-factura" data-monto="<%= f.monto %>">
+                    <input type="checkbox" name="facturas_ids" value="<%= f.tipo %>:<%= f.id %>" class="check-factura" data-monto="<%= f.monto %>">
                   <% } %>
                 </td>
                 <td data-label="PO Número"><%= f.po_numero ? f.po_numero : '—' %></td>
                 <td data-label="Proveedor"><%= f.proveedor_nombre %></td>
                 <td data-label="Fecha"><%= new Date(f.fecha).toLocaleDateString('es-CR') %></td>
                 <td data-label="N° Factura"><%= f.numero_factura %></td>
-                <td data-label="Monto" class="monto-factura" data-val="<%= f.monto %>">₡<%= parseFloat(f.monto).toLocaleString('es-CR') %></td>
+                <td data-label="Monto" class="monto-factura money" data-val="<%= f.monto %>">₡<%= parseFloat(f.monto).toLocaleString('es-CR') %></td>
                 <td data-label="Fecha Vencimiento">
                   <%= f.fecha_vencimiento_factura ? new Date(f.fecha_vencimiento_factura).toLocaleDateString('es-CR') : '—' %>
                   <% if (f.vencida) { %>
@@ -159,11 +194,13 @@
                 </td>
                 <td data-label="Acciones">
                   <% if (!f.pagada) { %>
-                    <form method="POST" action="/compras/facturas/<%= f.id %>/pagar" class="d-inline" onsubmit="return confirm('¿Marcar esta factura como pagada?')">
-                      <button type="submit" class="btn btn-sm btn-success">
-                        <i class="bi bi-check-circle"></i> Pagar
-                      </button>
-                    </form>
+                    <button
+                      type="submit"
+                      form="pagar-factura-<%= f.tipo %>-<%= f.id %>"
+                      class="btn btn-sm btn-success"
+                      onclick="return confirm('¿Marcar esta factura como pagada?')">
+                      <i class="bi bi-check-circle"></i> Pagar
+                    </button>
                   <% } else { %>
                     <span class="text-muted">Pagada</span>
                   <% } %>
@@ -187,6 +224,18 @@
         </div>
       </div>
     </form>
+
+    <% facturas.forEach(f => { %>
+      <% if (!f.pagada) { %>
+        <form
+          id="pagar-factura-<%= f.tipo %>-<%= f.id %>"
+          method="POST"
+          action="/compras/facturas/<%= f.id %>/pagar"
+          class="d-none">
+          <input type="hidden" name="tipo" value="<%= f.tipo %>">
+        </form>
+      <% } %>
+    <% }) %>
   </div>
 </div>
 
@@ -245,13 +294,15 @@
 
   function actualizarTotal() {
     let total = 0;
+    let seleccionadas = 0;
     checkboxes.forEach(cb => {
       if (cb.checked) {
+        seleccionadas += 1;
         total += parseFloat(cb.dataset.monto || 0);
       }
     });
     totalSpan.innerText = '₡' + total.toLocaleString('es-CR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-    btnPagar.disabled = (total === 0);
+    btnPagar.disabled = (seleccionadas === 0);
   }
 
   function marcarTodos() {
@@ -271,6 +322,6 @@
   actualizarTotal();
 </script>
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

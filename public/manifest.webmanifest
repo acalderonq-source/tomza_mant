@@ -1,0 +1,40 @@
+{
+  "name": "Tomza Taller",
+  "short_name": "Tomza",
+  "description": "Sistema de mantenimiento, agenda y compras de Gas Tomza.",
+  "start_url": "/dashboard",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#111827",
+  "theme_color": "#111827",
+  "categories": ["business", "productivity", "utilities"],
+  "icons": [
+    {
+      "src": "/img/app-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Agenda",
+      "short_name": "Agenda",
+      "url": "/agenda",
+      "icons": [{ "src": "/img/app-icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+    },
+    {
+      "name": "Mantenimientos",
+      "short_name": "Taller",
+      "url": "/mantenimientos",
+      "icons": [{ "src": "/img/app-icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+    },
+    {
+      "name": "Compras",
+      "short_name": "Compras",
+      "url": "/compras/ordenes",
+      "icons": [{ "src": "/img/app-icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+    }
+  ]
+}

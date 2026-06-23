@@ -45,6 +45,7 @@
       }
     }
   </style>
+  <link rel="stylesheet" href="/css/compras.css">
 </head>
 <body>
 
@@ -58,12 +59,38 @@
 </nav>
 
 <div class="container py-4">
+  <div class="page-heading">
+    <div>
+      <h1 class="page-title">Proveedores</h1>
+      <p class="page-subtitle">Directorio de proveedores usados en órdenes y facturas.</p>
+    </div>
+    <a href="/compras/proveedores/nuevo" class="btn btn-primary">
+      <i class="bi bi-plus-circle"></i> Nuevo proveedor
+    </a>
+  </div>
+
+  <div class="summary-grid">
+    <div class="summary-card">
+      <div class="summary-label">Proveedores</div>
+      <div class="summary-value"><%= proveedores.length %></div>
+    </div>
+    <div class="summary-card">
+      <div class="summary-label">Con email</div>
+      <div class="summary-value"><%= proveedores.filter(p => p.email).length %></div>
+    </div>
+    <div class="summary-card">
+      <div class="summary-label">Con teléfono</div>
+      <div class="summary-value"><%= proveedores.filter(p => p.telefono).length %></div>
+    </div>
+    <div class="summary-card">
+      <div class="summary-label">Con contacto</div>
+      <div class="summary-value"><%= proveedores.filter(p => p.contacto).length %></div>
+    </div>
+  </div>
+
   <div class="card p-3">
     <div class="d-flex justify-content-between mb-3">
-      <h3>📋 Listado de Proveedores</h3>
-      <a href="/compras/proveedores/nuevo" class="btn btn-primary">
-        <i class="bi bi-plus-circle"></i> Nuevo Proveedor
-      </a>
+      <h3 class="page-title fs-5">Listado de proveedores</h3>
     </div>
     <div class="table-responsive">
       <table class="table table-bordered table-hover">
@@ -97,7 +124,7 @@
                   <i class="bi bi-trash"></i> Eliminar
                 </a>
               </td>
-              
+            </tr>
             <% }) %>
           <% if (proveedores.length === 0) { %>
             <tr><td colspan="8" class="text-center">No hay proveedores registrados</td></tr>

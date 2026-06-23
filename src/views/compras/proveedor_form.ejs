@@ -17,6 +17,7 @@
       box-shadow: 0 8px 20px rgba(0,0,0,0.04);
     }
   </style>
+  <link rel="stylesheet" href="/css/compras.css">
 </head>
 <body>
 
@@ -29,7 +30,14 @@
 </nav>
 
 <div class="container py-4">
-  <div class="card p-4">
+  <div class="page-heading">
+    <div>
+      <h1 class="page-title"><%= proveedor ? 'Editar proveedor' : 'Nuevo proveedor' %></h1>
+      <p class="page-subtitle">Mantén actualizada la información de contacto y facturación.</p>
+    </div>
+  </div>
+
+  <div class="form-card">
     <form method="POST" action="/compras/proveedores">
       <input type="hidden" name="id" value="<%= proveedor ? proveedor.id : '' %>">
       

@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Nueva Orden de Compra</title>
+  <title><%= orden ? 'Editar Orden de Compra' : 'Nueva Orden de Compra' %></title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
   <style>
@@ -9,54 +9,68 @@
     .card { border: none; border-radius: 14px; box-shadow: 0 2px 12px rgba(0,0,0,.08); }
     .table thead th { background: #1f2937; color: white; }
   </style>
+  <link rel="stylesheet" href="/css/compras.css">
 </head>
 <body>
+<%
+  const esEdicion = !!orden;
+  const safeOrden = orden || {};
+  const lineasIniciales = Array.isArray(lineas) ? lineas : [];
+  const fechaOrden = safeOrden.fecha ? new Date(safeOrden.fecha).toLocaleDateString('es-CR') : new Date().toLocaleDateString('es-CR');
+%>
 <div class="container mt-4">
-  <div class="card p-4">
-    <h2>Nueva Orden de Compra</h2>
-    <form id="ordenForm" method="POST" action="/compras/ordenes">
+  <div class="page-heading">
+    <div>
+      <h1 class="page-title"><%= esEdicion ? 'Editar orden de compra' : 'Nueva orden de compra' %></h1>
+      <p class="page-subtitle">Completa el encabezado, líneas y totales de la orden.</p>
+    </div>
+    <a href="/compras/ordenes" class="btn btn-secondary btn-sm">Volver al listado</a>
+  </div>
+
+  <div class="form-card">
+    <form id="ordenForm" method="POST" action="<%= esEdicion ? `/compras/ordenes/${safeOrden.id}/editar` : '/compras/ordenes' %>">
       <div class="row">
         <div class="col-md-3">
-          <label>N° PO (se genera automático)</label>
+          <label>N° PO <%= esEdicion ? '' : '(se genera automático)' %></label>
           <input type="text" class="form-control" value="<%= siguientePO %>" disabled>
         </div>
         <div class="col-md-3">
           <label>Fecha</label>
-          <input type="text" class="form-control" value="<%= new Date().toLocaleDateString('es-CR') %>" disabled>
+          <input type="text" class="form-control" value="<%= fechaOrden %>" disabled>
         </div>
         <div class="col-md-3">
           <label>Proveedor</label>
           <select name="proveedor_id" class="form-select" required>
             <option value="">Seleccione</option>
             <% proveedores.forEach(p => { %>
-              <option value="<%= p.id %>"><%= p.nombre %></option>
+              <option value="<%= p.id %>" <%= safeOrden.proveedor_id == p.id ? 'selected' : '' %>><%= p.nombre %></option>
             <% }) %>
           </select>
         </div>
         <div class="col-md-3">
           <label>Forma de pago</label>
-          <input type="text" name="forma_pago" class="form-control" placeholder="crédito, contado, etc.">
+          <input type="text" name="forma_pago" class="form-control" placeholder="crédito, contado, etc." value="<%= safeOrden.forma_pago || '' %>">
         </div>
       </div>
       <div class="row mt-3">
         <div class="col-md-2">
           <label>Moneda</label>
           <select name="moneda" class="form-select">
-            <option value="CRC">Colones (CRC)</option>
-            <option value="USD">Dólares (USD)</option>
+            <option value="CRC" <%= (safeOrden.moneda || 'CRC') === 'CRC' ? 'selected' : '' %>>Colones (CRC)</option>
+            <option value="USD" <%= safeOrden.moneda === 'USD' ? 'selected' : '' %>>Dólares (USD)</option>
           </select>
         </div>
         <div class="col-md-4">
           <label>🏢 Empresa destinataria</label>
           <select name="empresa_destino" class="form-select" required>
-            <option value="GAS TOMZA" selected>Gas Tomza de Costa Rica S.A.</option>
-            <option value="SUPER GAS">Envasadora Super Gas GLP S.A.</option>
+            <option value="GAS TOMZA" <%= (safeOrden.empresa_destino || 'GAS TOMZA') === 'GAS TOMZA' ? 'selected' : '' %>>Gas Tomza de Costa Rica S.A.</option>
+            <option value="SUPER GAS" <%= safeOrden.empresa_destino === 'SUPER GAS' ? 'selected' : '' %>>Envasadora Super Gas GLP S.A.</option>
           </select>
         </div>
       </div>
 
       <hr>
-      <h4>Detalle de productos/servicios</h4>
+      <h4 class="page-title fs-5 mb-3">Detalle de productos/servicios</h4>
       <div class="table-responsive">
         <table class="table table-bordered" id="itemsTable">
           <thead>
@@ -66,22 +80,22 @@
             <!-- Las filas se agregarán dinámicamente -->
           </tbody>
           <tfoot>
-            <tr><td colspan="4" class="text-end"><strong>Subtotal</strong></td><td><input type="text" id="subtotal" name="subtotal" readonly class="form-control-plaintext"></td><td></td></tr>
-            <tr><td colspan="4" class="text-end"><strong>Descuento (%)</strong></td><td><input type="number" id="descuento" name="descuento" step="0.01" value="0" class="form-control"></td><td>\n</td></td>
-            <tr><td colspan="4" class="text-end"><strong>Transporte</strong></td><td><input type="number" id="transporte" name="transporte" step="0.01" value="0" class="form-control"></td><td></td></tr>
-            <tr><td colspan="4" class="text-end"><strong>IVA (%)</strong></td><td><input type="number" id="iva" name="iva" step="0.01" value="13" class="form-control"></td><td></td></tr>
-            <tr><td colspan="4" class="text-end"><strong>Total</strong></td><td><input type="text" id="total" name="total" readonly class="form-control-plaintext fw-bold"></td><td></td></tr>
+            <tr><td colspan="4" class="text-end"><strong>Subtotal</strong></td><td><input type="text" id="subtotal" name="subtotal" readonly class="form-control-plaintext money" value="<%= safeOrden.subtotal || '' %>"></td><td></td></tr>
+            <tr><td colspan="4" class="text-end"><strong>Descuento (%)</strong></td><td><input type="number" id="descuento" name="descuento" step="0.01" value="<%= safeOrden.descuento ?? 0 %>" class="form-control"></td><td></td></tr>
+            <tr><td colspan="4" class="text-end"><strong>Transporte</strong></td><td><input type="number" id="transporte" name="transporte" step="0.01" value="<%= safeOrden.transporte ?? 0 %>" class="form-control"></td><td></td></tr>
+            <tr><td colspan="4" class="text-end"><strong>IVA (%)</strong></td><td><input type="number" id="iva" name="iva" step="0.01" value="<%= safeOrden.iva ?? 13 %>" class="form-control"></td><td></td></tr>
+            <tr><td colspan="4" class="text-end"><strong>Total</strong></td><td><input type="text" id="total" name="total" readonly class="form-control-plaintext fw-bold money" value="<%= safeOrden.total || '' %>"></td><td></td></tr>
           </tfoot>
         </table>
       </div>
 
       <div class="mb-3">
         <label>Observaciones</label>
-        <textarea name="observaciones" class="form-control" rows="2"></textarea>
+        <textarea name="observaciones" class="form-control" rows="2"><%= safeOrden.observaciones || '' %></textarea>
       </div>
 
       <button type="button" class="btn btn-secondary" id="addRowBtn">➕ Agregar línea</button>
-      <button type="submit" class="btn btn-primary">Guardar orden</button>
+      <button type="submit" class="btn btn-primary"><%= esEdicion ? 'Actualizar orden' : 'Guardar orden' %></button>
       <a href="/compras/ordenes" class="btn btn-danger">Cancelar</a>
     </form>
   </div>
@@ -89,8 +103,9 @@
 
 <script>
   let rowIndex = 0;
+  const lineasIniciales = <%- JSON.stringify(lineasIniciales) %>;
 
-  function addRow() {
+  function addRow(linea = {}) {
     const tbody = document.querySelector("#itemsTable tbody");
     const newRow = document.createElement("tr");
     newRow.innerHTML = `
@@ -102,8 +117,14 @@
       <td><button type="button" class="btn btn-danger btn-sm removeRow">X</button></td>
     `;
     tbody.appendChild(newRow);
+    newRow.querySelector(`[name="lineas[${rowIndex}][codigo]"]`).value = linea.codigo || '';
+    newRow.querySelector(`[name="lineas[${rowIndex}][descripcion]"]`).value = linea.descripcion || '';
+    newRow.querySelector(`[name="lineas[${rowIndex}][cantidad]"]`).value = linea.cantidad ?? 1;
+    newRow.querySelector(`[name="lineas[${rowIndex}][precio_unitario]"]`).value = linea.precio_unitario ?? '';
+    newRow.querySelector(`[name="lineas[${rowIndex}][subtotal]"]`).value = linea.subtotal ?? '';
     rowIndex++;
     attachEventsToRow(newRow);
+    updateTotals();
   }
 
   function attachEventsToRow(row) {
@@ -145,8 +166,12 @@
   document.getElementById("descuento").addEventListener("input", updateTotals);
   document.getElementById("transporte").addEventListener("input", updateTotals);
   document.getElementById("iva").addEventListener("input", updateTotals);
-  // Agregar al menos una fila por defecto
-  addRow();
+
+  if (lineasIniciales.length) {
+    lineasIniciales.forEach(addRow);
+  } else {
+    addRow();
+  }
 </script>
 </body>
 </html>

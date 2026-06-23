@@ -17,6 +17,38 @@ function allowRoles(...roles) {
   };
 }
 
+function toArray(value) {
+  if (!value) return [];
+  return Array.isArray(value) ? value : [value];
+}
+
+function parseFacturaRef(value) {
+  const raw = String(value || "");
+  const [tipo, id] = raw.includes(":") ? raw.split(":") : ["orden", raw];
+
+  if (!["orden", "independiente"].includes(tipo) || !/^\d+$/.test(String(id))) {
+    return null;
+  }
+
+  return { tipo, id };
+}
+
+function normalizarLineas(lineas) {
+  if (!lineas) return [];
+
+  const lineasArray = Array.isArray(lineas) ? lineas : Object.values(lineas);
+
+  return lineasArray
+    .map(linea => ({
+      codigo: linea.codigo || null,
+      descripcion: String(linea.descripcion || "").trim(),
+      cantidad: linea.cantidad || 0,
+      precio_unitario: linea.precio_unitario || 0,
+      subtotal: linea.subtotal || 0
+    }))
+    .filter(linea => linea.descripcion);
+}
+
 // ===================== FUNCIÓN PARA GENERAR NÚMERO DE PO =====================
 async function generarNumeroPO() {
   const año = new Date().getFullYear();
@@ -48,18 +80,29 @@ router.get("/proveedores/nuevo", requireAuth, allowRoles("ADMIN", "PROVEEDURIA_T
   res.render("compras/proveedor_form", { proveedor: null, user: req.session.user });
 });
 
+router.get("/proveedores/editar/:id", requireAuth, allowRoles("ADMIN", "PROVEEDURIA_TALLER"), async (req, res) => {
+  try {
+    const [[proveedor]] = await pool.query("SELECT * FROM proveedores WHERE id = ?", [req.params.id]);
+    if (!proveedor) return res.status(404).send("Proveedor no encontrado");
+    res.render("compras/proveedor_form", { proveedor, user: req.session.user });
+  } catch (error) {
+    console.error(error);
+    res.status(500).send("Error cargando proveedor");
+  }
+});
+
 router.post("/proveedores", requireAuth, allowRoles("ADMIN", "PROVEEDURIA_TALLER"), async (req, res) => {
   try {
-    const { id, nombre, direccion, telefono, email, contacto } = req.body;
+    const { id, nombre, direccion, telefono, email, contacto, cedula_juridica } = req.body;
     if (id) {
       await pool.query(
-        "UPDATE proveedores SET nombre=?, direccion=?, telefono=?, email=?, contacto=? WHERE id=?",
-        [nombre, direccion, telefono, email, contacto, id]
+        "UPDATE proveedores SET nombre=?, direccion=?, telefono=?, email=?, contacto=?, cedula_juridica=? WHERE id=?",
+        [nombre, direccion, telefono, email, contacto, cedula_juridica || null, id]
       );
     } else {
       await pool.query(
-        "INSERT INTO proveedores (nombre, direccion, telefono, email, contacto) VALUES (?,?,?,?,?)",
-        [nombre, direccion, telefono, email, contacto]
+        "INSERT INTO proveedores (nombre, direccion, telefono, email, contacto, cedula_juridica) VALUES (?,?,?,?,?,?)",
+        [nombre, direccion, telefono, email, contacto, cedula_juridica || null]
       );
     }
     res.redirect("/compras/proveedores");
@@ -86,6 +129,7 @@ router.get("/ordenes/nueva", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEED
     const siguientePO = await generarNumeroPO();
     res.render("compras/orden_form", {
       orden: null,
+      lineas: [],
       proveedores,
       user: req.session.user,
       siguientePO,
@@ -94,6 +138,29 @@ router.get("/ordenes/nueva", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEED
   } catch (error) {
     console.error(error);
     res.status(500).send("Error cargando formulario");
+  }
+});
+
+router.get("/ordenes/:id/editar", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER", "CONTABILIDAD"), async (req, res) => {
+  try {
+    const id = req.params.id;
+    const [[orden]] = await pool.query("SELECT * FROM ordenes_compra WHERE id = ?", [id]);
+    if (!orden) return res.status(404).send("Orden no encontrada");
+
+    const [proveedores] = await pool.query("SELECT id, nombre FROM proveedores ORDER BY nombre");
+    const [lineas] = await pool.query("SELECT * FROM ordenes_compra_detalle WHERE orden_compra_id = ? ORDER BY id", [id]);
+
+    res.render("compras/orden_form", {
+      orden,
+      lineas,
+      proveedores,
+      user: req.session.user,
+      siguientePO: orden.po_numero,
+      fechaActual: orden.fecha
+    });
+  } catch (error) {
+    console.error("Error cargando orden para editar:", error);
+    res.status(500).send("Error cargando orden");
   }
 });
 
@@ -106,6 +173,13 @@ router.post("/ordenes", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_
     const fecha = new Date().toISOString().slice(0, 10);
 
     const { proveedor_id, forma_pago, moneda, lineas, subtotal, descuento, transporte, iva, total, observaciones, empresa_destino } = req.body;
+    const lineasOrden = normalizarLineas(lineas);
+
+    if (!lineasOrden.length) {
+      await connection.rollback();
+      return res.status(400).send("Debe agregar al menos una línea a la orden");
+    }
+
     const [result] = await connection.query(
       `INSERT INTO ordenes_compra 
        (po_numero, fecha, proveedor_id, forma_pago, moneda, subtotal, descuento, transporte, iva, total, observaciones, creado_por, estado, empresa_destino) 
@@ -114,16 +188,13 @@ router.post("/ordenes", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_
     );
     const ordenId = result.insertId;
 
-    for (let key in lineas) {
-      if (lineas.hasOwnProperty(key)) {
-        const linea = lineas[key];
-        await connection.query(
-          `INSERT INTO ordenes_compra_detalle 
-           (orden_compra_id, codigo, descripcion, cantidad, precio_unitario, subtotal) 
-           VALUES (?,?,?,?,?,?)`,
-          [ordenId, linea.codigo || null, linea.descripcion, linea.cantidad, linea.precio_unitario, linea.subtotal]
-        );
-      }
+    for (const linea of lineasOrden) {
+      await connection.query(
+        `INSERT INTO ordenes_compra_detalle
+         (orden_compra_id, codigo, descripcion, cantidad, precio_unitario, subtotal)
+         VALUES (?,?,?,?,?,?)`,
+        [ordenId, linea.codigo, linea.descripcion, linea.cantidad, linea.precio_unitario, linea.subtotal]
+      );
     }
     await connection.commit();
     res.redirect("/compras/ordenes");
@@ -131,6 +202,64 @@ router.post("/ordenes", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_
     await connection.rollback();
     console.error(error);
     res.status(500).send("Error guardando orden");
+  } finally {
+    connection.release();
+  }
+});
+
+router.post("/ordenes/:id/editar", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER", "CONTABILIDAD"), async (req, res) => {
+  const connection = await pool.getConnection();
+  try {
+    await connection.beginTransaction();
+
+    const id = req.params.id;
+    const { proveedor_id, forma_pago, moneda, lineas, subtotal, descuento, transporte, iva, total, observaciones, empresa_destino } = req.body;
+    const lineasOrden = normalizarLineas(lineas);
+
+    if (!lineasOrden.length) {
+      await connection.rollback();
+      return res.status(400).send("Debe agregar al menos una línea a la orden");
+    }
+
+    const [[orden]] = await connection.query("SELECT id FROM ordenes_compra WHERE id = ?", [id]);
+    if (!orden) {
+      await connection.rollback();
+      return res.status(404).send("Orden no encontrada");
+    }
+
+    await connection.query(
+      `UPDATE ordenes_compra
+       SET proveedor_id = ?,
+           forma_pago = ?,
+           moneda = ?,
+           subtotal = ?,
+           descuento = ?,
+           transporte = ?,
+           iva = ?,
+           total = ?,
+           observaciones = ?,
+           empresa_destino = ?
+       WHERE id = ?`,
+      [proveedor_id, forma_pago, moneda, subtotal, descuento, transporte, iva, total, observaciones || null, empresa_destino || 'GAS TOMZA', id]
+    );
+
+    await connection.query("DELETE FROM ordenes_compra_detalle WHERE orden_compra_id = ?", [id]);
+
+    for (const linea of lineasOrden) {
+      await connection.query(
+        `INSERT INTO ordenes_compra_detalle
+         (orden_compra_id, codigo, descripcion, cantidad, precio_unitario, subtotal)
+         VALUES (?,?,?,?,?,?)`,
+        [id, linea.codigo, linea.descripcion, linea.cantidad, linea.precio_unitario, linea.subtotal]
+      );
+    }
+
+    await connection.commit();
+    res.redirect(`/compras/ordenes/${id}/detalle`);
+  } catch (error) {
+    await connection.rollback();
+    console.error("Error editando orden:", error);
+    res.status(500).send("Error editando orden");
   } finally {
     connection.release();
   }
@@ -354,6 +483,7 @@ router.post("/facturas/agregar", requireAuth, allowRoles("ADMIN", "TALLER", "PRO
 router.get("/facturas", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER", "CONTABILIDAD"), async (req, res) => {
   try {
     const { proveedor_id, fecha_desde, fecha_hasta, pagada, vencida } = req.query;
+    const orden = req.query.orden === 'asc' ? 'asc' : 'desc';
 
     let sqlOrdenes = `
       SELECT 
@@ -386,32 +516,38 @@ router.get("/facturas", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_
       FROM facturas f
       WHERE 1=1
     `;
-    const params = [];
+    const paramsOrdenes = [];
+    const paramsIndependientes = [];
 
     if (proveedor_id && proveedor_id !== '') {
       sqlOrdenes += ` AND o.proveedor_id = ?`;
       sqlIndependientes += ` AND f.proveedor_id = ?`;
-      params.push(proveedor_id, proveedor_id);
+      paramsOrdenes.push(proveedor_id);
+      paramsIndependientes.push(proveedor_id);
     }
     if (fecha_desde && fecha_desde !== '') {
       sqlOrdenes += ` AND o.fecha >= ?`;
       sqlIndependientes += ` AND f.fecha >= ?`;
-      params.push(fecha_desde, fecha_desde);
+      paramsOrdenes.push(fecha_desde);
+      paramsIndependientes.push(fecha_desde);
     }
     if (fecha_hasta && fecha_hasta !== '') {
       sqlOrdenes += ` AND o.fecha <= ?`;
       sqlIndependientes += ` AND f.fecha <= ?`;
-      params.push(fecha_hasta, fecha_hasta);
+      paramsOrdenes.push(fecha_hasta);
+      paramsIndependientes.push(fecha_hasta);
     }
     if (pagada !== undefined && pagada !== '') {
       const pagadaVal = pagada === '1' ? 1 : 0;
-      sqlOrdenes += ` AND o.pagada = ?`;
-      sqlIndependientes += ` AND f.pagada = ?`;
-      params.push(pagadaVal, pagadaVal);
+      sqlOrdenes += ` AND COALESCE(o.pagada, 0) = ?`;
+      sqlIndependientes += ` AND COALESCE(f.pagada, 0) = ?`;
+      paramsOrdenes.push(pagadaVal);
+      paramsIndependientes.push(pagadaVal);
     }
 
-    // 🔥 CAMBIO AQUÍ: ORDER BY fecha ASC (más antigua primero)
-    const finalSql = `(${sqlOrdenes}) UNION ALL (${sqlIndependientes}) ORDER BY fecha ASC`;
+    const orderDirection = orden === 'asc' ? 'ASC' : 'DESC';
+    const finalSql = `(${sqlOrdenes}) UNION ALL (${sqlIndependientes}) ORDER BY fecha ${orderDirection}, id ${orderDirection}`;
+    const params = [...paramsOrdenes, ...paramsIndependientes];
     const [facturasUnidas] = await pool.query(finalSql, params);
 
     const hoy = new Date();
@@ -427,12 +563,18 @@ router.get("/facturas", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_
     }
 
     const [proveedores] = await pool.query("SELECT id, nombre FROM proveedores ORDER BY nombre");
+    const success = req.session.success;
+    const error = req.session.error;
+    delete req.session.success;
+    delete req.session.error;
 
     res.render("compras/facturas", {
       facturas: facturasFiltradas,
       user: req.session.user,
       proveedores,
-      filtros: { proveedor_id, fecha_desde, fecha_hasta, pagada, vencida },
+      filtros: { proveedor_id, fecha_desde, fecha_hasta, pagada, vencida, orden },
+      success,
+      error,
       hoy: hoy.toISOString().slice(0, 10)
     });
   } catch (error) {
@@ -444,13 +586,32 @@ router.get("/facturas", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_
 router.post("/facturas/:id/pagar", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER", "CONTABILIDAD"), async (req, res) => {
   try {
     const id = req.params.id;
+    const { tipo } = req.body;
     const fechaPago = new Date().toISOString().slice(0, 10);
-    const [[orden]] = await pool.query("SELECT id FROM ordenes_compra WHERE id = ? AND facturada = 1", [id]);
-    if (orden) {
-      await pool.query("UPDATE ordenes_compra SET pagada = 1, fecha_pago = ? WHERE id = ?", [fechaPago, id]);
+
+    if (tipo === 'orden') {
+      const [result] = await pool.query(
+        "UPDATE ordenes_compra SET pagada = 1, fecha_pago = ? WHERE id = ? AND facturada = 1 AND COALESCE(pagada, 0) = 0",
+        [fechaPago, id]
+      );
+      if (!result.affectedRows) {
+        req.session.error = "La factura de orden no existe o ya estaba pagada.";
+        return res.redirect("/compras/facturas");
+      }
+    } else if (tipo === 'independiente') {
+      const [result] = await pool.query(
+        "UPDATE facturas SET pagada = 1, fecha_pago = ? WHERE id = ? AND COALESCE(pagada, 0) = 0",
+        [fechaPago, id]
+      );
+      if (!result.affectedRows) {
+        req.session.error = "La factura independiente no existe o ya estaba pagada.";
+        return res.redirect("/compras/facturas");
+      }
     } else {
-      await pool.query("UPDATE facturas SET pagada = 1, fecha_pago = ? WHERE id = ?", [fechaPago, id]);
+      req.session.error = "Tipo de factura inválido.";
+      return res.redirect("/compras/facturas");
     }
+
     req.session.success = "Factura marcada como pagada.";
     res.redirect("/compras/facturas");
   } catch (error) {
@@ -462,26 +623,74 @@ router.post("/facturas/:id/pagar", requireAuth, allowRoles("ADMIN", "TALLER", "P
 router.post("/facturas/pagar-multiple", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER", "CONTABILIDAD"), async (req, res) => {
   try {
     const { facturas_ids } = req.body;
-    if (!facturas_ids || !facturas_ids.length) {
+    const seleccionadas = toArray(facturas_ids).map(parseFacturaRef).filter(Boolean);
+
+    if (!seleccionadas.length) {
       req.session.error = "No seleccionó ninguna factura.";
       return res.redirect("/compras/facturas");
     }
+
     const fechaPago = new Date().toISOString().slice(0, 10);
-    const placeholders = facturas_ids.map(() => '?').join(',');
-    const [facturas] = await pool.query(`
-      SELECT o.id, o.po_numero, o.total, o.factura, o.fecha_vencimiento_factura, p.nombre as proveedor_nombre
-      FROM ordenes_compra o
-      JOIN proveedores p ON p.id = o.proveedor_id
-      WHERE o.id IN (${placeholders}) AND o.facturada = 1 AND o.pagada = 0
-    `, facturas_ids);
+    const ordenIds = seleccionadas.filter(f => f.tipo === 'orden').map(f => f.id);
+    const independientesIds = seleccionadas.filter(f => f.tipo === 'independiente').map(f => f.id);
+    const facturas = [];
+
+    if (ordenIds.length) {
+      const placeholders = ordenIds.map(() => '?').join(',');
+      const [ordenes] = await pool.query(`
+        SELECT
+          o.id,
+          o.po_numero,
+          o.total,
+          o.factura,
+          o.fecha_vencimiento_factura,
+          p.nombre as proveedor_nombre,
+          'orden' as tipo
+        FROM ordenes_compra o
+        JOIN proveedores p ON p.id = o.proveedor_id
+        WHERE o.id IN (${placeholders}) AND o.facturada = 1 AND COALESCE(o.pagada, 0) = 0
+      `, ordenIds);
+      facturas.push(...ordenes);
+    }
+
+    if (independientesIds.length) {
+      const placeholders = independientesIds.map(() => '?').join(',');
+      const [independientes] = await pool.query(`
+        SELECT
+          f.id,
+          NULL as po_numero,
+          f.monto as total,
+          f.numero_factura as factura,
+          NULL as fecha_vencimiento_factura,
+          f.proveedor_nombre,
+          'independiente' as tipo
+        FROM facturas f
+        WHERE f.id IN (${placeholders}) AND COALESCE(f.pagada, 0) = 0
+      `, independientesIds);
+      facturas.push(...independientes);
+    }
+
     if (facturas.length === 0) {
       req.session.error = "Las facturas seleccionadas ya estaban pagadas o no existen.";
       return res.redirect("/compras/facturas");
     }
-    await pool.query(
-      `UPDATE ordenes_compra SET pagada = 1, fecha_pago = ? WHERE id IN (${placeholders})`,
-      [fechaPago, ...facturas_ids]
-    );
+
+    if (ordenIds.length) {
+      const placeholders = ordenIds.map(() => '?').join(',');
+      await pool.query(
+        `UPDATE ordenes_compra SET pagada = 1, fecha_pago = ? WHERE id IN (${placeholders}) AND facturada = 1 AND COALESCE(pagada, 0) = 0`,
+        [fechaPago, ...ordenIds]
+      );
+    }
+
+    if (independientesIds.length) {
+      const placeholders = independientesIds.map(() => '?').join(',');
+      await pool.query(
+        `UPDATE facturas SET pagada = 1, fecha_pago = ? WHERE id IN (${placeholders}) AND COALESCE(pagada, 0) = 0`,
+        [fechaPago, ...independientesIds]
+      );
+    }
+
     const totalPagado = facturas.reduce((sum, f) => sum + parseFloat(f.total), 0);
     const ejs = require('ejs');
     const path = require('path');
