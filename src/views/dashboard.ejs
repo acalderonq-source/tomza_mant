@@ -63,36 +63,46 @@
   <hr>
 
   <!-- ================== CONTENIDO SEGÚN ROL ================== -->
+<% if (user.rol === 'CONTABILIDAD') { %>
 
-  <% if (user.rol === 'TRAMITES') { %>
-    <!-- DASHBOARD PARA TRAMITES: estadísticas y opciones MINAE -->
-    <div class="row mb-4">
-      <div class="col-12 col-md-4 mb-3 mb-md-0">
-        <div class="card card-stats bg-primary text-white">
-          <div class="card-body">
-            <h5 class="card-title">📋 Trámites pendientes</h5>
-            <p class="stat-number"><%= totalPendientes %></p>
-          </div>
-        </div>
-      </div>
-      <div class="col-12 col-md-4 mb-3 mb-md-0">
-        <div class="card card-stats bg-warning text-dark">
-          <div class="card-body">
-            <h5 class="card-title">⚠️ Por vencer (15 días)</h5>
-            <p class="stat-number"><%= porVencer %></p>
-          </div>
-        </div>
-      </div>
-      <div class="col-12 col-md-4">
-        <div class="card card-stats bg-info text-white">
-          <div class="card-body">
-            <h5 class="card-title">📅 Citas próximas</h5>
-            <p class="stat-number"><%= citasProximas.length %></p>
-          </div>
-        </div>
-      </div>
+  <div class="card shadow-sm mb-4">
+    <div class="card-header bg-primary text-white">
+      💼 Panel de Contabilidad
     </div>
 
+    <div class="card-body">
+      <h5>Órdenes de compra</h5>
+      <p class="text-muted">
+        Acceso únicamente para revisar órdenes de compra.
+      </p>
+
+      <a href="/compras/ordenes" class="btn btn-primary">
+        🛒 Ver Órdenes de Compra
+      </a>
+    </div>
+  </div>
+
+<% } else if (user.rol === 'TRAMITES') { %>
+  <% if (user.rol === 'CONTABILIDAD') { %>
+
+  <div class="card shadow-sm mb-4">
+    <div class="card-header bg-primary text-white">
+      💼 Panel de Contabilidad
+    </div>
+
+    <div class="card-body">
+      <h5>Órdenes de compra</h5>
+      <p class="text-muted">
+        Acceso únicamente para revisar órdenes de compra.
+      </p>
+
+      <a href="/compras/ordenes" class="btn btn-primary">
+        🛒 Ver Órdenes de Compra
+      </a>
+    </div>
+  </div>
+
+<% } else if (user.rol === 'TRAMITES') { %>
     <!-- Botones principales para trámites -->
     <div class="d-grid gap-2 col-12 col-md-4 mb-4">
       <a href="/minae" class="btn btn-warning">🏛️ Control MINAE</a>
