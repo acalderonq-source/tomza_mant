@@ -30,7 +30,9 @@
       <p class="page-subtitle">Detalle de encabezado, productos y resumen financiero.</p>
     </div>
     <div class="d-flex gap-2 flex-wrap">
-      <a href="/compras/ordenes/<%= orden.id %>/editar" class="btn btn-outline-warning btn-sm"><i class="bi bi-pencil"></i> Editar</a>
+      <% if (user.rol !== 'CONTABILIDAD') { %>
+        <a href="/compras/ordenes/<%= orden.id %>/editar" class="btn btn-outline-warning btn-sm"><i class="bi bi-pencil"></i> Editar</a>
+      <% } %>
       <a href="/compras/ordenes/<%= orden.id %>/pdf" class="btn btn-primary btn-sm"><i class="bi bi-file-pdf"></i> PDF</a>
     </div>
   </div>

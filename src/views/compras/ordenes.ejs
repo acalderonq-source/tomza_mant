@@ -170,14 +170,17 @@
 </nav>
 
 <div class="container py-4">
+  <% const puedeModificarCompras = user.rol !== 'CONTABILIDAD'; %>
   <div class="page-heading">
     <div>
       <h1 class="page-title">Órdenes de compra</h1>
       <p class="page-subtitle">Consulta, factura y da seguimiento a las órdenes registradas.</p>
     </div>
-    <a href="/compras/ordenes/nueva" class="btn btn-dark btn-sm">
-      <i class="bi bi-plus-lg"></i> Nueva orden
-    </a>
+    <% if (puedeModificarCompras) { %>
+      <a href="/compras/ordenes/nueva" class="btn btn-dark btn-sm">
+        <i class="bi bi-plus-lg"></i> Nueva orden
+      </a>
+    <% } %>
   </div>
 
   <!-- Filtros -->
@@ -259,9 +262,11 @@
     <div class="card-header-modern d-flex justify-content-between align-items-center flex-wrap">
       <span><i class="bi bi-receipt me-2"></i>Listado de Órdenes</span>
       <div>
-        <a href="/compras/dashboard" class="btn btn-outline-dark btn-sm me-2">
-          <i class="bi bi-graph-up"></i> Dashboard
-        </a>
+        <% if (puedeModificarCompras) { %>
+          <a href="/compras/dashboard" class="btn btn-outline-dark btn-sm me-2">
+            <i class="bi bi-graph-up"></i> Dashboard
+          </a>
+        <% } %>
         <a href="/compras/facturas" class="btn btn-outline-info btn-sm me-2">
           <i class="bi bi-receipt"></i> Facturas
         </a>
@@ -321,57 +326,60 @@
                   </button>
                   <div class="dropdown-menu dropdown-menu-end acciones-menu p-2">
                     <a href="/compras/ordenes/<%= orden.id %>/detalle" class="dropdown-item"><i class="bi bi-eye"></i> Ver detalle</a>
-                    <a href="/compras/ordenes/<%= orden.id %>/editar" class="dropdown-item"><i class="bi bi-pencil"></i> Editar orden</a>
                     <a href="/compras/ordenes/<%= orden.id %>/pdf" class="dropdown-item"><i class="bi bi-file-pdf"></i> Descargar PDF</a>
 
-                    <div class="dropdown-divider"></div>
+                    <% if (puedeModificarCompras) { %>
+                      <a href="/compras/ordenes/<%= orden.id %>/editar" class="dropdown-item"><i class="bi bi-pencil"></i> Editar orden</a>
 
-                    <% if (!orden.facturada) { %>
-                      <form method="POST" action="/compras/ordenes/<%= orden.id %>/factura" class="factura-mini px-2 py-1">
-                        <label>Número de factura</label>
-                        <div class="input-group input-group-sm">
-                          <input type="text" name="factura" class="form-control input-factura" placeholder="N°" required>
-                          <button type="submit" class="btn btn-primary"><i class="bi bi-receipt"></i></button>
-                        </div>
-                        <input type="hidden" name="proveedor_id" value="<%= proveedor_id %>">
-                        <input type="hidden" name="fecha_desde" value="<%= fecha_desde %>">
-                        <input type="hidden" name="fecha_hasta" value="<%= fecha_hasta %>">
-                        <input type="hidden" name="po_numero" value="<%= po_numero %>">
-                        <input type="hidden" name="estado" value="<%= estado %>">
-                        <input type="hidden" name="facturada" value="<%= facturada %>">
-                      </form>
-                    <% } else { %>
-                      <div class="px-2 py-1"><span class="badge bg-success">Facturada</span></div>
-                    <% } %>
+                      <div class="dropdown-divider"></div>
 
-                    <div class="dropdown-divider"></div>
+                      <% if (!orden.facturada) { %>
+                        <form method="POST" action="/compras/ordenes/<%= orden.id %>/factura" class="factura-mini px-2 py-1">
+                          <label>Número de factura</label>
+                          <div class="input-group input-group-sm">
+                            <input type="text" name="factura" class="form-control input-factura" placeholder="N°" required>
+                            <button type="submit" class="btn btn-primary"><i class="bi bi-receipt"></i></button>
+                          </div>
+                          <input type="hidden" name="proveedor_id" value="<%= proveedor_id %>">
+                          <input type="hidden" name="fecha_desde" value="<%= fecha_desde %>">
+                          <input type="hidden" name="fecha_hasta" value="<%= fecha_hasta %>">
+                          <input type="hidden" name="po_numero" value="<%= po_numero %>">
+                          <input type="hidden" name="estado" value="<%= estado %>">
+                          <input type="hidden" name="facturada" value="<%= facturada %>">
+                        </form>
+                      <% } else { %>
+                        <div class="px-2 py-1"><span class="badge bg-success">Facturada</span></div>
+                      <% } %>
 
-                    <% if (orden.estado !== 'RECIBIDA_TOTAL' && orden.estado !== 'RECIBIDA_PARCIAL') { %>
-                      <form method="POST" action="/compras/ordenes/<%= orden.id %>/recibir">
-                        <input type="hidden" name="proveedor_id" value="<%= proveedor_id %>">
-                        <input type="hidden" name="fecha_desde" value="<%= fecha_desde %>">
-                        <input type="hidden" name="fecha_hasta" value="<%= fecha_hasta %>">
-                        <input type="hidden" name="po_numero" value="<%= po_numero %>">
-                        <input type="hidden" name="estado" value="<%= estado %>">
-                        <input type="hidden" name="facturada" value="<%= facturada %>">
-                        <button type="submit" class="dropdown-item text-success" onclick="return confirm('¿Marcar esta orden como recibida?')">
-                          <i class="bi bi-check-circle"></i> Marcar recibido
-                        </button>
-                      </form>
+                      <div class="dropdown-divider"></div>
 
-                      <form method="POST" action="/compras/ordenes/<%= orden.id %>/eliminar">
-                        <input type="hidden" name="proveedor_id" value="<%= proveedor_id %>">
-                        <input type="hidden" name="fecha_desde" value="<%= fecha_desde %>">
-                        <input type="hidden" name="fecha_hasta" value="<%= fecha_hasta %>">
-                        <input type="hidden" name="po_numero" value="<%= po_numero %>">
-                        <input type="hidden" name="estado" value="<%= estado %>">
-                        <input type="hidden" name="facturada" value="<%= facturada %>">
-                        <button type="submit" class="dropdown-item text-danger" onclick="return confirm('¿Eliminar esta orden permanentemente?')">
-                          <i class="bi bi-trash"></i> Eliminar orden
-                        </button>
-                      </form>
-                    <% } else { %>
-                      <div class="px-2 py-1"><span class="badge bg-success">Recibido</span></div>
+                      <% if (orden.estado !== 'RECIBIDA_TOTAL' && orden.estado !== 'RECIBIDA_PARCIAL') { %>
+                        <form method="POST" action="/compras/ordenes/<%= orden.id %>/recibir">
+                          <input type="hidden" name="proveedor_id" value="<%= proveedor_id %>">
+                          <input type="hidden" name="fecha_desde" value="<%= fecha_desde %>">
+                          <input type="hidden" name="fecha_hasta" value="<%= fecha_hasta %>">
+                          <input type="hidden" name="po_numero" value="<%= po_numero %>">
+                          <input type="hidden" name="estado" value="<%= estado %>">
+                          <input type="hidden" name="facturada" value="<%= facturada %>">
+                          <button type="submit" class="dropdown-item text-success" onclick="return confirm('¿Marcar esta orden como recibida?')">
+                            <i class="bi bi-check-circle"></i> Marcar recibido
+                          </button>
+                        </form>
+
+                        <form method="POST" action="/compras/ordenes/<%= orden.id %>/eliminar">
+                          <input type="hidden" name="proveedor_id" value="<%= proveedor_id %>">
+                          <input type="hidden" name="fecha_desde" value="<%= fecha_desde %>">
+                          <input type="hidden" name="fecha_hasta" value="<%= fecha_hasta %>">
+                          <input type="hidden" name="po_numero" value="<%= po_numero %>">
+                          <input type="hidden" name="estado" value="<%= estado %>">
+                          <input type="hidden" name="facturada" value="<%= facturada %>">
+                          <button type="submit" class="dropdown-item text-danger" onclick="return confirm('¿Eliminar esta orden permanentemente?')">
+                            <i class="bi bi-trash"></i> Eliminar orden
+                          </button>
+                        </form>
+                      <% } else { %>
+                        <div class="px-2 py-1"><span class="badge bg-success">Recibido</span></div>
+                      <% } %>
                     <% } %>
                   </div>
                 </div>

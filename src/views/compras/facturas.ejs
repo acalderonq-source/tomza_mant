@@ -57,14 +57,17 @@
 </nav>
 
 <div class="container py-4">
+  <% const puedeModificarCompras = user.rol !== 'CONTABILIDAD'; %>
   <div class="page-heading">
     <div>
       <h1 class="page-title">Facturas de compras</h1>
       <p class="page-subtitle">Controla facturas pendientes, vencidas y pagos múltiples.</p>
     </div>
-    <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#agregarFacturaModal">
-      <i class="bi bi-plus-circle"></i> Agregar factura
-    </button>
+    <% if (puedeModificarCompras) { %>
+      <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#agregarFacturaModal">
+        <i class="bi bi-plus-circle"></i> Agregar factura
+      </button>
+    <% } %>
   </div>
 
   <!-- Mensajes flash -->
@@ -177,7 +180,9 @@
         <table class="table table-bordered table-hover table-facturas">
           <thead class="table-light">
             <tr>
-              <th style="width: 40px;"><input type="checkbox" id="seleccionarTodos"></th>
+              <% if (puedeModificarCompras) { %>
+                <th style="width: 40px;"><input type="checkbox" id="seleccionarTodos"></th>
+              <% } %>
               <th>PO Número</th>
               <th>Proveedor</th>
               <th>Fecha</th>
@@ -191,11 +196,13 @@
           <tbody>
             <% facturas.forEach(f => { %>
               <tr class="<%= f.vencida ? 'table-danger' : '' %>">
-                <td class="text-center">
-                  <% if (!f.pagada && (parseFloat(f.saldo ?? f.monto) > 0)) { %>
-                    <input type="checkbox" name="facturas_ids" value="<%= f.tipo %>:<%= f.id %>" class="check-factura" data-monto="<%= f.saldo ?? f.monto %>">
-                  <% } %>
-                </td>
+                <% if (puedeModificarCompras) { %>
+                  <td class="text-center">
+                    <% if (!f.pagada && (parseFloat(f.saldo ?? f.monto) > 0)) { %>
+                      <input type="checkbox" name="facturas_ids" value="<%= f.tipo %>:<%= f.id %>" class="check-factura" data-monto="<%= f.saldo ?? f.monto %>">
+                    <% } %>
+                  </td>
+                <% } %>
                 <td data-label="PO Número"><%= f.po_numero ? f.po_numero : '—' %></td>
                 <td data-label="Proveedor"><%= f.proveedor_nombre %></td>
                 <td data-label="Fecha"><%= new Date(f.fecha).toLocaleDateString('es-CR') %></td>
@@ -232,23 +239,27 @@
                   <% } %>
                 </td>
                 <td data-label="Acciones">
-                  <button
-                    type="button"
-                    class="btn btn-sm btn-outline-primary mb-1"
-                    data-bs-toggle="modal"
-                    data-bs-target="#nc-<%= f.tipo %>-<%= f.id %>">
-                    <i class="bi bi-journal-minus"></i> NC
-                  </button>
-                  <% if (!f.pagada && (parseFloat(f.saldo ?? f.monto) > 0)) { %>
+                  <% if (puedeModificarCompras) { %>
                     <button
-                      type="submit"
-                      form="pagar-factura-<%= f.tipo %>-<%= f.id %>"
-                      class="btn btn-sm btn-success"
-                      onclick="return confirm('¿Marcar esta factura como pagada?')">
-                      <i class="bi bi-check-circle"></i> Pagar
+                      type="button"
+                      class="btn btn-sm btn-outline-primary mb-1"
+                      data-bs-toggle="modal"
+                      data-bs-target="#nc-<%= f.tipo %>-<%= f.id %>">
+                      <i class="bi bi-journal-minus"></i> NC
                     </button>
+                    <% if (!f.pagada && (parseFloat(f.saldo ?? f.monto) > 0)) { %>
+                      <button
+                        type="submit"
+                        form="pagar-factura-<%= f.tipo %>-<%= f.id %>"
+                        class="btn btn-sm btn-success"
+                        onclick="return confirm('¿Marcar esta factura como pagada?')">
+                        <i class="bi bi-check-circle"></i> Pagar
+                      </button>
+                    <% } else { %>
+                      <span class="text-muted d-block"><%= f.cubierta_por_nc ? 'Sin saldo' : 'Pagada' %></span>
+                    <% } %>
                   <% } else { %>
-                    <span class="text-muted d-block"><%= f.cubierta_por_nc ? 'Sin saldo' : 'Pagada' %></span>
+                    <span class="badge bg-secondary">Solo lectura</span>
                   <% } %>
                   <% if (f.tiene_nc) { %>
                     <div class="nc-note mt-2">
@@ -260,39 +271,44 @@
               </tr>
             <% }) %>
             <% if (facturas.length === 0) { %>
-              <tr><td colspan="9" class="text-center py-4">No hay facturas con los filtros seleccionados</td></tr>
+              <tr><td colspan="<%= puedeModificarCompras ? 9 : 8 %>" class="text-center py-4">No hay facturas con los filtros seleccionados</td></tr>
             <% } %>
           </tbody>
         </table>
       </div>
-      <div class="d-flex justify-content-between align-items-center mt-3">
-        <div>
-          <button type="submit" class="btn btn-success" id="btnPagarSeleccionadas" disabled>
-            <i class="bi bi-check2-circle"></i> Pagar seleccionadas
-          </button>
+      <% if (puedeModificarCompras) { %>
+        <div class="d-flex justify-content-between align-items-center mt-3">
+          <div>
+            <button type="submit" class="btn btn-success" id="btnPagarSeleccionadas" disabled>
+              <i class="bi bi-check2-circle"></i> Pagar seleccionadas
+            </button>
+          </div>
+          <div class="total-seleccion">
+            <strong>Total seleccionado:</strong> <span id="totalSeleccionado">₡0,00</span>
+          </div>
         </div>
-        <div class="total-seleccion">
-          <strong>Total seleccionado:</strong> <span id="totalSeleccionado">₡0,00</span>
-        </div>
-      </div>
+      <% } %>
     </form>
 
-    <% facturas.forEach(f => { %>
-      <% if (!f.pagada && (parseFloat(f.saldo ?? f.monto) > 0)) { %>
-        <form
-          id="pagar-factura-<%= f.tipo %>-<%= f.id %>"
-          method="POST"
-          action="/compras/facturas/<%= f.id %>/pagar"
-          class="d-none">
-          <input type="hidden" name="tipo" value="<%= f.tipo %>">
-        </form>
-      <% } %>
-    <% }) %>
+    <% if (puedeModificarCompras) { %>
+      <% facturas.forEach(f => { %>
+        <% if (!f.pagada && (parseFloat(f.saldo ?? f.monto) > 0)) { %>
+          <form
+            id="pagar-factura-<%= f.tipo %>-<%= f.id %>"
+            method="POST"
+            action="/compras/facturas/<%= f.id %>/pagar"
+            class="d-none">
+            <input type="hidden" name="tipo" value="<%= f.tipo %>">
+          </form>
+        <% } %>
+      <% }) %>
+    <% } %>
   </div>
 </div>
 
-<% facturas.forEach(f => { %>
-  <div class="modal fade" id="nc-<%= f.tipo %>-<%= f.id %>" tabindex="-1" aria-hidden="true">
+<% if (puedeModificarCompras) { %>
+  <% facturas.forEach(f => { %>
+    <div class="modal fade" id="nc-<%= f.tipo %>-<%= f.id %>" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog">
       <div class="modal-content">
         <form method="POST" action="/compras/facturas/<%= f.id %>/nota-credito">
@@ -336,11 +352,13 @@
         </form>
       </div>
     </div>
-  </div>
-<% }) %>
+    </div>
+  <% }) %>
+<% } %>
 
 <!-- Modal para agregar factura manualmente (PO opcional, proveedor desde selector) -->
-<div class="modal fade" id="agregarFacturaModal" tabindex="-1" aria-labelledby="agregarFacturaModalLabel" aria-hidden="true">
+<% if (puedeModificarCompras) { %>
+  <div class="modal fade" id="agregarFacturaModal" tabindex="-1" aria-labelledby="agregarFacturaModalLabel" aria-hidden="true">
   <div class="modal-dialog">
     <div class="modal-content">
       <div class="modal-header">
@@ -384,7 +402,8 @@
       </form>
     </div>
   </div>
-</div>
+  </div>
+<% } %>
 
 <script>
   const checkboxes = document.querySelectorAll('.check-factura');
@@ -393,6 +412,7 @@
   const selectTodos = document.getElementById('seleccionarTodos');
 
   function actualizarTotal() {
+    if (!btnPagar || !totalSpan) return;
     let total = 0;
     let seleccionadas = 0;
     checkboxes.forEach(cb => {
