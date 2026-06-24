@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Reporte de órdenes de compra</title>
+  <style>
+    @page {
+      size: Letter landscape;
+      margin: 8mm;
+    }
+    body {
+      color: #111827;
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 10px;
+      margin: 0;
+    }
+    .header {
+      align-items: flex-start;
+      border-bottom: 3px solid #111827;
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 12px;
+      padding-bottom: 10px;
+    }
+    .title {
+      font-size: 20px;
+      font-weight: 800;
+      margin: 0 0 3px;
+    }
+    .subtitle {
+      color: #64748b;
+      font-size: 11px;
+    }
+    .meta {
+      text-align: right;
+    }
+    .filters {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      display: table;
+      margin-bottom: 12px;
+      padding: 8px;
+      width: 100%;
+    }
+    .filter-item {
+      display: table-cell;
+      padding-right: 10px;
+    }
+    .label {
+      color: #64748b;
+      font-size: 9px;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+    .value {
+      font-weight: 700;
+      margin-top: 2px;
+    }
+    table {
+      border-collapse: collapse;
+      width: 100%;
+    }
+    th {
+      background: #111827;
+      color: #fff;
+      font-size: 9px;
+      padding: 6px 5px;
+      text-align: left;
+      text-transform: uppercase;
+    }
+    td {
+      border-bottom: 1px solid #dbe3ef;
+      padding: 6px 5px;
+      vertical-align: top;
+    }
+    .money {
+      text-align: right;
+      white-space: nowrap;
+    }
+    .estado {
+      border-radius: 999px;
+      display: inline-block;
+      font-size: 8px;
+      font-weight: 800;
+      padding: 3px 6px;
+    }
+    .estado-borrador { background: #e5e7eb; color: #374151; }
+    .estado-enviada { background: #dbeafe; color: #1d4ed8; }
+    .estado-recibida { background: #dcfce7; color: #166534; }
+    .observacion-row td {
+      background: #fbfdff;
+      color: #334155;
+      font-size: 9.5px;
+      padding-top: 4px;
+    }
+    .observacion-label {
+      color: #64748b;
+      font-weight: 800;
+      margin-right: 5px;
+    }
+    .total {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 800;
+      margin-top: 12px;
+      padding: 9px;
+      text-align: right;
+    }
+    .empty {
+      color: #64748b;
+      padding: 18px;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div>
+      <h1 class="title">Reporte de órdenes de compra</h1>
+      <div class="subtitle">Gas Tomza · Sistema de compras</div>
+    </div>
+    <div class="meta">
+      <div class="label">Generado</div>
+      <div class="value"><%= fechaGeneracion %></div>
+      <div class="subtitle"><%= ordenes.length %> orden<%= ordenes.length === 1 ? '' : 'es' %></div>
+    </div>
+  </div>
+
+  <div class="filters">
+    <div class="filter-item">
+      <div class="label">Proveedor</div>
+      <div class="value"><%= filtros.proveedor_nombre || 'Todos' %></div>
+    </div>
+    <div class="filter-item">
+      <div class="label">Desde</div>
+      <div class="value"><%= filtros.fecha_desde || '—' %></div>
+    </div>
+    <div class="filter-item">
+      <div class="label">Hasta</div>
+      <div class="value"><%= filtros.fecha_hasta || '—' %></div>
+    </div>
+    <div class="filter-item">
+      <div class="label">PO</div>
+      <div class="value"><%= filtros.po_numero || 'Todos' %></div>
+    </div>
+    <div class="filter-item">
+      <div class="label">Estado</div>
+      <div class="value"><%= filtros.estado ? filtros.estado.replace('_', ' ') : 'Todos' %></div>
+    </div>
+    <div class="filter-item">
+      <div class="label">Facturada</div>
+      <div class="value"><%= filtros.facturada === '1' ? 'Sí' : filtros.facturada === '0' ? 'No' : 'Todas' %></div>
+    </div>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>PO</th>
+        <th>Fecha</th>
+        <th>Proveedor</th>
+        <th>Empresa</th>
+        <th>Pago</th>
+        <th>Moneda</th>
+        <th class="money">Subtotal</th>
+        <th class="money">Desc.</th>
+        <th class="money">Transporte</th>
+        <th class="money">IVA</th>
+        <th class="money">Total</th>
+        <th>Factura</th>
+        <th>Estado</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% ordenes.forEach(orden => { %>
+        <tr>
+          <td><strong><%= orden.po_numero %></strong></td>
+          <td><%= new Date(orden.fecha).toLocaleDateString('es-CR') %></td>
+          <td><%= orden.proveedor_nombre %></td>
+          <td><%= orden.empresa_destino || 'GAS TOMZA' %></td>
+          <td><%= orden.forma_pago || '—' %></td>
+          <td><%= orden.moneda || '—' %></td>
+          <td class="money"><%= Number(orden.subtotal || 0).toLocaleString('es-CR') %></td>
+          <td class="money"><%= Number(orden.descuento || 0).toLocaleString('es-CR') %>%</td>
+          <td class="money"><%= Number(orden.transporte || 0).toLocaleString('es-CR') %></td>
+          <td class="money"><%= Number(orden.iva || 0).toLocaleString('es-CR') %>%</td>
+          <td class="money"><strong><%= Number(orden.total || 0).toLocaleString('es-CR') %></strong></td>
+          <td><%= orden.factura || '—' %></td>
+          <td>
+            <span class="estado <%= orden.estado === 'BORRADOR' ? 'estado-borrador' : orden.estado === 'ENVIADA' ? 'estado-enviada' : 'estado-recibida' %>">
+              <%= String(orden.estado || '').replace('_', ' ') %>
+            </span>
+          </td>
+        </tr>
+        <tr class="observacion-row">
+          <td colspan="13">
+            <span class="observacion-label">Observación:</span><%= orden.observaciones || 'Sin observaciones' %>
+          </td>
+        </tr>
+      <% }) %>
+      <% if (!ordenes.length) { %>
+        <tr>
+          <td colspan="13" class="empty">No hay órdenes con los filtros seleccionados.</td>
+        </tr>
+      <% } %>
+    </tbody>
+  </table>
+
+  <div class="total">Total filtrado: ₡<%= Number(totalFiltrado || 0).toLocaleString('es-CR') %></div>
+</body>
+</html>

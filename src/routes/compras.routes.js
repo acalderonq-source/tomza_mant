@@ -100,6 +100,45 @@ async function generarNumeroPO() {
   return `${año}-${consecutivo.toString().padStart(3, '0')}`;
 }
 
+function construirConsultaOrdenes(filtros = {}) {
+  const { proveedor_id, fecha_desde, fecha_hasta, po_numero, estado, facturada } = filtros;
+  let sql = `
+    SELECT o.*, p.nombre as proveedor_nombre
+    FROM ordenes_compra o
+    JOIN proveedores p ON p.id = o.proveedor_id
+    WHERE 1=1
+  `;
+  const params = [];
+
+  if (proveedor_id && proveedor_id !== '') {
+    sql += ` AND o.proveedor_id = ?`;
+    params.push(proveedor_id);
+  }
+  if (fecha_desde && fecha_desde !== '') {
+    sql += ` AND o.fecha >= ?`;
+    params.push(fecha_desde);
+  }
+  if (fecha_hasta && fecha_hasta !== '') {
+    sql += ` AND o.fecha <= ?`;
+    params.push(fecha_hasta);
+  }
+  if (po_numero && po_numero !== '') {
+    sql += ` AND o.po_numero LIKE ?`;
+    params.push(`%${po_numero}%`);
+  }
+  if (estado && estado !== '') {
+    sql += ` AND o.estado = ?`;
+    params.push(estado);
+  }
+  if (facturada !== undefined && facturada !== '') {
+    sql += ` AND o.facturada = ?`;
+    params.push(facturada === '1' ? 1 : 0);
+  }
+
+  sql += ` ORDER BY o.fecha DESC, o.id DESC`;
+  return { sql, params };
+}
+
 // ===================== PROVEEDORES =====================
 router.get("/proveedores", requireAuth, allowRoles("ADMIN", "PROVEEDURIA_TALLER"), async (req, res) => {
   try {
@@ -303,41 +342,7 @@ router.post("/ordenes/:id/editar", requireAuth, allowRoles("ADMIN", "TALLER", "P
 router.get("/ordenes", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER", "CONTABILIDAD"), async (req, res) => {
   try {
     const { proveedor_id, fecha_desde, fecha_hasta, po_numero, estado, facturada } = req.query;
-
-    let sql = `
-      SELECT o.*, p.nombre as proveedor_nombre 
-      FROM ordenes_compra o
-      JOIN proveedores p ON p.id = o.proveedor_id
-      WHERE 1=1
-    `;
-    const params = [];
-
-    if (proveedor_id && proveedor_id !== '') {
-      sql += ` AND o.proveedor_id = ?`;
-      params.push(proveedor_id);
-    }
-    if (fecha_desde && fecha_desde !== '') {
-      sql += ` AND o.fecha >= ?`;
-      params.push(fecha_desde);
-    }
-    if (fecha_hasta && fecha_hasta !== '') {
-      sql += ` AND o.fecha <= ?`;
-      params.push(fecha_hasta);
-    }
-    if (po_numero && po_numero !== '') {
-      sql += ` AND o.po_numero LIKE ?`;
-      params.push(`%${po_numero}%`);
-    }
-    if (estado && estado !== '') {
-      sql += ` AND o.estado = ?`;
-      params.push(estado);
-    }
-    if (facturada !== undefined && facturada !== '') {
-      sql += ` AND o.facturada = ?`;
-      params.push(facturada === '1' ? 1 : 0);
-    }
-
-    sql += ` ORDER BY o.fecha DESC, o.id DESC`;
+    const { sql, params } = construirConsultaOrdenes({ proveedor_id, fecha_desde, fecha_hasta, po_numero, estado, facturada });
 
     const [ordenes] = await pool.query(sql, params);
     const [proveedores] = await pool.query("SELECT id, nombre FROM proveedores ORDER BY nombre");
@@ -357,6 +362,50 @@ router.get("/ordenes", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_T
   } catch (error) {
     console.error(error);
     res.status(500).send("Error");
+  }
+});
+
+router.get("/ordenes/reporte/pdf", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER", "CONTABILIDAD"), async (req, res) => {
+  try {
+    const { proveedor_id, fecha_desde, fecha_hasta, po_numero, estado, facturada } = req.query;
+    const filtros = { proveedor_id, fecha_desde, fecha_hasta, po_numero, estado, facturada };
+    const { sql, params } = construirConsultaOrdenes(filtros);
+    const [ordenes] = await pool.query(sql, params);
+
+    const [[proveedorFiltro]] = proveedor_id
+      ? await pool.query("SELECT nombre FROM proveedores WHERE id = ?", [proveedor_id])
+      : [[null]];
+
+    const totalFiltrado = ordenes.reduce((sum, orden) => sum + (parseFloat(orden.total) || 0), 0);
+    const ejs = require("ejs");
+    const path = require("path");
+    const fs = require("fs");
+    const pdf = require("html-pdf");
+    const tmpDir = path.join(process.cwd(), "tmp");
+    fs.mkdirSync(tmpDir, { recursive: true });
+
+    const html = await ejs.renderFile(path.join(__dirname, "../views/compras/ordenes_reporte_pdf.ejs"), {
+      ordenes,
+      filtros: {
+        ...filtros,
+        proveedor_nombre: proveedorFiltro ? proveedorFiltro.nombre : null
+      },
+      totalFiltrado,
+      fechaGeneracion: new Date().toLocaleString("es-CR")
+    });
+
+    pdf.create(html, { format: "Letter", orientation: "landscape", border: "8mm", directory: tmpDir }).toBuffer((err, buffer) => {
+      if (err) {
+        console.error("Error generando reporte de órdenes:", err);
+        return res.status(500).send("Error al generar reporte");
+      }
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", `attachment; filename=reporte_ordenes_${new Date().toISOString().slice(0, 19).replace(/:/g, "-")}.pdf`);
+      res.send(buffer);
+    });
+  } catch (error) {
+    console.error("Error descargando reporte de órdenes:", error);
+    res.status(500).send("Error descargando reporte");
   }
 });
 
