@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Solicitudes de Llantas</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <link rel="stylesheet" href="/css/mantenimientos.css">
+  <style>
+    .status-flow {
+      display: flex;
+      flex-wrap: wrap;
+      gap: .35rem;
+    }
+    .status-chip {
+      background: #e2e8f0;
+      border-radius: 999px;
+      color: #475569;
+      font-size: .75rem;
+      font-weight: 800;
+      padding: .35rem .6rem;
+    }
+    .status-chip.active {
+      background: #dcfce7;
+      color: #166534;
+    }
+    .quote-box {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      padding: .75rem;
+    }
+    .llantas-list {
+      display: grid;
+      gap: 1rem;
+      padding: 1rem;
+    }
+    .llanta-card {
+      background: #fff;
+      border: 1px solid #e2e8f0;
+      border-radius: 16px;
+      box-shadow: 0 10px 24px rgba(15, 23, 42, 0.05);
+      padding: 1rem;
+    }
+    .llanta-card-header {
+      align-items: flex-start;
+      display: flex;
+      gap: .75rem;
+      justify-content: space-between;
+      margin-bottom: .85rem;
+    }
+    .llanta-title {
+      color: #111827;
+      font-size: 1rem;
+      font-weight: 850;
+      margin: 0;
+    }
+    .llanta-meta {
+      color: #64748b;
+      font-size: .82rem;
+      margin-top: .15rem;
+    }
+    .llanta-grid {
+      display: grid;
+      gap: .75rem;
+      grid-template-columns: 1.2fr 1fr 1fr 1fr;
+    }
+    .llanta-field {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      padding: .75rem;
+    }
+    .llanta-label {
+      color: #64748b;
+      font-size: .72rem;
+      font-weight: 850;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+    }
+    .llanta-value {
+      color: #111827;
+      font-weight: 750;
+      margin-top: .2rem;
+    }
+    .llanta-actions {
+      align-items: center;
+      display: flex;
+      flex-wrap: wrap;
+      gap: .5rem;
+      justify-content: flex-end;
+      margin-top: .85rem;
+    }
+    .cotizar-panel {
+      border-top: 1px solid #e2e8f0;
+      margin-top: .85rem;
+      padding-top: .85rem;
+    }
+    .week-section {
+      display: grid;
+      gap: .75rem;
+    }
+    .week-heading {
+      align-items: center;
+      background: #f1f5f9;
+      border: 1px solid #e2e8f0;
+      border-radius: 14px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: .5rem;
+      justify-content: space-between;
+      padding: .75rem 1rem;
+    }
+    .week-title {
+      color: #111827;
+      font-size: .95rem;
+      font-weight: 850;
+      margin: 0;
+    }
+    .week-count {
+      background: #111827;
+      border-radius: 999px;
+      color: #fff;
+      font-size: .75rem;
+      font-weight: 800;
+      padding: .35rem .65rem;
+    }
+    .week-actions {
+      align-items: center;
+      display: flex;
+      flex-wrap: wrap;
+      gap: .5rem;
+    }
+    .bulk-panel {
+      background: #fff;
+      border: 1px solid #e2e8f0;
+      border-radius: 14px;
+      padding: 1rem;
+    }
+    .bulk-row {
+      align-items: center;
+      border-bottom: 1px solid #e2e8f0;
+      display: grid;
+      gap: .75rem;
+      grid-template-columns: 34px 1.4fr 1fr 1fr;
+      padding: .75rem 0;
+    }
+    .bulk-row:last-child {
+      border-bottom: 0;
+    }
+    .bulk-title {
+      color: #111827;
+      font-weight: 800;
+    }
+    .bulk-meta {
+      color: #64748b;
+      font-size: .8rem;
+    }
+    @media (max-width: 1100px) {
+      .llanta-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+    @media (max-width: 640px) {
+      .llanta-card-header {
+        flex-direction: column;
+      }
+      .llanta-grid {
+        grid-template-columns: 1fr;
+      }
+      .llanta-actions {
+        justify-content: stretch;
+      }
+      .llanta-actions .btn,
+      .llanta-actions form {
+        width: 100%;
+      }
+      .bulk-row {
+        grid-template-columns: 28px 1fr;
+      }
+      .bulk-row .form-control {
+        grid-column: 2;
+      }
+    }
+  </style>
+</head>
+<body>
+
+<%
+  const total = solicitudes.length;
+  const pendientes = solicitudes.filter(s => s.estado === 'SOLICITADA').length;
+  const cotizadas = solicitudes.filter(s => s.estado === 'COTIZADA').length;
+  const compradas = solicitudes.filter(s => s.estado === 'COMPRADA').length;
+  const recibidas = solicitudes.filter(s => s.estado === 'RECIBIDA').length;
+  const puedeSolicitar = ['ADMIN', 'SUPERVISOR_PESADO', 'TALLER', 'MECANICO'].includes(user.rol);
+  const badgeEstado = (estado) => {
+    if (estado === 'RECIBIDA') return 'badge-closed';
+    if (estado === 'COMPRADA') return 'badge-today';
+    if (estado === 'COTIZADA') return 'badge-priority';
+    return 'badge-open';
+  };
+  const fechaCorta = (date) => new Date(date).toLocaleDateString('es-CR');
+  const inicioSemana = (date) => {
+    const inicio = new Date(date);
+    const dia = (inicio.getDay() + 6) % 7;
+    inicio.setHours(0, 0, 0, 0);
+    inicio.setDate(inicio.getDate() - dia);
+    return inicio;
+  };
+  const llaveSemana = (date) => {
+    const inicio = inicioSemana(date);
+    return `${inicio.getFullYear()}-${String(inicio.getMonth() + 1).padStart(2, '0')}-${String(inicio.getDate()).padStart(2, '0')}`;
+  };
+  const finSemana = (date) => {
+    const fin = new Date(inicioSemana(date));
+    fin.setDate(fin.getDate() + 6);
+    return fin;
+  };
+  const ordenEstado = (estado) => estados.indexOf(estado) === -1 ? 99 : estados.indexOf(estado);
+  const gruposSemana = [];
+  [...solicitudes]
+    .sort((a, b) => new Date(b.fecha_solicitud) - new Date(a.fecha_solicitud) || ordenEstado(a.estado) - ordenEstado(b.estado))
+    .forEach(s => {
+      const key = llaveSemana(s.fecha_solicitud);
+      let grupo = gruposSemana.find(item => item.key === key);
+      if (!grupo) {
+        const inicio = inicioSemana(s.fecha_solicitud);
+        grupo = {
+          key,
+          inicio,
+          fin: finSemana(s.fecha_solicitud),
+          solicitudes: []
+        };
+        gruposSemana.push(grupo);
+      }
+      grupo.solicitudes.push(s);
+    });
+  const cotizacionSemanaUrl = (grupo) => {
+    const params = new URLSearchParams();
+    params.set('semana', grupo.key);
+    if (filtros.sede) params.set('sede', filtros.sede);
+    if (filtros.placa) params.set('placa', filtros.placa);
+    return `/llantas/cotizacion.pdf?${params.toString()}`;
+  };
+%>
+
+<nav class="navbar navbar-dark px-3 py-2">
+  <span class="navbar-brand fw-semibold"><i class="bi bi-circle"></i> Solicitudes de Llantas</span>
+  <div class="text-white">
+    <%= user.usuario %> (<%= user.rol %>)
+    <a href="/dashboard" class="btn btn-outline-light btn-sm ms-2">Dashboard</a>
+  </div>
+</nav>
+
+<div class="container-fluid py-4">
+  <div class="page-heading">
+    <div>
+      <h1 class="page-title">Solicitud de llantas</h1>
+      <p class="page-subtitle">Supervisores solicitan por placa y taller/proveeduría da seguimiento a cotización, compra y llegada.</p>
+    </div>
+    <div class="d-flex flex-wrap gap-2 justify-content-end">
+      <% if (puedeSolicitar) { %>
+        <button class="btn btn-danger btn-sm" data-bs-toggle="modal" data-bs-target="#solicitudModal">
+          <i class="bi bi-plus-circle"></i> Nueva solicitud
+        </button>
+      <% } %>
+    </div>
+  </div>
+
+  <div class="summary-grid">
+    <div class="summary-card">
+      <div class="summary-label">Solicitudes</div>
+      <div class="summary-value"><%= total %></div>
+    </div>
+    <div class="summary-card">
+      <div class="summary-label">Pendientes</div>
+      <div class="summary-value"><%= pendientes %></div>
+    </div>
+    <div class="summary-card">
+      <div class="summary-label">Cotizadas</div>
+      <div class="summary-value"><%= cotizadas %></div>
+    </div>
+    <div class="summary-card">
+      <div class="summary-label">Compradas / recibidas</div>
+      <div class="summary-value"><%= compradas %> / <%= recibidas %></div>
+    </div>
+  </div>
+
+  <div class="filters-card">
+    <form method="GET" action="/llantas" class="row g-3">
+      <div class="col-md-3">
+        <label class="form-label small">Sede</label>
+        <select name="sede" class="form-select form-select-sm">
+          <option value="">Todas permitidas</option>
+          <% sedesPermitidas.forEach(sede => { %>
+            <option value="<%= sede %>" <%= filtros.sede === sede ? 'selected' : '' %>><%= sede %></option>
+          <% }) %>
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label small">Estado</label>
+        <select name="estado" class="form-select form-select-sm">
+          <option value="">Todos</option>
+          <% estados.forEach(estado => { %>
+            <option value="<%= estado %>" <%= filtros.estado === estado ? 'selected' : '' %>><%= estado.replace('_', ' ') %></option>
+          <% }) %>
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label small">Placa</label>
+        <input type="text" name="placa" class="form-control form-control-sm" value="<%= filtros.placa || '' %>" placeholder="Buscar placa">
+      </div>
+      <div class="col-md-2 d-flex align-items-end">
+        <button class="btn btn-dark btn-sm w-100"><i class="bi bi-funnel"></i> Filtrar</button>
+      </div>
+      <div class="col-md-1 d-flex align-items-end">
+        <a href="/llantas" class="btn btn-secondary btn-sm w-100">Limpiar</a>
+      </div>
+    </form>
+  </div>
+
+  <div class="surface-card">
+    <div class="p-3 border-bottom">
+      <h2 class="page-title fs-5">Listado de solicitudes</h2>
+      <p class="page-subtitle">Vista por las sedes permitidas para el usuario.</p>
+    </div>
+    <div class="llantas-list">
+      <% if (!solicitudes.length) { %>
+        <div class="empty-state">No hay solicitudes de llantas con los filtros seleccionados.</div>
+      <% } %>
+
+      <% gruposSemana.forEach((grupo, grupoIndex) => { %>
+        <%
+          const pendientesCotizarSemana = grupo.solicitudes.filter(s => s.estado === 'SOLICITADA');
+          const pendientesComprarSemana = grupo.solicitudes.filter(s => ['SOLICITADA', 'COTIZADA'].includes(s.estado));
+          const collapseId = grupo.key.replace(/-/g, '');
+          const modalId = `cotizacionSemana${collapseId}`;
+        %>
+        <section class="week-section">
+          <div class="week-heading">
+            <div>
+              <h3 class="week-title">Cotización <%= grupoIndex + 1 %></h3>
+              <div class="bulk-meta">Semana del <%= fechaCorta(grupo.inicio) %> al <%= fechaCorta(grupo.fin) %></div>
+            </div>
+            <div class="week-actions">
+              <span class="week-count"><%= grupo.solicitudes.length %> solicitud<%= grupo.solicitudes.length === 1 ? '' : 'es' %></span>
+              <button class="btn btn-sm btn-dark" type="button" data-bs-toggle="modal" data-bs-target="#<%= modalId %>">
+                Desplegar
+              </button>
+            </div>
+          </div>
+
+          <div class="modal fade" id="<%= modalId %>" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-xl modal-dialog-scrollable">
+              <div class="modal-content">
+                <div class="modal-header">
+                  <div>
+                    <h5 class="modal-title">Cotización <%= grupoIndex + 1 %></h5>
+                    <div class="bulk-meta">Semana del <%= fechaCorta(grupo.inicio) %> al <%= fechaCorta(grupo.fin) %></div>
+                  </div>
+                  <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                  <div class="week-actions mb-3">
+                    <a href="<%= cotizacionSemanaUrl(grupo) %>" class="btn btn-sm btn-outline-dark">
+                      <i class="bi bi-file-earmark-pdf me-1"></i> Descargar cotización semana
+                    </a>
+                    <% if (puedeCotizar && pendientesCotizarSemana.length) { %>
+                      <button class="btn btn-sm btn-primary" type="button" data-bs-toggle="collapse" data-bs-target="#cotizarSemana<%= collapseId %>">
+                        Cotizar semana
+                      </button>
+                    <% } %>
+                    <% if (puedeComprar && pendientesComprarSemana.length) { %>
+                      <button class="btn btn-sm btn-success" type="button" data-bs-toggle="collapse" data-bs-target="#comprarSemana<%= collapseId %>">
+                        Comprar semana
+                      </button>
+                    <% } %>
+                  </div>
+
+                  <% if (puedeCotizar && pendientesCotizarSemana.length) { %>
+                    <div class="collapse mb-3" id="cotizarSemana<%= collapseId %>">
+                      <form method="POST" action="/llantas/cotizar-multiple" class="bulk-panel">
+                        <input type="hidden" name="sede" value="<%= filtros.sede || '' %>">
+                        <input type="hidden" name="estado" value="<%= filtros.estado || '' %>">
+                        <input type="hidden" name="placa" value="<%= filtros.placa || '' %>">
+                        <h4 class="page-title fs-6 mb-1">Cotizar pendientes de la semana</h4>
+                        <p class="page-subtitle mb-2">Todas vienen marcadas. Desmarque las que no se van a cotizar.</p>
+                        <% pendientesCotizarSemana.forEach(s => { %>
+                          <div class="bulk-row">
+                            <input class="form-check-input" type="checkbox" name="solicitud_ids" value="<%= s.id %>" checked>
+                            <div>
+                              <div class="bulk-title">#<%= s.id %> · <%= s.placa %></div>
+                              <div class="bulk-meta"><%= s.sede %> · <%= s.cantidad %> x <%= s.medida %></div>
+                            </div>
+                            <div class="bulk-meta"><%= s.posicion || 'Sin posición' %></div>
+                            <div class="bulk-meta"><%= s.motivo || 'Sin motivo' %></div>
+                          </div>
+                        <% }) %>
+                        <div class="d-flex justify-content-end mt-3">
+                          <button class="btn btn-primary btn-sm" onclick="return confirm('¿Cotizar las solicitudes seleccionadas de esta semana?')">
+                            Cotizar seleccionadas
+                          </button>
+                        </div>
+                      </form>
+                    </div>
+                  <% } %>
+
+                  <% if (puedeComprar && pendientesComprarSemana.length) { %>
+                    <div class="collapse mb-3" id="comprarSemana<%= collapseId %>">
+                      <form method="POST" action="/llantas/comprar-multiple" class="bulk-panel">
+                        <input type="hidden" name="sede" value="<%= filtros.sede || '' %>">
+                        <input type="hidden" name="estado" value="<%= filtros.estado || '' %>">
+                        <input type="hidden" name="placa" value="<%= filtros.placa || '' %>">
+                        <h4 class="page-title fs-6 mb-1">Comprar solicitudes de la semana</h4>
+                        <p class="page-subtitle mb-2">Todas vienen marcadas. Desmarque las que no se van a comprar.</p>
+                        <% pendientesComprarSemana.forEach(s => { %>
+                          <label class="bulk-row">
+                            <input class="form-check-input" type="checkbox" name="solicitud_ids" value="<%= s.id %>" checked>
+                            <div>
+                              <div class="bulk-title">#<%= s.id %> · <%= s.placa %></div>
+                              <div class="bulk-meta"><%= s.sede %> · <%= s.cantidad %> x <%= s.medida %> · <%= s.estado %></div>
+                            </div>
+                            <div class="bulk-meta"><%= s.fecha_cotizada ? `Cotizada ${fechaCorta(s.fecha_cotizada)}` : 'Sin cotizar' %></div>
+                            <div class="bulk-meta"><%= s.motivo || 'Sin motivo' %></div>
+                          </label>
+                        <% }) %>
+                        <div class="d-flex justify-content-end mt-3">
+                          <button class="btn btn-success btn-sm" onclick="return confirm('¿Marcar como compradas las solicitudes seleccionadas?')">
+                            Comprar seleccionadas
+                          </button>
+                        </div>
+                      </form>
+                    </div>
+                  <% } %>
+
+                  <div class="llantas-list p-0">
+                    <% grupo.solicitudes.forEach(s => { %>
+                      <article class="llanta-card">
+                        <div class="llanta-card-header">
+                          <div>
+                            <h3 class="llanta-title">Solicitud #<%= s.id %> · <%= s.placa %></h3>
+                            <div class="llanta-meta"><%= s.sede %> · <%= fechaCorta(s.fecha_solicitud) %></div>
+                          </div>
+                          <span class="badge <%= badgeEstado(s.estado) %>"><%= s.estado %></span>
+                        </div>
+
+                        <div class="llanta-grid">
+                          <div class="llanta-field">
+                            <div class="llanta-label">Llanta solicitada</div>
+                            <div class="llanta-value"><%= s.cantidad %> x <%= s.medida %></div>
+                            <small class="text-muted"><%= s.posicion || 'Posición no indicada' %><% if (s.marca_sugerida) { %> · <%= s.marca_sugerida %><% } %></small>
+                          </div>
+                          <div class="llanta-field">
+                            <div class="llanta-label">Motivo</div>
+                            <div class="llanta-value"><%= s.motivo || '—' %></div>
+                          </div>
+                          <div class="llanta-field">
+                            <div class="llanta-label">Cotización</div>
+                            <% if (s.estado === 'COTIZADA' || s.fecha_cotizada) { %>
+                              <div class="llanta-value">Cotizada</div>
+                              <% if (s.fecha_cotizada) { %>
+                                <small class="text-muted">Fecha: <%= fechaCorta(s.fecha_cotizada) %></small>
+                              <% } %>
+                            <% } else { %>
+                              <div class="llanta-value text-muted">Sin cotización</div>
+                            <% } %>
+                          </div>
+                          <div class="llanta-field">
+                            <div class="llanta-label">Seguimiento</div>
+                            <div class="status-flow mt-1">
+                              <% estados.forEach(estado => { %>
+                                <span class="status-chip <%= estados.indexOf(s.estado) >= estados.indexOf(estado) ? 'active' : '' %>"><%= estado.charAt(0) %></span>
+                              <% }) %>
+                            </div>
+                            <% if (s.fecha_recibida) { %>
+                              <small class="text-muted d-block mt-2">Recibida: <%= fechaCorta(s.fecha_recibida) %></small>
+                            <% } %>
+                          </div>
+                        </div>
+
+                        <% if (puedeCotizar && s.estado === 'SOLICITADA') { %>
+                          <form method="POST" action="/llantas/<%= s.id %>/cotizar" class="cotizar-panel">
+                            <input type="hidden" name="sede" value="<%= filtros.sede || '' %>">
+                            <input type="hidden" name="estado" value="<%= filtros.estado || '' %>">
+                            <input type="hidden" name="placa" value="<%= filtros.placa || '' %>">
+                            <div class="d-flex justify-content-end">
+                              <button class="btn btn-sm btn-primary" onclick="return confirm('¿Marcar esta solicitud como cotizada?')">Marcar cotizada</button>
+                            </div>
+                          </form>
+                        <% } %>
+
+                        <div class="llanta-actions">
+                          <a href="/llantas/<%= s.id %>/cotizacion.pdf" class="btn btn-sm btn-outline-dark"><i class="bi bi-file-pdf me-1"></i> Descargar cotización</a>
+
+                          <% if (puedeComprar && ['SOLICITADA', 'COTIZADA'].includes(s.estado)) { %>
+                            <form method="POST" action="/llantas/<%= s.id %>/comprar">
+                              <input type="hidden" name="sede" value="<%= filtros.sede || '' %>">
+                              <input type="hidden" name="estado" value="<%= filtros.estado || '' %>">
+                              <input type="hidden" name="placa" value="<%= filtros.placa || '' %>">
+                              <button class="btn btn-sm btn-success" onclick="return confirm('¿Marcar esta solicitud como comprada?')"><i class="bi bi-cart-check me-1"></i> Marcar comprada</button>
+                            </form>
+                          <% } %>
+
+                          <% if (puedeRecibir && s.estado === 'COMPRADA') { %>
+                            <form method="POST" action="/llantas/<%= s.id %>/recibir">
+                              <input type="hidden" name="sede" value="<%= filtros.sede || '' %>">
+                              <input type="hidden" name="estado" value="<%= filtros.estado || '' %>">
+                              <input type="hidden" name="placa" value="<%= filtros.placa || '' %>">
+                              <button class="btn btn-sm btn-success" onclick="return confirm('¿Confirmar que la llanta llegó a sede?')"><i class="bi bi-check-circle me-1"></i> Marcar recibida</button>
+                            </form>
+                          <% } %>
+                        </div>
+                      </article>
+                    <% }) %>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      <% }) %>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="solicitudModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <form method="POST" action="/llantas/solicitar">
+        <div class="modal-header">
+          <h5 class="modal-title">Nueva solicitud de llanta</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="row g-3">
+            <div class="col-md-5">
+              <label class="form-label">Placa / sede</label>
+              <select name="unidad_id" class="form-select" required>
+                <option value="">Seleccione unidad</option>
+                <% unidades.forEach(u => { %>
+                  <option value="<%= u.id %>"><%= u.placa %> · <%= u.sede %></option>
+                <% }) %>
+              </select>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Medida</label>
+              <input name="medida" class="form-control" placeholder="Ej: 295/80R22.5" required>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Cantidad</label>
+              <input name="cantidad" type="number" min="1" value="1" class="form-control" required>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Posición</label>
+              <input name="posicion" class="form-control" placeholder="Delantera, trasera, eje 2...">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Marca sugerida</label>
+              <input name="marca_sugerida" class="form-control" placeholder="Opcional">
+            </div>
+            <div class="col-md-12">
+              <label class="form-label">Motivo</label>
+              <textarea name="motivo" class="form-control" rows="2" placeholder="Desgaste, pinchazo, reemplazo preventivo..."></textarea>
+            </div>
+            <div class="col-md-12">
+              <label class="form-label">Observaciones</label>
+              <textarea name="observaciones" class="form-control" rows="2"></textarea>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button class="btn btn-danger">Crear solicitud</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

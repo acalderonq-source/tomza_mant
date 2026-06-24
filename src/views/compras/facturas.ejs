@@ -14,7 +14,24 @@
     .badge-vencida { background-color: #dc3545; color: white; }
     .badge-pagada { background-color: #198754; }
     .badge-pendiente { background-color: #ffc107; color: #000; }
+    .badge-nc { background-color: #0ea5e9; color: #fff; }
     .total-seleccion { font-size: 1.2rem; font-weight: bold; margin-top: 1rem; text-align: right; }
+    .amount-stack { display: grid; gap: .2rem; }
+    .amount-original { color: #64748b; font-size: .78rem; text-decoration: line-through; }
+    .amount-credit { color: #0369a1; font-size: .8rem; font-weight: 700; }
+    .amount-balance { color: #111827; font-size: .98rem; font-weight: 800; }
+    .nc-note {
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      border-radius: 12px;
+      color: #1e3a8a;
+      display: inline-grid;
+      gap: .1rem;
+      padding: .4rem .55rem;
+      text-align: left;
+    }
+    .nc-note strong { font-size: .8rem; }
+    .nc-note small { color: #1d4ed8; }
     @media (max-width: 768px) {
       .table-facturas thead { display: none; }
       .table-facturas, .table-facturas tbody, .table-facturas tr, .table-facturas td {
@@ -117,9 +134,14 @@
   </div>
 
   <%
-    const totalFacturas = facturas.reduce((sum, f) => sum + (parseFloat(f.monto) || 0), 0);
-    const facturasPagadas = facturas.filter(f => f.pagada).length;
-    const facturasPendientes = facturas.filter(f => !f.pagada).length;
+    const totalFacturas = facturas.reduce((sum, f) => sum + (parseFloat(f.monto_original ?? f.monto) || 0), 0);
+    const totalNotasCredito = facturas.reduce((sum, f) => sum + (parseFloat(f.nota_credito_monto) || 0), 0);
+    const totalSaldo = facturas.reduce((sum, f) => {
+      if (f.pagada || f.cubierta_por_nc) return sum;
+      return sum + (parseFloat(f.saldo ?? f.monto) || 0);
+    }, 0);
+    const facturasPagadas = facturas.filter(f => f.pagada || f.cubierta_por_nc).length;
+    const facturasPendientes = facturas.filter(f => !f.pagada && (parseFloat(f.saldo ?? f.monto) > 0)).length;
     const facturasVencidas = facturas.filter(f => f.vencida).length;
   %>
   <div class="summary-grid">
@@ -128,16 +150,16 @@
       <div class="summary-value"><%= facturas.length %></div>
     </div>
     <div class="summary-card">
-      <div class="summary-label">Monto listado</div>
+      <div class="summary-label">Monto original</div>
       <div class="summary-value">₡<%= totalFacturas.toLocaleString('es-CR', { maximumFractionDigits: 0 }) %></div>
     </div>
     <div class="summary-card">
-      <div class="summary-label">Pendientes</div>
-      <div class="summary-value"><%= facturasPendientes %></div>
+      <div class="summary-label">Notas crédito</div>
+      <div class="summary-value">₡<%= totalNotasCredito.toLocaleString('es-CR', { maximumFractionDigits: 0 }) %></div>
     </div>
     <div class="summary-card">
-      <div class="summary-label">Vencidas</div>
-      <div class="summary-value"><%= facturasVencidas %></div>
+      <div class="summary-label">Saldo pendiente</div>
+      <div class="summary-value">₡<%= totalSaldo.toLocaleString('es-CR', { maximumFractionDigits: 0 }) %></div>
     </div>
   </div>
 
@@ -146,7 +168,7 @@
     <div class="d-flex justify-content-between align-items-center mb-3">
       <div>
         <h3 class="page-title fs-5">Listado de facturas</h3>
-        <p class="page-subtitle">Pagadas: <%= facturasPagadas %> · Pendientes: <%= facturasPendientes %></p>
+        <p class="page-subtitle">Pagadas/cubiertas: <%= facturasPagadas %> · Pendientes: <%= facturasPendientes %> · Vencidas: <%= facturasVencidas %></p>
       </div>
     </div>
 
@@ -170,15 +192,25 @@
             <% facturas.forEach(f => { %>
               <tr class="<%= f.vencida ? 'table-danger' : '' %>">
                 <td class="text-center">
-                  <% if (!f.pagada) { %>
-                    <input type="checkbox" name="facturas_ids" value="<%= f.tipo %>:<%= f.id %>" class="check-factura" data-monto="<%= f.monto %>">
+                  <% if (!f.pagada && (parseFloat(f.saldo ?? f.monto) > 0)) { %>
+                    <input type="checkbox" name="facturas_ids" value="<%= f.tipo %>:<%= f.id %>" class="check-factura" data-monto="<%= f.saldo ?? f.monto %>">
                   <% } %>
                 </td>
                 <td data-label="PO Número"><%= f.po_numero ? f.po_numero : '—' %></td>
                 <td data-label="Proveedor"><%= f.proveedor_nombre %></td>
                 <td data-label="Fecha"><%= new Date(f.fecha).toLocaleDateString('es-CR') %></td>
                 <td data-label="N° Factura"><%= f.numero_factura %></td>
-                <td data-label="Monto" class="monto-factura money" data-val="<%= f.monto %>">₡<%= parseFloat(f.monto).toLocaleString('es-CR') %></td>
+                <td data-label="Monto" class="monto-factura money" data-val="<%= f.saldo ?? f.monto %>">
+                  <div class="amount-stack">
+                    <% if (f.tiene_nc) { %>
+                      <span class="amount-original">Factura: ₡<%= parseFloat(f.monto_original ?? f.monto).toLocaleString('es-CR') %></span>
+                      <span class="amount-credit">NC: -₡<%= parseFloat(f.nota_credito_monto || 0).toLocaleString('es-CR') %></span>
+                      <span class="amount-balance">Saldo: ₡<%= parseFloat(f.saldo || 0).toLocaleString('es-CR') %></span>
+                    <% } else { %>
+                      <span class="amount-balance">₡<%= parseFloat(f.monto).toLocaleString('es-CR') %></span>
+                    <% } %>
+                  </div>
+                </td>
                 <td data-label="Fecha Vencimiento">
                   <%= f.fecha_vencimiento_factura ? new Date(f.fecha_vencimiento_factura).toLocaleDateString('es-CR') : '—' %>
                   <% if (f.vencida) { %>
@@ -186,14 +218,28 @@
                   <% } %>
                 </td>
                 <td data-label="Estado">
-                  <% if (f.pagada) { %>
+                  <% if (f.cubierta_por_nc) { %>
+                    <span class="badge badge-nc">Cubierta por NC</span>
+                  <% } else if (f.pagada) { %>
                     <span class="badge badge-pagada">Pagada el <%= new Date(f.fecha_pago).toLocaleDateString('es-CR') %></span>
                   <% } else { %>
                     <span class="badge badge-pendiente">Pendiente</span>
                   <% } %>
+                  <% if (f.tiene_nc && !f.cubierta_por_nc) { %>
+                    <div class="mt-2">
+                      <span class="badge badge-nc">NC aplicada</span>
+                    </div>
+                  <% } %>
                 </td>
                 <td data-label="Acciones">
-                  <% if (!f.pagada) { %>
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-outline-primary mb-1"
+                    data-bs-toggle="modal"
+                    data-bs-target="#nc-<%= f.tipo %>-<%= f.id %>">
+                    <i class="bi bi-journal-minus"></i> NC
+                  </button>
+                  <% if (!f.pagada && (parseFloat(f.saldo ?? f.monto) > 0)) { %>
                     <button
                       type="submit"
                       form="pagar-factura-<%= f.tipo %>-<%= f.id %>"
@@ -202,7 +248,13 @@
                       <i class="bi bi-check-circle"></i> Pagar
                     </button>
                   <% } else { %>
-                    <span class="text-muted">Pagada</span>
+                    <span class="text-muted d-block"><%= f.cubierta_por_nc ? 'Sin saldo' : 'Pagada' %></span>
+                  <% } %>
+                  <% if (f.tiene_nc) { %>
+                    <div class="nc-note mt-2">
+                      <strong>NC <%= f.nota_credito_numero || 'registrada' %></strong>
+                      <small><%= f.nota_credito_fecha ? new Date(f.nota_credito_fecha).toLocaleDateString('es-CR') : 'Sin fecha' %></small>
+                    </div>
                   <% } %>
                 </td>
               </tr>
@@ -226,7 +278,7 @@
     </form>
 
     <% facturas.forEach(f => { %>
-      <% if (!f.pagada) { %>
+      <% if (!f.pagada && (parseFloat(f.saldo ?? f.monto) > 0)) { %>
         <form
           id="pagar-factura-<%= f.tipo %>-<%= f.id %>"
           method="POST"
@@ -238,6 +290,54 @@
     <% }) %>
   </div>
 </div>
+
+<% facturas.forEach(f => { %>
+  <div class="modal fade" id="nc-<%= f.tipo %>-<%= f.id %>" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <form method="POST" action="/compras/facturas/<%= f.id %>/nota-credito">
+          <div class="modal-header">
+            <div>
+              <h5 class="modal-title"><i class="bi bi-journal-minus me-1"></i> Nota de crédito</h5>
+              <small class="text-muted">Factura <%= f.numero_factura %> · <%= f.proveedor_nombre %></small>
+            </div>
+            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body">
+            <input type="hidden" name="tipo" value="<%= f.tipo %>">
+            <div class="alert alert-info py-2">
+              Monto factura: <strong>₡<%= parseFloat(f.monto_original ?? f.monto).toLocaleString('es-CR') %></strong>
+              <% if (f.tiene_nc) { %>
+                <br>NC actual: <strong>₡<%= parseFloat(f.nota_credito_monto || 0).toLocaleString('es-CR') %></strong>
+              <% } %>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Número de NC</label>
+              <input type="text" name="numero_nc" class="form-control" value="<%= f.nota_credito_numero || '' %>" required>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Fecha de NC</label>
+              <input type="date" name="fecha_nc" class="form-control" value="<%= f.nota_credito_fecha ? new Date(f.nota_credito_fecha).toISOString().slice(0, 10) : hoy %>" required>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Monto de NC</label>
+              <input type="number" step="0.01" min="0.01" max="<%= f.monto_original ?? f.monto %>" name="monto_nc" class="form-control" value="<%= f.nota_credito_monto || '' %>" required>
+              <small class="text-muted">Si cubre todo el monto, la factura queda liquidada por NC.</small>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Motivo / detalle</label>
+              <textarea name="motivo_nc" class="form-control" rows="3" placeholder="Ej: devolución, diferencia de precio, anulación parcial..."><%= f.nota_credito_motivo || '' %></textarea>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+            <button class="btn btn-primary">Guardar NC</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+<% }) %>
 
 <!-- Modal para agregar factura manualmente (PO opcional, proveedor desde selector) -->
 <div class="modal fade" id="agregarFacturaModal" tabindex="-1" aria-labelledby="agregarFacturaModalLabel" aria-hidden="true">

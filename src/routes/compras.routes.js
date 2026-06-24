@@ -49,6 +49,41 @@ function normalizarLineas(lineas) {
     .filter(linea => linea.descripcion);
 }
 
+async function columnExists(tableName, columnName) {
+  const [[row]] = await pool.query(
+    `SELECT COUNT(*) AS count
+     FROM INFORMATION_SCHEMA.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE()
+       AND TABLE_NAME = ?
+       AND COLUMN_NAME = ?`,
+    [tableName, columnName]
+  );
+  return Number(row.count) > 0;
+}
+
+async function ensureNotaCreditoColumns() {
+  const tables = ["ordenes_compra", "facturas"];
+  const columns = [
+    ["nota_credito_numero", "VARCHAR(100) NULL"],
+    ["nota_credito_fecha", "DATE NULL"],
+    ["nota_credito_monto", "DECIMAL(12,2) NOT NULL DEFAULT 0"],
+    ["nota_credito_motivo", "TEXT NULL"]
+  ];
+
+  for (const table of tables) {
+    for (const [column, definition] of columns) {
+      if (!(await columnExists(table, column))) {
+        await pool.query(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+      }
+    }
+  }
+}
+
+function parseMonto(value) {
+  const monto = parseFloat(value);
+  return Number.isFinite(monto) ? monto : 0;
+}
+
 // ===================== FUNCIÓN PARA GENERAR NÚMERO DE PO =====================
 async function generarNumeroPO() {
   const año = new Date().getFullYear();
@@ -482,6 +517,7 @@ router.post("/facturas/agregar", requireAuth, allowRoles("ADMIN", "TALLER", "PRO
 // ===================== LISTADO DE FACTURAS (unificado) =====================
 router.get("/facturas", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER", "CONTABILIDAD"), async (req, res) => {
   try {
+    await ensureNotaCreditoColumns();
     const { proveedor_id, fecha_desde, fecha_hasta, pagada, vencida } = req.query;
     const orden = req.query.orden === 'asc' ? 'asc' : 'desc';
 
@@ -495,6 +531,10 @@ router.get("/facturas", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_
         o.fecha_vencimiento_factura, 
         o.pagada, 
         o.fecha_pago,
+        o.nota_credito_numero,
+        o.nota_credito_fecha,
+        o.nota_credito_monto,
+        o.nota_credito_motivo,
         p.nombre as proveedor_nombre,
         'orden' as tipo
       FROM ordenes_compra o
@@ -511,6 +551,10 @@ router.get("/facturas", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_
         NULL as fecha_vencimiento_factura, 
         f.pagada, 
         f.fecha_pago,
+        f.nota_credito_numero,
+        f.nota_credito_fecha,
+        f.nota_credito_monto,
+        f.nota_credito_motivo,
         f.proveedor_nombre,
         'independiente' as tipo
       FROM facturas f
@@ -552,10 +596,20 @@ router.get("/facturas", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_
 
     const hoy = new Date();
     hoy.setHours(0, 0, 0, 0);
-    const facturasConEstado = facturasUnidas.map(f => ({
-      ...f,
-      vencida: (f.tipo === 'orden' && !f.pagada && f.fecha_vencimiento_factura && new Date(f.fecha_vencimiento_factura) < hoy)
-    }));
+    const facturasConEstado = facturasUnidas.map(f => {
+      const montoOriginal = parseMonto(f.monto);
+      const notaCreditoMonto = Math.min(parseMonto(f.nota_credito_monto), montoOriginal);
+      const saldo = Math.max(montoOriginal - notaCreditoMonto, 0);
+      return {
+        ...f,
+        monto_original: montoOriginal,
+        nota_credito_monto: notaCreditoMonto,
+        saldo,
+        cubierta_por_nc: notaCreditoMonto > 0 && saldo <= 0,
+        tiene_nc: notaCreditoMonto > 0 || Boolean(f.nota_credito_numero),
+        vencida: (f.tipo === 'orden' && !f.pagada && saldo > 0 && f.fecha_vencimiento_factura && new Date(f.fecha_vencimiento_factura) < hoy)
+      };
+    });
 
     let facturasFiltradas = facturasConEstado;
     if (vencida === '1') {
@@ -583,28 +637,108 @@ router.get("/facturas", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_
   }
 });
 
+router.post("/facturas/:id/nota-credito", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER", "CONTABILIDAD"), async (req, res) => {
+  try {
+    await ensureNotaCreditoColumns();
+    const id = req.params.id;
+    const { tipo, numero_nc, fecha_nc, monto_nc, motivo_nc } = req.body;
+    const montoNC = parseMonto(monto_nc);
+
+    if (!["orden", "independiente"].includes(tipo)) {
+      req.session.error = "Tipo de factura inválido para nota de crédito.";
+      return res.redirect("/compras/facturas");
+    }
+    if (!numero_nc || !fecha_nc || montoNC <= 0) {
+      req.session.error = "Debe completar número, fecha y monto de la nota de crédito.";
+      return res.redirect("/compras/facturas");
+    }
+
+    const table = tipo === "orden" ? "ordenes_compra" : "facturas";
+    const montoColumn = tipo === "orden" ? "total" : "monto";
+    const extraWhere = tipo === "orden" ? "AND facturada = 1" : "";
+    const [[factura]] = await pool.query(
+      `SELECT id, ${montoColumn} AS monto, COALESCE(pagada, 0) AS pagada
+       FROM ${table}
+       WHERE id = ? ${extraWhere}`,
+      [id]
+    );
+
+    if (!factura) {
+      req.session.error = "Factura no encontrada.";
+      return res.redirect("/compras/facturas");
+    }
+
+    const montoFactura = parseMonto(factura.monto);
+    if (montoNC > montoFactura) {
+      req.session.error = "La nota de crédito no puede ser mayor al monto de la factura.";
+      return res.redirect("/compras/facturas");
+    }
+
+    const cubiertaPorNC = montoNC >= montoFactura;
+    await pool.query(
+      `UPDATE ${table}
+       SET nota_credito_numero = ?,
+           nota_credito_fecha = ?,
+           nota_credito_monto = ?,
+           nota_credito_motivo = ?,
+           pagada = CASE WHEN ? THEN 1 ELSE pagada END,
+           fecha_pago = CASE WHEN ? THEN ? ELSE fecha_pago END
+       WHERE id = ?`,
+      [
+        numero_nc.trim(),
+        fecha_nc,
+        montoNC,
+        motivo_nc || null,
+        cubiertaPorNC,
+        cubiertaPorNC,
+        fecha_nc,
+        id
+      ]
+    );
+
+    req.session.success = cubiertaPorNC
+      ? "Nota de crédito registrada. La factura quedó cubierta por NC."
+      : "Nota de crédito registrada correctamente.";
+    res.redirect("/compras/facturas");
+  } catch (error) {
+    console.error("Error registrando nota de crédito:", error);
+    req.session.error = "Error interno al registrar la nota de crédito.";
+    res.redirect("/compras/facturas");
+  }
+});
+
 router.post("/facturas/:id/pagar", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER", "CONTABILIDAD"), async (req, res) => {
   try {
+    await ensureNotaCreditoColumns();
     const id = req.params.id;
     const { tipo } = req.body;
     const fechaPago = new Date().toISOString().slice(0, 10);
 
     if (tipo === 'orden') {
       const [result] = await pool.query(
-        "UPDATE ordenes_compra SET pagada = 1, fecha_pago = ? WHERE id = ? AND facturada = 1 AND COALESCE(pagada, 0) = 0",
+        `UPDATE ordenes_compra
+         SET pagada = 1, fecha_pago = ?
+         WHERE id = ?
+           AND facturada = 1
+           AND COALESCE(pagada, 0) = 0
+           AND GREATEST(total - COALESCE(nota_credito_monto, 0), 0) > 0`,
         [fechaPago, id]
       );
       if (!result.affectedRows) {
-        req.session.error = "La factura de orden no existe o ya estaba pagada.";
+        req.session.error = "La factura de orden no existe, ya estaba pagada o no tiene saldo pendiente.";
         return res.redirect("/compras/facturas");
       }
     } else if (tipo === 'independiente') {
       const [result] = await pool.query(
-        "UPDATE facturas SET pagada = 1, fecha_pago = ? WHERE id = ? AND COALESCE(pagada, 0) = 0",
+        `UPDATE facturas
+         SET pagada = 1, fecha_pago = ?
+         WHERE id = ?
+           AND COALESCE(pagada, 0) = 0
+           AND GREATEST(monto - COALESCE(nota_credito_monto, 0), 0) > 0`,
         [fechaPago, id]
       );
       if (!result.affectedRows) {
-        req.session.error = "La factura independiente no existe o ya estaba pagada.";
+        req.session.error = "La factura independiente no existe, ya estaba pagada o no tiene saldo pendiente.";
         return res.redirect("/compras/facturas");
       }
     } else {
@@ -622,6 +756,7 @@ router.post("/facturas/:id/pagar", requireAuth, allowRoles("ADMIN", "TALLER", "P
 
 router.post("/facturas/pagar-multiple", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER", "CONTABILIDAD"), async (req, res) => {
   try {
+    await ensureNotaCreditoColumns();
     const { facturas_ids } = req.body;
     const seleccionadas = toArray(facturas_ids).map(parseFacturaRef).filter(Boolean);
 
@@ -641,14 +776,19 @@ router.post("/facturas/pagar-multiple", requireAuth, allowRoles("ADMIN", "TALLER
         SELECT
           o.id,
           o.po_numero,
-          o.total,
+          GREATEST(o.total - COALESCE(o.nota_credito_monto, 0), 0) as total,
           o.factura,
           o.fecha_vencimiento_factura,
+          COALESCE(o.nota_credito_monto, 0) as nota_credito_monto,
+          o.nota_credito_numero,
           p.nombre as proveedor_nombre,
           'orden' as tipo
         FROM ordenes_compra o
         JOIN proveedores p ON p.id = o.proveedor_id
-        WHERE o.id IN (${placeholders}) AND o.facturada = 1 AND COALESCE(o.pagada, 0) = 0
+        WHERE o.id IN (${placeholders})
+          AND o.facturada = 1
+          AND COALESCE(o.pagada, 0) = 0
+          AND GREATEST(o.total - COALESCE(o.nota_credito_monto, 0), 0) > 0
       `, ordenIds);
       facturas.push(...ordenes);
     }
@@ -659,13 +799,17 @@ router.post("/facturas/pagar-multiple", requireAuth, allowRoles("ADMIN", "TALLER
         SELECT
           f.id,
           NULL as po_numero,
-          f.monto as total,
+          GREATEST(f.monto - COALESCE(f.nota_credito_monto, 0), 0) as total,
           f.numero_factura as factura,
           NULL as fecha_vencimiento_factura,
+          COALESCE(f.nota_credito_monto, 0) as nota_credito_monto,
+          f.nota_credito_numero,
           f.proveedor_nombre,
           'independiente' as tipo
         FROM facturas f
-        WHERE f.id IN (${placeholders}) AND COALESCE(f.pagada, 0) = 0
+        WHERE f.id IN (${placeholders})
+          AND COALESCE(f.pagada, 0) = 0
+          AND GREATEST(f.monto - COALESCE(f.nota_credito_monto, 0), 0) > 0
       `, independientesIds);
       facturas.push(...independientes);
     }
@@ -678,7 +822,12 @@ router.post("/facturas/pagar-multiple", requireAuth, allowRoles("ADMIN", "TALLER
     if (ordenIds.length) {
       const placeholders = ordenIds.map(() => '?').join(',');
       await pool.query(
-        `UPDATE ordenes_compra SET pagada = 1, fecha_pago = ? WHERE id IN (${placeholders}) AND facturada = 1 AND COALESCE(pagada, 0) = 0`,
+        `UPDATE ordenes_compra
+         SET pagada = 1, fecha_pago = ?
+         WHERE id IN (${placeholders})
+           AND facturada = 1
+           AND COALESCE(pagada, 0) = 0
+           AND GREATEST(total - COALESCE(nota_credito_monto, 0), 0) > 0`,
         [fechaPago, ...ordenIds]
       );
     }
@@ -686,7 +835,11 @@ router.post("/facturas/pagar-multiple", requireAuth, allowRoles("ADMIN", "TALLER
     if (independientesIds.length) {
       const placeholders = independientesIds.map(() => '?').join(',');
       await pool.query(
-        `UPDATE facturas SET pagada = 1, fecha_pago = ? WHERE id IN (${placeholders}) AND COALESCE(pagada, 0) = 0`,
+        `UPDATE facturas
+         SET pagada = 1, fecha_pago = ?
+         WHERE id IN (${placeholders})
+           AND COALESCE(pagada, 0) = 0
+           AND GREATEST(monto - COALESCE(nota_credito_monto, 0), 0) > 0`,
         [fechaPago, ...independientesIds]
       );
     }

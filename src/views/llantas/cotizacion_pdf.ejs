@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title><%= titulo || 'Cotización de llantas' %></title>
+  <style>
+    @page {
+      size: Letter;
+      margin: 8mm;
+    }
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      color: #000;
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 12px;
+      margin: 0;
+    }
+    .sheet {
+      border: 2px solid #111;
+      min-height: 100%;
+      padding-bottom: 8px;
+    }
+    .company-bar {
+      background: #1f3d6d;
+      color: #fff;
+      font-size: 13px;
+      font-weight: 700;
+      line-height: 18px;
+      text-align: center;
+    }
+    .header {
+      display: table;
+      padding: 4px 8px 0;
+      width: 100%;
+    }
+    .logo-cell,
+    .date-cell {
+      display: table-cell;
+      vertical-align: top;
+      width: 50%;
+    }
+    .logo {
+      height: 58px;
+      object-fit: contain;
+      width: 190px;
+    }
+    .date-cell {
+      font-size: 12px;
+      padding-top: 12px;
+      text-align: right;
+    }
+    .contact {
+      font-size: 12px;
+      line-height: 15px;
+      margin-top: -2px;
+      text-align: center;
+    }
+    .emails {
+      color: #0563c1;
+      text-decoration: underline;
+    }
+    table {
+      border-collapse: collapse;
+      margin: 3px auto 0;
+      table-layout: fixed;
+      width: 100%;
+    }
+    th {
+      background: #1f3d6d;
+      border: 1px solid #000;
+      color: #fff;
+      font-weight: 700;
+      line-height: 14px;
+      padding: 1px 3px;
+      text-align: center;
+    }
+    td {
+      border: 1px solid #000;
+      line-height: 15px;
+      padding: 1px 3px;
+      vertical-align: middle;
+    }
+    .col-cedi { width: 15%; }
+    .col-entregar { width: 18%; }
+    .col-placa { width: 16%; }
+    .col-cantidad { width: 13%; }
+    .col-descripcion { width: 38%; }
+    .center {
+      text-align: center;
+    }
+    .bold {
+      font-weight: 700;
+    }
+    .entregar {
+      font-size: 13px;
+      font-weight: 700;
+      text-align: center;
+    }
+    .entregar.cartago {
+      background: #ffff99;
+    }
+    .entregar.alajuela {
+      background: #f4b183;
+    }
+    .total-label,
+    .total-value {
+      background: #d9eaf7;
+      font-weight: 700;
+    }
+    .blank {
+      border: 0;
+    }
+    .empty {
+      color: #555;
+      padding: 16px 4px;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="sheet">
+    <div class="company-bar">Gas Tomza de Costa Rica S.A</div>
+
+    <div class="header">
+      <div class="logo-cell">
+        <img class="logo" src="file:///<%= logoPath %>">
+      </div>
+      <div class="date-cell"><%= fechaGeneracion %></div>
+    </div>
+
+    <div class="contact">
+      La lima, Cartago<br>
+      3-101-349880<br>
+      Telefono: 2201-6000<br>
+      <span class="emails">facelectronica@tomza.com&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;efernandez.m@tomza.com</span>
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th class="col-cedi">CEDI</th>
+          <th class="col-entregar">Entregar</th>
+          <th class="col-placa">Placa</th>
+          <th class="col-cantidad">Cantidad</th>
+          <th class="col-descripcion">Descripción</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% if (!grupos.length) { %>
+          <tr>
+            <td colspan="5" class="empty">No hay solicitudes para generar la cotización.</td>
+          </tr>
+        <% } %>
+
+        <% grupos.forEach(grupo => { %>
+          <% grupo.filas.forEach((fila, index) => { %>
+            <%
+              const primeraEntrega = index === 0;
+              const primeraCedi = index === 0 || grupo.filas[index - 1].cedi !== fila.cedi;
+              const cediRowspan = grupo.filas.filter(item => item.cedi === fila.cedi).length;
+              const entregar = grupo.entregar || fila.entregar || '';
+            %>
+            <tr>
+              <% if (primeraCedi) { %>
+                <td rowspan="<%= cediRowspan %>"><%= fila.cedi %></td>
+              <% } %>
+              <% if (primeraEntrega) { %>
+                <td rowspan="<%= grupo.filas.length %>" class="entregar <%= entregar.toLowerCase() %>"><%= entregar %></td>
+              <% } %>
+              <td class="center bold"><%= fila.placa %></td>
+              <td class="center"><%= fila.cantidad %></td>
+              <td><%= fila.descripcion || fila.motivo || 'Llanta solicitada' %></td>
+            </tr>
+          <% }) %>
+        <% }) %>
+
+        <tr>
+          <td colspan="2" class="blank"></td>
+          <td class="total-label">Total de unidades</td>
+          <td class="total-value center"><%= totalUnidades %></td>
+          <td class="blank"></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</body>
+</html>
