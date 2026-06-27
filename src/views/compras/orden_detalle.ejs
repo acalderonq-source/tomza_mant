@@ -88,10 +88,10 @@
     <div class="card-body p-0">
       <div class="table-responsive">
         <table class="table table-bordered mb-0">
-          <thead><tr><th>Código</th><th>Descripción</th><th>Cantidad</th><th>Precio unitario</th><th>Subtotal</th></tr></thead>
+          <thead><tr><th>Placa</th><th>Descripción</th><th>Cantidad</th><th>Precio unitario</th><th>Subtotal</th></tr></thead>
           <tbody>
             <% lineas.forEach(lin => { %>
-              <tr><td data-label="Código"><%= lin.codigo || '-' %></td><td data-label="Descripción"><%= lin.descripcion %></td><td data-label="Cantidad"><%= lin.cantidad %></td><td data-label="Precio unitario" class="money"><%= parseFloat(lin.precio_unitario).toLocaleString('es-CR') %></td><td data-label="Subtotal" class="money"><%= parseFloat(lin.subtotal).toLocaleString('es-CR') %></td></tr>
+              <tr><td data-label="Placa"><%= lin.codigo || '-' %></td><td data-label="Descripción"><%= lin.descripcion %></td><td data-label="Cantidad"><%= lin.cantidad %></td><td data-label="Precio unitario" class="money"><%= parseFloat(lin.precio_unitario).toLocaleString('es-CR') %></td><td data-label="Subtotal" class="money"><%= parseFloat(lin.subtotal).toLocaleString('es-CR') %></td></tr>
             <% }) %>
             <% if (lineas.length === 0) { %><tr><td colspan="5" class="text-center">Sin líneas registradas</td></tr><% } %>
           </tbody>

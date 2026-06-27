@@ -2,6 +2,16 @@ const express = require("express");
 const router = express.Router();
 const pool = require("../db");
 
+async function safeQuery(sql, params = [], fallback = []) {
+  try {
+    const [rows] = await pool.query(sql, params);
+    return rows;
+  } catch (error) {
+    console.warn("Dashboard query omitida:", error.code || error.message);
+    return fallback;
+  }
+}
+
 // =========================================================
 // DASHBOARD PRINCIPAL
 // =========================================================
@@ -15,6 +25,10 @@ router.get("/", async (req, res) => {
     // =========================
     if (!req.session.user) {
       return res.redirect("/login");
+    }
+
+    if (["MENSAJERO", "MENSAJERIA", "MENSAJERO_FACTURAS"].includes(req.session.user.rol)) {
+      return res.redirect("/compras/facturas");
     }
 
     // =========================
@@ -115,6 +129,148 @@ router.get("/", async (req, res) => {
     const stats = statsRows[0] || { realizados: 0, pendientes: 0 };
 
     // =========================
+    // KPIs EJECUTIVOS
+    // =========================
+    const sedeUnidadWhere = sedeFiltro ? "WHERE sede = ?" : "";
+    const sedeUnidadParams = sedeFiltro ? [sedeFiltro] : [];
+
+    const [unidadesRow] = await safeQuery(
+      `SELECT COUNT(*) AS total FROM unidades ${sedeUnidadWhere}`,
+      sedeUnidadParams,
+      [{ total: 0 }]
+    );
+
+    const [unidadesResumenRow] = await safeQuery(
+      `SELECT
+         COUNT(*) AS total,
+         SUM(CASE WHEN activa = 1 THEN 1 ELSE 0 END) AS activas,
+         SUM(CASE WHEN activa = 0 THEN 1 ELSE 0 END) AS inactivas,
+         SUM(CASE WHEN varada = 1 THEN 1 ELSE 0 END) AS varadas
+       FROM unidades
+       ${sedeUnidadWhere}`,
+      sedeUnidadParams,
+      [{ total: 0, activas: 0, inactivas: 0, varadas: 0 }]
+    );
+
+    const [mantenimientosVencidosRow] = await safeQuery(
+      `SELECT COUNT(*) AS total
+       FROM mantenimientos m
+       JOIN unidades u ON u.id = m.unidad_id
+       WHERE m.estado != 'CERRADO'
+         AND m.fecha_programada < ?
+         ${sedeFiltro ? "AND u.sede = ?" : ""}`,
+      sedeFiltro ? [fechaHoy, sedeFiltro] : [fechaHoy],
+      [{ total: 0 }]
+    );
+
+    const [mantenimientosMananaRow] = await safeQuery(
+      `SELECT COUNT(*) AS total
+       FROM mantenimientos m
+       JOIN unidades u ON u.id = m.unidad_id
+       WHERE m.estado != 'CERRADO'
+         AND DATE(m.fecha_programada) = DATE_ADD(?, INTERVAL 1 DAY)
+         ${sedeFiltro ? "AND u.sede = ?" : ""}`,
+      sedeFiltro ? [fechaHoy, sedeFiltro] : [fechaHoy],
+      [{ total: 0 }]
+    );
+
+    const [ordenesAbiertasRow] = await safeQuery(
+      `SELECT COUNT(*) AS total
+       FROM ordenes_compra
+       WHERE estado NOT IN ('RECIBIDA_TOTAL')`,
+      [],
+      [{ total: 0 }]
+    );
+
+    const [facturasOrdenesRow] = await safeQuery(
+      `SELECT COUNT(*) AS pendientes,
+              COALESCE(SUM(GREATEST(total - COALESCE(nota_credito_monto, 0) - COALESCE(abono_monto, 0), 0)), 0) AS monto
+       FROM ordenes_compra
+       WHERE facturada = 1
+         AND COALESCE(pagada, 0) = 0
+         AND GREATEST(total - COALESCE(nota_credito_monto, 0) - COALESCE(abono_monto, 0), 0) > 0`,
+      [],
+      [{ pendientes: 0, monto: 0 }]
+    );
+
+    const [facturasIndependientesRow] = await safeQuery(
+      `SELECT COUNT(*) AS pendientes,
+              COALESCE(SUM(GREATEST(monto - COALESCE(nota_credito_monto, 0) - COALESCE(abono_monto, 0), 0)), 0) AS monto
+       FROM facturas
+       WHERE COALESCE(pagada, 0) = 0
+         AND GREATEST(monto - COALESCE(nota_credito_monto, 0) - COALESCE(abono_monto, 0), 0) > 0`,
+      [],
+      [{ pendientes: 0, monto: 0 }]
+    );
+
+    const [facturasVencidasRow] = await safeQuery(
+      `SELECT COUNT(*) AS total
+       FROM ordenes_compra
+       WHERE facturada = 1
+         AND COALESCE(pagada, 0) = 0
+         AND fecha_vencimiento_factura IS NOT NULL
+         AND fecha_vencimiento_factura < ?`,
+      [fechaHoy],
+      [{ total: 0 }]
+    );
+
+    const [llantasRow] = await safeQuery(
+      `SELECT
+         SUM(CASE WHEN estado = 'SOLICITADA' THEN 1 ELSE 0 END) AS solicitadas,
+         SUM(CASE WHEN estado = 'COTIZADA' THEN 1 ELSE 0 END) AS cotizadas,
+         SUM(CASE WHEN estado = 'COMPRADA' THEN 1 ELSE 0 END) AS compradas
+       FROM solicitudes_llantas
+       ${sedeFiltro ? "WHERE sede = ?" : ""}`,
+      sedeFiltro ? [sedeFiltro] : [],
+      [{ solicitadas: 0, cotizadas: 0, compradas: 0 }]
+    );
+
+    const comprasPendientes = Number(facturasOrdenesRow.pendientes || 0) + Number(facturasIndependientesRow.pendientes || 0);
+    const montoPendiente = Number(facturasOrdenesRow.monto || 0) + Number(facturasIndependientesRow.monto || 0);
+    const ejecutivo = {
+      unidades: Number(unidadesRow.total || 0),
+      unidadesActivas: Number(unidadesResumenRow.activas || 0),
+      unidadesInactivas: Number(unidadesResumenRow.inactivas || 0),
+      unidadesVaradas: Number(unidadesResumenRow.varadas || 0),
+      mantenimientosVencidos: Number(mantenimientosVencidosRow.total || 0),
+      mantenimientosManana: Number(mantenimientosMananaRow.total || 0),
+      ordenesAbiertas: Number(ordenesAbiertasRow.total || 0),
+      facturasPendientes: comprasPendientes,
+      facturasVencidas: Number(facturasVencidasRow.total || 0),
+      montoPendiente,
+      llantasSolicitadas: Number(llantasRow.solicitadas || 0),
+      llantasCotizadas: Number(llantasRow.cotizadas || 0),
+      llantasCompradas: Number(llantasRow.compradas || 0)
+    };
+
+    const alertasEjecutivas = [
+      ejecutivo.facturasVencidas > 0 ? {
+        tipo: "Crítica",
+        titulo: "Facturas vencidas",
+        detalle: `${ejecutivo.facturasVencidas} factura${ejecutivo.facturasVencidas === 1 ? "" : "s"} requiere revisión.`,
+        url: "/compras/facturas?vencida=1"
+      } : null,
+      ejecutivo.mantenimientosVencidos > 0 ? {
+        tipo: "Operación",
+        titulo: "Mantenimientos atrasados",
+        detalle: `${ejecutivo.mantenimientosVencidos} mantenimiento${ejecutivo.mantenimientosVencidos === 1 ? "" : "s"} pendiente fuera de fecha.`,
+        url: "/mantenimientos"
+      } : null,
+      ejecutivo.llantasCompradas > 0 ? {
+        tipo: "Logística",
+        titulo: "Llantas compradas sin recibir",
+        detalle: `${ejecutivo.llantasCompradas} solicitud${ejecutivo.llantasCompradas === 1 ? "" : "es"} pendiente de llegada.`,
+        url: "/llantas"
+      } : null,
+      ejecutivo.ordenesAbiertas > 0 ? {
+        tipo: "Compras",
+        titulo: "Órdenes abiertas",
+        detalle: `${ejecutivo.ordenesAbiertas} orden${ejecutivo.ordenesAbiertas === 1 ? "" : "es"} sin recepción total.`,
+        url: "/compras/ordenes"
+      } : null
+    ].filter(Boolean);
+
+    // =========================
     // RENDER (se pasan TODAS las variables que la vista pueda esperar)
     // =========================
     res.render("dashboard", {
@@ -127,7 +283,9 @@ router.get("/", async (req, res) => {
       totalPendientes: 0,
       porVencer: 0,
       citasProximas: [],
-      ultimosTramites: []
+      ultimosTramites: [],
+      ejecutivo,
+      alertasEjecutivas
     });
 
   } catch (error) {

@@ -22,6 +22,7 @@
   .items{ margin-top:5px; }
   .items th{ background:#2F5597; color:white; border:1px solid #ccc; padding:3px; font-size:9px; }
   .items td{ border:1px solid #ddd; padding:3px; height:20px; }
+  .items .obs{ color:#374151; font-size:8px; line-height:1.25; word-break:break-word; }
   .totals{ margin-top:20px; text-align:right; }
   .totals table{ width:300px; margin-left:auto; }
   .totals td{ padding:4px; }
@@ -58,6 +59,7 @@
         <th>N° Factura</th>
         <th>Monto</th>
         <th>Fecha Vencimiento</th>
+        <th>Observación</th>
       </tr>
     </thead>
     <tbody>
@@ -68,6 +70,7 @@
         <td><%= f.factura %></td>
         <td class="text-right">₡<%= parseFloat(f.total).toLocaleString('es-CR') %></td>
         <td><%= f.fecha_vencimiento_factura ? new Date(f.fecha_vencimiento_factura).toLocaleDateString('es-CR') : '—' %></td>
+        <td class="obs"><%= f.observacion || f.factura_observacion || f.abono_observacion || f.nota_credito_motivo || '—' %></td>
       </tr>
       <% }) %>
     </tbody>

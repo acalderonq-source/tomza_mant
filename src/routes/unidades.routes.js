@@ -2,116 +2,300 @@ const express = require("express");
 const router = express.Router();
 const pool = require("../db");
 
+function requireAuth(req, res, next) {
+  if (!req.session.user) return res.redirect("/login");
+  next();
+}
+
+router.use(requireAuth);
+
+function puedeEditarUnidades(user) {
+  return ["ADMIN", "TALLER", "MECANICO"].includes(user.rol);
+}
+
+async function columnExists(tableName, columnName) {
+  const [[row]] = await pool.query(
+    `SELECT COUNT(*) AS count
+     FROM INFORMATION_SCHEMA.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE()
+       AND TABLE_NAME = ?
+       AND COLUMN_NAME = ?`,
+    [tableName, columnName]
+  );
+  return Number(row.count) > 0;
+}
+
+async function ensureUnidadEstadoColumns() {
+  const columns = [
+    ["activa", "TINYINT(1) NOT NULL DEFAULT 1"],
+    ["varada", "TINYINT(1) NOT NULL DEFAULT 0"],
+    ["razon_varada", "TEXT NULL"],
+  ];
+
+  for (const [column, definition] of columns) {
+    if (!(await columnExists("unidades", column))) {
+      await pool.query(`ALTER TABLE unidades ADD COLUMN ${column} ${definition}`);
+    }
+  }
+}
+
+async function obtenerSedesPermitidas(req) {
+  const user = req.session.user;
+
+  if (user.rol === "ADMIN") {
+    if (req.session.sedeSeleccionada && req.session.sedeSeleccionada !== "TODAS") {
+      return [req.session.sedeSeleccionada];
+    }
+    return [];
+  }
+
+  const [extras] = await pool.query(
+    `SELECT sede
+     FROM usuarios_sedes
+     WHERE usuario_id = ?`,
+    [user.id]
+  );
+
+  const sedesExtras = extras.map(e => e.sede);
+  const todasLasSedes = [...new Set([user.sede, ...sedesExtras].filter(Boolean))];
+
+  if (
+    req.session.sedeSeleccionada &&
+    todasLasSedes.includes(req.session.sedeSeleccionada)
+  ) {
+    return [req.session.sedeSeleccionada];
+  }
+
+  return todasLasSedes;
+}
+
+function puedeVerUnidad(unidad, sedesPermitidas) {
+  return sedesPermitidas.length === 0 || sedesPermitidas.includes(unidad.sede);
+}
+
+async function obtenerUnidadAutorizada(req, id) {
+  const sedesPermitidas = await obtenerSedesPermitidas(req);
+  const [[unidad]] = await pool.query(
+    `SELECT id, placa, sede, activa, varada, razon_varada
+     FROM unidades
+     WHERE id = ?
+     LIMIT 1`,
+    [id]
+  );
+
+  if (!unidad) {
+    return { error: 404, mensaje: "Unidad no encontrada" };
+  }
+
+  if (!puedeVerUnidad(unidad, sedesPermitidas)) {
+    return { error: 403, mensaje: "No tienes permiso para cambiar esta unidad." };
+  }
+
+  return { unidad };
+}
+
 // ===================== LISTADO DE UNIDADES =====================
 router.get("/", async (req, res) => {
   try {
-    if (!req.session.user) return res.redirect("/login");
+    await ensureUnidadEstadoColumns();
 
     const user = req.session.user;
-
-    let sedesPermitidas = [];
-
-    if (user.rol === "ADMIN") {
-      if (req.session.sedeSeleccionada && req.session.sedeSeleccionada !== "TODAS") {
-        sedesPermitidas = [req.session.sedeSeleccionada];
-      } else {
-        sedesPermitidas = []; // TODAS
-      }
-    } else {
-
-  // =========================
-  // TRAER SEDES EXTRA
-  // =========================
-  const [extras] = await pool.query(`
-    SELECT sede
-    FROM usuarios_sedes
-    WHERE usuario_id = ?
-  `, [user.id]);
-
-  // =========================
-  // ARMAR SEDES
-  // =========================
-  const sedesExtras = extras.map(
-    e => e.sede
-  );
-
-  const todasLasSedes = [
-    ...new Set([
-      user.sede,
-      ...sedesExtras
-    ])
-  ];
-
-  // =========================
-  // SI ELIGIÓ UNA SEDE
-  // =========================
-  if (
-    req.session.sedeSeleccionada &&
-    todasLasSedes.includes(
-      req.session.sedeSeleccionada
-    )
-  ) {
-
-    sedesPermitidas = [
-      req.session.sedeSeleccionada
-    ];
-
-  } else {
-
-    sedesPermitidas = todasLasSedes;
-
-  }
-
-}
+    const sedesPermitidas = await obtenerSedesPermitidas(req);
+    const estadoFiltro = req.query.estado || "activas";
+    const varadoFiltro = req.query.varado || "";
+    const placaFiltro = String(req.query.placa || "").trim();
 
     let sql = `
-      SELECT id, placa, sede
+      SELECT id, placa, sede, activa, varada, razon_varada
       FROM unidades
+      WHERE 1=1
     `;
-    let params = [];
+    const params = [];
 
     if (sedesPermitidas.length > 0) {
-      sql += " WHERE sede IN (?)";
+      sql += " AND sede IN (?)";
       params.push(sedesPermitidas);
     }
 
-    sql += " ORDER BY placa";
+    if (estadoFiltro === "activas") {
+      sql += " AND activa = 1";
+    } else if (estadoFiltro === "inactivas") {
+      sql += " AND activa = 0";
+    }
+
+    if (varadoFiltro === "1") {
+      sql += " AND varada = 1";
+    } else if (varadoFiltro === "0") {
+      sql += " AND varada = 0";
+    }
+
+    if (placaFiltro) {
+      sql += " AND placa LIKE ?";
+      params.push(`%${placaFiltro.toUpperCase()}%`);
+    }
+
+    sql += " ORDER BY activa DESC, varada DESC, sede ASC, placa ASC";
 
     const [unidades] = await pool.query(sql, params);
+
+    let resumenSql = `
+      SELECT
+        COUNT(*) AS total,
+        SUM(CASE WHEN activa = 1 THEN 1 ELSE 0 END) AS activas,
+        SUM(CASE WHEN activa = 0 THEN 1 ELSE 0 END) AS inactivas,
+        SUM(CASE WHEN varada = 1 THEN 1 ELSE 0 END) AS varadas
+      FROM unidades
+      WHERE 1=1
+    `;
+    const resumenParams = [];
+
+    if (sedesPermitidas.length > 0) {
+      resumenSql += " AND sede IN (?)";
+      resumenParams.push(sedesPermitidas);
+    }
+
+    const [[resumen]] = await pool.query(resumenSql, resumenParams);
 
     res.render("unidades", {
       unidades,
       user,
-      sedeSeleccionada: req.session.sedeSeleccionada || "TODAS"
+      sedeSeleccionada: req.session.sedeSeleccionada || "TODAS",
+      puedeEditar: puedeEditarUnidades(user),
+      filtros: {
+        estado: estadoFiltro,
+        varado: varadoFiltro,
+        placa: placaFiltro,
+      },
+      resumen: {
+        total: Number(resumen.total || 0),
+        activas: Number(resumen.activas || 0),
+        inactivas: Number(resumen.inactivas || 0),
+        varadas: Number(resumen.varadas || 0),
+      },
     });
-
   } catch (error) {
-    console.error("❌ ERROR /unidades:", error);
+    console.error("ERROR /unidades:", error);
     res.status(500).send("Error interno");
   }
 });
 
-// ===================== AGREGAR UNIDAD (ADMIN) =====================
-router.post("/agregar", async (req, res) => {
+async function agregarUnidad(req, res) {
   try {
-    if (!req.session.user) return res.redirect("/login");
-    if (req.session.user.rol !== "ADMIN") return res.status(403).send("No autorizado");
+    await ensureUnidadEstadoColumns();
 
-    const { placa } = req.body;
+    if (!puedeEditarUnidades(req.session.user)) {
+      return res.status(403).send("No autorizado");
+    }
 
-    const sede = req.session.sedeSeleccionada && req.session.sedeSeleccionada !== "TODAS"
-      ? req.session.sedeSeleccionada
-      : req.session.user.sede;
+    const { placa, sede } = req.body;
+    const placaNormalizada = String(placa || "").trim().toUpperCase();
+
+    if (!placaNormalizada) {
+      return res.status(400).send("La placa es obligatoria");
+    }
+
+    const sedeAsignada =
+      req.session.user.rol === "ADMIN" && sede
+        ? sede
+        : req.session.sedeSeleccionada && req.session.sedeSeleccionada !== "TODAS"
+          ? req.session.sedeSeleccionada
+          : req.session.user.sede;
+
+    if (!sedeAsignada) {
+      return res.status(400).send("No se pudo determinar la sede de la unidad");
+    }
 
     await pool.query(
-      "INSERT INTO unidades (placa, sede) VALUES (?, ?)",
-      [placa.trim().toUpperCase(), sede]
+      "INSERT INTO unidades (placa, sede, activa, varada, razon_varada) VALUES (?, ?, 1, 0, NULL)",
+      [placaNormalizada, sedeAsignada]
     );
 
     res.redirect("/unidades");
-
   } catch (error) {
-    console.error("❌ ERROR agregar unidad:", error);
+    console.error("ERROR agregar unidad:", error);
+    res.status(500).send("Error interno");
+  }
+}
+
+// ===================== AGREGAR UNIDAD =====================
+router.post("/", agregarUnidad);
+router.post("/agregar", agregarUnidad);
+
+// ===================== ACTIVAR / INACTIVAR UNIDAD =====================
+router.post("/:id/estado", async (req, res) => {
+  try {
+    await ensureUnidadEstadoColumns();
+
+    if (!puedeEditarUnidades(req.session.user)) {
+      return res.status(403).send("No autorizado");
+    }
+
+    const id = parseInt(req.params.id, 10);
+    if (Number.isNaN(id)) {
+      return res.status(400).send("ID de unidad inválido");
+    }
+
+    const resultado = await obtenerUnidadAutorizada(req, id);
+    if (resultado.error) {
+      return res.status(resultado.error).send(resultado.mensaje);
+    }
+
+    const activa = req.body.activa === "1" ? 1 : 0;
+
+    await pool.query(
+      `UPDATE unidades
+       SET activa = ?,
+           varada = CASE WHEN ? = 0 THEN 0 ELSE varada END,
+           razon_varada = CASE WHEN ? = 0 THEN NULL ELSE razon_varada END
+       WHERE id = ?`,
+      [activa, activa, activa, id]
+    );
+
+    res.redirect("/unidades");
+  } catch (error) {
+    console.error("ERROR actualizando estado unidad:", error);
+    res.status(500).send("Error interno");
+  }
+});
+
+// ===================== MARCAR / LIMPIAR VARADA =====================
+router.post("/:id/varada", async (req, res) => {
+  try {
+    await ensureUnidadEstadoColumns();
+
+    if (!puedeEditarUnidades(req.session.user)) {
+      return res.status(403).send("No autorizado");
+    }
+
+    const id = parseInt(req.params.id, 10);
+    if (Number.isNaN(id)) {
+      return res.status(400).send("ID de unidad inválido");
+    }
+
+    const resultado = await obtenerUnidadAutorizada(req, id);
+    if (resultado.error) {
+      return res.status(resultado.error).send(resultado.mensaje);
+    }
+
+    const varada = req.body.varada === "1" ? 1 : 0;
+    const razon = String(req.body.razon_varada || "").trim();
+
+    if (varada === 1 && !razon) {
+      return res.status(400).send("Debe indicar la razón por la que la unidad está varada");
+    }
+
+    await pool.query(
+      `UPDATE unidades
+       SET varada = ?,
+           razon_varada = ?,
+           activa = CASE WHEN ? = 1 THEN 1 ELSE activa END
+       WHERE id = ?`,
+      [varada, varada ? razon : null, varada, id]
+    );
+
+    res.redirect("/unidades");
+  } catch (error) {
+    console.error("ERROR actualizando unidad varada:", error);
     res.status(500).send("Error interno");
   }
 });

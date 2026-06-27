@@ -23,6 +23,7 @@
     "node-cron": "^4.2.1",
     "nodemailer": "^8.0.9",
     "pdfmake": "^0.2.7",
+    "web-push": "^3.6.7",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {

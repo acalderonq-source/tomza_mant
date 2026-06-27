@@ -1,4 +1,4 @@
-const CACHE_NAME = "tomza-taller-v1";
+const CACHE_NAME = "tomza-taller-v2";
 const STATIC_ASSETS = [
   "/offline.html",
   "/manifest.webmanifest",
@@ -45,6 +45,53 @@ self.addEventListener("fetch", event => {
         caches.open(CACHE_NAME).then(cache => cache.put(request, copy));
         return response;
       });
+    })
+  );
+});
+
+self.addEventListener("push", event => {
+  let payload = {
+    title: "Tomza Taller",
+    body: "Tiene una notificación pendiente.",
+    icon: "/img/app-icon.svg",
+    badge: "/img/app-icon.svg",
+    url: "/dashboard",
+    tag: "tomza-notificacion"
+  };
+
+  if (event.data) {
+    try {
+      payload = { ...payload, ...event.data.json() };
+    } catch (error) {
+      payload.body = event.data.text();
+    }
+  }
+
+  const options = {
+    body: payload.body,
+    icon: payload.icon || "/img/app-icon.svg",
+    badge: payload.badge || "/img/app-icon.svg",
+    data: payload.data || { url: payload.url || "/dashboard" },
+    tag: payload.tag,
+    renotify: true
+  };
+
+  event.waitUntil(self.registration.showNotification(payload.title, options));
+});
+
+self.addEventListener("notificationclick", event => {
+  event.notification.close();
+  const targetUrl = (event.notification.data && event.notification.data.url) || "/dashboard";
+
+  event.waitUntil(
+    clients.matchAll({ type: "window", includeUncontrolled: true }).then(clientList => {
+      for (const client of clientList) {
+        if ("focus" in client && client.url.includes(targetUrl)) {
+          return client.focus();
+        }
+      }
+      if (clients.openWindow) return clients.openWindow(targetUrl);
+      return null;
     })
   );
 });

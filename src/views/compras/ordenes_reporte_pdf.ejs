@@ -94,10 +94,39 @@
       font-size: 9.5px;
       padding-top: 4px;
     }
+    .info-row td {
+      background: #f8fafc;
+      color: #334155;
+      font-size: 9px;
+      line-height: 1.35;
+    }
     .observacion-label {
       color: #64748b;
       font-weight: 800;
       margin-right: 5px;
+    }
+    .detail-cell {
+      background: #fff;
+      padding: 0 0 10px;
+    }
+    .detail-title {
+      color: #111827;
+      font-size: 9px;
+      font-weight: 900;
+      margin: 6px 0 4px;
+      text-transform: uppercase;
+    }
+    .detail-table th {
+      background: #334155;
+      font-size: 8px;
+      padding: 4px;
+    }
+    .detail-table td {
+      font-size: 8.5px;
+      padding: 4px;
+    }
+    .muted {
+      color: #64748b;
     }
     .total {
       background: #f8fafc;
@@ -147,6 +176,10 @@
       <div class="value"><%= filtros.po_numero || 'Todos' %></div>
     </div>
     <div class="filter-item">
+      <div class="label">Placa</div>
+      <div class="value"><%= filtros.placa_unidad || 'Todas' %></div>
+    </div>
+    <div class="filter-item">
       <div class="label">Estado</div>
       <div class="value"><%= filtros.estado ? filtros.estado.replace('_', ' ') : 'Todos' %></div>
     </div>
@@ -162,6 +195,7 @@
         <th>PO</th>
         <th>Fecha</th>
         <th>Proveedor</th>
+        <th>Placa</th>
         <th>Empresa</th>
         <th>Pago</th>
         <th>Moneda</th>
@@ -180,6 +214,7 @@
           <td><strong><%= orden.po_numero %></strong></td>
           <td><%= new Date(orden.fecha).toLocaleDateString('es-CR') %></td>
           <td><%= orden.proveedor_nombre %></td>
+          <td><%= orden.placa_unidad || '—' %></td>
           <td><%= orden.empresa_destino || 'GAS TOMZA' %></td>
           <td><%= orden.forma_pago || '—' %></td>
           <td><%= orden.moneda || '—' %></td>
@@ -196,14 +231,61 @@
           </td>
         </tr>
         <tr class="observacion-row">
-          <td colspan="13">
+          <td colspan="14">
             <span class="observacion-label">Observación:</span><%= orden.observaciones || 'Sin observaciones' %>
+          </td>
+        </tr>
+        <tr class="info-row">
+          <td colspan="14">
+            <strong>Facturación:</strong>
+            <span>Facturada: <%= Number(orden.facturada || 0) ? 'Sí' : 'No' %></span>
+            · <span>N° factura: <%= orden.factura || '—' %></span>
+            · <span>Vence: <%= orden.fecha_vencimiento_factura ? new Date(orden.fecha_vencimiento_factura).toLocaleDateString('es-CR') : '—' %></span>
+            · <span>Pagada: <%= Number(orden.pagada || 0) ? 'Sí' : 'No' %></span>
+            · <span>Fecha pago: <%= orden.fecha_pago ? new Date(orden.fecha_pago).toLocaleDateString('es-CR') : '—' %></span>
+            · <span>Recibido: <%= Number(orden.factura_producto_recibido || 0) ? 'Sí' : 'No' %></span>
+            · <span>Recepción: <%= orden.factura_fecha_recepcion ? new Date(orden.factura_fecha_recepcion).toLocaleDateString('es-CR') : '—' %></span>
+            <% if (orden.factura_observacion) { %>
+              <br><strong>Observación de factura:</strong> <%= orden.factura_observacion %>
+            <% } %>
+          </td>
+        </tr>
+        <tr>
+          <td colspan="14" class="detail-cell">
+            <div class="detail-title">Detalle de productos / servicios</div>
+            <table class="detail-table">
+              <thead>
+                <tr>
+                  <th>Placa</th>
+                  <th>Descripción</th>
+                  <th class="money">Cantidad</th>
+                  <th class="money">Precio unitario</th>
+                  <th class="money">Subtotal</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% (orden.lineas || []).forEach(linea => { %>
+                  <tr>
+                    <td><%= linea.codigo || '—' %></td>
+                    <td><%= linea.descripcion || '—' %></td>
+                    <td class="money"><%= Number(linea.cantidad || 0).toLocaleString('es-CR') %></td>
+                    <td class="money"><%= Number(linea.precio_unitario || 0).toLocaleString('es-CR') %></td>
+                    <td class="money"><strong><%= Number(linea.subtotal || 0).toLocaleString('es-CR') %></strong></td>
+                  </tr>
+                <% }) %>
+                <% if (!(orden.lineas || []).length) { %>
+                  <tr>
+                    <td colspan="5" class="muted">Sin productos o servicios registrados.</td>
+                  </tr>
+                <% } %>
+              </tbody>
+            </table>
           </td>
         </tr>
       <% }) %>
       <% if (!ordenes.length) { %>
         <tr>
-          <td colspan="13" class="empty">No hay órdenes con los filtros seleccionados.</td>
+          <td colspan="14" class="empty">No hay órdenes con los filtros seleccionados.</td>
         </tr>
       <% } %>
     </tbody>

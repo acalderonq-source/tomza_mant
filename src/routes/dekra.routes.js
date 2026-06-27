@@ -48,6 +48,7 @@ router.get("/", requireAuth, async (req, res) => {
     const sedeFiltro = obtenerSedeFiltro(req);
     const mes = req.query.mes || "";
     const negocio = req.query.negocio || "";
+    const estado = req.query.estado || "";
 
     let sql = `
       SELECT
@@ -81,15 +82,34 @@ router.get("/", requireAuth, async (req, res) => {
       params.push(negocio);
     }
 
+    if (estado) {
+      sql += ` AND d.estado = ?`;
+      params.push(estado);
+    }
+
     sql += ` ORDER BY d.sede, d.mes, d.negocio, u.placa`;
 
     const [rows] = await pool.query(sql, params);
+    const resumen = rows.reduce((acc, item) => {
+      acc.total += 1;
+      if (item.estado === "REALIZADO") acc.realizados += 1;
+      if (item.estado === "NO_REALIZADO") acc.noRealizados += 1;
+      if (item.estado === "PENDIENTE") acc.pendientes += 1;
+      return acc;
+    }, { total: 0, realizados: 0, noRealizados: 0, pendientes: 0 });
+
+    resumen.cumplimiento = resumen.total
+      ? Math.round((resumen.realizados / resumen.total) * 100)
+      : 0;
 
     res.render("dekra", {
       registros: rows,
       user: req.session.user,
       mesSeleccionado: mes,
-      negocioSeleccionado: negocio
+      negocioSeleccionado: negocio,
+      estadoSeleccionado: estado,
+      resumen,
+      sedeSeleccionada: sedeFiltro || "TODAS"
     });
   } catch (error) {
     console.error("❌ Error cargando DEKRA:", error);

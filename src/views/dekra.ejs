@@ -4,240 +4,184 @@
   <meta charset="UTF-8">
   <title>Control DEKRA</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
-
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
   <style>
-
-    .estado-realizado{
-      background: #d1fae5 !important;
+    body { background: #eef2f7; color: #0f172a; font-family: "Segoe UI", Roboto, Arial, sans-serif; }
+    .navbar { background: #101827; border-bottom: 3px solid #f59e0b; }
+    .shell { max-width: 1360px; }
+    .hero, .panel, .kpi-card {
+      background: #fff;
+      border: 1px solid #dbe3ef;
+      border-radius: 8px;
+      box-shadow: 0 10px 22px rgba(15,23,42,.05);
     }
-
-    .estado-no-realizado{
-      background: #fecaca !important;
-    }
-
-    .estado-pendiente{
-      background: #fef3c7 !important;
-    }
-
+    .hero { background: linear-gradient(135deg, #101827, #1f2937); color: #fff; padding: 1rem 1.15rem; }
+    .hero-title { font-size: 1.45rem; font-weight: 850; margin: 0; }
+    .hero-copy { color: #cbd5e1; margin: .25rem 0 0; }
+    .kpi-grid { display: grid; gap: .75rem; grid-template-columns: repeat(5, minmax(0, 1fr)); }
+    .kpi-card { border-top: 4px solid #f59e0b; padding: .85rem; }
+    .kpi-label { color: #64748b; font-size: .72rem; font-weight: 850; letter-spacing: .04em; text-transform: uppercase; }
+    .kpi-value { font-size: 1.65rem; font-weight: 900; line-height: 1.1; margin-top: .25rem; }
+    .kpi-foot { color: #64748b; font-size: .8rem; }
+    .filter-label { color: #475569; font-size: .75rem; font-weight: 800; text-transform: uppercase; }
+    .table thead th { background: #f8fafc; color: #475569; font-size: .74rem; font-weight: 850; letter-spacing: .04em; text-transform: uppercase; }
+    .table tbody td { vertical-align: middle; }
+    .status-pill { border-radius: 999px; font-size: .74rem; font-weight: 850; padding: .35rem .65rem; }
+    .status-ok { background: #dcfce7; color: #166534; }
+    .status-bad { background: #fee2e2; color: #991b1b; }
+    .status-wait { background: #fef3c7; color: #92400e; }
+    .business-pill { border-radius: 999px; font-weight: 800; padding: .35rem .65rem; }
+    .obs-box { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; color: #334155; padding: .45rem .55rem; }
+    .empty-state { color: #64748b; font-weight: 700; padding: 1.5rem; text-align: center; }
+    @media (max-width: 1100px) { .kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+    @media (max-width: 680px) { .kpi-grid { grid-template-columns: 1fr; } }
   </style>
-
 </head>
+<body>
 
-<body class="bg-dark text-light">
+<%
+  const data = resumen || { total: 0, realizados: 0, noRealizados: 0, pendientes: 0, cumplimiento: 0 };
+  const puedeEditar = user.rol !== 'SUPERVISOR' && user.rol !== 'SUPERVISOR_PESADO';
+%>
 
-<div class="container mt-4">
+<nav class="navbar navbar-dark px-3 py-2">
+  <span class="navbar-brand fw-semibold"><i class="bi bi-clipboard2-check me-1"></i> Control DEKRA</span>
+  <div class="d-flex gap-2">
+    <a href="/dashboard" class="btn btn-sm btn-outline-light">Dashboard</a>
+  </div>
+</nav>
 
-  <div class="d-flex justify-content-between align-items-center mb-3">
-    <h3 class="text-warning">Control DEKRA</h3>
-
-    <div>
-      <% if (user.rol !== 'SUPERVISOR' && user.rol !== 'SUPERVISOR_PESADO') { %>
-        <a href="/dekra/nuevo" class="btn btn-warning">➕ Nuevo registro</a>
+<div class="container-fluid shell py-4">
+  <section class="hero mb-3">
+    <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
+      <div>
+        <h1 class="hero-title">Cumplimiento DEKRA</h1>
+        <p class="hero-copy">Sede: <strong><%= sedeSeleccionada || 'TODAS' %></strong> · Control por mes, negocio y estado.</p>
+      </div>
+      <% if (puedeEditar) { %>
+        <a href="/dekra/nuevo" class="btn btn-warning"><i class="bi bi-plus-circle me-1"></i> Nuevo registro</a>
       <% } %>
-
-      <a href="/dashboard" class="btn btn-secondary">Volver</a>
     </div>
-  </div>
+  </section>
 
-  <!-- FILTROS -->
-  <form method="GET" action="/dekra" class="row g-2 mb-3">
+  <section class="kpi-grid mb-3">
+    <div class="kpi-card"><div class="kpi-label">Registros</div><div class="kpi-value"><%= data.total %></div><div class="kpi-foot">En la vista actual</div></div>
+    <div class="kpi-card"><div class="kpi-label">Realizados</div><div class="kpi-value"><%= data.realizados %></div><div class="kpi-foot">Unidades que pasaron</div></div>
+    <div class="kpi-card"><div class="kpi-label">Pendientes</div><div class="kpi-value"><%= data.pendientes %></div><div class="kpi-foot">Requieren gestión</div></div>
+    <div class="kpi-card"><div class="kpi-label">No realizados</div><div class="kpi-value"><%= data.noRealizados %></div><div class="kpi-foot">Con motivo registrado</div></div>
+    <div class="kpi-card"><div class="kpi-label">Cumplimiento</div><div class="kpi-value"><%= data.cumplimiento %>%</div><div class="kpi-foot">Realizados / total</div></div>
+  </section>
 
-    <div class="col-md-3">
-      <select name="mes" class="form-select">
-        <option value="">Todos los meses</option>
+  <section class="panel p-3 mb-3">
+    <form method="GET" action="/dekra" class="row g-3 align-items-end">
+      <div class="col-md-3">
+        <label class="filter-label">Mes</label>
+        <select name="mes" class="form-select form-select-sm">
+          <option value="">Todos los meses</option>
+          <% ['ENE-JUL','FEB-AGO','MAR-SET','ABR-OCT','MAY-NOV'].forEach(mes => { %>
+            <option value="<%= mes %>" <%= mesSeleccionado === mes ? 'selected' : '' %>><%= mes %></option>
+          <% }) %>
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label class="filter-label">Negocio</label>
+        <select name="negocio" class="form-select form-select-sm">
+          <option value="">Todos los negocios</option>
+          <% ['CILINDROS','GRANEL'].forEach(negocio => { %>
+            <option value="<%= negocio %>" <%= negocioSeleccionado === negocio ? 'selected' : '' %>><%= negocio %></option>
+          <% }) %>
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label class="filter-label">Estado</label>
+        <select name="estado" class="form-select form-select-sm">
+          <option value="">Todos los estados</option>
+          <% [['PENDIENTE','Pendiente'], ['REALIZADO','Realizado'], ['NO_REALIZADO','No realizado']].forEach(([value, label]) => { %>
+            <option value="<%= value %>" <%= estadoSeleccionado === value ? 'selected' : '' %>><%= label %></option>
+          <% }) %>
+        </select>
+      </div>
+      <div class="col-md-2">
+        <button class="btn btn-dark btn-sm w-100"><i class="bi bi-funnel me-1"></i> Filtrar</button>
+      </div>
+      <div class="col-md-1">
+        <a href="/dekra" class="btn btn-secondary btn-sm w-100">Limpiar</a>
+      </div>
+    </form>
+  </section>
 
-        <option value="ENE-JUL" <%= mesSeleccionado === 'ENE-JUL' ? 'selected' : '' %>>
-          ENE-JUL
-        </option>
-
-        <option value="FEB-AGO" <%= mesSeleccionado === 'FEB-AGO' ? 'selected' : '' %>>
-          FEB-AGO
-        </option>
-
-        <option value="MAR-SET" <%= mesSeleccionado === 'MAR-SET' ? 'selected' : '' %>>
-          MAR-SET
-        </option>
-
-        <option value="ABR-OCT" <%= mesSeleccionado === 'ABR-OCT' ? 'selected' : '' %>>
-          ABR-OCT
-        </option>
-
-        <option value="MAY-NOV" <%= mesSeleccionado === 'MAY-NOV' ? 'selected' : '' %>>
-          MAY-NOV
-        </option>
-      </select>
+  <section class="panel">
+    <div class="p-3 border-bottom d-flex justify-content-between align-items-center flex-wrap gap-2">
+      <div>
+        <h2 class="h5 fw-bold mb-0">Listado de unidades</h2>
+        <div class="text-muted small">Priorizado por sede, mes, negocio y placa.</div>
+      </div>
+      <span class="badge text-bg-dark"><%= registros.length %> resultado<%= registros.length === 1 ? '' : 's' %></span>
     </div>
-
-    <div class="col-md-3">
-      <select name="negocio" class="form-select">
-        <option value="">Todos los negocios</option>
-
-        <option value="CILINDROS" <%= negocioSeleccionado === 'CILINDROS' ? 'selected' : '' %>>
-          CILINDROS
-        </option>
-
-        <option value="GRANEL" <%= negocioSeleccionado === 'GRANEL' ? 'selected' : '' %>>
-          GRANEL
-        </option>
-      </select>
-    </div>
-
-    <div class="col-md-2">
-      <button class="btn btn-outline-warning w-100">
-        Filtrar
-      </button>
-    </div>
-
-  </form>
-
-  <!-- TABLA -->
-  <div class="table-responsive">
-
-    <table class="table table-bordered table-hover align-middle bg-white">
-
-      <thead class="table-dark">
-        <tr>
-          <th>Placa</th>
-          <th>Sede</th>
-          <th>Mes</th>
-          <th>Negocio</th>
-          <th>Estado</th>
-          <th>Observación</th>
-          <th style="width: 260px;">Acciones</th>
-        </tr>
-      </thead>
-
-      <tbody>
-
-        <% registros.forEach(r => { %>
-
-          <tr class="
-            <%= r.estado === 'REALIZADO' ? 'estado-realizado' : '' %>
-            <%= r.estado === 'NO_REALIZADO' ? 'estado-no-realizado' : '' %>
-            <%= r.estado === 'PENDIENTE' ? 'estado-pendiente' : '' %>
-          ">
-
-            <td>
-              <strong><%= r.placa %></strong>
-            </td>
-
-            <td><%= r.sede %></td>
-
-            <td><%= r.mes %></td>
-
-            <td>
-              <span class="badge <%= r.negocio === 'GRANEL' ? 'bg-danger' : 'bg-primary' %>">
-                <%= r.negocio %>
-              </span>
-            </td>
-
-            <!-- ESTADO -->
-            <td>
-
-              <% if (r.estado === 'REALIZADO') { %>
-
-                <span class="badge bg-success">
-                  ✔ Pasó
-                </span>
-
-              <% } else if (r.estado === 'NO_REALIZADO') { %>
-
-                <span class="badge bg-danger">
-                  ✖ No pasó
-                </span>
-
-              <% } else { %>
-
-                <span class="badge bg-warning text-dark">
-                  Pendiente
-                </span>
-
-              <% } %>
-
-            </td>
-
-            <td>
-              <%= r.observacion || '—' %>
-            </td>
-
-            <td>
-
-              <% if (user.rol !== 'SUPERVISOR' && user.rol !== 'SUPERVISOR_PESADO') { %>
-
-                <div class="d-flex gap-2 flex-wrap">
-
-                  <form method="POST" action="/dekra/<%= r.id %>/realizado">
-                    <button class="btn btn-success btn-sm">
-                      ✔ Pasó
-                    </button>
-                  </form>
-
-                  <button
-                    class="btn btn-danger btn-sm"
-                    data-bs-toggle="collapse"
-                    data-bs-target="#obs-<%= r.id %>">
-
-                    ✖ No pudo ir
-
-                  </button>
-
-                </div>
-
-                <!-- OBS -->
-                <div class="collapse mt-2" id="obs-<%= r.id %>">
-
-                  <form method="POST" action="/dekra/<%= r.id %>/no-realizado">
-
-                    <textarea
-                      name="observacion"
-                      class="form-control mb-2"
-                      rows="2"
-                      placeholder="Ej: motor malo, frenos, falta repuesto..."
-                      required></textarea>
-
-                    <button class="btn btn-danger btn-sm">
-                      Guardar motivo
-                    </button>
-
-                  </form>
-
-                </div>
-
-              <% } else { %>
-
-                <span class="text-muted">
-                  Solo visualización
-                </span>
-
-              <% } %>
-
-            </td>
-
-          </tr>
-
-        <% }) %>
-
-        <% if (registros.length === 0) { %>
-
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead>
           <tr>
-            <td colspan="7" class="text-center">
-              No hay registros DEKRA
-            </td>
+            <th>Placa</th>
+            <th>Sede</th>
+            <th>Mes</th>
+            <th>Negocio</th>
+            <th>Estado</th>
+            <th>Observación</th>
+            <th>Actualizado</th>
+            <th class="text-end">Acciones</th>
           </tr>
-
-        <% } %>
-
-      </tbody>
-
-    </table>
-
-  </div>
-
+        </thead>
+        <tbody>
+          <% registros.forEach(r => { %>
+            <tr>
+              <td><strong><%= r.placa %></strong></td>
+              <td><%= r.sede %></td>
+              <td><%= r.mes %></td>
+              <td><span class="business-pill <%= r.negocio === 'GRANEL' ? 'text-bg-danger' : 'text-bg-primary' %>"><%= r.negocio %></span></td>
+              <td>
+                <% if (r.estado === 'REALIZADO') { %>
+                  <span class="status-pill status-ok">Pasó</span>
+                <% } else if (r.estado === 'NO_REALIZADO') { %>
+                  <span class="status-pill status-bad">No realizó</span>
+                <% } else { %>
+                  <span class="status-pill status-wait">Pendiente</span>
+                <% } %>
+              </td>
+              <td><div class="obs-box"><%= r.observacion || 'Sin observación' %></div></td>
+              <td><%= r.fecha_registro || '—' %></td>
+              <td class="text-end">
+                <% if (puedeEditar) { %>
+                  <div class="d-flex gap-2 justify-content-end flex-wrap">
+                    <form method="POST" action="/dekra/<%= r.id %>/realizado">
+                      <button class="btn btn-success btn-sm"><i class="bi bi-check-circle me-1"></i> Pasó</button>
+                    </form>
+                    <button class="btn btn-outline-danger btn-sm" data-bs-toggle="collapse" data-bs-target="#obs-<%= r.id %>">
+                      <i class="bi bi-x-circle me-1"></i> No pudo ir
+                    </button>
+                  </div>
+                  <div class="collapse mt-2" id="obs-<%= r.id %>">
+                    <form method="POST" action="/dekra/<%= r.id %>/no-realizado">
+                      <textarea name="observacion" class="form-control form-control-sm mb-2" rows="2" placeholder="Motivo del no realizado" required></textarea>
+                      <button class="btn btn-danger btn-sm">Guardar motivo</button>
+                    </form>
+                  </div>
+                <% } else { %>
+                  <span class="badge text-bg-secondary">Solo lectura</span>
+                <% } %>
+              </td>
+            </tr>
+          <% }) %>
+          <% if (!registros.length) { %>
+            <tr><td colspan="8" class="empty-state">No hay registros DEKRA con los filtros seleccionados.</td></tr>
+          <% } %>
+        </tbody>
+      </table>
+    </div>
+  </section>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-
 </body>
 </html>

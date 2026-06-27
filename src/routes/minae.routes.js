@@ -42,6 +42,41 @@ function obtenerSedeFiltro(req) {
   return sede || null;
 }
 
+const fechaRegex = /^\d{4}-\d{2}-\d{2}$/;
+
+function validarFechaOpcional(valor, campo) {
+  if (valor && !fechaRegex.test(valor)) {
+    return `Formato de ${campo} inválido (YYYY-MM-DD)`;
+  }
+  return null;
+}
+
+function usuarioPuedeVerSede(req, sede) {
+  const sedeFiltro = obtenerSedeFiltro(req);
+  return sedeFiltro === null || sede === sedeFiltro;
+}
+
+async function obtenerTramiteAutorizado(req, id) {
+  const [[tramite]] = await pool.query(
+    `SELECT mt.*, u.placa
+     FROM minae_tramites mt
+     JOIN unidades u ON u.id = mt.unidad_id
+     WHERE mt.id = ?
+     LIMIT 1`,
+    [id]
+  );
+
+  if (!tramite) {
+    return { error: 404, mensaje: "Trámite no encontrado" };
+  }
+
+  if (!usuarioPuedeVerSede(req, tramite.sede)) {
+    return { error: 403, mensaje: "No tienes permiso para editar este trámite." };
+  }
+
+  return { tramite };
+}
+
 // =====================================================
 // LISTADO MINAE
 // =====================================================
@@ -168,15 +203,14 @@ router.post("/nuevo", async (req, res) => {
       return res.status(400).send("El campo 'tipo' es obligatorio");
     }
 
-    const fechaRegex = /^\d{4}-\d{2}-\d{2}$/;
-    if (fecha_envio && !fechaRegex.test(fecha_envio)) {
-      return res.status(400).send("Formato de fecha_envio inválido (YYYY-MM-DD)");
-    }
-    if (vencimiento && !fechaRegex.test(vencimiento)) {
-      return res.status(400).send("Formato de vencimiento inválido (YYYY-MM-DD)");
-    }
-    if (fecha_cita && !fechaRegex.test(fecha_cita)) {
-      return res.status(400).send("Formato de fecha_cita inválido (YYYY-MM-DD)");
+    const errorFecha =
+      validarFechaOpcional(fecha_envio, "fecha_envio") ||
+      validarFechaOpcional(vencimiento, "vencimiento") ||
+      validarFechaOpcional(presentacion, "presentacion") ||
+      validarFechaOpcional(subsane, "subsane") ||
+      validarFechaOpcional(fecha_cita, "fecha_cita");
+    if (errorFecha) {
+      return res.status(400).send(errorFecha);
     }
 
     const [[unidad]] = await pool.query(
@@ -211,6 +245,113 @@ router.post("/nuevo", async (req, res) => {
   } catch (error) {
     console.error("❌ Error guardando MINAE:", error);
     res.status(500).send("Error guardando MINAE");
+  }
+});
+
+// =====================================================
+// FORMULARIO PARA ACTUALIZAR DATOS DEL TRÁMITE
+// =====================================================
+router.get("/:id/editar", async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (Number.isNaN(id)) {
+      return res.status(400).send("ID de trámite inválido");
+    }
+
+    const resultado = await obtenerTramiteAutorizado(req, id);
+    if (resultado.error) {
+      return res.status(resultado.error).send(resultado.mensaje);
+    }
+
+    res.render("minae_editar", {
+      tramite: resultado.tramite,
+      user: req.session.user,
+    });
+  } catch (error) {
+    console.error("❌ Error cargando edición MINAE:", error);
+    res.status(500).send("Error cargando edición MINAE");
+  }
+});
+
+// =====================================================
+// GUARDAR DATOS ACTUALIZADOS DEL TRÁMITE
+// =====================================================
+router.post("/:id/editar", async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (Number.isNaN(id)) {
+      return res.status(400).send("ID de trámite inválido");
+    }
+
+    const resultado = await obtenerTramiteAutorizado(req, id);
+    if (resultado.error) {
+      return res.status(resultado.error).send(resultado.mensaje);
+    }
+
+    const {
+      tipo,
+      cr,
+      estado,
+      fecha_envio,
+      vencimiento,
+      presentacion,
+      subsane,
+      ot,
+      empresa,
+      lugar,
+      hora,
+      observacion,
+    } = req.body;
+
+    if (!tipo) {
+      return res.status(400).send("El campo 'tipo' es obligatorio");
+    }
+
+    const errorFecha =
+      validarFechaOpcional(fecha_envio, "fecha_envio") ||
+      validarFechaOpcional(vencimiento, "vencimiento") ||
+      validarFechaOpcional(presentacion, "presentacion") ||
+      validarFechaOpcional(subsane, "subsane");
+    if (errorFecha) {
+      return res.status(400).send(errorFecha);
+    }
+
+    await pool.query(
+      `UPDATE minae_tramites
+       SET tipo = ?,
+           cr = ?,
+           estado = ?,
+           fecha_envio = ?,
+           vencimiento = ?,
+           presentacion = ?,
+           subsane = ?,
+           ot = ?,
+           empresa = ?,
+           lugar = ?,
+           hora = ?,
+           observacion = ?
+       WHERE id = ?`,
+      [
+        tipo,
+        cr || null,
+        estado || "PENDIENTE",
+        fecha_envio || null,
+        vencimiento || null,
+        presentacion || null,
+        subsane || null,
+        ot || null,
+        empresa || null,
+        lugar || null,
+        hora || null,
+        observacion || null,
+        id,
+      ]
+    );
+
+    res.redirect("/minae");
+  } catch (error) {
+    console.error("❌ Error actualizando MINAE:", error);
+    res.status(500).send("Error actualizando MINAE");
   }
 });
 

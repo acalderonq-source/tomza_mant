@@ -19,7 +19,56 @@
     .amount-stack { display: grid; gap: .2rem; }
     .amount-original { color: #64748b; font-size: .78rem; text-decoration: line-through; }
     .amount-credit { color: #0369a1; font-size: .8rem; font-weight: 700; }
+    .amount-payment { color: #15803d; font-size: .8rem; font-weight: 700; }
     .amount-balance { color: #111827; font-size: .98rem; font-weight: 800; }
+    .provider-search {
+      border-color: #bfdbfe;
+      background: #f8fafc;
+    }
+    .messenger-card {
+      background: linear-gradient(135deg, #ffffff, #f8fafc);
+      border: 1px solid #dbe3ef;
+    }
+    .mobile-action {
+      min-height: 44px;
+    }
+    .receipt-modal .modal-content {
+      border: 0;
+      border-radius: 18px;
+      overflow: hidden;
+    }
+    .receipt-modal .modal-header {
+      background: #111827;
+      color: #fff;
+    }
+    .receipt-modal .btn-close {
+      filter: invert(1);
+      opacity: .9;
+    }
+    .receipt-help {
+      border-radius: 14px;
+      margin-bottom: 1rem;
+    }
+    .camera-box {
+      background: #f8fafc;
+      border: 1px dashed #cbd5e1;
+      border-radius: 14px;
+      padding: .9rem;
+    }
+    .photo-preview-card {
+      background: #fff;
+      border: 1px solid #dbe3ef;
+      border-radius: 14px;
+      display: inline-block;
+      padding: .6rem;
+    }
+    .photo-preview-card img {
+      border-radius: 10px;
+      max-height: 180px;
+      max-width: 220px;
+      object-fit: cover;
+      width: 100%;
+    }
     .nc-note {
       background: #eff6ff;
       border: 1px solid #bfdbfe;
@@ -32,6 +81,103 @@
     }
     .nc-note strong { font-size: .8rem; }
     .nc-note small { color: #1d4ed8; }
+    @media (max-width: 576px) {
+      body { background: #eef2f7; }
+      .navbar {
+        align-items: flex-start;
+        gap: .6rem;
+      }
+      .navbar .navbar-brand {
+        font-size: 1rem;
+        white-space: normal;
+      }
+      .navbar .text-white {
+        display: flex;
+        flex-wrap: wrap;
+        gap: .45rem;
+        width: 100%;
+      }
+      .navbar .text-white .btn {
+        margin-left: 0 !important;
+      }
+      .container {
+        padding-left: .85rem;
+        padding-right: .85rem;
+      }
+      .page-heading {
+        align-items: stretch !important;
+        gap: .8rem;
+      }
+      .page-heading .btn,
+      .messenger-card .btn {
+        min-height: 48px;
+        width: 100%;
+      }
+      .page-title {
+        font-size: 1.35rem;
+        line-height: 1.15;
+      }
+      .page-subtitle {
+        font-size: .92rem;
+      }
+      .messenger-card {
+        border-radius: 16px;
+        padding: 1rem !important;
+      }
+      .messenger-card .alert {
+        border-radius: 14px;
+        font-size: .9rem;
+      }
+      .receipt-modal {
+        margin: 0;
+        max-width: 100%;
+      }
+      .receipt-modal .modal-content {
+        border-radius: 0;
+        min-height: 100vh;
+      }
+      .receipt-modal .modal-header,
+      .receipt-modal .modal-footer {
+        position: sticky;
+        z-index: 3;
+      }
+      .receipt-modal .modal-header {
+        top: 0;
+      }
+      .receipt-modal .modal-footer {
+        background: #fff;
+        border-top: 1px solid #e2e8f0;
+        bottom: 0;
+        display: grid;
+        gap: .55rem;
+      }
+      .receipt-modal .modal-footer .btn {
+        margin: 0;
+        min-height: 48px;
+        width: 100%;
+      }
+      .receipt-modal .form-control,
+      .receipt-modal .form-select {
+        font-size: 1rem;
+        min-height: 46px;
+      }
+      .receipt-modal textarea.form-control {
+        min-height: 104px;
+      }
+      .receipt-help {
+        font-size: .92rem;
+      }
+      .camera-box {
+        padding: .8rem;
+      }
+      .photo-preview-card {
+        display: block;
+      }
+      .photo-preview-card img {
+        max-height: 260px;
+        max-width: 100%;
+      }
+    }
     @media (max-width: 768px) {
       .table-facturas thead { display: none; }
       .table-facturas, .table-facturas tbody, .table-facturas tr, .table-facturas td {
@@ -51,21 +197,33 @@
   <span class="navbar-brand fw-semibold"><i class="bi bi-receipt"></i> Gestión de Facturas</span>
   <div class="text-white">
     <%= user.usuario %> (<%= user.rol %>)
-    <a href="/compras/ordenes" class="btn btn-sm btn-outline-light ms-2">← Órdenes</a>
-    <a href="/dashboard" class="btn btn-sm btn-outline-light ms-2">Dashboard</a>
+    <% if (!['MENSAJERO', 'MENSAJERIA', 'MENSAJERO_FACTURAS'].includes(user.rol)) { %>
+      <a href="/compras/ordenes" class="btn btn-sm btn-outline-light ms-2">← Órdenes</a>
+      <a href="/dashboard" class="btn btn-sm btn-outline-light ms-2">Dashboard</a>
+    <% } %>
+    <a href="/logout" class="btn btn-sm btn-warning ms-2">Salir</a>
   </div>
 </nav>
 
 <div class="container py-4">
-  <% const puedeModificarCompras = user.rol !== 'CONTABILIDAD'; %>
+  <%
+    const rolesGestionFacturas = ['ADMIN', 'TALLER', 'PROVEEDURIA_TALLER'];
+    const rolesMensajeroFacturas = ['MENSAJERO', 'MENSAJERIA', 'MENSAJERO_FACTURAS'];
+    const puedeGestionarFacturas = rolesGestionFacturas.includes(user.rol);
+    const puedeRecibirFacturas = puedeGestionarFacturas || rolesMensajeroFacturas.includes(user.rol);
+    const modoMensajero = rolesMensajeroFacturas.includes(user.rol);
+    const puedeModificarCompras = puedeGestionarFacturas;
+  %>
   <div class="page-heading">
     <div>
-      <h1 class="page-title">Facturas de compras</h1>
-      <p class="page-subtitle">Controla facturas pendientes, vencidas y pagos múltiples.</p>
+      <h1 class="page-title"><%= modoMensajero ? 'Recepción de facturas' : 'Facturas de compras' %></h1>
+      <p class="page-subtitle">
+        <%= modoMensajero ? 'Seleccione la orden de compra, registre la factura y adjunte la foto si aplica.' : 'Controla facturas pendientes, vencidas y pagos múltiples.' %>
+      </p>
     </div>
-    <% if (puedeModificarCompras) { %>
+    <% if (puedeRecibirFacturas) { %>
       <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#agregarFacturaModal">
-        <i class="bi bi-plus-circle"></i> Agregar factura
+        <i class="bi bi-plus-circle"></i> Recibir factura
       </button>
     <% } %>
   </div>
@@ -84,16 +242,36 @@
     </div>
   <% } %>
 
+  <% if (modoMensajero) { %>
+    <div class="card p-4 messenger-card">
+      <div class="d-flex align-items-start justify-content-between gap-3 flex-wrap">
+        <div>
+          <h3 class="page-title fs-5">Registrar recepción</h3>
+          <p class="page-subtitle mb-0">
+            Use el botón <strong>Recibir factura</strong>, seleccione la orden de compra y registre la factura recibida.
+          </p>
+        </div>
+        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#agregarFacturaModal">
+          <i class="bi bi-receipt"></i> Recibir factura
+        </button>
+      </div>
+      <div class="alert alert-warning mt-3 mb-0">
+        Su usuario solo puede registrar recepción de facturas ligadas a órdenes de compra. No puede pagar, editar órdenes, registrar NC ni ver otros módulos de compras.
+      </div>
+    </div>
+  <% } else { %>
+
   <!-- Filtros -->
   <div class="filtros-card">
     <h5 class="mb-3 fw-semibold"><i class="bi bi-funnel me-2"></i>Filtrar facturas</h5>
     <form method="GET" action="/compras/facturas" class="row g-3">
       <div class="col-md-2">
         <label class="form-label small fw-semibold">Proveedor</label>
-        <select name="proveedor_id" class="form-select form-select-sm">
+        <input type="text" class="form-control form-control-sm provider-search mb-1" data-provider-target="proveedorFiltroSelect" placeholder="Buscar por letra, ej: L">
+        <select name="proveedor_id" id="proveedorFiltroSelect" class="form-select form-select-sm">
           <option value="">Todos</option>
           <% proveedores.forEach(p => { %>
-            <option value="<%= p.id %>" <%= filtros.proveedor_id == p.id ? 'selected' : '' %>><%= p.nombre %></option>
+            <option value="<%= p.id %>" data-provider-name="<%= p.nombre %>" <%= filtros.proveedor_id == p.id ? 'selected' : '' %>><%= p.nombre %></option>
           <% }) %>
         </select>
       </div>
@@ -139,6 +317,7 @@
   <%
     const totalFacturas = facturas.reduce((sum, f) => sum + (parseFloat(f.monto_original ?? f.monto) || 0), 0);
     const totalNotasCredito = facturas.reduce((sum, f) => sum + (parseFloat(f.nota_credito_monto) || 0), 0);
+    const totalAbonos = facturas.reduce((sum, f) => sum + (parseFloat(f.abono_monto) || 0), 0);
     const totalSaldo = facturas.reduce((sum, f) => {
       if (f.pagada || f.cubierta_por_nc) return sum;
       return sum + (parseFloat(f.saldo ?? f.monto) || 0);
@@ -146,6 +325,13 @@
     const facturasPagadas = facturas.filter(f => f.pagada || f.cubierta_por_nc).length;
     const facturasPendientes = facturas.filter(f => !f.pagada && (parseFloat(f.saldo ?? f.monto) > 0)).length;
     const facturasVencidas = facturas.filter(f => f.vencida).length;
+    const reporteParams = new URLSearchParams();
+    if (filtros.proveedor_id) reporteParams.set('proveedor_id', filtros.proveedor_id);
+    if (filtros.fecha_desde) reporteParams.set('fecha_desde', filtros.fecha_desde);
+    if (filtros.fecha_hasta) reporteParams.set('fecha_hasta', filtros.fecha_hasta);
+    if (filtros.vencida) reporteParams.set('vencida', filtros.vencida);
+    if (filtros.orden) reporteParams.set('orden', filtros.orden);
+    const reportePendientesUrl = '/compras/facturas/reporte/pdf' + (reporteParams.toString() ? `?${reporteParams.toString()}` : '');
   %>
   <div class="summary-grid">
     <div class="summary-card">
@@ -161,6 +347,10 @@
       <div class="summary-value">₡<%= totalNotasCredito.toLocaleString('es-CR', { maximumFractionDigits: 0 }) %></div>
     </div>
     <div class="summary-card">
+      <div class="summary-label">Abonos</div>
+      <div class="summary-value">₡<%= totalAbonos.toLocaleString('es-CR', { maximumFractionDigits: 0 }) %></div>
+    </div>
+    <div class="summary-card">
       <div class="summary-label">Saldo pendiente</div>
       <div class="summary-value">₡<%= totalSaldo.toLocaleString('es-CR', { maximumFractionDigits: 0 }) %></div>
     </div>
@@ -173,6 +363,9 @@
         <h3 class="page-title fs-5">Listado de facturas</h3>
         <p class="page-subtitle">Pagadas/cubiertas: <%= facturasPagadas %> · Pendientes: <%= facturasPendientes %> · Vencidas: <%= facturasVencidas %></p>
       </div>
+      <a href="<%= reportePendientesUrl %>" class="btn btn-outline-success btn-sm">
+        <i class="bi bi-download"></i> Descargar pendientes
+      </a>
     </div>
 
     <form method="POST" action="/compras/facturas/pagar-multiple" id="multiplePagoForm">
@@ -186,6 +379,7 @@
               <th>PO Número</th>
               <th>Proveedor</th>
               <th>Fecha</th>
+              <th>Recepción</th>
               <th>N° Factura</th>
               <th>Monto</th>
               <th>Fecha Vencimiento</th>
@@ -206,12 +400,34 @@
                 <td data-label="PO Número"><%= f.po_numero ? f.po_numero : '—' %></td>
                 <td data-label="Proveedor"><%= f.proveedor_nombre %></td>
                 <td data-label="Fecha"><%= new Date(f.fecha).toLocaleDateString('es-CR') %></td>
+                <td data-label="Recepción">
+                  <div class="small">
+                    <% if (f.factura_foto_producto) { %>
+                      <div>
+                        <a href="<%= f.factura_foto_producto %>" target="_blank" class="btn btn-sm btn-outline-secondary">
+                          <i class="bi bi-image"></i> Ver foto
+                        </a>
+                      </div>
+                    <% } %>
+                    <% if (f.factura_observacion) { %>
+                      <div class="text-muted mt-1"><%= f.factura_observacion %></div>
+                    <% } %>
+                    <% if (!f.factura_foto_producto && !f.factura_observacion) { %>
+                      <span class="text-muted">Sin evidencia</span>
+                    <% } %>
+                  </div>
+                </td>
                 <td data-label="N° Factura"><%= f.numero_factura %></td>
                 <td data-label="Monto" class="monto-factura money" data-val="<%= f.saldo ?? f.monto %>">
                   <div class="amount-stack">
-                    <% if (f.tiene_nc) { %>
+                    <% if (f.tiene_nc || f.tiene_abono) { %>
                       <span class="amount-original">Factura: ₡<%= parseFloat(f.monto_original ?? f.monto).toLocaleString('es-CR') %></span>
-                      <span class="amount-credit">NC: -₡<%= parseFloat(f.nota_credito_monto || 0).toLocaleString('es-CR') %></span>
+                      <% if (f.tiene_nc) { %>
+                        <span class="amount-credit">NC: -₡<%= parseFloat(f.nota_credito_monto || 0).toLocaleString('es-CR') %></span>
+                      <% } %>
+                      <% if (f.tiene_abono) { %>
+                        <span class="amount-payment">Abonos: -₡<%= parseFloat(f.abono_monto || 0).toLocaleString('es-CR') %></span>
+                      <% } %>
                       <span class="amount-balance">Saldo: ₡<%= parseFloat(f.saldo || 0).toLocaleString('es-CR') %></span>
                     <% } else { %>
                       <span class="amount-balance">₡<%= parseFloat(f.monto).toLocaleString('es-CR') %></span>
@@ -237,6 +453,11 @@
                       <span class="badge badge-nc">NC aplicada</span>
                     </div>
                   <% } %>
+                  <% if (f.tiene_abono && !f.pagada) { %>
+                    <div class="mt-2">
+                      <span class="badge bg-success">Con abono</span>
+                    </div>
+                  <% } %>
                 </td>
                 <td data-label="Acciones">
                   <% if (puedeModificarCompras) { %>
@@ -248,6 +469,13 @@
                       <i class="bi bi-journal-minus"></i> NC
                     </button>
                     <% if (!f.pagada && (parseFloat(f.saldo ?? f.monto) > 0)) { %>
+                      <button
+                        type="button"
+                        class="btn btn-sm btn-outline-success mb-1"
+                        data-bs-toggle="modal"
+                        data-bs-target="#abono-<%= f.tipo %>-<%= f.id %>">
+                        <i class="bi bi-cash-coin"></i> Abonar
+                      </button>
                       <button
                         type="submit"
                         form="pagar-factura-<%= f.tipo %>-<%= f.id %>"
@@ -271,7 +499,7 @@
               </tr>
             <% }) %>
             <% if (facturas.length === 0) { %>
-              <tr><td colspan="<%= puedeModificarCompras ? 9 : 8 %>" class="text-center py-4">No hay facturas con los filtros seleccionados</td></tr>
+              <tr><td colspan="<%= puedeModificarCompras ? 10 : 9 %>" class="text-center py-4">No hay facturas con los filtros seleccionados</td></tr>
             <% } %>
           </tbody>
         </table>
@@ -304,6 +532,8 @@
       <% }) %>
     <% } %>
   </div>
+
+  <% } %>
 </div>
 
 <% if (puedeModificarCompras) { %>
@@ -353,51 +583,137 @@
       </div>
     </div>
     </div>
+    <% if (!f.pagada && (parseFloat(f.saldo ?? f.monto) > 0)) { %>
+      <div class="modal fade" id="abono-<%= f.tipo %>-<%= f.id %>" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <form method="POST" action="/compras/facturas/<%= f.id %>/abono">
+            <div class="modal-header">
+              <div>
+                <h5 class="modal-title"><i class="bi bi-cash-coin me-1"></i> Registrar abono</h5>
+                <small class="text-muted">Factura <%= f.numero_factura %> · <%= f.proveedor_nombre %></small>
+              </div>
+              <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+              <input type="hidden" name="tipo" value="<%= f.tipo %>">
+              <div class="alert alert-success py-2">
+                Saldo pendiente: <strong>₡<%= parseFloat(f.saldo || 0).toLocaleString('es-CR') %></strong>
+                <% if (f.tiene_abono) { %>
+                  <br>Abonado actualmente: <strong>₡<%= parseFloat(f.abono_monto || 0).toLocaleString('es-CR') %></strong>
+                <% } %>
+              </div>
+              <div class="mb-3">
+                <label class="form-label">Fecha del abono</label>
+                <input type="date" name="fecha_abono" class="form-control" value="<%= hoy %>" required>
+              </div>
+              <div class="mb-3">
+                <label class="form-label">Monto del abono</label>
+                <input type="number" step="0.01" min="0.01" max="<%= f.saldo || 0 %>" name="monto_abono" class="form-control" required>
+                <small class="text-muted">Si el abono cubre todo el saldo, la factura queda pagada.</small>
+              </div>
+              <div class="mb-3">
+                <label class="form-label">Observación</label>
+                <textarea name="observacion_abono" class="form-control" rows="3" placeholder="Ej: transferencia parcial, pago programado, abono de caja..."><%= f.abono_observacion || '' %></textarea>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+              <button class="btn btn-success">Guardar abono</button>
+            </div>
+          </form>
+        </div>
+      </div>
+      </div>
+    <% } %>
   <% }) %>
 <% } %>
 
-<!-- Modal para agregar factura manualmente (PO opcional, proveedor desde selector) -->
-<% if (puedeModificarCompras) { %>
+<!-- Modal para recepción de factura ligada a orden de compra -->
+<% if (puedeRecibirFacturas) { %>
   <div class="modal fade" id="agregarFacturaModal" tabindex="-1" aria-labelledby="agregarFacturaModalLabel" aria-hidden="true">
-  <div class="modal-dialog">
+  <div class="modal-dialog modal-lg receipt-modal">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title" id="agregarFacturaModalLabel">➕ Agregar nueva factura</h5>
+        <h5 class="modal-title" id="agregarFacturaModalLabel"><i class="bi bi-box-seam me-1"></i> Recepción de factura</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
-      <form method="POST" action="/compras/facturas/agregar">
+      <form method="POST" action="/compras/facturas/agregar" id="recepcionFacturaForm">
         <div class="modal-body">
-          <div class="mb-3">
-            <label class="form-label">Número de PO (opcional)</label>
-            <input type="text" name="po_numero" class="form-control" placeholder="Ej: 2026-381">
-            <small class="text-muted">Si tiene orden de compra, ingrésela; si no, deje vacío.</small>
+          <div class="alert alert-info receipt-help">
+            Seleccione la orden de compra y registre la factura recibida.
           </div>
-          <div class="mb-3">
-            <label class="form-label">Número de Factura</label>
-            <input type="text" name="factura" class="form-control" required>
+
+          <div class="row g-3">
+            <div class="col-md-8">
+              <label class="form-label">Orden de compra</label>
+              <input type="text" class="form-control provider-search mb-1" data-provider-target="ordenFacturaSelect" placeholder="Buscar por proveedor o PO, ej: L">
+              <select name="orden_id" id="ordenFacturaSelect" class="form-select">
+                <option value=""><%= modoMensajero ? 'Seleccione una orden de compra' : 'Sin orden de compra / factura independiente' %></option>
+                <% ordenesDisponibles.forEach(o => { %>
+                  <option value="<%= o.id %>" data-provider-name="<%= o.proveedor_nombre %>" data-search-extra="<%= o.po_numero %>">
+                    <%= o.po_numero %> · <%= o.proveedor_nombre %> · ₡<%= parseFloat(o.total || 0).toLocaleString('es-CR') %> · <%= o.estado.replace('_', ' ') %>
+                  </option>
+                <% }) %>
+              </select>
+              <small class="text-muted">Solo aparecen órdenes que aún no están facturadas.</small>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">PO manual</label>
+              <input type="text" name="po_numero" class="form-control" placeholder="Ej: 2026-381">
+              <small class="text-muted">Úselo solo si no encuentra la orden arriba.</small>
+            </div>
           </div>
-          <div class="mb-3">
-            <label class="form-label">Fecha de la Factura</label>
-            <input type="date" name="fecha_factura" class="form-control" required>
+
+          <hr>
+
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label">Número de factura</label>
+              <input type="text" name="factura" class="form-control" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Fecha de factura</label>
+              <input type="date" name="fecha_factura" class="form-control" value="<%= hoy %>" required>
+            </div>
           </div>
-          <div class="mb-3">
-            <label class="form-label">Proveedor</label>
-            <select name="proveedor_id" class="form-select" required>
-              <option value="">Seleccione un proveedor</option>
-              <% proveedores.forEach(p => { %>
-                <option value="<%= p.id %>"><%= p.nombre %></option>
-              <% }) %>
-            </select>
-            <small class="text-muted">Obligatorio si no ingresa PO.</small>
+
+          <div class="row g-3 mt-1">
+            <% if (!modoMensajero) { %>
+              <div class="col-md-4">
+                <label class="form-label">Proveedor independiente</label>
+                <input type="text" class="form-control provider-search mb-1" data-provider-target="proveedorIndependienteSelect" placeholder="Buscar por letra, ej: L">
+                <select name="proveedor_id" id="proveedorIndependienteSelect" class="form-select">
+                  <option value="">Solo si no hay PO</option>
+                  <% proveedores.forEach(p => { %>
+                    <option value="<%= p.id %>" data-provider-name="<%= p.nombre %>"><%= p.nombre %></option>
+                  <% }) %>
+                </select>
+              </div>
+              <div class="col-md-4">
+                <label class="form-label">Monto independiente</label>
+                <input type="number" step="0.01" name="monto" class="form-control" placeholder="0.00">
+                <small class="text-muted">En PO se usa el total de la orden.</small>
+              </div>
+            <% } %>
           </div>
-          <div class="mb-3">
-            <label class="form-label">Monto (opcional)</label>
-            <input type="number" step="0.01" name="monto" class="form-control" placeholder="0.00">
+
+          <div class="mt-3 camera-box">
+            <label class="form-label">Foto del producto</label>
+            <input type="file" id="fotoProductoInput" class="form-control" accept="image/*" capture="environment">
+            <input type="hidden" name="foto_producto_data" id="fotoProductoData">
+            <small class="text-muted">Opcional. Se guarda como evidencia de lo recibido.</small>
+            <div id="fotoProductoPreview" class="mt-2"></div>
+          </div>
+
+          <div class="mt-3">
+            <label class="form-label">Observación de recepción</label>
+            <textarea name="observacion_recepcion" rows="3" class="form-control" placeholder="Ej: foto de respaldo, pendiente revisar cantidad..."></textarea>
           </div>
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-          <button type="submit" class="btn btn-primary">Guardar Factura</button>
+          <button type="submit" class="btn btn-primary">Guardar recepción</button>
         </div>
       </form>
     </div>
@@ -406,6 +722,104 @@
 <% } %>
 
 <script>
+  function normalizarBusqueda(value) {
+    return String(value || '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .trim();
+  }
+
+  document.querySelectorAll('.provider-search').forEach(input => {
+    input.addEventListener('input', () => {
+      const target = document.getElementById(input.dataset.providerTarget);
+      if (!target) return;
+
+      const term = normalizarBusqueda(input.value);
+      let selectedVisible = true;
+
+      Array.from(target.options).forEach(option => {
+        if (!option.value) {
+          option.hidden = false;
+          return;
+        }
+
+        const name = normalizarBusqueda(option.dataset.providerName || option.textContent);
+        const extra = normalizarBusqueda(option.dataset.searchExtra || '');
+        const visible = !term || name.startsWith(term) || extra.includes(term);
+        option.hidden = !visible;
+
+        if (option.selected && !visible) {
+          selectedVisible = false;
+        }
+      });
+
+      if (!selectedVisible) {
+        target.value = '';
+      }
+    });
+  });
+
+  const fotoProductoInput = document.getElementById('fotoProductoInput');
+  const fotoProductoData = document.getElementById('fotoProductoData');
+  const fotoProductoPreview = document.getElementById('fotoProductoPreview');
+
+  function comprimirFoto(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onerror = () => reject(new Error('No se pudo leer la foto.'));
+      reader.onload = () => {
+        const img = new Image();
+        img.onerror = () => reject(new Error('No se pudo procesar la foto.'));
+        img.onload = () => {
+          const maxSize = 1280;
+          let { width, height } = img;
+
+          if (width > height && width > maxSize) {
+            height = Math.round((height * maxSize) / width);
+            width = maxSize;
+          } else if (height > maxSize) {
+            width = Math.round((width * maxSize) / height);
+            height = maxSize;
+          }
+
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, width, height);
+          resolve(canvas.toDataURL('image/jpeg', 0.78));
+        };
+        img.src = reader.result;
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  if (fotoProductoInput && fotoProductoData) {
+    fotoProductoInput.addEventListener('change', async () => {
+      const file = fotoProductoInput.files && fotoProductoInput.files[0];
+      fotoProductoData.value = '';
+      if (fotoProductoPreview) fotoProductoPreview.innerHTML = '';
+      if (!file) return;
+
+      try {
+        const dataUrl = await comprimirFoto(file);
+        fotoProductoData.value = dataUrl;
+        if (fotoProductoPreview) {
+          fotoProductoPreview.innerHTML = `
+            <div class="photo-preview-card">
+              <img src="${dataUrl}" alt="Vista previa">
+              <div class="small text-muted mt-1">Foto lista para guardar</div>
+            </div>`;
+        }
+      } catch (error) {
+        alert(error.message || 'No se pudo preparar la foto.');
+        fotoProductoInput.value = '';
+      }
+    });
+  }
+
   const checkboxes = document.querySelectorAll('.check-factura');
   const btnPagar = document.getElementById('btnPagarSeleccionadas');
   const totalSpan = document.getElementById('totalSeleccionado');

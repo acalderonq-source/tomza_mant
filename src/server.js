@@ -5,13 +5,14 @@ const path = require("path");
 const session = require("express-session");
 const cron = require("node-cron");
 const enviarAlertasDekra = require("./utils/dekraMail");
+const { enviarRecordatoriosMantenimientos, ensurePushTables } = require("./utils/notificacionesPush");
 
 // Inicializar app
 const app = express();
 
 // ===================== MIDDLEWARES =====================
-app.use(express.urlencoded({ extended: true }));
-app.use(express.json());
+app.use(express.urlencoded({ extended: true, limit: "10mb" }));
+app.use(express.json({ limit: "10mb" }));
 // ✅ CORREGIDO: Apunta a la carpeta public en la raíz del proyecto
 app.use(express.static(path.join(__dirname, "..", "public")));
 
@@ -88,6 +89,8 @@ const dekraRoutes = require("./routes/dekra.routes");
 const minaeRoutes = require("./routes/minae.routes");
 const comprasRoutes = require("./routes/compras.routes");
 const llantasRoutes = require("./routes/llantas.routes");
+const notificacionesRoutes = require("./routes/notificaciones.routes");
+const iaRoutes = require("./routes/ia.routes");
 
 // ===================== USAR RUTAS =====================
 app.use("/", authRoutes);
@@ -103,13 +106,29 @@ app.use("/dekra", dekraRoutes);
 app.use("/minae", minaeRoutes);
 app.use("/compras", comprasRoutes);
 app.use("/llantas", llantasRoutes);
+app.use("/notificaciones", notificacionesRoutes);
+app.use("/ia", iaRoutes);
 
 // ===================== CRON JOBS =====================
+ensurePushTables().catch(error => {
+  console.warn("No se pudo preparar tabla de notificaciones:", error.code || error.message);
+});
+
 cron.schedule("0 7 * * *", async () => {
   const hoy = new Date().getDate();
   if (hoy === 1 || hoy === 15) {
     console.log("📧 Enviando alertas DEKRA...");
     await enviarAlertasDekra();
+  }
+});
+
+cron.schedule("0 8 * * *", async () => {
+  try {
+    console.log("🔔 Enviando recordatorios de mantenimientos de mañana...");
+    const resultado = await enviarRecordatoriosMantenimientos();
+    console.log("🔔 Resultado notificaciones:", resultado);
+  } catch (error) {
+    console.error("Error enviando notificaciones de mantenimientos:", error);
   }
 });
 

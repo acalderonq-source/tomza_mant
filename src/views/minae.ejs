@@ -5,162 +5,229 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Control MINAE</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
   <style>
-    @media (max-width: 768px) {
-      .table thead { display: none; }
-      .table, .table tbody, .table tr, .table td {
-        display: block;
-        width: 100%;
-      }
-      .table tr {
-        margin-bottom: 1rem;
-        border: 1px solid #dee2e6;
-        border-radius: 8px;
-        padding: 0.5rem;
-        background: white;
-        color: black;
-      }
-      .table td {
-        text-align: right;
-        padding-left: 50%;
-        position: relative;
-        border: none;
-        border-bottom: 1px solid #eee;
-      }
-      .table td::before {
-        content: attr(data-label);
-        position: absolute;
-        left: 1rem;
-        width: 45%;
-        font-weight: bold;
-        text-align: left;
-      }
+    body { background: #eef2f7; color: #0f172a; font-family: "Segoe UI", Roboto, Arial, sans-serif; }
+    .navbar { background: #101827; border-bottom: 3px solid #2563eb; }
+    .shell { max-width: 1440px; }
+    .hero, .panel, .kpi-card {
+      background: #fff;
+      border: 1px solid #dbe3ef;
+      border-radius: 8px;
+      box-shadow: 0 10px 22px rgba(15,23,42,.05);
     }
+    .hero { background: linear-gradient(135deg, #101827, #1e3a8a); color: #fff; padding: 1rem 1.15rem; }
+    .hero-title { font-size: 1.45rem; font-weight: 850; margin: 0; }
+    .hero-copy { color: #cbd5e1; margin: .25rem 0 0; }
+    .kpi-grid { display: grid; gap: .75rem; grid-template-columns: repeat(5, minmax(0, 1fr)); }
+    .kpi-card { border-top: 4px solid #2563eb; padding: .85rem; }
+    .kpi-red { border-top-color: #dc2626; }
+    .kpi-amber { border-top-color: #d97706; }
+    .kpi-green { border-top-color: #16a34a; }
+    .kpi-label { color: #64748b; font-size: .72rem; font-weight: 850; letter-spacing: .04em; text-transform: uppercase; }
+    .kpi-value { font-size: 1.65rem; font-weight: 900; line-height: 1.1; margin-top: .25rem; }
+    .kpi-foot { color: #64748b; font-size: .8rem; }
+    .filter-label { color: #475569; font-size: .75rem; font-weight: 800; text-transform: uppercase; }
+    .table thead th { background: #f8fafc; color: #475569; font-size: .74rem; font-weight: 850; letter-spacing: .04em; text-transform: uppercase; }
+    .table tbody td { vertical-align: middle; }
+    .status-pill { border-radius: 999px; font-size: .74rem; font-weight: 850; padding: .35rem .65rem; }
+    .status-ok { background: #dcfce7; color: #166534; }
+    .status-progress { background: #dbeafe; color: #1d4ed8; }
+    .status-wait { background: #fef3c7; color: #92400e; }
+    .risk-pill { border-radius: 999px; font-size: .74rem; font-weight: 850; padding: .35rem .65rem; }
+    .risk-red { background: #fee2e2; color: #991b1b; }
+    .risk-amber { background: #fef3c7; color: #92400e; }
+    .risk-green { background: #dcfce7; color: #166534; }
+    .detail-muted { color: #64748b; font-size: .82rem; }
+    .empty-state { color: #64748b; font-weight: 700; padding: 1.5rem; text-align: center; }
+    @media (max-width: 1180px) { .kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+    @media (max-width: 680px) { .kpi-grid { grid-template-columns: 1fr; } }
   </style>
 </head>
-<body class="bg-dark text-light">
+<body>
 
-<div class="container mt-4">
+<%
+  const hoy = new Date();
+  hoy.setHours(0, 0, 0, 0);
+  const diasPara = (fecha) => {
+    if (!fecha) return null;
+    const f = new Date(fecha);
+    f.setHours(0, 0, 0, 0);
+    return Math.ceil((f - hoy) / (1000 * 60 * 60 * 24));
+  };
+  const total = tramites.length;
+  const vencidos = tramites.filter(t => {
+    const dias = diasPara(t.vencimiento);
+    return dias !== null && dias < 0 && t.estado !== 'FINALIZADO';
+  }).length;
+  const porVencer = tramites.filter(t => {
+    const dias = diasPara(t.vencimiento);
+    return dias !== null && dias >= 0 && dias <= 15 && t.estado !== 'FINALIZADO';
+  }).length;
+  const finalizados = tramites.filter(t => t.estado === 'FINALIZADO').length;
+  const conCita = tramites.filter(t => t.tiene_cita).length;
+  const sinCita = tramites.filter(t => !t.tiene_cita && t.estado !== 'FINALIZADO').length;
+  const estados = ['PENDIENTE', 'EN PROCESO', 'FINALIZADO'];
+  const negocios = ['CILINDRERO', 'GRANEL', 'TRANSPORTADORA', 'TECNICOS', 'TALLER'];
+  const sedes = ['Cartago', 'Guapiles', 'La Cruz', 'Perez Zeledon', 'Rio Claro', 'San Carlos', 'Nicoya'];
+%>
 
-  <!-- HEADER -->
-  <div class="d-flex justify-content-between align-items-center mb-4">
-    <div>
-      <h2 class="text-warning fw-bold">🏛️ Control MINAE</h2>
-      <div class="text-secondary">Sede actual: <strong><%= sedeSeleccionada %></strong></div>
-    </div>
-    <div>
-      <a href="/minae/nuevo" class="btn btn-warning">➕ Nuevo trámite</a>
-      <a href="/dashboard" class="btn btn-secondary">Volver</a>
-    </div>
+<nav class="navbar navbar-dark px-3 py-2">
+  <span class="navbar-brand fw-semibold"><i class="bi bi-bank me-1"></i> Control MINAE</span>
+  <div class="d-flex gap-2">
+    <a href="/dashboard" class="btn btn-sm btn-outline-light">Dashboard</a>
   </div>
+</nav>
 
-  <!-- FILTROS -->
-  <form method="GET" action="/minae" class="row g-2 mb-4">
-    <div class="col-md-2">
-      <input type="month" name="fecha" class="form-control" value="<%= fechaSeleccionada || '' %>">
+<div class="container-fluid shell py-4">
+  <section class="hero mb-3">
+    <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
+      <div>
+        <h1 class="hero-title">Gestión regulatoria MINAE</h1>
+        <p class="hero-copy">Sede: <strong><%= sedeSeleccionada %></strong> · Trámites, vencimientos y citas.</p>
+      </div>
+      <a href="/minae/nuevo" class="btn btn-primary"><i class="bi bi-plus-circle me-1"></i> Nuevo trámite</a>
     </div>
-    <div class="col-md-2">
-      <select name="negocio" class="form-select">
-        <option value="">Todos los negocios</option>
-        <option value="CILINDRERO">CILINDRERO</option>
-        <option value="GRANEL">GRANEL</option>
-        <option value="TRANSPORTADORA">TRANSPORTADORA</option>
-        <option value="TECNICOS">TECNICOS</option>
-        <option value="TALLER">TALLER</option>
-      </select>
-    </div>
-    <div class="col-md-2">
-      <select name="sede" class="form-select">
-        <option value="">Todas las sedes</option>
-        <option value="Cartago">Cartago</option>
-        <option value="Guapiles">Guápiles</option>
-        <option value="La Cruz">La Cruz</option>
-        <option value="Perez Zeledon">Pérez Zeledón</option>
-        <option value="Rio Claro">Río Claro</option>
-        <option value="San Carlos">San Carlos</option>
-        <option value="Nicoya">Nicoya</option>
-      </select>
-    </div>
-    <div class="col-md-2">
-      <select name="estado" class="form-select">
-        <option value="">Todos los estados</option>
-        <option value="PENDIENTE">PENDIENTE</option>
-        <option value="EN PROCESO">EN PROCESO</option>
-        <option value="FINALIZADO">FINALIZADO</option>
-      </select>
-    </div>
-    <div class="col-md-2">
-      <select name="cita" class="form-select">
-        <option value="">Todas las citas</option>
-        <option value="1">Con cita</option>
-        <option value="0">Sin cita</option>
-      </select>
-    </div>
-    <div class="col-md-2">
-      <button class="btn btn-warning w-100">Filtrar</button>
-    </div>
-  </form>
+  </section>
 
-  <!-- TABLA -->
-  <div class="table-responsive">
-    <table class="table table-dark table-hover table-bordered align-middle">
-      <thead class="table-warning text-dark">
-        <tr>
-          <th>Placa</th>
-          <th>Tipo</th>
-          <th>CR#</th>
-          <th>Estado</th>
-          <th>Vencimiento</th>
-          <th>Empresa</th>
-          <th>Lugar</th>
-          <th>Hora</th>
-          <th>OT</th>
-          <th>Fecha cita</th>
-          <th>Hora cita</th>
-          <th>Lugar cita</th>
-          <th>Acciones</th>
-        </tr>
-      </thead>
-      <tbody>
-        <% tramites.forEach(t => { 
-          let color = '';
-          if (t.vencimiento) {
-            const hoy = new Date();
-            const vence = new Date(t.vencimiento);
-            const dif = Math.ceil((vence - hoy) / (1000 * 60 * 60 * 24));
-            if (dif < 0) color = 'table-danger';
-            else if (dif <= 15) color = 'table-warning';
-            else color = 'table-success';
-          }
-        %>
-          <tr class="<%= color %>">
-            <td data-label="Placa"><strong><%= t.placa %></strong></td>
-            <td data-label="Tipo"><%= t.tipo || '-' %></td>
-            <td data-label="CR#"><%= t.cr || '-' %></td>
-            <td data-label="Estado"><%= t.estado || '-' %></td>
-            <td data-label="Vencimiento"><%= t.vencimiento ? new Date(t.vencimiento).toLocaleDateString('es-CR') : '-' %></td>
-            <td data-label="Empresa"><%= t.empresa || '-' %></td>
-            <td data-label="Lugar"><%= t.lugar || '-' %></td>
-            <td data-label="Hora"><%= t.hora || '-' %></td>
-            <td data-label="OT"><%= t.ot || '-' %></td>
-            <td data-label="Fecha cita"><%= t.fecha_cita ? new Date(t.fecha_cita).toLocaleDateString('es-CR') : '—' %></td>
-            <td data-label="Hora cita"><%= t.hora_cita || '—' %></td>
-            <td data-label="Lugar cita"><%= t.lugar_cita || '—' %></td>
-            <td data-label="Acciones">
-              <a href="/minae/<%= t.id %>/cita" class="btn btn-sm btn-outline-info">
-                📅 <%= t.tiene_cita ? 'Editar cita' : 'Agregar cita' %>
-              </a>
-            </td>
-          </tr>
-        <% }) %>
-        <% if (tramites.length === 0) { %>
+  <section class="kpi-grid mb-3">
+    <div class="kpi-card"><div class="kpi-label">Trámites</div><div class="kpi-value"><%= total %></div><div class="kpi-foot">En la vista actual</div></div>
+    <div class="kpi-card kpi-red"><div class="kpi-label">Vencidos</div><div class="kpi-value"><%= vencidos %></div><div class="kpi-foot">Requieren atención</div></div>
+    <div class="kpi-card kpi-amber"><div class="kpi-label">Por vencer</div><div class="kpi-value"><%= porVencer %></div><div class="kpi-foot">Próximos 15 días</div></div>
+    <div class="kpi-card kpi-green"><div class="kpi-label">Finalizados</div><div class="kpi-value"><%= finalizados %></div><div class="kpi-foot">Cerrados</div></div>
+    <div class="kpi-card"><div class="kpi-label">Sin cita</div><div class="kpi-value"><%= sinCita %></div><div class="kpi-foot"><%= conCita %> con cita</div></div>
+  </section>
+
+  <section class="panel p-3 mb-3">
+    <form method="GET" action="/minae" class="row g-3 align-items-end">
+      <div class="col-md-2">
+        <label class="filter-label">Mes vencimiento</label>
+        <input type="month" name="fecha" class="form-control form-control-sm" value="<%= fechaSeleccionada || '' %>">
+      </div>
+      <div class="col-md-2">
+        <label class="filter-label">Negocio</label>
+        <select name="negocio" class="form-select form-select-sm">
+          <option value="">Todos</option>
+          <% negocios.forEach(negocio => { %>
+            <option value="<%= negocio %>" <%= negocioSeleccionado === negocio ? 'selected' : '' %>><%= negocio %></option>
+          <% }) %>
+        </select>
+      </div>
+      <% if (user.rol === 'ADMIN' && sedeSeleccionada === 'TODAS') { %>
+        <div class="col-md-2">
+          <label class="filter-label">Sede</label>
+          <select name="sede" class="form-select form-select-sm">
+            <option value="">Todas</option>
+            <% sedes.forEach(sede => { %>
+              <option value="<%= sede %>" <%= sedeManualSeleccionada === sede ? 'selected' : '' %>><%= sede %></option>
+            <% }) %>
+          </select>
+        </div>
+      <% } %>
+      <div class="col-md-2">
+        <label class="filter-label">Estado</label>
+        <select name="estado" class="form-select form-select-sm">
+          <option value="">Todos</option>
+          <% estados.forEach(estado => { %>
+            <option value="<%= estado %>" <%= estadoSeleccionado === estado ? 'selected' : '' %>><%= estado %></option>
+          <% }) %>
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label class="filter-label">Cita</label>
+        <select name="cita" class="form-select form-select-sm">
+          <option value="">Todas</option>
+          <option value="1" <%= citaSeleccionada === '1' ? 'selected' : '' %>>Con cita</option>
+          <option value="0" <%= citaSeleccionada === '0' ? 'selected' : '' %>>Sin cita</option>
+        </select>
+      </div>
+      <div class="col-md-1">
+        <button class="btn btn-dark btn-sm w-100"><i class="bi bi-funnel me-1"></i> Filtrar</button>
+      </div>
+      <div class="col-md-1">
+        <a href="/minae" class="btn btn-secondary btn-sm w-100">Limpiar</a>
+      </div>
+    </form>
+  </section>
+
+  <section class="panel">
+    <div class="p-3 border-bottom d-flex justify-content-between align-items-center flex-wrap gap-2">
+      <div>
+        <h2 class="h5 fw-bold mb-0">Bandeja de trámites</h2>
+        <div class="text-muted small">Ordenada por vencimiento y placa.</div>
+      </div>
+      <span class="badge text-bg-dark"><%= tramites.length %> resultado<%= tramites.length === 1 ? '' : 's' %></span>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead>
           <tr>
-            <td colspan="13" class="text-center">No hay trámites registrados</td>
+            <th>Placa</th>
+            <th>Tipo / CR</th>
+            <th>Sede / Negocio</th>
+            <th>Estado</th>
+            <th>Vencimiento</th>
+            <th>Cita</th>
+            <th>Gestión</th>
+            <th class="text-end">Acciones</th>
           </tr>
-        <% } %>
-      </tbody>
-    </table>
-  </div>
+        </thead>
+        <tbody>
+          <% tramites.forEach(t => {
+            const dias = diasPara(t.vencimiento);
+            const riesgo = dias === null ? 'Sin fecha' : dias < 0 ? `Vencido ${Math.abs(dias)} d` : dias <= 15 ? `Vence en ${dias} d` : `En ${dias} d`;
+            const riesgoClass = dias === null ? 'risk-amber' : dias < 0 ? 'risk-red' : dias <= 15 ? 'risk-amber' : 'risk-green';
+            const estadoClass = t.estado === 'FINALIZADO' ? 'status-ok' : t.estado === 'EN PROCESO' ? 'status-progress' : 'status-wait';
+          %>
+            <tr>
+              <td><strong><%= t.placa %></strong></td>
+              <td>
+                <div class="fw-semibold"><%= t.tipo || '-' %></div>
+                <div class="detail-muted">CR: <%= t.cr || '-' %></div>
+              </td>
+              <td>
+                <div><%= t.sede || '-' %></div>
+                <div class="detail-muted"><%= t.negocio || '-' %></div>
+              </td>
+              <td><span class="status-pill <%= estadoClass %>"><%= t.estado || '-' %></span></td>
+              <td>
+                <div><%= t.vencimiento ? new Date(t.vencimiento).toLocaleDateString('es-CR') : '-' %></div>
+                <span class="risk-pill <%= riesgoClass %>"><%= riesgo %></span>
+              </td>
+              <td>
+                <% if (t.tiene_cita) { %>
+                  <div class="fw-semibold"><%= t.fecha_cita ? new Date(t.fecha_cita).toLocaleDateString('es-CR') : 'Con cita' %></div>
+                  <div class="detail-muted"><%= t.hora_cita || '—' %> · <%= t.lugar_cita || 'Sin lugar' %></div>
+                <% } else { %>
+                  <span class="badge text-bg-secondary">Sin cita</span>
+                <% } %>
+              </td>
+              <td>
+                <div class="detail-muted">Empresa: <%= t.empresa || '-' %></div>
+                <div class="detail-muted">OT: <%= t.ot || '-' %></div>
+                <div class="detail-muted">Lugar: <%= t.lugar || '-' %></div>
+              </td>
+              <td class="text-end">
+                <div class="d-flex justify-content-end gap-2 flex-wrap">
+                  <a href="/minae/<%= t.id %>/editar" class="btn btn-sm btn-outline-dark">
+                    <i class="bi bi-pencil-square me-1"></i>Actualizar datos
+                  </a>
+                  <a href="/minae/<%= t.id %>/cita" class="btn btn-sm btn-outline-primary">
+                    <i class="bi bi-calendar-event me-1"></i><%= t.tiene_cita ? 'Editar cita' : 'Agregar cita' %>
+                  </a>
+                </div>
+              </td>
+            </tr>
+          <% }) %>
+          <% if (!tramites.length) { %>
+            <tr><td colspan="8" class="empty-state">No hay trámites con los filtros seleccionados.</td></tr>
+          <% } %>
+        </tbody>
+      </table>
+    </div>
+  </section>
 </div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

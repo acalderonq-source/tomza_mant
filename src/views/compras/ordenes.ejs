@@ -52,7 +52,7 @@
     }
     .table-ordenes {
       margin-bottom: 0;
-      min-width: 920px;
+      min-width: 980px;
     }
     .table-ordenes th,
     .table-ordenes td {
@@ -177,6 +177,7 @@
     if (filtros.fecha_desde) reporteParams.set('fecha_desde', filtros.fecha_desde);
     if (filtros.fecha_hasta) reporteParams.set('fecha_hasta', filtros.fecha_hasta);
     if (filtros.po_numero) reporteParams.set('po_numero', filtros.po_numero);
+    if (filtros.placa_unidad) reporteParams.set('placa_unidad', filtros.placa_unidad);
     if (filtros.estado) reporteParams.set('estado', filtros.estado);
     if (filtros.facturada !== undefined && filtros.facturada !== '') reporteParams.set('facturada', filtros.facturada);
     const reporteOrdenesUrl = '/compras/ordenes/reporte/pdf' + (reporteParams.toString() ? `?${reporteParams.toString()}` : '');
@@ -217,6 +218,10 @@
       <div class="col-md-2">
         <label class="form-label small fw-semibold text-secondary">PO Número</label>
         <input type="text" name="po_numero" class="form-control form-control-sm" placeholder="Ej: 2026-260" value="<%= filtros.po_numero || '' %>">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label small fw-semibold text-secondary">Placa</label>
+        <input type="text" name="placa_unidad" class="form-control form-control-sm text-uppercase" placeholder="Ej: CL279463" value="<%= filtros.placa_unidad || '' %>">
       </div>
       <div class="col-md-2">
         <label class="form-label small fw-semibold text-secondary">Estado</label>
@@ -297,6 +302,7 @@
             <th>PO Número</th>
             <th>Fecha</th>
             <th>Proveedor</th>
+            <th>Placa</th>
             <th>Moneda</th>
             <th>Total</th>
             <th>Factura</th>
@@ -312,6 +318,7 @@
               const fecha_desde = filtrosActuales.fecha_desde || '';
               const fecha_hasta = filtrosActuales.fecha_hasta || '';
               const po_numero = filtrosActuales.po_numero || '';
+              const placa_unidad = filtrosActuales.placa_unidad || '';
               const estado = filtrosActuales.estado || '';
               const facturada = filtrosActuales.facturada || '';
             %>
@@ -319,6 +326,7 @@
               <td data-label="PO Número"><strong><%= orden.po_numero %></strong></td>
               <td data-label="Fecha"><%= new Date(orden.fecha).toLocaleDateString('es-CR') %></td>
               <td data-label="Proveedor"><%= orden.proveedor_nombre %></td>
+              <td data-label="Placa"><%= orden.placa_unidad || '—' %></td>
               <td data-label="Moneda"><%= orden.moneda %></td>
               <td data-label="Total" class="money"><%= parseFloat(orden.total).toLocaleString('es-CR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %></td>
               <td data-label="Factura"><%= orden.factura || '—' %></td>
@@ -357,6 +365,7 @@
                           <input type="hidden" name="fecha_desde" value="<%= fecha_desde %>">
                           <input type="hidden" name="fecha_hasta" value="<%= fecha_hasta %>">
                           <input type="hidden" name="po_numero" value="<%= po_numero %>">
+                          <input type="hidden" name="placa_unidad" value="<%= placa_unidad %>">
                           <input type="hidden" name="estado" value="<%= estado %>">
                           <input type="hidden" name="facturada" value="<%= facturada %>">
                         </form>
@@ -372,6 +381,7 @@
                           <input type="hidden" name="fecha_desde" value="<%= fecha_desde %>">
                           <input type="hidden" name="fecha_hasta" value="<%= fecha_hasta %>">
                           <input type="hidden" name="po_numero" value="<%= po_numero %>">
+                          <input type="hidden" name="placa_unidad" value="<%= placa_unidad %>">
                           <input type="hidden" name="estado" value="<%= estado %>">
                           <input type="hidden" name="facturada" value="<%= facturada %>">
                           <button type="submit" class="dropdown-item text-success" onclick="return confirm('¿Marcar esta orden como recibida?')">
@@ -384,6 +394,7 @@
                           <input type="hidden" name="fecha_desde" value="<%= fecha_desde %>">
                           <input type="hidden" name="fecha_hasta" value="<%= fecha_hasta %>">
                           <input type="hidden" name="po_numero" value="<%= po_numero %>">
+                          <input type="hidden" name="placa_unidad" value="<%= placa_unidad %>">
                           <input type="hidden" name="estado" value="<%= estado %>">
                           <input type="hidden" name="facturada" value="<%= facturada %>">
                           <button type="submit" class="dropdown-item text-danger" onclick="return confirm('¿Eliminar esta orden permanentemente?')">
@@ -400,7 +411,7 @@
             </tr>
           <% }) %>
           <% if (ordenes.length === 0) { %>
-            <tr><td colspan="8" class="text-center text-muted py-4">No hay órdenes con los filtros seleccionados</td></tr>
+            <tr><td colspan="9" class="text-center text-muted py-4">No hay órdenes con los filtros seleccionados</td></tr>
           <% } %>
         </tbody>
       </table>

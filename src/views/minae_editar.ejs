@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Actualizar datos MINAE</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <style>
+    body { background: #eef2f7; color: #0f172a; font-family: "Segoe UI", Roboto, Arial, sans-serif; }
+    .navbar { background: #101827; border-bottom: 3px solid #2563eb; }
+    .shell { max-width: 1180px; }
+    .hero, .panel, .info-card {
+      background: #fff;
+      border: 1px solid #dbe3ef;
+      border-radius: 8px;
+      box-shadow: 0 10px 22px rgba(15,23,42,.05);
+    }
+    .hero { background: linear-gradient(135deg, #101827, #1e3a8a); color: #fff; padding: 1rem 1.15rem; }
+    .hero-title { font-size: 1.45rem; font-weight: 850; margin: 0; }
+    .hero-copy { color: #cbd5e1; margin: .25rem 0 0; }
+    .info-grid { display: grid; gap: .75rem; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .info-card { padding: .85rem; }
+    .info-label, .form-label {
+      color: #64748b;
+      font-size: .74rem;
+      font-weight: 850;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+    }
+    .info-value { font-size: 1.05rem; font-weight: 850; }
+    .form-control, .form-select { border-color: #cbd5e1; }
+    .section-title { font-size: .95rem; font-weight: 850; margin: 0; }
+    @media (max-width: 760px) { .info-grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+<%
+  const dateInput = (value) => {
+    if (!value) return '';
+    if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}/.test(value)) return value.slice(0, 10);
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? '' : date.toISOString().slice(0, 10);
+  };
+  const estados = ['PENDIENTE', 'EN PROCESO', 'FINALIZADO'];
+%>
+
+<nav class="navbar navbar-dark px-3 py-2">
+  <span class="navbar-brand fw-semibold"><i class="bi bi-bank me-1"></i> Control MINAE</span>
+  <div class="d-flex gap-2">
+    <a href="/minae" class="btn btn-sm btn-outline-light">Volver a MINAE</a>
+    <a href="/dashboard" class="btn btn-sm btn-outline-light">Dashboard</a>
+  </div>
+</nav>
+
+<div class="container-fluid shell py-4">
+  <section class="hero mb-3">
+    <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
+      <div>
+        <h1 class="hero-title">Actualizar datos MINAE</h1>
+        <p class="hero-copy">Editar información del trámite sin modificar la unidad asociada.</p>
+      </div>
+      <span class="badge text-bg-light text-dark">Trámite #<%= tramite.id %></span>
+    </div>
+  </section>
+
+  <section class="info-grid mb-3">
+    <div class="info-card">
+      <div class="info-label">Placa</div>
+      <div class="info-value"><%= tramite.placa || '-' %></div>
+    </div>
+    <div class="info-card">
+      <div class="info-label">Sede</div>
+      <div class="info-value"><%= tramite.sede || '-' %></div>
+    </div>
+    <div class="info-card">
+      <div class="info-label">Negocio</div>
+      <div class="info-value"><%= tramite.negocio || '-' %></div>
+    </div>
+  </section>
+
+  <section class="panel p-3">
+    <form method="POST" action="/minae/<%= tramite.id %>/editar" class="row g-3">
+      <div class="col-12">
+        <p class="section-title">Datos principales</p>
+      </div>
+
+      <div class="col-md-5">
+        <label class="form-label">Tipo trámite</label>
+        <input type="text" name="tipo" class="form-control" value="<%= tramite.tipo || '' %>" required>
+      </div>
+
+      <div class="col-md-3">
+        <label class="form-label">CR#</label>
+        <input type="text" name="cr" class="form-control" value="<%= tramite.cr || '' %>">
+      </div>
+
+      <div class="col-md-4">
+        <label class="form-label">Estado</label>
+        <select name="estado" class="form-select">
+          <% estados.forEach(estado => { %>
+            <option value="<%= estado %>" <%= tramite.estado === estado ? 'selected' : '' %>><%= estado %></option>
+          <% }) %>
+        </select>
+      </div>
+
+      <div class="col-12">
+        <hr>
+        <p class="section-title">Fechas de gestión</p>
+      </div>
+
+      <div class="col-md-3">
+        <label class="form-label">Fecha envío</label>
+        <input type="date" name="fecha_envio" class="form-control" value="<%= dateInput(tramite.fecha_envio) %>">
+      </div>
+
+      <div class="col-md-3">
+        <label class="form-label">Vencimiento</label>
+        <input type="date" name="vencimiento" class="form-control" value="<%= dateInput(tramite.vencimiento) %>">
+      </div>
+
+      <div class="col-md-3">
+        <label class="form-label">Presentación</label>
+        <input type="date" name="presentacion" class="form-control" value="<%= dateInput(tramite.presentacion) %>">
+      </div>
+
+      <div class="col-md-3">
+        <label class="form-label">Subsane</label>
+        <input type="date" name="subsane" class="form-control" value="<%= dateInput(tramite.subsane) %>">
+      </div>
+
+      <div class="col-12">
+        <hr>
+        <p class="section-title">Seguimiento operativo</p>
+      </div>
+
+      <div class="col-md-3">
+        <label class="form-label">OT</label>
+        <input type="text" name="ot" class="form-control" value="<%= tramite.ot || '' %>">
+      </div>
+
+      <div class="col-md-3">
+        <label class="form-label">Empresa</label>
+        <input type="text" name="empresa" class="form-control" value="<%= tramite.empresa || '' %>">
+      </div>
+
+      <div class="col-md-4">
+        <label class="form-label">Lugar</label>
+        <input type="text" name="lugar" class="form-control" value="<%= tramite.lugar || '' %>">
+      </div>
+
+      <div class="col-md-2">
+        <label class="form-label">Hora</label>
+        <input type="text" name="hora" class="form-control" value="<%= tramite.hora || '' %>">
+      </div>
+
+      <div class="col-12">
+        <label class="form-label">Observación</label>
+        <textarea name="observacion" rows="4" class="form-control"><%= tramite.observacion || '' %></textarea>
+      </div>
+
+      <div class="col-12 d-flex justify-content-between flex-wrap gap-2 pt-2">
+        <a href="/minae" class="btn btn-outline-secondary">
+          <i class="bi bi-arrow-left me-1"></i>Volver
+        </a>
+        <button class="btn btn-primary fw-semibold">
+          <i class="bi bi-check2-circle me-1"></i>Guardar cambios
+        </button>
+      </div>
+    </form>
+  </section>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

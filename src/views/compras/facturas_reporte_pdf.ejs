@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Reporte de facturas pendientes</title>
+  <style>
+    @page {
+      size: Letter landscape;
+      margin: 8mm;
+    }
+    body {
+      color: #111827;
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 10px;
+      margin: 0;
+    }
+    .header {
+      align-items: flex-start;
+      border-bottom: 3px solid #111827;
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 12px;
+      padding-bottom: 10px;
+    }
+    .title {
+      font-size: 20px;
+      font-weight: 800;
+      margin: 0 0 3px;
+    }
+    .subtitle {
+      color: #64748b;
+      font-size: 11px;
+    }
+    .meta {
+      text-align: right;
+    }
+    .filters,
+    .totals {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      display: table;
+      margin-bottom: 12px;
+      padding: 8px;
+      width: 100%;
+    }
+    .filter-item,
+    .total-item {
+      display: table-cell;
+      padding-right: 10px;
+    }
+    .label {
+      color: #64748b;
+      font-size: 9px;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+    .value {
+      font-weight: 700;
+      margin-top: 2px;
+    }
+    .total-main .value {
+      color: #14532d;
+      font-size: 14px;
+      font-weight: 900;
+    }
+    table {
+      border-collapse: collapse;
+      width: 100%;
+    }
+    th {
+      background: #111827;
+      color: #fff;
+      font-size: 9px;
+      padding: 6px 5px;
+      text-align: left;
+      text-transform: uppercase;
+    }
+    td {
+      border-bottom: 1px solid #dbe3ef;
+      padding: 6px 5px;
+      vertical-align: top;
+    }
+    .money {
+      text-align: right;
+      white-space: nowrap;
+    }
+    .badge {
+      background: #fef3c7;
+      border-radius: 999px;
+      color: #92400e;
+      display: inline-block;
+      font-size: 8px;
+      font-weight: 800;
+      padding: 3px 6px;
+    }
+    .badge-danger {
+      background: #fee2e2;
+      color: #991b1b;
+    }
+    .empty {
+      color: #64748b;
+      padding: 18px;
+      text-align: center;
+    }
+    .small {
+      color: #64748b;
+      font-size: 9px;
+      margin-top: 2px;
+    }
+    .obs {
+      color: #334155;
+      font-size: 8.5px;
+      line-height: 1.25;
+      word-break: break-word;
+    }
+    .provider-row td {
+      background: #e5e7eb;
+      border-bottom: 1px solid #cbd5e1;
+      color: #111827;
+      font-size: 10px;
+      font-weight: 900;
+      text-transform: uppercase;
+    }
+    .subtotal-row td {
+      background: #f8fafc;
+      border-bottom: 2px solid #94a3b8;
+      font-weight: 900;
+    }
+    .grand-total {
+      background: #ecfdf5;
+      border: 1px solid #86efac;
+      border-radius: 8px;
+      color: #14532d;
+      font-size: 14px;
+      font-weight: 900;
+      margin-top: 12px;
+      padding: 9px;
+      text-align: right;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div>
+      <h1 class="title">Facturas pendientes por pagar</h1>
+      <div class="subtitle">Gas Tomza · Sistema de compras</div>
+    </div>
+    <div class="meta">
+      <div class="label">Generado</div>
+      <div class="value"><%= fechaGeneracion %></div>
+      <div class="subtitle"><%= facturas.length %> factura<%= facturas.length === 1 ? '' : 's' %></div>
+    </div>
+  </div>
+
+  <div class="filters">
+    <div class="filter-item">
+      <div class="label">Proveedor</div>
+      <div class="value"><%= filtros.proveedor_nombre || 'Todos' %></div>
+    </div>
+    <div class="filter-item">
+      <div class="label">Desde</div>
+      <div class="value"><%= filtros.fecha_desde || '-' %></div>
+    </div>
+    <div class="filter-item">
+      <div class="label">Hasta</div>
+      <div class="value"><%= filtros.fecha_hasta || '-' %></div>
+    </div>
+    <div class="filter-item">
+      <div class="label">Estado</div>
+      <div class="value">Pendientes</div>
+    </div>
+    <div class="filter-item">
+      <div class="label">Solo vencidas</div>
+      <div class="value"><%= filtros.vencida === '1' ? 'Si' : 'No' %></div>
+    </div>
+  </div>
+
+  <div class="totals">
+    <div class="total-item">
+      <div class="label">Monto original</div>
+      <div class="value">CRC <%= Number(totales.montoOriginal || 0).toLocaleString('es-CR') %></div>
+    </div>
+    <div class="total-item">
+      <div class="label">Notas de credito</div>
+      <div class="value">CRC <%= Number(totales.notasCredito || 0).toLocaleString('es-CR') %></div>
+    </div>
+    <div class="total-item">
+      <div class="label">Abonos</div>
+      <div class="value">CRC <%= Number(totales.abonos || 0).toLocaleString('es-CR') %></div>
+    </div>
+    <div class="total-item total-main">
+      <div class="label">Total pendiente</div>
+      <div class="value">CRC <%= Number(totales.saldo || 0).toLocaleString('es-CR') %></div>
+    </div>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>PO</th>
+        <th>Fecha</th>
+        <th>Proveedor</th>
+        <th>Factura</th>
+        <th>Vencimiento</th>
+        <th class="money">Monto</th>
+        <th class="money">NC</th>
+        <th class="money">Abonos</th>
+        <th class="money">Saldo</th>
+        <th>Estado</th>
+        <th>Observación</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% gruposProveedor.forEach(grupo => { %>
+        <tr class="provider-row">
+          <td colspan="11">
+            <%= grupo.proveedor %> · <%= grupo.facturas.length %> factura<%= grupo.facturas.length === 1 ? '' : 's' %>
+          </td>
+        </tr>
+        <% grupo.facturas.forEach(f => { %>
+          <tr>
+            <td><%= f.po_numero || '-' %></td>
+            <td><%= f.fecha ? new Date(f.fecha).toLocaleDateString('es-CR') : '-' %></td>
+            <td><%= f.proveedor_nombre || '-' %></td>
+            <td><strong><%= f.numero_factura || '-' %></strong></td>
+            <td><%= f.fecha_vencimiento_factura ? new Date(f.fecha_vencimiento_factura).toLocaleDateString('es-CR') : '-' %></td>
+            <td class="money"><%= Number(f.monto_original ?? f.monto ?? 0).toLocaleString('es-CR') %></td>
+            <td class="money"><%= Number(f.nota_credito_monto || 0).toLocaleString('es-CR') %></td>
+            <td class="money"><%= Number(f.abono_monto || 0).toLocaleString('es-CR') %></td>
+            <td class="money"><strong><%= Number(f.saldo || 0).toLocaleString('es-CR') %></strong></td>
+            <td>
+              <span class="badge <%= f.vencida ? 'badge-danger' : '' %>"><%= f.vencida ? 'Vencida' : 'Pendiente' %></span>
+              <% if (f.tiene_nc) { %><div class="small">NC <%= f.nota_credito_numero || 'registrada' %></div><% } %>
+            </td>
+            <td class="obs"><%= f.factura_observacion || f.abono_observacion || f.nota_credito_motivo || f.observacion || '-' %></td>
+          </tr>
+        <% }) %>
+        <tr class="subtotal-row">
+          <td colspan="5">Total <%= grupo.proveedor %></td>
+          <td class="money"><%= Number(grupo.totales.montoOriginal || 0).toLocaleString('es-CR') %></td>
+          <td class="money"><%= Number(grupo.totales.notasCredito || 0).toLocaleString('es-CR') %></td>
+          <td class="money"><%= Number(grupo.totales.abonos || 0).toLocaleString('es-CR') %></td>
+          <td class="money"><%= Number(grupo.totales.saldo || 0).toLocaleString('es-CR') %></td>
+          <td colspan="2"></td>
+        </tr>
+      <% }) %>
+      <% if (!gruposProveedor.length) { %>
+        <tr>
+          <td colspan="11" class="empty">No hay facturas pendientes con los filtros seleccionados.</td>
+        </tr>
+      <% } %>
+    </tbody>
+  </table>
+
+  <div class="grand-total">
+    Total general pendiente: CRC <%= Number(totales.saldo || 0).toLocaleString('es-CR') %>
+  </div>
+</body>
+</html>

@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+  <title>IA Tomza</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <style>
+    :root {
+      --bg: #eef2f7;
+      --ink: #0f172a;
+      --muted: #64748b;
+      --line: #dbe3ef;
+      --navy: #111827;
+      --brand: #dc2626;
+      --blue: #2563eb;
+    }
+    body {
+      background: var(--bg);
+      color: var(--ink);
+      font-family: "Segoe UI", Roboto, Arial, sans-serif;
+    }
+    .topbar {
+      background: var(--navy);
+      border-bottom: 3px solid var(--brand);
+    }
+    .app-shell {
+      max-width: 1120px;
+    }
+    .hero {
+      background: linear-gradient(135deg, #111827, #1f2937);
+      border-radius: 10px;
+      color: #fff;
+      padding: 1.1rem 1.2rem;
+    }
+    .hero-title {
+      font-size: 1.45rem;
+      font-weight: 900;
+      margin: 0;
+    }
+    .hero-copy {
+      color: #cbd5e1;
+      margin: .25rem 0 0;
+    }
+    .soft-card {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      box-shadow: 0 10px 24px rgba(15, 23, 42, .05);
+    }
+    .chat-box {
+      display: grid;
+      gap: .8rem;
+      max-height: 58vh;
+      overflow-y: auto;
+      padding: 1rem;
+    }
+    .message {
+      border-radius: 12px;
+      max-width: 88%;
+      padding: .85rem .95rem;
+      white-space: pre-wrap;
+    }
+    .message-user {
+      background: #dbeafe;
+      justify-self: end;
+    }
+    .message-ai {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      justify-self: start;
+    }
+    .quick-prompt {
+      border: 1px solid #cbd5e1;
+      border-radius: 999px;
+      background: #fff;
+      color: #334155;
+      font-size: .85rem;
+      font-weight: 750;
+      padding: .45rem .75rem;
+    }
+    .quick-prompt:hover {
+      border-color: var(--blue);
+      color: var(--blue);
+    }
+    .composer {
+      border-top: 1px solid var(--line);
+      padding: 1rem;
+    }
+    .status-pill {
+      border-radius: 999px;
+      display: inline-flex;
+      font-size: .78rem;
+      font-weight: 850;
+      gap: .35rem;
+      padding: .35rem .65rem;
+    }
+    .status-ok { background: #dcfce7; color: #166534; }
+    .status-warn { background: #fef3c7; color: #92400e; }
+    @media (max-width: 680px) {
+      .message { max-width: 100%; }
+      .chat-box { max-height: 54vh; }
+    }
+  </style>
+</head>
+<body>
+<nav class="navbar navbar-dark topbar px-3 py-2">
+  <span class="navbar-brand fw-semibold"><i class="bi bi-stars me-1"></i> IA Tomza</span>
+  <div class="text-white d-flex align-items-center gap-2 flex-wrap">
+    <span class="small"><%= user.usuario %> · <%= user.rol %></span>
+    <a href="/dashboard" class="btn btn-sm btn-outline-light rounded-pill px-3">Dashboard</a>
+  </div>
+</nav>
+
+<main class="container-fluid app-shell py-4">
+  <section class="hero mb-3">
+    <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
+      <div>
+        <h1 class="hero-title">Asistente inteligente</h1>
+        <p class="hero-copy">Busca datos relacionados, cruza prioridades y recomienda qué atender primero.</p>
+      </div>
+      <span class="status-pill <%= tieneApiKey ? 'status-ok' : 'status-warn' %>">
+        <i class="bi <%= tieneApiKey ? 'bi-check-circle' : 'bi-exclamation-triangle' %>"></i>
+        <%= tieneApiKey ? `Conectado (${modelo})` : 'Falta OPENAI_API_KEY' %>
+      </span>
+    </div>
+  </section>
+
+  <section class="soft-card">
+    <div class="p-3 border-bottom">
+      <div class="d-flex flex-wrap gap-2">
+        <button class="quick-prompt" type="button" data-prompt="Analiza todo y dime las prioridades reales de hoy, con acciones concretas.">Prioridades reales</button>
+        <button class="quick-prompt" type="button" data-prompt="Busca mantenimientos atrasados, próximos y unidades varadas. ¿Qué debo resolver primero?">Taller y flota</button>
+        <button class="quick-prompt" type="button" data-prompt="Analiza facturas pendientes por proveedor, vencidas y montos. ¿Qué pago primero?">Facturas por pagar</button>
+        <button class="quick-prompt" type="button" data-prompt="Revisa llantas, DEKRA y MINAE. ¿Qué puede atrasar la operación?">Cumplimiento</button>
+        <button class="quick-prompt" type="button" data-prompt="Si te doy una placa, PO o factura, busca todo lo relacionado y dime el estado.">Buscar por dato</button>
+      </div>
+    </div>
+
+    <div id="chatBox" class="chat-box">
+      <div class="message message-ai">Hola. Soy la IA del sistema. Ahora analizo la pregunta, busco datos relacionados y le devuelvo prioridades con acciones concretas.</div>
+    </div>
+
+    <form id="iaForm" class="composer">
+      <label for="pregunta" class="form-label fw-semibold">Pregunta</label>
+      <div class="input-group">
+        <textarea id="pregunta" class="form-control" rows="2" maxlength="1200" placeholder="Ej: ¿qué debo atender primero hoy?"></textarea>
+        <button class="btn btn-dark px-4" type="submit" id="sendBtn">
+          <i class="bi bi-send"></i>
+        </button>
+      </div>
+      <div class="form-text">Puede preguntar por placa, PO, factura, proveedor, sede o prioridad. La IA analiza, pero no cambia datos.</div>
+    </form>
+  </section>
+</main>
+
+<script>
+  const chatBox = document.getElementById('chatBox');
+  const form = document.getElementById('iaForm');
+  const input = document.getElementById('pregunta');
+  const sendBtn = document.getElementById('sendBtn');
+
+  function addMessage(text, type) {
+    const div = document.createElement('div');
+    div.className = `message message-${type}`;
+    div.textContent = text;
+    chatBox.appendChild(div);
+    chatBox.scrollTop = chatBox.scrollHeight;
+    return div;
+  }
+
+  async function preguntar(text) {
+    const pregunta = String(text || '').trim();
+    if (!pregunta) return;
+
+    addMessage(pregunta, 'user');
+    input.value = '';
+    sendBtn.disabled = true;
+    const thinking = addMessage('Entendiendo la pregunta y buscando datos relacionados...', 'ai');
+
+    try {
+      const response = await fetch('/ia/preguntar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pregunta })
+      });
+      const data = await response.json();
+      thinking.textContent = data.ok ? data.respuesta : (data.error || 'No se pudo consultar la IA.');
+    } catch (error) {
+      thinking.textContent = 'No se pudo conectar con la IA.';
+    } finally {
+      sendBtn.disabled = false;
+      input.focus();
+      chatBox.scrollTop = chatBox.scrollHeight;
+    }
+  }
+
+  form.addEventListener('submit', event => {
+    event.preventDefault();
+    preguntar(input.value);
+  });
+
+  document.querySelectorAll('.quick-prompt').forEach(button => {
+    button.addEventListener('click', () => preguntar(button.dataset.prompt));
+  });
+</script>
+</body>
+</html>

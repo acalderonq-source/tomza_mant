@@ -61,7 +61,7 @@
           </select>
         </div>
         <div class="col-md-4">
-          <label>🏢 Empresa destinataria</label>
+          <label>Empresa destinataria</label>
           <select name="empresa_destino" class="form-select" required>
             <option value="GAS TOMZA" <%= (safeOrden.empresa_destino || 'GAS TOMZA') === 'GAS TOMZA' ? 'selected' : '' %>>Gas Tomza de Costa Rica S.A.</option>
             <option value="SUPER GAS" <%= safeOrden.empresa_destino === 'SUPER GAS' ? 'selected' : '' %>>Envasadora Super Gas GLP S.A.</option>
@@ -74,7 +74,7 @@
       <div class="table-responsive">
         <table class="table table-bordered" id="itemsTable">
           <thead>
-            <tr><th>Código</th><th>Descripción</th><th>Cantidad</th><th>Precio unitario</th><th>Subtotal</th><th></th></tr>
+            <tr><th>Placa</th><th>Descripción</th><th>Cantidad</th><th>Precio unitario</th><th>Subtotal</th><th></th></tr>
           </thead>
           <tbody>
             <!-- Las filas se agregarán dinámicamente -->
@@ -109,7 +109,7 @@
     const tbody = document.querySelector("#itemsTable tbody");
     const newRow = document.createElement("tr");
     newRow.innerHTML = `
-      <td><input type="text" name="lineas[${rowIndex}][codigo]" class="form-control"></td>
+      <td><input type="text" name="lineas[${rowIndex}][codigo]" class="form-control text-uppercase" placeholder="Ej: CL279463"></td>
       <td><textarea name="lineas[${rowIndex}][descripcion]" class="form-control" rows="2" required></textarea></td>
       <td><input type="number" name="lineas[${rowIndex}][cantidad]" class="form-control cantidad" value="1" step="0.01"></td>
       <td><input type="number" name="lineas[${rowIndex}][precio_unitario]" class="form-control precio" step="0.01"></td>
