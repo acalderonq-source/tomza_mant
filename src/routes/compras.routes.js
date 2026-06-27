@@ -1149,6 +1149,230 @@ router.get("/facturas/reporte/pdf", requireAuth, allowRoles("ADMIN", "TALLER", "
   }
 });
 
+router.get("/facturas/reporte/excel", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER", "CONTABILIDAD"), async (req, res) => {
+  try {
+    await ensureFacturaRecepcionColumns();
+    await ensureNotaCreditoColumns();
+    await ensureAbonoColumns();
+
+    const { proveedor_id, fecha_desde, fecha_hasta, vencida } = req.query;
+    const orden = req.query.orden === "asc" ? "asc" : "desc";
+    const filtros = { proveedor_id, fecha_desde, fecha_hasta, pagada: "0", vencida, orden };
+    const facturas = await obtenerFacturasCompras(filtros);
+
+    const [[proveedorFiltro]] = proveedor_id
+      ? await queryWithRetry("SELECT nombre FROM proveedores WHERE id = ?", [proveedor_id])
+      : [[null]];
+
+    const gruposProveedor = Array.from(facturas.reduce((map, factura) => {
+      const proveedorNombre = factura.proveedor_nombre || "Sin proveedor";
+      if (!map.has(proveedorNombre)) {
+        map.set(proveedorNombre, {
+          proveedor: proveedorNombre,
+          facturas: [],
+          totales: {
+            montoOriginal: 0,
+            notasCredito: 0,
+            abonos: 0,
+            saldo: 0
+          }
+        });
+      }
+
+      const grupo = map.get(proveedorNombre);
+      grupo.facturas.push(factura);
+      grupo.totales.montoOriginal += parseMonto(factura.monto_original ?? factura.monto);
+      grupo.totales.notasCredito += parseMonto(factura.nota_credito_monto);
+      grupo.totales.abonos += parseMonto(factura.abono_monto);
+      grupo.totales.saldo += parseMonto(factura.saldo);
+
+      return map;
+    }, new Map()).values()).sort((a, b) => a.proveedor.localeCompare(b.proveedor, "es"));
+
+    gruposProveedor.forEach(grupo => {
+      grupo.facturas.sort((a, b) => {
+        const fechaA = a.fecha ? new Date(a.fecha).getTime() : 0;
+        const fechaB = b.fecha ? new Date(b.fecha).getTime() : 0;
+        return fechaA - fechaB;
+      });
+    });
+
+    const totales = facturas.reduce((acc, f) => {
+      acc.montoOriginal += parseMonto(f.monto_original ?? f.monto);
+      acc.notasCredito += parseMonto(f.nota_credito_monto);
+      acc.abonos += parseMonto(f.abono_monto);
+      acc.saldo += parseMonto(f.saldo);
+      return acc;
+    }, {
+      montoOriginal: 0,
+      notasCredito: 0,
+      abonos: 0,
+      saldo: 0
+    });
+
+    const ExcelJS = require("exceljs");
+    const workbook = new ExcelJS.Workbook();
+    workbook.creator = "Gas Tomza";
+    workbook.created = new Date();
+    const worksheet = workbook.addWorksheet("Pendientes", {
+      views: [{ state: "frozen", ySplit: 7 }]
+    });
+
+    worksheet.columns = [
+      { header: "Proveedor", key: "proveedor", width: 28 },
+      { header: "PO", key: "po", width: 15 },
+      { header: "Fecha", key: "fecha", width: 13 },
+      { header: "Factura", key: "factura", width: 18 },
+      { header: "Vencimiento", key: "vencimiento", width: 13 },
+      { header: "Monto original", key: "montoOriginal", width: 15 },
+      { header: "NC", key: "notaCredito", width: 13 },
+      { header: "Abonos", key: "abonos", width: 13 },
+      { header: "Saldo", key: "saldo", width: 15 },
+      { header: "Estado", key: "estado", width: 13 },
+      { header: "Observación", key: "observacion", width: 42 }
+    ];
+
+    worksheet.mergeCells("A1:K1");
+    worksheet.getCell("A1").value = "Facturas pendientes por pagar";
+    worksheet.getCell("A1").font = { bold: true, size: 16, color: { argb: "FFFFFFFF" } };
+    worksheet.getCell("A1").alignment = { vertical: "middle", horizontal: "center" };
+    worksheet.getCell("A1").fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF111827" } };
+    worksheet.getRow(1).height = 24;
+
+    worksheet.getCell("A3").value = "Generado";
+    worksheet.getCell("B3").value = new Date();
+    worksheet.getCell("B3").numFmt = "yyyy-mm-dd hh:mm";
+    worksheet.getCell("D3").value = "Proveedor";
+    worksheet.getCell("E3").value = proveedorFiltro ? proveedorFiltro.nombre : "Todos";
+    worksheet.getCell("G3").value = "Solo vencidas";
+    worksheet.getCell("H3").value = vencida === "1" ? "Si" : "No";
+
+    worksheet.getCell("A4").value = "Desde";
+    worksheet.getCell("B4").value = fecha_desde || "-";
+    worksheet.getCell("D4").value = "Hasta";
+    worksheet.getCell("E4").value = fecha_hasta || "-";
+    worksheet.getCell("G4").value = "Facturas";
+    worksheet.getCell("H4").value = facturas.length;
+
+    worksheet.getCell("A5").value = "Monto original";
+    worksheet.getCell("B5").value = totales.montoOriginal;
+    worksheet.getCell("D5").value = "Notas de credito";
+    worksheet.getCell("E5").value = totales.notasCredito;
+    worksheet.getCell("G5").value = "Abonos";
+    worksheet.getCell("H5").value = totales.abonos;
+    worksheet.getCell("J5").value = "Total pendiente";
+    worksheet.getCell("K5").value = totales.saldo;
+
+    ["A3", "D3", "G3", "A4", "D4", "G4", "A5", "D5", "G5", "J5"].forEach(cell => {
+      worksheet.getCell(cell).font = { bold: true, color: { argb: "FF475569" } };
+    });
+    ["B5", "E5", "H5", "K5"].forEach(cell => {
+      worksheet.getCell(cell).numFmt = '"CRC" #,##0.00';
+      worksheet.getCell(cell).font = { bold: true };
+    });
+    worksheet.getCell("K5").font = { bold: true, color: { argb: "FF14532D" } };
+
+    const headerRow = worksheet.getRow(7);
+    headerRow.values = worksheet.columns.map(col => col.header);
+    headerRow.font = { bold: true, color: { argb: "FFFFFFFF" } };
+    headerRow.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1F2937" } };
+    headerRow.alignment = { vertical: "middle", horizontal: "center" };
+    headerRow.height = 20;
+
+    let rowNumber = 8;
+    gruposProveedor.forEach(grupo => {
+      const providerRow = worksheet.getRow(rowNumber++);
+      providerRow.getCell(1).value = `${grupo.proveedor} (${grupo.facturas.length} factura${grupo.facturas.length === 1 ? "" : "s"})`;
+      worksheet.mergeCells(providerRow.number, 1, providerRow.number, 11);
+      providerRow.font = { bold: true, color: { argb: "FF111827" } };
+      providerRow.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE5E7EB" } };
+
+      grupo.facturas.forEach(f => {
+        const row = worksheet.getRow(rowNumber++);
+        row.values = [
+          f.proveedor_nombre || "-",
+          f.po_numero || "-",
+          f.fecha ? new Date(f.fecha) : null,
+          f.numero_factura || "-",
+          f.fecha_vencimiento_factura ? new Date(f.fecha_vencimiento_factura) : null,
+          parseMonto(f.monto_original ?? f.monto),
+          parseMonto(f.nota_credito_monto),
+          parseMonto(f.abono_monto),
+          parseMonto(f.saldo),
+          f.vencida ? "Vencida" : "Pendiente",
+          f.factura_observacion || f.abono_observacion || f.nota_credito_motivo || f.observacion || "-"
+        ];
+        row.getCell(3).numFmt = "yyyy-mm-dd";
+        row.getCell(5).numFmt = "yyyy-mm-dd";
+        [6, 7, 8, 9].forEach(col => {
+          row.getCell(col).numFmt = '"CRC" #,##0.00';
+        });
+        row.getCell(10).font = { bold: true, color: { argb: f.vencida ? "FF991B1B" : "FF92400E" } };
+        row.getCell(11).alignment = { wrapText: true, vertical: "top" };
+      });
+
+      const subtotalRow = worksheet.getRow(rowNumber++);
+      subtotalRow.values = [
+        `Total ${grupo.proveedor}`,
+        "", "", "", "",
+        grupo.totales.montoOriginal,
+        grupo.totales.notasCredito,
+        grupo.totales.abonos,
+        grupo.totales.saldo,
+        "", ""
+      ];
+      worksheet.mergeCells(subtotalRow.number, 1, subtotalRow.number, 5);
+      subtotalRow.font = { bold: true };
+      subtotalRow.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF8FAFC" } };
+      [6, 7, 8, 9].forEach(col => {
+        subtotalRow.getCell(col).numFmt = '"CRC" #,##0.00';
+      });
+    });
+
+    const totalRow = worksheet.getRow(rowNumber + 1);
+    totalRow.values = [
+      "TOTAL GENERAL",
+      "", "", "", "",
+      totales.montoOriginal,
+      totales.notasCredito,
+      totales.abonos,
+      totales.saldo,
+      "", ""
+    ];
+    worksheet.mergeCells(totalRow.number, 1, totalRow.number, 5);
+    totalRow.font = { bold: true, color: { argb: "FF14532D" } };
+    totalRow.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFDCFCE7" } };
+    [6, 7, 8, 9].forEach(col => {
+      totalRow.getCell(col).numFmt = '"CRC" #,##0.00';
+    });
+
+    worksheet.eachRow(row => {
+      row.eachCell(cell => {
+        cell.border = {
+          top: { style: "thin", color: { argb: "FFE2E8F0" } },
+          left: { style: "thin", color: { argb: "FFE2E8F0" } },
+          bottom: { style: "thin", color: { argb: "FFE2E8F0" } },
+          right: { style: "thin", color: { argb: "FFE2E8F0" } }
+        };
+        cell.alignment = cell.alignment || { vertical: "middle" };
+      });
+    });
+
+    worksheet.autoFilter = {
+      from: "A7",
+      to: "K7"
+    };
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    res.setHeader("Content-Disposition", `attachment; filename=reporte_facturas_pendientes_${new Date().toISOString().slice(0, 19).replace(/:/g, "-")}.xlsx`);
+    res.send(Buffer.from(buffer));
+  } catch (error) {
+    console.error("Error descargando Excel de facturas pendientes:", error);
+    res.status(500).send("Error descargando Excel");
+  }
+});
+
 router.post("/facturas/:id/nota-credito", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER"), async (req, res) => {
   try {
     await ensureNotaCreditoColumns();

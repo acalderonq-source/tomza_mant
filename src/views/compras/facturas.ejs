@@ -332,6 +332,7 @@
     if (filtros.vencida) reporteParams.set('vencida', filtros.vencida);
     if (filtros.orden) reporteParams.set('orden', filtros.orden);
     const reportePendientesUrl = '/compras/facturas/reporte/pdf' + (reporteParams.toString() ? `?${reporteParams.toString()}` : '');
+    const reportePendientesExcelUrl = '/compras/facturas/reporte/excel' + (reporteParams.toString() ? `?${reporteParams.toString()}` : '');
   %>
   <div class="summary-grid">
     <div class="summary-card">
@@ -363,9 +364,14 @@
         <h3 class="page-title fs-5">Listado de facturas</h3>
         <p class="page-subtitle">Pagadas/cubiertas: <%= facturasPagadas %> · Pendientes: <%= facturasPendientes %> · Vencidas: <%= facturasVencidas %></p>
       </div>
-      <a href="<%= reportePendientesUrl %>" class="btn btn-outline-success btn-sm">
-        <i class="bi bi-download"></i> Descargar pendientes
-      </a>
+      <div class="d-flex gap-2 flex-wrap justify-content-end">
+        <a href="<%= reportePendientesUrl %>" class="btn btn-outline-danger btn-sm">
+          <i class="bi bi-file-earmark-pdf"></i> PDF pendientes
+        </a>
+        <a href="<%= reportePendientesExcelUrl %>" class="btn btn-outline-success btn-sm">
+          <i class="bi bi-file-earmark-excel"></i> Excel pendientes
+        </a>
+      </div>
     </div>
 
     <form method="POST" action="/compras/facturas/pagar-multiple" id="multiplePagoForm">
