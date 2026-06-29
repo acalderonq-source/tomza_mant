@@ -171,7 +171,13 @@
 
 <div class="container py-4">
   <%
-    const puedeModificarCompras = user.rol !== 'CONTABILIDAD';
+    const rolesGestionCompras = ['ADMIN', 'TALLER', 'PROVEEDURIA_TALLER'];
+    const rolesMensajeroFacturas = ['MENSAJERO', 'MENSAJERIA', 'MENSAJERO_FACTURAS'];
+    const puedeModificarCompras = rolesGestionCompras.includes(user.rol);
+    const esMensajero = rolesMensajeroFacturas.includes(user.rol);
+    const puedeRegistrarFacturaOrden = puedeModificarCompras || esMensajero;
+    const puedeVerFacturas = ['ADMIN', 'TALLER', 'PROVEEDURIA_TALLER', 'CONTABILIDAD'].includes(user.rol);
+    const puedeDescargarReporte = !esMensajero;
     const reporteParams = new URLSearchParams();
     if (filtros.proveedor_id) reporteParams.set('proveedor_id', filtros.proveedor_id);
     if (filtros.fecha_desde) reporteParams.set('fecha_desde', filtros.fecha_desde);
@@ -185,7 +191,7 @@
   <div class="page-heading">
     <div>
       <h1 class="page-title">Órdenes de compra</h1>
-      <p class="page-subtitle">Consulta, factura y da seguimiento a las órdenes registradas.</p>
+      <p class="page-subtitle"><%= esMensajero ? 'Registre facturas recibidas directamente desde la orden de compra.' : 'Consulta, factura y da seguimiento a las órdenes registradas.' %></p>
     </div>
     <% if (puedeModificarCompras) { %>
       <a href="/compras/ordenes/nueva" class="btn btn-dark btn-sm">
@@ -193,6 +199,13 @@
       </a>
     <% } %>
   </div>
+
+  <% if (success) { %>
+    <div class="alert alert-success"><i class="bi bi-check-circle me-1"></i><%= success %></div>
+  <% } %>
+  <% if (error) { %>
+    <div class="alert alert-danger"><i class="bi bi-exclamation-triangle me-1"></i><%= error %></div>
+  <% } %>
 
   <!-- Filtros -->
   <div class="filtros-card">
@@ -277,17 +290,21 @@
     <div class="card-header-modern d-flex justify-content-between align-items-center flex-wrap">
       <span><i class="bi bi-receipt me-2"></i>Listado de Órdenes</span>
       <div>
-        <a href="<%= reporteOrdenesUrl %>" class="btn btn-outline-success btn-sm me-2">
-          <i class="bi bi-download"></i> Descargar reporte
-        </a>
+        <% if (puedeDescargarReporte) { %>
+          <a href="<%= reporteOrdenesUrl %>" class="btn btn-outline-success btn-sm me-2">
+            <i class="bi bi-download"></i> Descargar reporte
+          </a>
+        <% } %>
         <% if (puedeModificarCompras) { %>
           <a href="/compras/dashboard" class="btn btn-outline-dark btn-sm me-2">
             <i class="bi bi-graph-up"></i> Dashboard
           </a>
         <% } %>
-        <a href="/compras/facturas" class="btn btn-outline-info btn-sm me-2">
-          <i class="bi bi-receipt"></i> Facturas
-        </a>
+        <% if (puedeVerFacturas) { %>
+          <a href="/compras/facturas" class="btn btn-outline-info btn-sm me-2">
+            <i class="bi bi-receipt"></i> Facturas
+          </a>
+        <% } %>
         <% if (user.rol === 'ADMIN' || user.rol === 'PROVEEDURIA_TALLER') { %>
           <a href="/compras/proveedores" class="btn btn-outline-secondary btn-sm me-2">
             <i class="bi bi-building"></i> Gestionar Proveedores
@@ -347,20 +364,27 @@
                   </button>
                   <div class="dropdown-menu dropdown-menu-end acciones-menu p-2">
                     <a href="/compras/ordenes/<%= orden.id %>/detalle" class="dropdown-item"><i class="bi bi-eye"></i> Ver detalle</a>
-                    <a href="/compras/ordenes/<%= orden.id %>/pdf" class="dropdown-item"><i class="bi bi-file-pdf"></i> Descargar PDF</a>
+                    <% if (!esMensajero) { %>
+                      <a href="/compras/ordenes/<%= orden.id %>/pdf" class="dropdown-item"><i class="bi bi-file-pdf"></i> Descargar PDF</a>
+                    <% } %>
 
                     <% if (puedeModificarCompras) { %>
                       <a href="/compras/ordenes/<%= orden.id %>/editar" class="dropdown-item"><i class="bi bi-pencil"></i> Editar orden</a>
+                    <% } %>
 
+                    <% if (puedeRegistrarFacturaOrden) { %>
                       <div class="dropdown-divider"></div>
 
                       <% if (!orden.facturada) { %>
                         <form method="POST" action="/compras/ordenes/<%= orden.id %>/factura" class="factura-mini px-2 py-1">
                           <label>Número de factura</label>
-                          <div class="input-group input-group-sm">
-                            <input type="text" name="factura" class="form-control input-factura" placeholder="N°" required>
-                            <button type="submit" class="btn btn-primary"><i class="bi bi-receipt"></i></button>
-                          </div>
+                          <input type="text" name="factura" class="form-control form-control-sm input-factura mb-2" placeholder="N° factura" required>
+                          <label>Fecha de factura</label>
+                          <input type="date" name="fecha_factura" class="form-control form-control-sm mb-2" value="<%= hoy || '' %>" required>
+                          <label>Observación</label>
+                          <textarea name="observacion_recepcion" class="form-control form-control-sm mb-2" rows="2" placeholder="Opcional"></textarea>
+                          <input type="hidden" name="fecha_recepcion" value="<%= hoy || '' %>">
+                          <input type="hidden" name="producto_recibido" value="1">
                           <input type="hidden" name="proveedor_id" value="<%= proveedor_id %>">
                           <input type="hidden" name="fecha_desde" value="<%= fecha_desde %>">
                           <input type="hidden" name="fecha_hasta" value="<%= fecha_hasta %>">
@@ -368,11 +392,16 @@
                           <input type="hidden" name="placa_unidad" value="<%= placa_unidad %>">
                           <input type="hidden" name="estado" value="<%= estado %>">
                           <input type="hidden" name="facturada" value="<%= facturada %>">
+                          <button type="submit" class="btn btn-primary btn-sm w-100">
+                            <i class="bi bi-receipt"></i> Registrar factura
+                          </button>
                         </form>
                       <% } else { %>
                         <div class="px-2 py-1"><span class="badge bg-success">Facturada</span></div>
                       <% } %>
+                    <% } %>
 
+                    <% if (puedeModificarCompras) { %>
                       <div class="dropdown-divider"></div>
 
                       <% if (orden.estado !== 'RECIBIDA_TOTAL' && orden.estado !== 'RECIBIDA_PARCIAL') { %>

@@ -20,15 +20,15 @@ function allowRoles(...roles) {
 }
 
 const ROLES_GESTION_FACTURAS = ["ADMIN", "TALLER", "PROVEEDURIA_TALLER"];
+const ROLES_MENSAJERO_FACTURAS = ["MENSAJERO", "MENSAJERIA", "MENSAJERO_FACTURAS"];
 const ROLES_RECEPCION_FACTURAS = [
-  ...ROLES_GESTION_FACTURAS,
-  "MENSAJERO",
-  "MENSAJERIA",
-  "MENSAJERO_FACTURAS"
+  ...ROLES_GESTION_FACTURAS
 ];
+const ROLES_VER_ORDENES = [...ROLES_GESTION_FACTURAS, "CONTABILIDAD", ...ROLES_MENSAJERO_FACTURAS];
+const ROLES_REGISTRAR_FACTURA_ORDEN = [...ROLES_GESTION_FACTURAS, ...ROLES_MENSAJERO_FACTURAS];
 
 function esMensajeroFacturas(user) {
-  return ["MENSAJERO", "MENSAJERIA", "MENSAJERO_FACTURAS"].includes(user.rol);
+  return ROLES_MENSAJERO_FACTURAS.includes(user.rol);
 }
 
 function toArray(value) {
@@ -629,7 +629,7 @@ router.post("/ordenes/:id/editar", requireAuth, allowRoles("ADMIN", "TALLER", "P
   }
 });
 
-router.get("/ordenes", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER", "CONTABILIDAD"), async (req, res) => {
+router.get("/ordenes", requireAuth, allowRoles(...ROLES_VER_ORDENES), async (req, res) => {
   try {
     await ensureOrdenPlacaColumn();
     const { proveedor_id, fecha_desde, fecha_hasta, po_numero, placa_unidad, estado, facturada } = req.query;
@@ -641,6 +641,10 @@ router.get("/ordenes", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_T
 
     let totalFiltrado = 0;
     ordenes.forEach(o => totalFiltrado += parseFloat(o.total) || 0);
+    const success = req.session.success;
+    const error = req.session.error;
+    delete req.session.success;
+    delete req.session.error;
 
     res.render("compras/ordenes", {
       ordenes,
@@ -648,7 +652,10 @@ router.get("/ordenes", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_T
       proveedores,
       estados,
       filtros: { proveedor_id, fecha_desde, fecha_hasta, po_numero, placa_unidad, estado, facturada },
-      totalFiltrado
+      totalFiltrado,
+      success,
+      error,
+      hoy: new Date().toISOString().slice(0, 10)
     });
   } catch (error) {
     console.error(error);
@@ -724,7 +731,7 @@ router.get("/ordenes/reporte/pdf", requireAuth, allowRoles("ADMIN", "TALLER", "P
   }
 });
 
-router.get("/ordenes/:id/detalle", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER", "CONTABILIDAD"), async (req, res) => {
+router.get("/ordenes/:id/detalle", requireAuth, allowRoles(...ROLES_VER_ORDENES), async (req, res) => {
   try {
     await ensureOrdenPlacaColumn();
     const id = req.params.id;
@@ -802,7 +809,7 @@ router.post("/ordenes/:id/eliminar", requireAuth, allowRoles("ADMIN", "TALLER", 
   }
 });
 
-router.post("/ordenes/:id/factura", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER"), async (req, res) => {
+router.post("/ordenes/:id/factura", requireAuth, allowRoles(...ROLES_REGISTRAR_FACTURA_ORDEN), async (req, res) => {
   try {
     await ensureFacturaRecepcionColumns();
     const id = req.params.id;
@@ -824,8 +831,31 @@ router.post("/ordenes/:id/factura", requireAuth, allowRoles("ADMIN", "TALLER", "
       estado,
       facturada
     } = req.body;
-    const [[orden]] = await pool.query("SELECT fecha FROM ordenes_compra WHERE id = ?", [id]);
-    if (!orden) return res.status(404).send("Orden no encontrada");
+
+    const queryParams = [];
+    if (proveedor_id) queryParams.push(`proveedor_id=${encodeURIComponent(proveedor_id)}`);
+    if (fecha_desde) queryParams.push(`fecha_desde=${encodeURIComponent(fecha_desde)}`);
+    if (fecha_hasta) queryParams.push(`fecha_hasta=${encodeURIComponent(fecha_hasta)}`);
+    if (po_numero) queryParams.push(`po_numero=${encodeURIComponent(po_numero)}`);
+    if (placa_unidad) queryParams.push(`placa_unidad=${encodeURIComponent(placa_unidad)}`);
+    if (estado) queryParams.push(`estado=${encodeURIComponent(estado)}`);
+    if (facturada !== undefined && facturada !== '') queryParams.push(`facturada=${encodeURIComponent(facturada)}`);
+    const redirectUrl = "/compras/ordenes" + (queryParams.length ? "?" + queryParams.join("&") : "");
+
+    const [[orden]] = await pool.query("SELECT fecha, po_numero, facturada FROM ordenes_compra WHERE id = ?", [id]);
+    if (!orden) {
+      req.session.error = "Orden no encontrada.";
+      return res.redirect(redirectUrl);
+    }
+    if (orden.facturada) {
+      req.session.error = `La orden ${orden.po_numero} ya tiene factura registrada.`;
+      return res.redirect(redirectUrl);
+    }
+    if (!factura || String(factura).trim() === "") {
+      req.session.error = "Debe indicar el número de factura.";
+      return res.redirect(redirectUrl);
+    }
+
     const fechaBase = fecha_factura || new Date().toISOString().slice(0, 10);
     const fechaVencimiento = new Date(fechaBase);
     fechaVencimiento.setDate(fechaVencimiento.getDate() + 30);
@@ -860,19 +890,12 @@ router.post("/ordenes/:id/factura", requireAuth, allowRoles("ADMIN", "TALLER", "
         id
       ]
     );
-    const queryParams = [];
-    if (proveedor_id) queryParams.push(`proveedor_id=${encodeURIComponent(proveedor_id)}`);
-    if (fecha_desde) queryParams.push(`fecha_desde=${encodeURIComponent(fecha_desde)}`);
-    if (fecha_hasta) queryParams.push(`fecha_hasta=${encodeURIComponent(fecha_hasta)}`);
-    if (po_numero) queryParams.push(`po_numero=${encodeURIComponent(po_numero)}`);
-    if (placa_unidad) queryParams.push(`placa_unidad=${encodeURIComponent(placa_unidad)}`);
-    if (estado) queryParams.push(`estado=${encodeURIComponent(estado)}`);
-    if (facturada !== undefined && facturada !== '') queryParams.push(`facturada=${encodeURIComponent(facturada)}`);
-    const redirectUrl = "/compras/ordenes" + (queryParams.length ? "?" + queryParams.join("&") : "");
+    req.session.success = `Factura ${factura} registrada en la orden ${orden.po_numero}.`;
     res.redirect(redirectUrl);
   } catch (error) {
     console.error("❌ Error al registrar factura:", error);
-    res.status(500).send("Error al registrar factura");
+    req.session.error = "Error al registrar factura.";
+    res.redirect("/compras/ordenes");
   }
 });
 
@@ -1001,30 +1024,11 @@ router.post("/facturas/agregar", requireAuth, allowRoles(...ROLES_RECEPCION_FACT
 });
 
 // ===================== LISTADO DE FACTURAS (unificado) =====================
-router.get("/facturas", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER", "CONTABILIDAD", "MENSAJERO", "MENSAJERIA", "MENSAJERO_FACTURAS"), async (req, res) => {
+router.get("/facturas", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER", "CONTABILIDAD"), async (req, res) => {
   try {
     await ensureFacturaRecepcionColumns();
     const hoy = new Date();
     hoy.setHours(0, 0, 0, 0);
-
-    if (esMensajeroFacturas(req.session.user)) {
-      const ordenesDisponibles = await obtenerOrdenesDisponiblesFactura();
-      const success = req.session.success;
-      const error = req.session.error;
-      delete req.session.success;
-      delete req.session.error;
-
-      return res.render("compras/facturas", {
-        facturas: [],
-        user: req.session.user,
-        proveedores: [],
-        ordenesDisponibles,
-        filtros: { proveedor_id: "", fecha_desde: "", fecha_hasta: "", pagada: "", vencida: "", orden: "desc" },
-        success,
-        error,
-        hoy: hoy.toISOString().slice(0, 10)
-      });
-    }
 
     await ensureNotaCreditoColumns();
     await ensureAbonoColumns();
