@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Reportes de supervisores</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <link rel="stylesheet" href="/css/mantenimientos.css">
+  <style>
+    .report-text.important { color: #dc2626; font-weight: 800; }
+    .sheet-wrap { background: #fff; border: 1px solid #111827; overflow-x: auto; }
+    .sheet-table { border-collapse: collapse; margin: 0; min-width: 980px; width: 100%; }
+    .sheet-table td,
+    .sheet-table th { border: 1px solid #111827; font-size: 12px; line-height: 1.15; padding: 2px 4px; vertical-align: middle; }
+    .sheet-table .sede-row td { background: #9fc5e8; color: #000; font-weight: 800; text-align: center; }
+    .sheet-table .placa-cell { font-weight: 700; width: 95px; white-space: nowrap; }
+    .sheet-table .reporte-cell { color: #000; min-height: 18px; }
+    .sheet-table .reporte-cell.important { color: #dc2626; font-weight: 700; }
+    .sheet-table .action-cell { width: 120px; text-align: center; }
+    .sheet-table .detail-row td { background: #f8fafc; border-top: 0; padding: 0; }
+    .sheet-table .detail-panel { padding: .75rem; }
+    .sheet-note { color: #64748b; font-size: .8rem; margin: .35rem 0 .75rem; }
+    .suggestion-card { border: 1px solid #bfdbfe; border-left: 5px solid #2563eb; border-radius: 14px; background: #eff6ff; padding: 1rem; margin-bottom: .8rem; }
+    .meta { color: #64748b; font-size: .82rem; }
+    textarea.form-control { min-height: 76px; }
+    @media (max-width: 768px) {
+      .sheet-table { min-width: 760px; }
+      .sheet-table td,
+      .sheet-table th { font-size: 11px; }
+    }
+  </style>
+</head>
+<body>
+<nav class="navbar navbar-dark px-3 py-2">
+  <span class="navbar-brand fw-semibold"><i class="bi bi-clipboard-pulse"></i> Reportes de supervisores</span>
+  <div class="d-flex align-items-center gap-2 flex-wrap">
+    <span class="text-white small"><%= user.usuario %> (<%= user.rol %>)</span>
+    <a href="/mantenimientos" class="btn btn-outline-light btn-sm">Mantenimientos</a>
+    <a href="/dashboard" class="btn btn-secondary btn-sm">Dashboard</a>
+  </div>
+</nav>
+
+<main class="container-fluid py-4">
+  <div class="page-heading">
+    <div>
+      <h1 class="page-title">Reportes pendientes</h1>
+      <p class="page-subtitle">Taller/admin edita, marca lo importante y confirma cuando un correctivo resolvió el reporte.</p>
+    </div>
+    <a href="/reportes-supervisores/historial" class="btn btn-outline-dark btn-sm">
+      <i class="bi bi-clock-history"></i> Historial
+    </a>
+  </div>
+
+  <% if (success) { %><div class="alert alert-success"><%= success %></div><% } %>
+  <% if (error) { %><div class="alert alert-danger"><%= error %></div><% } %>
+
+  <% if (puedeCrear) { %>
+    <section class="surface-card p-3 mb-3">
+      <h2 class="page-title fs-5 mb-3"><i class="bi bi-plus-circle"></i> Nuevo reporte</h2>
+      <form method="POST" action="/reportes-supervisores" class="row g-3">
+        <div class="col-lg-4">
+          <label class="form-label">Unidad</label>
+          <select name="unidad_id" class="form-select" required>
+            <option value="">Seleccione placa</option>
+            <% unidades.forEach(u => { %>
+              <option value="<%= u.id %>"><%= u.placa %> · <%= u.sede %></option>
+            <% }) %>
+          </select>
+        </div>
+        <div class="col-lg-6">
+          <label class="form-label">Reporte del supervisor</label>
+          <textarea name="descripcion_original" class="form-control" placeholder="Ej: revisar frenos, fuga de aceite..." required></textarea>
+        </div>
+        <div class="col-lg-2 d-flex align-items-end">
+          <button class="btn btn-dark w-100"><i class="bi bi-save"></i> Guardar</button>
+        </div>
+      </form>
+    </section>
+  <% } %>
+
+  <% if (puedeEditar && sugerencias.length) { %>
+    <section class="mb-3">
+      <h2 class="page-title fs-5 mb-2"><i class="bi bi-stars"></i> Sugerencias por correctivos</h2>
+      <% sugerencias.forEach(s => { %>
+        <article class="suggestion-card">
+          <div class="d-flex justify-content-between gap-3 flex-wrap">
+            <div>
+              <div class="fw-bold"><%= s.placa %> · <%= s.sede %></div>
+              <div class="meta">Confianza IA: <%= Math.round(Number(s.confianza || 0) * 100) %>% · Correctivo: <%= s.fecha_correctivo ? new Date(s.fecha_correctivo).toLocaleDateString('es-CR') : '—' %></div>
+            </div>
+            <div class="d-flex gap-2">
+              <form method="POST" action="/reportes-supervisores/sugerencias/<%= s.id %>/confirmar">
+                <button class="btn btn-success btn-sm" onclick="return confirm('¿Mover este reporte a historial?')">Confirmar</button>
+              </form>
+              <form method="POST" action="/reportes-supervisores/sugerencias/<%= s.id %>/descartar">
+                <button class="btn btn-outline-secondary btn-sm">Descartar</button>
+              </form>
+            </div>
+          </div>
+          <div class="row g-2 mt-2">
+            <div class="col-md-6">
+              <div class="meta">Reporte</div>
+              <div><%= s.descripcion_limpia || s.descripcion_original %></div>
+            </div>
+            <div class="col-md-6">
+              <div class="meta">Correctivo realizado</div>
+              <div><%= s.trabajo_realizado %></div>
+            </div>
+          </div>
+          <div class="meta mt-2"><%= s.motivo %></div>
+        </article>
+      <% }) %>
+    </section>
+  <% } %>
+
+  <section class="filters-card">
+    <form method="GET" action="/reportes-supervisores" class="row g-3">
+      <div class="col-md-3">
+        <label class="form-label small">Sede</label>
+        <input type="text" name="sede" class="form-control form-control-sm" value="<%= filtros.sede || '' %>" placeholder="Ej: Cartago">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label small">Placa</label>
+        <input type="text" name="placa" class="form-control form-control-sm text-uppercase" value="<%= filtros.placa || '' %>">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label small">Importante</label>
+        <select name="importante" class="form-select form-select-sm">
+          <option value="">Todos</option>
+          <option value="1" <%= filtros.importante === '1' ? 'selected' : '' %>>Solo marcados en rojo</option>
+        </select>
+      </div>
+      <div class="col-md-3 d-flex align-items-end gap-2">
+        <button class="btn btn-dark btn-sm flex-fill">Filtrar</button>
+        <a href="/reportes-supervisores" class="btn btn-secondary btn-sm flex-fill">Limpiar</a>
+      </div>
+    </form>
+  </section>
+
+  <section class="mt-3">
+    <% if (!reportes.length) { %>
+      <div class="empty-state">No hay reportes pendientes con los filtros seleccionados.</div>
+    <% } %>
+
+    <% if (reportes.length) { %>
+      <%
+        const gruposSede = Array.from(reportes.reduce((map, reporte) => {
+          const sedeReporte = reporte.sede || 'Sin sede';
+          if (!map.has(sedeReporte)) map.set(sedeReporte, []);
+          map.get(sedeReporte).push(reporte);
+          return map;
+        }, new Map()).entries()).sort((a, b) => a[0].localeCompare(b[0], 'es'));
+      %>
+      <p class="sheet-note">Formato compacto por sede. La línea roja corresponde a reportes marcados como importantes por taller/admin.</p>
+      <div class="sheet-wrap">
+        <table class="sheet-table">
+          <tbody>
+            <% gruposSede.forEach(([sedeNombre, items]) => { %>
+              <tr class="sede-row">
+                <td colspan="<%= puedeEditar ? 3 : 2 %>"><%= sedeNombre %></td>
+              </tr>
+              <% items.forEach(r => { %>
+                <tr>
+                  <td class="placa-cell"><%= r.placa %></td>
+                  <td class="reporte-cell <%= r.importante ? 'important' : '' %>">
+                    <%= r.descripcion_limpia || r.descripcion_original %>
+                  </td>
+                  <% if (puedeEditar) { %>
+                    <td class="action-cell">
+                      <button class="btn btn-outline-dark btn-sm py-0 px-2" type="button" data-bs-toggle="collapse" data-bs-target="#editReporte<%= r.id %>" aria-expanded="false">
+                        Editar
+                      </button>
+                    </td>
+                  <% } %>
+                </tr>
+                <% if (puedeEditar) { %>
+                  <tr class="detail-row">
+                    <td colspan="3">
+                      <div class="collapse" id="editReporte<%= r.id %>">
+                        <div class="detail-panel">
+                          <div class="row g-3">
+                            <div class="col-lg-4">
+                              <div class="meta">Original</div>
+                              <div><%= r.descripcion_original %></div>
+                              <div class="meta mt-2">
+                                <%= r.supervisor_nombre || 'Supervisor' %> ·
+                                <%= r.fecha_reporte ? new Date(r.fecha_reporte).toLocaleString('es-CR') : '' %> ·
+                                <%= r.estado.replace('_', ' ') %>
+                              </div>
+                            </div>
+                            <div class="col-lg-8">
+                              <form method="POST" action="/reportes-supervisores/<%= r.id %>/editar">
+                                <label class="form-label small fw-bold">Texto corregido</label>
+                                <textarea name="descripcion_limpia" class="form-control mb-2 <%= r.importante ? 'report-text important' : '' %>"><%= r.descripcion_limpia || '' %></textarea>
+                                <label class="form-label small fw-bold">Nota taller/admin</label>
+                                <textarea name="nota_taller" class="form-control mb-2" rows="2"><%= r.nota_taller || '' %></textarea>
+                                <div class="d-flex gap-2 flex-wrap align-items-center">
+                                  <label class="form-check mb-0">
+                                    <input class="form-check-input" type="checkbox" name="importante" value="1" <%= r.importante ? 'checked' : '' %>>
+                                    <span class="form-check-label">Marcar en rojo</span>
+                                  </label>
+                                  <select name="estado" class="form-select form-select-sm" style="max-width: 180px;">
+                                    <option value="PENDIENTE" <%= r.estado === 'PENDIENTE' ? 'selected' : '' %>>Pendiente</option>
+                                    <option value="EN_REVISION" <%= r.estado === 'EN_REVISION' ? 'selected' : '' %>>En revisión</option>
+                                  </select>
+                                  <button class="btn btn-primary btn-sm">Guardar</button>
+                                </div>
+                              </form>
+                              <div class="d-flex gap-2 flex-wrap mt-2">
+                                <form method="POST" action="/reportes-supervisores/<%= r.id %>/limpiar-ia">
+                                  <button class="btn btn-outline-primary btn-sm"><i class="bi bi-stars"></i> Limpiar texto</button>
+                                </form>
+                                <form method="POST" action="/reportes-supervisores/<%= r.id %>/cerrar" class="d-flex gap-2">
+                                  <input type="text" name="motivo" class="form-control form-control-sm" placeholder="Motivo de cierre manual">
+                                  <button class="btn btn-outline-success btn-sm" onclick="return confirm('¿Mover al historial?')">Cerrar</button>
+                                </form>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
+                <% } %>
+              <% }) %>
+              <% for (let i = items.length; i < 10; i++) { %>
+                <tr>
+                  <td class="placa-cell">&nbsp;</td>
+                  <td class="reporte-cell">&nbsp;</td>
+                  <% if (puedeEditar) { %><td class="action-cell">&nbsp;</td><% } %>
+                </tr>
+              <% } %>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+  </section>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

@@ -11,6 +11,7 @@
 <body>
 
 <%
+  const reportes = Array.isArray(reportesPendientes) ? reportesPendientes : [];
   const conPendiente = correctivos.filter(c => c.pendiente).length;
   const conMecanico = correctivos.filter(c => c.mecanicos && c.mecanicos !== '—').length;
   const placasUnicas = new Set(correctivos.map(c => c.placa)).size;
@@ -30,9 +31,12 @@
       <h1 class="page-title">Historial de correctivos</h1>
       <p class="page-subtitle">Trabajos no programados, repuestos y seguimiento por unidad.</p>
     </div>
-    <% if (user.rol === 'MECANICO' || user.rol === 'ADMIN') { %>
-      <a href="/mantenimientos/correctivos/nuevo" class="btn btn-danger btn-sm"><i class="bi bi-plus-circle"></i> Nuevo correctivo</a>
-    <% } %>
+    <div class="d-flex gap-2 flex-wrap">
+      <a href="/reportes-supervisores" class="btn btn-outline-primary btn-sm"><i class="bi bi-clipboard-pulse"></i> Reportes supervisores</a>
+      <% if (['MECANICO','ADMIN','TALLER'].includes(user.rol)) { %>
+        <a href="/mantenimientos/correctivos/nuevo" class="btn btn-danger btn-sm"><i class="bi bi-plus-circle"></i> Nuevo correctivo</a>
+      <% } %>
+    </div>
   </div>
 
   <div class="summary-grid">
@@ -53,6 +57,54 @@
       <div class="summary-value"><%= placasUnicas %></div>
     </div>
   </div>
+
+  <% if (['MECANICO','ADMIN','TALLER'].includes(user.rol)) { %>
+    <div class="surface-card mb-3">
+      <div class="p-3 border-bottom d-flex justify-content-between align-items-center gap-2 flex-wrap">
+        <div>
+          <h2 class="page-title fs-5">Reportes pendientes de supervisores</h2>
+          <p class="page-subtitle">Seleccione un reporte para completar el correctivo y moverlo al historial.</p>
+        </div>
+        <span class="badge text-bg-dark"><%= reportes.length %></span>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+          <thead>
+            <tr>
+              <th>Placa</th>
+              <th>Sede</th>
+              <th>Reporte</th>
+              <th>Supervisor</th>
+              <th>Fecha</th>
+              <th class="text-end">Acción</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% if (!reportes.length) { %>
+              <tr><td colspan="6" class="empty-state">No hay reportes pendientes para completar.</td></tr>
+            <% } %>
+            <% reportes.forEach(r => { %>
+              <tr>
+                <td data-label="Placa"><strong><%= r.placa %></strong></td>
+                <td data-label="Sede"><%= r.sede %></td>
+                <td data-label="Reporte" class="text-cell">
+                  <% if (r.importante) { %><span class="badge text-bg-danger me-1">Importante</span><% } %>
+                  <span class="<%= r.importante ? 'text-danger fw-bold' : '' %>"><%= r.descripcion_limpia || r.descripcion_original %></span>
+                </td>
+                <td data-label="Supervisor"><%= r.supervisor_nombre || '—' %></td>
+                <td data-label="Fecha"><%= r.fecha_reporte ? new Date(r.fecha_reporte).toLocaleDateString('es-CR') : '—' %></td>
+                <td data-label="Acción" class="text-end">
+                  <a href="/mantenimientos/correctivos/nuevo?reporte_id=<%= r.id %>" class="btn btn-sm btn-success">
+                    <i class="bi bi-check-circle"></i> Completar
+                  </a>
+                </td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  <% } %>
 
   <div class="surface-card">
     <div class="p-3 border-bottom">

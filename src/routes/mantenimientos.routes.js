@@ -3,6 +3,10 @@ const router = express.Router();
 const pool = require("../db");
 const calcularPuntos = require("../utils/puntajeCorrectivos");
 const ExcelJS = require("exceljs");
+const {
+  ensureReportesSupervisoresTables,
+  registrarSugerenciasParaCorrectivo
+} = require("../utils/reportesSupervisoresDb");
 
 // =====================================================
 // MIDDLEWARE DE AUTENTICACIÓN
@@ -23,6 +27,95 @@ function obtenerSedeFiltro(req) {
     return null;
   }
   return req.session.sedeSeleccionada || req.session.user.sede || null;
+}
+
+function obtenerValoresSeleccionados(body) {
+  const seleccion = body.mecanicos !== undefined ? body.mecanicos : body["mecanicos[]"];
+  if (seleccion === undefined) return [];
+  if (Array.isArray(seleccion)) return seleccion.filter(Boolean).map(String);
+  if (typeof seleccion === "object" && seleccion !== null) return Object.values(seleccion).filter(Boolean).map(String);
+  return [String(seleccion)];
+}
+
+function obtenerValorCampoMecanico(body, nombreCampo, idMecanico, indiceOrdenado = -1) {
+  const id = String(idMecanico);
+  const planoPorId = body[`${nombreCampo}[${id}]`];
+  if (planoPorId !== undefined) {
+    return String(planoPorId || "").trim();
+  }
+
+  const planoPorIndice = indiceOrdenado >= 0 ? body[`${nombreCampo}[${indiceOrdenado}]`] : undefined;
+  if (planoPorIndice !== undefined) {
+    return String(planoPorIndice || "").trim();
+  }
+
+  const campos = body[nombreCampo];
+  if (!campos) return "";
+
+  if (Object.prototype.hasOwnProperty.call(campos, id)) {
+    return String(campos[id] || "").trim();
+  }
+
+  if (Array.isArray(campos) && indiceOrdenado >= 0 && campos[indiceOrdenado] !== undefined) {
+    return String(campos[indiceOrdenado] || "").trim();
+  }
+
+  return "";
+}
+
+async function obtenerReportesPendientesSupervisores(sedeFiltro) {
+  await ensureReportesSupervisoresTables(pool);
+
+  const params = [];
+  let sql = `
+    SELECT
+      rs.id,
+      rs.unidad_id,
+      rs.sede,
+      rs.supervisor_nombre,
+      rs.descripcion_original,
+      rs.descripcion_limpia,
+      rs.importante,
+      rs.fecha_reporte,
+      u.placa
+    FROM reportes_supervisores rs
+    JOIN unidades u ON u.id = rs.unidad_id
+    WHERE rs.estado IN ('PENDIENTE','EN_REVISION')
+  `;
+
+  if (sedeFiltro) {
+    sql += " AND rs.sede = ?";
+    params.push(sedeFiltro);
+  }
+
+  sql += " ORDER BY rs.importante DESC, rs.sede, u.placa, rs.fecha_reporte DESC";
+  const [reportes] = await pool.query(sql, params);
+  return reportes;
+}
+
+async function obtenerReporteSupervisorAutorizado(reporteId, sedeFiltro) {
+  if (!reporteId) return null;
+  await ensureReportesSupervisoresTables(pool);
+
+  const params = [reporteId];
+  let sql = `
+    SELECT
+      rs.*,
+      u.placa
+    FROM reportes_supervisores rs
+    JOIN unidades u ON u.id = rs.unidad_id
+    WHERE rs.id = ?
+      AND rs.estado IN ('PENDIENTE','EN_REVISION')
+  `;
+
+  if (sedeFiltro) {
+    sql += " AND rs.sede = ?";
+    params.push(sedeFiltro);
+  }
+
+  sql += " LIMIT 1";
+  const [[reporte]] = await pool.query(sql, params);
+  return reporte || null;
 }
 
 // =====================================================
@@ -57,7 +150,15 @@ router.get("/correctivos", requireAuth, async (req, res) => {
       `,
       params
     );
-    res.render("correctivos", { correctivos: rows, user: req.session.user });
+    const reportesPendientes = ["MECANICO", "ADMIN", "TALLER"].includes(req.session.user.rol)
+      ? await obtenerReportesPendientesSupervisores(sedeFiltro)
+      : [];
+
+    res.render("correctivos", {
+      correctivos: rows,
+      reportesPendientes,
+      user: req.session.user
+    });
   } catch (error) {
     console.error("❌ ERROR listado correctivos:", error);
     res.status(500).send("Error interno");
@@ -105,9 +206,13 @@ router.get("/exportar", requireAuth, async (req, res) => {
 // =====================================================
 router.get("/correctivos/nuevo", requireAuth, async (req, res) => {
   try {
-    if (!["MECANICO", "ADMIN"].includes(req.session.user.rol))
+    if (!["MECANICO", "ADMIN", "TALLER"].includes(req.session.user.rol))
       return res.redirect("/mantenimientos");
-    const sedeFiltro = obtenerSedeFiltro(req);
+    let sedeFiltro = obtenerSedeFiltro(req);
+    const reporteAtendido = await obtenerReporteSupervisorAutorizado(req.query.reporte_id, sedeFiltro);
+    if (!sedeFiltro && reporteAtendido) {
+      sedeFiltro = reporteAtendido.sede;
+    }
     if (!sedeFiltro) return res.status(400).send("No hay sede seleccionada");
     const [unidades] = await pool.query("SELECT id, placa FROM unidades WHERE sede = ? ORDER BY placa", [sedeFiltro]);
     let sqlMecanicos = "SELECT id, nombre FROM mecanicos WHERE activo = 1";
@@ -120,7 +225,7 @@ router.get("/correctivos/nuevo", requireAuth, async (req, res) => {
     }
     sqlMecanicos += " ORDER BY nombre";
     const [mecanicos] = await pool.query(sqlMecanicos, paramsMecanicos);
-    res.render("correctivos_nuevo", { unidades, mecanicos, user: req.session.user });
+    res.render("correctivos_nuevo", { unidades, mecanicos, reporteAtendido, user: req.session.user });
   } catch (error) {
     console.error("❌ ERROR form correctivo:", error);
     res.status(500).send("Error interno");
@@ -132,42 +237,40 @@ router.get("/correctivos/nuevo", requireAuth, async (req, res) => {
 // =====================================================
 router.post("/correctivos", requireAuth, async (req, res) => {
   try {
-    const { unidad_id, mecanicos, trabajos, repuestos, pendiente } = req.body;
-    if (!unidad_id) return res.status(400).send("Debe seleccionar una unidad.");
-    let mecanicosArray = [];
-    if (mecanicos !== undefined) {
-      mecanicosArray = Array.isArray(mecanicos) ? mecanicos.filter(Boolean) : [mecanicos];
+    if (!["MECANICO", "ADMIN", "TALLER"].includes(req.session.user.rol)) {
+      return res.status(403).send("No autorizado");
     }
-    mecanicosArray = mecanicosArray.map(String);
+    const { unidad_id, pendiente, trabajo_general, reporte_id } = req.body;
+    if (!unidad_id) return res.status(400).send("Debe seleccionar una unidad.");
+    const mecanicosArray = obtenerValoresSeleccionados(req.body);
     if (mecanicosArray.length === 0) return res.status(400).send("Debe seleccionar al menos un mecánico.");
 
     const sedeFiltro = obtenerSedeFiltro(req);
+    const [[unidadCorrectivo]] = await pool.query("SELECT id, sede FROM unidades WHERE id = ?", [unidad_id]);
+    if (!unidadCorrectivo) return res.status(400).send("Unidad no encontrada.");
+    const sedeCorrectivo = sedeFiltro || unidadCorrectivo.sede;
     let sqlMecanicos = "SELECT id FROM mecanicos WHERE activo = 1";
     let paramsMecanicos = [];
-    if (sedeFiltro === "Transportadora" || sedeFiltro === "Granel") {
+    if (sedeCorrectivo === "Transportadora" || sedeCorrectivo === "Granel") {
       sqlMecanicos += " AND sede = 'Transportadora'";
     } else {
       sqlMecanicos += " AND sede = ?";
-      paramsMecanicos.push(sedeFiltro);
+      paramsMecanicos.push(sedeCorrectivo);
     }
     sqlMecanicos += " ORDER BY nombre";
     const [todosMecanicos] = await pool.query(sqlMecanicos, paramsMecanicos);
     const idsOrdenados = todosMecanicos.map(m => String(m.id));
 
     let resumenGeneral = "";
-    if (trabajos && typeof trabajos === "object" && !Array.isArray(trabajos)) {
-      for (const idMec of mecanicosArray) {
-        const trabajo = (trabajos[idMec] || "").trim();
-        if (trabajo.length > 0) resumenGeneral += trabajo + " | ";
+    for (const idMec of mecanicosArray) {
+      const idx = idsOrdenados.indexOf(idMec);
+      const trabajo = obtenerValorCampoMecanico(req.body, "trabajos", idMec, idx);
+      if (trabajo.length > 0) {
+        resumenGeneral += trabajo + " | ";
       }
-    } else if (Array.isArray(trabajos)) {
-      for (let idx = 0; idx < idsOrdenados.length; idx++) {
-        const idMec = idsOrdenados[idx];
-        if (mecanicosArray.includes(idMec)) {
-          const trabajo = (trabajos[idx] || "").trim();
-          if (trabajo.length > 0) resumenGeneral += trabajo + " | ";
-        }
-      }
+    }
+    if (!resumenGeneral.trim() && trabajo_general && String(trabajo_general).trim()) {
+      resumenGeneral = String(trabajo_general).trim() + " | ";
     }
     if (!resumenGeneral.trim()) return res.status(400).send("Debe escribir al menos un trabajo.");
 
@@ -175,22 +278,15 @@ router.post("/correctivos", requireAuth, async (req, res) => {
     const [result] = await pool.query(
       `INSERT INTO correctivos (unidad_id, sede, trabajo_realizado, pendiente, creado_por, puntos)
        VALUES (?, ?, ?, ?, ?, ?)`,
-      [unidad_id, sedeFiltro, resumenGeneral, pendiente || null, req.session.user.id, puntos]
+      [unidad_id, sedeCorrectivo, resumenGeneral, pendiente || null, req.session.user.id, puntos]
     );
     const correctivoId = result.insertId;
 
     for (const idMec of mecanicosArray) {
       let trabajo = null, repuesto = null;
-      if (trabajos && typeof trabajos === "object" && !Array.isArray(trabajos)) {
-        trabajo = (trabajos[idMec] || "").trim() || null;
-        repuesto = (repuestos && repuestos[idMec]) ? repuestos[idMec].trim() || null : null;
-      } else if (Array.isArray(trabajos)) {
-        const idx = idsOrdenados.indexOf(idMec);
-        if (idx !== -1) {
-          trabajo = (trabajos[idx] || "").trim() || null;
-          repuesto = (repuestos && repuestos[idx]) ? repuestos[idx].trim() || null : null;
-        }
-      }
+      const idx = idsOrdenados.indexOf(idMec);
+      trabajo = obtenerValorCampoMecanico(req.body, "trabajos", idMec, idx) || null;
+      repuesto = obtenerValorCampoMecanico(req.body, "repuestos", idMec, idx) || null;
       if (trabajo || repuesto) {
         await pool.query(
           `INSERT INTO correctivo_trabajos (correctivo_id, mecanico_id, trabajo, repuestos)
@@ -199,6 +295,41 @@ router.post("/correctivos", requireAuth, async (req, res) => {
         );
       }
     }
+
+    const reporteAtendido = await obtenerReporteSupervisorAutorizado(reporte_id, sedeFiltro);
+    if (reporteAtendido && String(reporteAtendido.unidad_id) === String(unidad_id)) {
+      await pool.query(
+        `UPDATE reportes_supervisores
+         SET estado = 'HISTORIAL',
+             cerrado_por = ?,
+             fecha_cierre = NOW(),
+             correctivo_id = ?,
+             cierre_motivo = ?,
+             cierre_confianza = 1,
+             actualizado_en = NOW()
+         WHERE id = ?`,
+        [
+          req.session.user.id,
+          correctivoId,
+          "Cerrado por mecánico al completar correctivo desde el reporte.",
+          reporteAtendido.id
+        ]
+      );
+      await pool.query(
+        `UPDATE reportes_supervisores_sugerencias
+         SET estado = CASE WHEN estado = 'PENDIENTE' THEN 'CONFIRMADA' ELSE estado END,
+             resuelto_por = COALESCE(resuelto_por, ?),
+             resuelto_en = COALESCE(resuelto_en, NOW())
+         WHERE reporte_id = ?`,
+        [req.session.user.id, reporteAtendido.id]
+      );
+    }
+
+    const sugerencias = await registrarSugerenciasParaCorrectivo(pool, correctivoId);
+    if (sugerencias.length && ["ADMIN", "TALLER"].includes(req.session.user.rol)) {
+      return res.redirect(`/reportes-supervisores?correctivo_id=${correctivoId}`);
+    }
+
     res.redirect("/mantenimientos/correctivos");
   } catch (error) {
     console.error("❌ ERROR guardar correctivo:", error);

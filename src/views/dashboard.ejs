@@ -8,18 +8,16 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
   <style>
     :root {
-      --bg: #eef2f7;
-      --card: #ffffff;
-      --ink: #0f172a;
+      --bg: #f3f6fa;
+      --card: #fff;
+      --ink: #111827;
       --muted: #64748b;
       --line: #dbe3ef;
-      --brand: #dc2626;
-      --navy: #111827;
+      --dark: #111827;
+      --red: #dc2626;
       --blue: #2563eb;
       --green: #16a34a;
       --amber: #d97706;
-      --red: #dc2626;
-      --purple: #7c3aed;
     }
 
     body {
@@ -29,15 +27,15 @@
     }
 
     .topbar {
-      background: var(--navy);
-      border-bottom: 3px solid var(--brand);
+      background: var(--dark);
+      border-bottom: 3px solid var(--red);
     }
 
-    .brand-mark {
+    .brand-box {
       align-items: center;
       background: #fff;
       border-radius: 8px;
-      color: var(--brand);
+      color: var(--red);
       display: inline-flex;
       height: 32px;
       justify-content: center;
@@ -45,369 +43,38 @@
       width: 32px;
     }
 
-    .app-shell {
-      max-width: 1320px;
+    .shell {
+      max-width: 1180px;
     }
 
-    .hero {
-      background: linear-gradient(135deg, #111827 0%, #1f2937 70%, #3b1114 100%);
+    .simple-hero {
+      background: var(--card);
+      border: 1px solid var(--line);
       border-radius: 10px;
-      color: #fff;
-      padding: 1.25rem;
+      padding: 1rem;
     }
 
-    .hero-title {
-      font-size: 1.55rem;
-      font-weight: 850;
+    .page-title {
+      font-size: 1.45rem;
+      font-weight: 900;
       margin: 0;
     }
 
-    .hero-subtitle {
-      color: #cbd5e1;
-      margin: .25rem 0 0;
+    .page-subtitle,
+    .small-muted {
+      color: var(--muted);
     }
-
-    .hero-pill {
-      background: rgba(255,255,255,.1);
-      border: 1px solid rgba(255,255,255,.18);
-      border-radius: 999px;
-      color: #e2e8f0;
-      display: inline-flex;
-      gap: .4rem;
-      padding: .4rem .75rem;
-      white-space: nowrap;
-    }
-
-    .hero-grid {
-      display: grid;
-      gap: .75rem;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
-      margin-top: 1rem;
-    }
-
-    .hero-metric {
-      background: rgba(255,255,255,.08);
-      border: 1px solid rgba(255,255,255,.14);
-      border-radius: 10px;
-      padding: .75rem;
-    }
-
-    .hero-metric-label {
-      color: #cbd5e1;
-      font-size: .72rem;
-      font-weight: 800;
-      text-transform: uppercase;
-    }
-
-    .hero-metric-value {
-      font-size: 1.25rem;
-      font-weight: 900;
-      margin-top: .15rem;
-    }
-
-    .state-pill {
-      border-radius: 999px;
-      display: inline-flex;
-      font-size: .78rem;
-      font-weight: 850;
-      gap: .35rem;
-      padding: .38rem .72rem;
-    }
-
-    .state-ok { background: #dcfce7; color: #166534; }
-    .state-warn { background: #fef3c7; color: #92400e; }
-    .state-danger { background: #fee2e2; color: #991b1b; }
 
     .section-title {
       font-size: 1rem;
-      font-weight: 850;
-      margin: 0;
-    }
-
-    .section-note {
-      color: var(--muted);
-      font-size: .85rem;
-      margin: .15rem 0 0;
-    }
-
-    .soft-card {
-      background: var(--card);
-      border: 1px solid var(--line);
-      border-radius: 10px;
-      box-shadow: 0 10px 24px rgba(15, 23, 42, .05);
-    }
-
-    .kpi-grid {
-      display: grid;
-      gap: .85rem;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
-    }
-
-    .kpi-card {
-      background: var(--card);
-      border: 1px solid var(--line);
-      border-radius: 10px;
-      padding: .95rem;
-      position: relative;
-      overflow: hidden;
-      transition: transform .14s ease, box-shadow .14s ease;
-    }
-
-    .kpi-card:hover {
-      box-shadow: 0 14px 26px rgba(15, 23, 42, .09);
-      transform: translateY(-2px);
-    }
-
-    .kpi-card::before {
-      content: "";
-      display: block;
-      height: 4px;
-      left: 0;
-      position: absolute;
-      top: 0;
-      width: 100%;
-    }
-
-    .kpi-blue::before { background: var(--blue); }
-    .kpi-green::before { background: var(--green); }
-    .kpi-amber::before { background: var(--amber); }
-    .kpi-red::before { background: var(--red); }
-    .kpi-purple::before { background: var(--purple); }
-
-    .kpi-top {
-      align-items: center;
-      display: flex;
-      justify-content: space-between;
-      gap: .7rem;
-    }
-
-    .kpi-icon {
-      align-items: center;
-      border-radius: 10px;
-      display: inline-flex;
-      flex: 0 0 38px;
-      font-size: 1.1rem;
-      height: 38px;
-      justify-content: center;
-      width: 38px;
-    }
-
-    .kpi-blue .kpi-icon { background: #dbeafe; color: #1d4ed8; }
-    .kpi-green .kpi-icon { background: #dcfce7; color: #166534; }
-    .kpi-amber .kpi-icon { background: #fef3c7; color: #92400e; }
-    .kpi-red .kpi-icon { background: #fee2e2; color: #991b1b; }
-    .kpi-purple .kpi-icon { background: #ede9fe; color: #6d28d9; }
-
-    .kpi-label {
-      color: var(--muted);
-      font-size: .72rem;
-      font-weight: 850;
-      letter-spacing: .04em;
-      text-transform: uppercase;
-    }
-
-    .kpi-value {
-      font-size: 1.9rem;
       font-weight: 900;
-      letter-spacing: 0;
-      line-height: 1.1;
-      margin-top: .35rem;
-    }
-
-    .kpi-foot {
-      color: var(--muted);
-      font-size: .82rem;
-      margin-top: .3rem;
-    }
-
-    .kpi-link {
-      color: #334155;
-      display: inline-flex;
-      font-size: .78rem;
-      font-weight: 800;
-      margin-top: .55rem;
-      text-decoration: none;
-    }
-
-    .kpi-link:hover {
-      color: var(--blue);
-    }
-
-    .status-strip {
-      display: grid;
-      gap: .75rem;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
-    }
-
-    .status-card {
-      align-items: center;
-      background: #fff;
-      border: 1px solid var(--line);
-      border-radius: 10px;
-      display: flex;
-      gap: .65rem;
-      padding: .75rem;
-    }
-
-    .status-dot {
-      border-radius: 999px;
-      flex: 0 0 10px;
-      height: 10px;
-      width: 10px;
-    }
-
-    .dot-green { background: var(--green); }
-    .dot-amber { background: var(--amber); }
-    .dot-red { background: var(--red); }
-    .dot-blue { background: var(--blue); }
-
-    .status-label {
-      color: var(--muted);
-      font-size: .75rem;
-      font-weight: 800;
-      text-transform: uppercase;
-    }
-
-    .status-value {
-      font-weight: 900;
-      line-height: 1.1;
-    }
-
-    .quick-actions {
-      display: grid;
-      gap: .8rem;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
-    }
-
-    .action-card {
-      background: var(--card);
-      border: 1px solid var(--line);
-      border-radius: 10px;
-      color: var(--ink);
-      display: flex;
-      gap: .75rem;
-      min-height: 106px;
-      padding: .9rem;
-      text-decoration: none;
-      transition: transform .14s ease, box-shadow .14s ease, border-color .14s ease;
-    }
-
-    .action-card.primary {
-      background: linear-gradient(135deg, #ffffff, #eff6ff);
-      border-color: #bfdbfe;
-    }
-
-    .action-card:hover {
-      border-color: #b6c3d6;
-      box-shadow: 0 14px 28px rgba(15, 23, 42, .1);
-      color: var(--ink);
-      transform: translateY(-2px);
-    }
-
-    .action-icon {
-      align-items: center;
-      background: #eff6ff;
-      border-radius: 10px;
-      color: var(--blue);
-      display: inline-flex;
-      flex: 0 0 42px;
-      font-size: 1.25rem;
-      height: 42px;
-      justify-content: center;
-      width: 42px;
-    }
-
-    .action-title {
-      font-weight: 850;
-      margin-bottom: .15rem;
-    }
-
-    .action-copy {
-      color: var(--muted);
-      font-size: .83rem;
-      margin: 0;
-    }
-
-    .panel-head {
-      align-items: center;
-      border-bottom: 1px solid var(--line);
-      display: flex;
-      justify-content: space-between;
-      padding: .9rem 1rem;
-    }
-
-    .priority-list {
-      display: grid;
-      gap: .7rem;
-      padding: 1rem;
-    }
-
-    .priority-item {
-      align-items: center;
-      background: #f8fafc;
-      border: 1px solid #e2e8f0;
-      border-radius: 10px;
-      display: flex;
-      gap: .8rem;
-      justify-content: space-between;
-      padding: .75rem;
-    }
-
-    .priority-item.critical {
-      background: #fff7f7;
-      border-color: #fecaca;
-    }
-
-    .priority-item.clean {
-      background: #f0fdf4;
-      border-color: #bbf7d0;
-    }
-
-    .priority-tag {
-      border-radius: 999px;
-      display: inline-block;
-      font-size: .7rem;
-      font-weight: 850;
-      padding: .25rem .55rem;
-    }
-
-    .tag-red { background: #fee2e2; color: #991b1b; }
-    .tag-amber { background: #fef3c7; color: #92400e; }
-    .tag-blue { background: #dbeafe; color: #1d4ed8; }
-
-    .module-grid {
-      display: grid;
-      gap: .7rem;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      padding: 1rem;
-    }
-
-    .module-link {
-      align-items: center;
-      border: 1px solid var(--line);
-      border-radius: 10px;
-      color: var(--ink);
-      display: flex;
-      gap: .6rem;
-      padding: .75rem;
-      text-decoration: none;
-    }
-
-    .module-link:hover {
-      background: #f8fafc;
-      color: var(--ink);
-      border-color: #b6c3d6;
-    }
-
-    .module-link i {
-      color: var(--blue);
-      font-size: 1.05rem;
+      margin: 0 0 .65rem;
     }
 
     .sede-selector {
       display: flex;
       flex-wrap: wrap;
-      gap: .45rem;
+      gap: .4rem;
     }
 
     .sede-selector .btn {
@@ -416,105 +83,144 @@
       font-weight: 750;
     }
 
-    .table thead th {
-      background: #f8fafc;
-      color: #475569;
-      font-size: .72rem;
-      font-weight: 850;
-      letter-spacing: .04em;
+    .summary-grid {
+      display: grid;
+      gap: .75rem;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+
+    .summary-card,
+    .module-card,
+    .plain-card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+    }
+
+    .summary-card {
+      padding: .85rem;
+    }
+
+    .summary-label {
+      color: var(--muted);
+      font-size: .75rem;
+      font-weight: 800;
       text-transform: uppercase;
     }
 
-    .badge-soft {
-      border-radius: 999px;
-      font-weight: 750;
-      padding: .35em .65em;
+    .summary-value {
+      font-size: 1.7rem;
+      font-weight: 900;
+      line-height: 1.1;
+      margin-top: .25rem;
     }
 
-    .badge-ok { background: #dcfce7; color: #166534; }
-    .badge-warn { background: #fef3c7; color: #92400e; }
+    .summary-foot {
+      color: var(--muted);
+      font-size: .82rem;
+      margin-top: .25rem;
+    }
+
+    .module-grid {
+      display: grid;
+      gap: .8rem;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .module-card {
+      color: var(--ink);
+      display: flex;
+      gap: .8rem;
+      min-height: 92px;
+      padding: 1rem;
+      text-decoration: none;
+      transition: border-color .12s ease, transform .12s ease;
+    }
+
+    .module-card:hover {
+      border-color: #94a3b8;
+      color: var(--ink);
+      transform: translateY(-1px);
+    }
+
+    .module-icon {
+      align-items: center;
+      border-radius: 10px;
+      display: inline-flex;
+      flex: 0 0 42px;
+      font-size: 1.25rem;
+      height: 42px;
+      justify-content: center;
+      width: 42px;
+    }
+
+    .icon-blue { background: #dbeafe; color: #1d4ed8; }
+    .icon-green { background: #dcfce7; color: #166534; }
+    .icon-amber { background: #fef3c7; color: #92400e; }
+    .icon-red { background: #fee2e2; color: #991b1b; }
+    .icon-dark { background: #e5e7eb; color: #111827; }
+
+    .module-title {
+      font-weight: 900;
+    }
+
+    .module-copy {
+      color: var(--muted);
+      font-size: .84rem;
+      margin: .1rem 0 0;
+    }
+
+    .alert-list {
+      display: grid;
+      gap: .6rem;
+    }
+
+    .alert-item {
+      align-items: center;
+      background: #fff;
+      border: 1px solid var(--line);
+      border-left: 5px solid var(--blue);
+      border-radius: 10px;
+      display: flex;
+      gap: .8rem;
+      justify-content: space-between;
+      padding: .75rem;
+    }
+
+    .alert-item.danger { border-left-color: var(--red); }
+    .alert-item.warn { border-left-color: var(--amber); }
+    .alert-item.ok { border-left-color: var(--green); }
+
+    .table thead th {
+      background: #f8fafc;
+      color: #475569;
+      font-size: .75rem;
+      font-weight: 900;
+      text-transform: uppercase;
+    }
 
     .empty-state {
       color: var(--muted);
       font-weight: 700;
-      padding: 1.5rem;
+      padding: 1.4rem;
       text-align: center;
     }
 
-    .empty-state i {
-      color: #94a3b8;
-      display: block;
-      font-size: 1.7rem;
-      margin-bottom: .4rem;
-    }
-
-    .table-dashboard td,
-    .table-dashboard th {
-      vertical-align: middle;
-    }
-
-    @media (max-width: 1100px) {
-      .kpi-grid,
-      .quick-actions {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-      }
-      .hero-grid,
-      .status-strip {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-      }
+    @media (max-width: 960px) {
+      .summary-grid,
       .module-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
       }
     }
 
-    @media (max-width: 680px) {
-      .hero {
-        padding: 1rem;
-      }
-      .hero-title {
-        font-size: 1.25rem;
-      }
-      .kpi-grid,
-      .quick-actions,
-      .hero-grid,
-      .status-strip,
+    @media (max-width: 620px) {
+      .summary-grid,
       .module-grid {
         grid-template-columns: 1fr;
       }
-      .priority-item {
+      .alert-item {
         align-items: flex-start;
         flex-direction: column;
-      }
-      .topbar .user-box {
-        width: 100%;
-      }
-      .table-dashboard thead {
-        display: none;
-      }
-      .table-dashboard,
-      .table-dashboard tbody,
-      .table-dashboard tr,
-      .table-dashboard td {
-        display: block;
-        width: 100%;
-      }
-      .table-dashboard tr {
-        border-bottom: 1px solid var(--line);
-        padding: .75rem 1rem;
-      }
-      .table-dashboard td {
-        border: 0;
-        display: flex;
-        justify-content: space-between;
-        gap: 1rem;
-        padding: .35rem 0;
-        text-align: right;
-      }
-      .table-dashboard td::before {
-        color: var(--muted);
-        content: attr(data-label);
-        font-weight: 800;
-        text-align: left;
       }
     }
   </style>
@@ -525,87 +231,51 @@
   const exec = ejecutivo || {};
   const mantenimientosHoy = Array.isArray(hoy) ? hoy : [];
   const sedeActual = sedeSeleccionada || user.sede || 'TODAS';
-  const alertas = Array.isArray(alertasEjecutivas) ? alertasEjecutivas : [];
   const sedes = user.rol === 'ADMIN'
     ? ['Cartago', 'Guapiles', 'La Cruz', 'Alajuela', 'San Carlos', 'Rio Claro', 'Perez Zeledon', 'Nicoya', 'Tecnicos', 'Taller', 'Transportadora', 'Granel']
     : (Array.isArray(sedesMultiples) ? sedesMultiples : []);
   const money = (value) => Number(value || 0).toLocaleString('es-CR', { maximumFractionDigits: 0 });
   const puedeVerCompras = ['ADMIN', 'TALLER', 'PROVEEDURIA_TALLER', 'CONTABILIDAD'].includes(user.rol);
   const puedeVerOperaciones = user.rol !== 'CONTABILIDAD';
+  const puedeVerReportesSupervisores = ['ADMIN', 'TALLER', 'MECANICO', 'SUPERVISOR', 'SUPERVISOR_PESADO'].includes(user.rol);
+  const puedeVerAceite = ['ADMIN', 'MECANICO'].includes(user.rol);
   const llantasEnProceso = Number(exec.llantasSolicitadas || 0) + Number(exec.llantasCotizadas || 0) + Number(exec.llantasCompradas || 0);
   const unidadesActivas = Number(exec.unidadesActivas ?? exec.unidades ?? 0);
   const unidadesVaradas = Number(exec.unidadesVaradas || 0);
-  const unidadesInactivas = Number(exec.unidadesInactivas || 0);
-  const mantenimientosManana = Number(exec.mantenimientosManana || 0);
-  const riesgoAlto = Number(exec.facturasVencidas || 0) > 0 || Number(exec.mantenimientosVencidos || 0) > 0;
-  const riesgoMedio = !riesgoAlto && (Number(exec.facturasPendientes || 0) > 0 || llantasEnProceso > 0 || unidadesVaradas > 0);
-  const estadoGeneral = riesgoAlto ? 'Atención requerida' : riesgoMedio ? 'Seguimiento normal' : 'Operación estable';
-  const estadoClass = riesgoAlto ? 'state-danger' : riesgoMedio ? 'state-warn' : 'state-ok';
-  const estadoIcon = riesgoAlto ? 'bi-exclamation-triangle' : riesgoMedio ? 'bi-activity' : 'bi-check-circle';
-  const resumenPrioridades = [
-    Number(exec.facturasVencidas || 0) > 0 ? { tag: 'Finanzas', tagClass: 'tag-red', itemClass: 'critical', titulo: 'Facturas vencidas', detalle: `${exec.facturasVencidas} factura${Number(exec.facturasVencidas) === 1 ? '' : 's'} requiere pago o revisión.`, url: '/compras/facturas?vencida=1' } : null,
-    Number(exec.mantenimientosVencidos || 0) > 0 ? { tag: 'Taller', tagClass: 'tag-amber', itemClass: 'critical', titulo: 'Mantenimientos atrasados', detalle: `${exec.mantenimientosVencidos} mantenimiento${Number(exec.mantenimientosVencidos) === 1 ? '' : 's'} fuera de fecha.`, url: '/mantenimientos' } : null,
-    unidadesVaradas > 0 ? { tag: 'Flota', tagClass: 'tag-red', itemClass: 'critical', titulo: 'Unidades varadas', detalle: `${unidadesVaradas} unidad${unidadesVaradas === 1 ? '' : 'es'} marcada como varada.`, url: '/unidades?varado=1' } : null,
-    Number(exec.llantasCompradas || 0) > 0 ? { tag: 'Llantas', tagClass: 'tag-blue', itemClass: '', titulo: 'Llantas compradas sin recibir', detalle: `${exec.llantasCompradas} solicitud${Number(exec.llantasCompradas) === 1 ? '' : 'es'} pendiente de llegada.`, url: '/llantas' } : null
+  const mantenimientosPendientes = Number(safeStats.pendientes || 0);
+  const mantenimientosAtrasados = Number(exec.mantenimientosVencidos || 0);
+  const facturasPendientes = Number(exec.facturasPendientes || 0);
+  const facturasVencidas = Number(exec.facturasVencidas || 0);
+  const alertas = [
+    facturasVencidas > 0 ? { cls: 'danger', titulo: 'Facturas vencidas', detalle: `${facturasVencidas} factura${facturasVencidas === 1 ? '' : 's'} necesita revisión.`, url: '/compras/facturas?vencida=1' } : null,
+    mantenimientosAtrasados > 0 ? { cls: 'warn', titulo: 'Mantenimientos atrasados', detalle: `${mantenimientosAtrasados} mantenimiento${mantenimientosAtrasados === 1 ? '' : 's'} fuera de fecha.`, url: '/mantenimientos?filtro=pendientes' } : null,
+    unidadesVaradas > 0 ? { cls: 'danger', titulo: 'Unidades varadas', detalle: `${unidadesVaradas} unidad${unidadesVaradas === 1 ? '' : 'es'} marcada como varada.`, url: '/unidades?varado=1' } : null,
+    Number(exec.llantasCompradas || 0) > 0 ? { cls: 'warn', titulo: 'Llantas compradas sin recibir', detalle: `${exec.llantasCompradas} solicitud${Number(exec.llantasCompradas) === 1 ? '' : 'es'} pendiente de llegada.`, url: '/llantas' } : null
   ].filter(Boolean);
-  const prioridades = resumenPrioridades.length ? resumenPrioridades : alertas.slice(0, 3).map(a => ({
-    tag: a.tipo,
-    tagClass: 'tag-blue',
-    titulo: a.titulo,
-    detalle: a.detalle,
-    url: a.url
-  }));
 %>
 
 <nav class="navbar navbar-dark topbar px-3 py-2">
-  <span class="navbar-brand fw-semibold"><span class="brand-mark"><i class="bi bi-speedometer2"></i></span>Gas Tomza</span>
-  <div class="user-box text-white d-flex align-items-center justify-content-end gap-2 flex-wrap">
+  <span class="navbar-brand fw-semibold"><span class="brand-box"><i class="bi bi-house"></i></span>Gas Tomza</span>
+  <div class="text-white d-flex align-items-center gap-2 flex-wrap">
     <span class="small"><%= user.usuario %> · <%= user.rol %></span>
     <a href="/logout" class="btn btn-warning btn-sm rounded-pill px-3">Salir</a>
   </div>
 </nav>
 
-<main class="container-fluid app-shell py-4">
-  <section class="hero mb-3">
+<main class="container-fluid shell py-4">
+  <section class="simple-hero mb-3">
     <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
       <div>
-        <h1 class="hero-title">Dashboard principal</h1>
-        <p class="hero-subtitle">Resumen claro de lo que ocupa atención hoy.</p>
+        <h1 class="page-title">Inicio</h1>
+        <div class="page-subtitle">Sede actual: <strong><%= sedeActual %></strong> · <%= new Date().toLocaleDateString('es-CR') %></div>
       </div>
-      <div class="d-flex gap-2 flex-wrap justify-content-end">
-        <span class="state-pill <%= estadoClass %>"><i class="bi <%= estadoIcon %>"></i> <%= estadoGeneral %></span>
-        <span class="hero-pill"><i class="bi bi-geo-alt"></i> <%= sedeActual %></span>
-        <span class="hero-pill"><i class="bi bi-calendar3"></i> <%= new Date().toLocaleDateString('es-CR') %></span>
-      </div>
-    </div>
-    <div class="hero-grid">
-      <div class="hero-metric">
-        <div class="hero-metric-label">Mantenimientos hoy</div>
-        <div class="hero-metric-value"><%= mantenimientosHoy.length %></div>
-      </div>
-      <div class="hero-metric">
-        <div class="hero-metric-label">Mañana</div>
-        <div class="hero-metric-value"><%= mantenimientosManana %></div>
-      </div>
-      <div class="hero-metric">
-        <div class="hero-metric-label">Varadas</div>
-        <div class="hero-metric-value"><%= unidadesVaradas %></div>
-      </div>
-      <div class="hero-metric">
-        <div class="hero-metric-label">Facturas vencidas</div>
-        <div class="hero-metric-value"><%= exec.facturasVencidas || 0 %></div>
-      </div>
+      <a href="/ia" class="btn btn-dark btn-sm rounded-pill px-3"><i class="bi bi-stars"></i> IA Tomza</a>
     </div>
   </section>
 
   <% if ((user.rol === 'ADMIN' || sedes.length > 1) && sedes.length) { %>
-    <section class="soft-card p-3 mb-3">
-      <div class="d-flex justify-content-between align-items-center gap-3 flex-wrap mb-2">
-        <div>
-          <h2 class="section-title">Sede de trabajo</h2>
-          <p class="section-note">Cambie la sede para ver la operación correspondiente.</p>
-        </div>
-      </div>
+    <section class="plain-card p-3 mb-3">
+      <h2 class="section-title">Cambiar sede</h2>
       <div class="sede-selector">
         <% sedes.forEach(sede => { %>
           <form method="POST" action="/cambiar-sede">
@@ -621,233 +291,150 @@
     </section>
   <% } %>
 
-  <section class="kpi-grid mb-3">
-    <article class="kpi-card kpi-blue">
-      <div class="kpi-top">
-        <div class="kpi-label">Unidades</div>
-        <span class="kpi-icon"><i class="bi bi-truck-front"></i></span>
-      </div>
-      <div class="kpi-value"><%= exec.unidades || 0 %></div>
-      <div class="kpi-foot"><%= unidadesActivas %> activas · <%= unidadesInactivas %> inactivas</div>
-      <% if (puedeVerOperaciones) { %><a href="/unidades" class="kpi-link">Ver unidades</a><% } %>
-    </article>
-    <article class="kpi-card kpi-amber">
-      <div class="kpi-top">
-        <div class="kpi-label">Mantenimientos pendientes</div>
-        <span class="kpi-icon"><i class="bi bi-tools"></i></span>
-      </div>
-      <div class="kpi-value"><%= safeStats.pendientes || 0 %></div>
-      <div class="kpi-foot"><%= exec.mantenimientosVencidos || 0 %> atrasados · <%= mantenimientosManana %> mañana</div>
-      <% if (puedeVerOperaciones) { %><a href="/mantenimientos?filtro=pendientes" class="kpi-link">Abrir pendientes</a><% } %>
-    </article>
-    <article class="kpi-card kpi-red">
-      <div class="kpi-top">
-        <div class="kpi-label">Facturas por pagar</div>
-        <span class="kpi-icon"><i class="bi bi-receipt"></i></span>
-      </div>
-      <div class="kpi-value"><%= exec.facturasPendientes || 0 %></div>
-      <div class="kpi-foot">CRC <%= money(exec.montoPendiente) %> pendiente</div>
-      <% if (puedeVerCompras) { %><a href="/compras/facturas?pagada=0" class="kpi-link">Ver pendientes</a><% } %>
-    </article>
-    <article class="kpi-card kpi-purple">
-      <div class="kpi-top">
-        <div class="kpi-label">Llantas en proceso</div>
-        <span class="kpi-icon"><i class="bi bi-circle"></i></span>
-      </div>
-      <div class="kpi-value"><%= llantasEnProceso %></div>
-      <div class="kpi-foot"><%= exec.llantasCompradas || 0 %> compradas sin recibir</div>
-      <% if (puedeVerOperaciones) { %><a href="/llantas" class="kpi-link">Ver solicitudes</a><% } %>
-    </article>
-  </section>
-
-  <section class="status-strip mb-3">
-    <article class="status-card">
-      <span class="status-dot dot-green"></span>
-      <div>
-        <div class="status-label">Activas</div>
-        <div class="status-value"><%= unidadesActivas %> unidades</div>
-      </div>
-    </article>
-    <article class="status-card">
-      <span class="status-dot <%= unidadesVaradas > 0 ? 'dot-red' : 'dot-green' %>"></span>
-      <div>
-        <div class="status-label">Varadas</div>
-        <div class="status-value"><%= unidadesVaradas %> unidades</div>
-      </div>
-    </article>
-    <article class="status-card">
-      <span class="status-dot <%= Number(exec.mantenimientosVencidos || 0) > 0 ? 'dot-amber' : 'dot-green' %>"></span>
-      <div>
-        <div class="status-label">Taller</div>
-        <div class="status-value"><%= exec.mantenimientosVencidos || 0 %> atrasados</div>
-      </div>
-    </article>
-    <article class="status-card">
-      <span class="status-dot <%= Number(exec.facturasVencidas || 0) > 0 ? 'dot-red' : 'dot-blue' %>"></span>
-      <div>
-        <div class="status-label">Finanzas</div>
-        <div class="status-value"><%= exec.facturasVencidas || 0 %> vencidas</div>
-      </div>
-    </article>
+  <section class="summary-grid mb-3">
+    <div class="summary-card">
+      <div class="summary-label">Mantenimientos</div>
+      <div class="summary-value"><%= mantenimientosPendientes %></div>
+      <div class="summary-foot"><%= mantenimientosAtrasados %> atrasados · <%= mantenimientosHoy.length %> hoy</div>
+    </div>
+    <div class="summary-card">
+      <div class="summary-label">Unidades</div>
+      <div class="summary-value"><%= exec.unidades || 0 %></div>
+      <div class="summary-foot"><%= unidadesActivas %> activas · <%= unidadesVaradas %> varadas</div>
+    </div>
+    <div class="summary-card">
+      <div class="summary-label">Facturas</div>
+      <div class="summary-value"><%= facturasPendientes %></div>
+      <div class="summary-foot"><%= facturasVencidas %> vencidas · CRC <%= money(exec.montoPendiente) %></div>
+    </div>
+    <div class="summary-card">
+      <div class="summary-label">Llantas</div>
+      <div class="summary-value"><%= llantasEnProceso %></div>
+      <div class="summary-foot"><%= exec.llantasCompradas || 0 %> compradas sin recibir</div>
+    </div>
   </section>
 
   <section class="mb-3">
-    <div class="d-flex justify-content-between align-items-center gap-3 flex-wrap mb-2">
-      <div>
-        <h2 class="section-title">Accesos rápidos</h2>
-        <p class="section-note">Las acciones más usadas del sistema.</p>
-      </div>
-    </div>
-    <div class="quick-actions">
-      <a href="/ia" class="action-card primary">
-        <span class="action-icon"><i class="bi bi-stars"></i></span>
-        <div>
-          <div class="action-title">IA Tomza</div>
-          <p class="action-copy">Pregunte por prioridades, facturas, unidades y mantenimientos.</p>
+    <h2 class="section-title">Alertas</h2>
+    <div class="alert-list">
+      <% if (!alertas.length) { %>
+        <div class="alert-item ok">
+          <div>
+            <div class="fw-bold">Todo se ve estable</div>
+            <div class="small-muted">No hay alertas críticas para esta sede.</div>
+          </div>
+          <a href="/mantenimientos" class="btn btn-sm btn-outline-dark">Revisar</a>
         </div>
-      </a>
+      <% } %>
+      <% alertas.forEach(a => { %>
+        <div class="alert-item <%= a.cls %>">
+          <div>
+            <div class="fw-bold"><%= a.titulo %></div>
+            <div class="small-muted"><%= a.detalle %></div>
+          </div>
+          <a href="<%= a.url %>" class="btn btn-sm btn-dark">Abrir</a>
+        </div>
+      <% }) %>
+    </div>
+  </section>
+
+  <section class="mb-3">
+    <h2 class="section-title">Módulos</h2>
+    <div class="module-grid">
       <% if (puedeVerOperaciones) { %>
-        <a href="/mantenimientos" class="action-card primary">
-          <span class="action-icon"><i class="bi bi-tools"></i></span>
-          <div>
-            <div class="action-title">Mantenimientos</div>
-            <p class="action-copy">Revisar pendientes, cerrar trabajos y ver el plan diario.</p>
-          </div>
+        <a href="/mantenimientos" class="module-card">
+          <span class="module-icon icon-amber"><i class="bi bi-tools"></i></span>
+          <div><div class="module-title">Mantenimientos</div><p class="module-copy">Pendientes, correctivos y cierres.</p></div>
         </a>
-        <a href="/unidades" class="action-card">
-          <span class="action-icon"><i class="bi bi-truck-front"></i></span>
-          <div>
-            <div class="action-title">Unidades</div>
-            <p class="action-copy">Ver activas, varadas y estado operativo.</p>
-          </div>
+        <% if (puedeVerReportesSupervisores) { %>
+          <a href="/reportes-supervisores" class="module-card">
+            <span class="module-icon icon-blue"><i class="bi bi-clipboard-pulse"></i></span>
+            <div><div class="module-title">Reportes supervisores</div><p class="module-copy">Fallas reportadas por unidad.</p></div>
+          </a>
+        <% } %>
+        <a href="/unidades" class="module-card">
+          <span class="module-icon icon-green"><i class="bi bi-truck-front"></i></span>
+          <div><div class="module-title">Unidades</div><p class="module-copy">Activas, inactivas y varadas.</p></div>
         </a>
-        <a href="/llantas" class="action-card">
-          <span class="action-icon"><i class="bi bi-circle"></i></span>
-          <div>
-            <div class="action-title">Llantas</div>
-            <p class="action-copy">Solicitudes, cotizaciones, compras y llegadas.</p>
-          </div>
+        <a href="/llantas" class="module-card">
+          <span class="module-icon icon-dark"><i class="bi bi-circle"></i></span>
+          <div><div class="module-title">Llantas</div><p class="module-copy">Solicitudes, compras y llegadas.</p></div>
         </a>
+        <a href="/dekra" class="module-card">
+          <span class="module-icon icon-blue"><i class="bi bi-clipboard-check"></i></span>
+          <div><div class="module-title">DEKRA</div><p class="module-copy">Revisión técnica y vencimientos.</p></div>
+        </a>
+        <a href="/minae" class="module-card">
+          <span class="module-icon icon-blue"><i class="bi bi-bank"></i></span>
+          <div><div class="module-title">MINAE</div><p class="module-copy">Trámites y permisos.</p></div>
+        </a>
+        <% if (puedeVerAceite) { %>
+          <a href="/aceite" class="module-card">
+            <span class="module-icon icon-amber"><i class="bi bi-droplet-half"></i></span>
+            <div><div class="module-title">Aceite</div><p class="module-copy">Cambios y control.</p></div>
+          </a>
+        <% } %>
       <% } %>
       <% if (puedeVerCompras) { %>
-        <a href="/compras/facturas" class="action-card <%= Number(exec.facturasVencidas || 0) > 0 ? 'primary' : '' %>">
-          <span class="action-icon"><i class="bi bi-receipt"></i></span>
-          <div>
-            <div class="action-title">Facturas</div>
-            <p class="action-copy">Pendientes, abonos, notas de credito y reportes.</p>
-          </div>
+        <a href="/compras/ordenes" class="module-card">
+          <span class="module-icon icon-dark"><i class="bi bi-cart-check"></i></span>
+          <div><div class="module-title">Órdenes</div><p class="module-copy">Órdenes de compra.</p></div>
         </a>
+        <a href="/compras/facturas" class="module-card">
+          <span class="module-icon icon-red"><i class="bi bi-receipt"></i></span>
+          <div><div class="module-title">Facturas</div><p class="module-copy">Pendientes, pagos y reportes.</p></div>
+        </a>
+        <% if (user.rol !== 'CONTABILIDAD') { %>
+          <a href="/compras/dashboard" class="module-card">
+            <span class="module-icon icon-blue"><i class="bi bi-bar-chart"></i></span>
+            <div><div class="module-title">Compras</div><p class="module-copy">Resumen del área.</p></div>
+          </a>
+        <% } %>
       <% } %>
     </div>
   </section>
 
-  <div class="row g-3">
-    <div class="col-xl-7">
-      <section class="soft-card h-100">
-        <div class="panel-head">
-          <div>
-            <h2 class="section-title">Prioridades</h2>
-            <p class="section-note">Lo más importante para atender primero.</p>
-          </div>
-          <span class="badge text-bg-dark"><%= prioridades.length %></span>
+  <% if (puedeVerOperaciones) { %>
+    <section class="plain-card">
+      <div class="p-3 border-bottom d-flex justify-content-between align-items-center gap-2 flex-wrap">
+        <div>
+          <h2 class="section-title mb-1">Mantenimientos de hoy</h2>
+          <div class="small-muted">Trabajos programados para la sede actual.</div>
         </div>
-        <div class="priority-list">
-          <% if (!prioridades.length) { %>
-            <div class="priority-item clean">
-              <div>
-                <span class="priority-tag tag-blue">OK</span>
-                <div class="fw-bold mt-1">Todo se ve estable por ahora</div>
-                <div class="text-muted small">No hay vencimientos críticos ni atrasos fuertes en esta sede.</div>
-              </div>
-              <a href="/mantenimientos" class="btn btn-sm btn-outline-dark rounded-pill px-3">Revisar</a>
-            </div>
-          <% } %>
-          <% prioridades.forEach(item => { %>
-            <article class="priority-item <%= item.itemClass || '' %>">
-              <div>
-                <span class="priority-tag <%= item.tagClass %>"><%= item.tag %></span>
-                <div class="fw-bold mt-1"><%= item.titulo %></div>
-                <div class="text-muted small"><%= item.detalle %></div>
-              </div>
-              <a href="<%= item.url %>" class="btn btn-sm btn-outline-dark rounded-pill px-3">Abrir</a>
-            </article>
-          <% }) %>
-        </div>
-      </section>
-    </div>
-
-    <div class="col-xl-5">
-      <section class="soft-card h-100">
-        <div class="panel-head">
-          <div>
-            <h2 class="section-title">Módulos</h2>
-            <p class="section-note">Entrada directa a cada área.</p>
-          </div>
-        </div>
-        <div class="module-grid">
-          <a href="/ia" class="module-link"><i class="bi bi-stars"></i><span>IA Tomza</span></a>
-          <% if (puedeVerOperaciones) { %>
-            <a href="/dekra" class="module-link"><i class="bi bi-clipboard-check"></i><span>DEKRA</span></a>
-            <a href="/minae" class="module-link"><i class="bi bi-bank"></i><span>MINAE</span></a>
-            <% if (['ADMIN','MECANICO'].includes(user.rol)) { %>
-              <a href="/aceite" class="module-link"><i class="bi bi-droplet-half"></i><span>Aceite</span></a>
-            <% } %>
-          <% } %>
-          <% if (puedeVerCompras) { %>
-            <a href="/compras/ordenes" class="module-link"><i class="bi bi-cart-check"></i><span>Ordenes</span></a>
-            <a href="/compras/facturas" class="module-link"><i class="bi bi-receipt"></i><span>Facturas</span></a>
-            <% if (user.rol !== 'CONTABILIDAD') { %>
-              <a href="/compras/dashboard" class="module-link"><i class="bi bi-bar-chart"></i><span>Compras</span></a>
-            <% } %>
-          <% } %>
-        </div>
-      </section>
-    </div>
-
-    <% if (puedeVerOperaciones) { %>
-      <div class="col-12">
-        <section class="soft-card">
-          <div class="panel-head">
-            <div>
-              <h2 class="section-title">Mantenimientos de hoy</h2>
-              <p class="section-note">Plan del día para la sede seleccionada.</p>
-            </div>
-            <a href="/mantenimientos" class="btn btn-sm btn-dark rounded-pill px-3">Ver todos</a>
-          </div>
-          <div class="table-responsive">
-            <% if (!mantenimientosHoy.length) { %>
-              <div class="empty-state"><i class="bi bi-check-circle"></i>No hay mantenimientos programados para hoy.</div>
-            <% } else { %>
-              <table class="table table-sm mb-0 table-dashboard">
-                <thead>
-                  <tr>
-                    <th>Placa</th>
-                    <th>Sede</th>
-                    <th>Tipo</th>
-                    <th>Estado</th>
-                    <th>Plan</th>
-                    <th></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <% mantenimientosHoy.forEach(m => { %>
-                    <tr>
-                      <td data-label="Placa"><strong><%= m.placa %></strong></td>
-                      <td data-label="Sede"><%= m.sede %></td>
-                      <td data-label="Tipo"><%= m.tipo %></td>
-                      <td data-label="Estado"><span class="badge-soft <%= m.estado === 'CERRADO' ? 'badge-ok' : 'badge-warn' %>"><%= m.estado %></span></td>
-                      <td data-label="Plan"><%= m.plan || '-' %></td>
-                      <td data-label="Acción" class="text-end"><a href="/mantenimientos/<%= m.id %>" class="btn btn-sm btn-outline-dark rounded-pill">Abrir</a></td>
-                    </tr>
-                  <% }) %>
-                </tbody>
-              </table>
-            <% } %>
-          </div>
-        </section>
+        <a href="/mantenimientos" class="btn btn-sm btn-outline-dark">Ver todos</a>
       </div>
-    <% } %>
-  </div>
+      <div class="table-responsive">
+        <% if (!mantenimientosHoy.length) { %>
+          <div class="empty-state">No hay mantenimientos programados para hoy.</div>
+        <% } else { %>
+          <table class="table table-sm mb-0 align-middle">
+            <thead>
+              <tr>
+                <th>Placa</th>
+                <th>Sede</th>
+                <th>Tipo</th>
+                <th>Estado</th>
+                <th>Plan</th>
+                <th class="text-end">Acción</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% mantenimientosHoy.forEach(m => { %>
+                <tr>
+                  <td><strong><%= m.placa %></strong></td>
+                  <td><%= m.sede %></td>
+                  <td><%= m.tipo %></td>
+                  <td><span class="badge <%= m.estado === 'CERRADO' ? 'text-bg-success' : 'text-bg-warning' %>"><%= m.estado %></span></td>
+                  <td><%= m.plan || '-' %></td>
+                  <td class="text-end"><a href="/mantenimientos/<%= m.id %>" class="btn btn-sm btn-dark">Abrir</a></td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        <% } %>
+      </div>
+    </section>
+  <% } %>
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>

@@ -9,6 +9,88 @@
   <link rel="stylesheet" href="/css/mantenimientos.css">
   <style>
     textarea { resize: vertical; }
+    body { background: #f3f6fa; }
+    .simple-card {
+      background: #fff;
+      border: 1px solid #dbe3ef;
+      border-radius: 12px;
+      padding: 1rem;
+    }
+    .step-title {
+      font-size: 1rem;
+      font-weight: 900;
+      margin: 0 0 .75rem;
+    }
+    .mechanic-list {
+      display: grid;
+      gap: .75rem;
+    }
+    .mechanic-card {
+      background: #fff;
+      border: 1px solid #dbe3ef;
+      border-radius: 12px;
+      padding: .9rem;
+      transition: border-color .12s ease, background .12s ease;
+    }
+    .mechanic-card.selected {
+      background: #f0fdf4;
+      border-color: #22c55e;
+    }
+    .mechanic-head {
+      align-items: center;
+      display: flex;
+      gap: .65rem;
+      margin-bottom: .75rem;
+    }
+    .mechanic-head label {
+      cursor: pointer;
+      font-size: 1rem;
+      margin: 0;
+    }
+    .mec-check {
+      height: 1.2rem;
+      width: 1.2rem;
+    }
+    .form-control,
+    .form-select {
+      border-color: #cbd5e1;
+      border-radius: 10px;
+    }
+    .helper-box {
+      background: #f8fafc;
+      border: 1px solid #dbe3ef;
+      border-radius: 12px;
+      padding: .85rem;
+    }
+    .sticky-actions {
+      background: rgba(243,246,250,.95);
+      border-top: 1px solid #dbe3ef;
+      bottom: 0;
+      display: flex;
+      gap: .5rem;
+      padding: .75rem 0;
+      position: sticky;
+      z-index: 5;
+    }
+    @media (max-width: 768px) {
+      .container { padding-left: .75rem; padding-right: .75rem; }
+      .navbar .text-white {
+        align-items: flex-start;
+        display: flex;
+        flex-direction: column;
+        gap: .35rem;
+      }
+      .page-title { font-size: 1.25rem; }
+      .simple-card { padding: .85rem; }
+      .mechanic-card { padding: .8rem; }
+      textarea.form-control { min-height: 92px; }
+      .sticky-actions {
+        flex-direction: column;
+      }
+      .sticky-actions .btn {
+        width: 100%;
+      }
+    }
   </style>
 </head>
 <body>
@@ -22,71 +104,78 @@
 </nav>
 
 <div class="container py-4">
+  <% const reporte = typeof reporteAtendido !== 'undefined' ? reporteAtendido : null; %>
   <div class="page-heading">
     <div>
       <h1 class="page-title">Registrar correctivo</h1>
-      <p class="page-subtitle">Selecciona la unidad, mecánicos participantes, trabajos y repuestos utilizados.</p>
+      <p class="page-subtitle">Formulario simple para mecánicos. Seleccione la unidad, marque quién trabajó y escriba qué se hizo.</p>
     </div>
   </div>
 
-  <div class="surface-card p-3 p-md-4">
+  <div class="simple-card">
     <form id="formCorrectivo" method="POST" action="/mantenimientos/correctivos">
-      <div class="row g-3 mb-4">
-        <div class="col-md-5">
+      <input type="hidden" name="trabajo_general" id="trabajoGeneral">
+      <% if (reporte) { %>
+        <input type="hidden" name="reporte_id" value="<%= reporte.id %>">
+        <div class="alert alert-info mb-4">
+          <div class="fw-bold"><i class="bi bi-clipboard-pulse"></i> Completando reporte de supervisor</div>
+          <div><strong><%= reporte.placa %></strong> · <%= reporte.sede %></div>
+          <div class="<%= reporte.importante ? 'text-danger fw-bold' : '' %>"><%= reporte.descripcion_limpia || reporte.descripcion_original %></div>
+          <small>Al guardar este correctivo, el reporte pasará al historial.</small>
+        </div>
+      <% } %>
+      <section class="mb-4">
+        <h2 class="step-title"><i class="bi bi-truck-front"></i> 1. Unidad</h2>
+        <div class="row g-3">
+        <div class="col-lg-5">
           <label class="form-label">Unidad</label>
           <select name="unidad_id" class="form-select" required>
             <option value="">Seleccione una unidad</option>
             <% unidades.forEach(u => { %>
-              <option value="<%= u.id %>"><%= u.placa %></option>
+              <option value="<%= u.id %>" <%= reporte && String(reporte.unidad_id) === String(u.id) ? 'selected' : '' %>><%= u.placa %></option>
             <% }) %>
           </select>
         </div>
-        <div class="col-md-7">
-          <div class="detail-item h-100">
-            <div class="detail-label">Instrucción</div>
-            <div class="detail-value">Marca los mecánicos que participaron y escribe al menos un trabajo realizado.</div>
+        <div class="col-lg-7">
+          <div class="helper-box h-100">
+            <div class="fw-bold text-uppercase small text-secondary">Instrucción</div>
+            <div>Marque el mecánico que participó y escriba el trabajo realizado. Puede marcar varios si trabajaron juntos.</div>
           </div>
         </div>
-      </div>
+        </div>
+      </section>
 
-      <h2 class="page-title fs-5 mb-3"><i class="bi bi-person-gear"></i> Ejecución por mecánico</h2>
-      <div class="table-responsive mb-4">
-        <table class="table table-hover align-middle">
-          <thead>
-            <tr>
-              <th style="width:70px;" class="text-center">Seleccionar</th>
-              <th style="width:260px;">Mecánico</th>
-              <th>Trabajo realizado</th>
-              <th>Repuestos usados</th>
-            </tr>
-          </thead>
-          <tbody>
-            <% mecanicos.forEach(m => { %>
-              <tr>
-                <td class="text-center" data-label="Seleccionar">
-                  <input class="form-check-input mec-check" type="checkbox" name="mecanicos[]" value="<%= m.id %>" id="mec_<%= m.id %>">
-                </td>
-                <td data-label="Mecánico">
-                  <label class="fw-bold" for="mec_<%= m.id %>"><%= m.nombre %></label>
-                </td>
-                <td data-label="Trabajo realizado">
-                  <textarea name="trabajos[<%= m.id %>]" class="form-control trabajo-text" rows="2" placeholder="Detalle del trabajo realizado"></textarea>
-                </td>
-                <td data-label="Repuestos usados">
-                  <input type="text" name="repuestos[<%= m.id %>]" class="form-control" placeholder="Ej: abrazaderas, manguera">
-                </td>
-              </tr>
-            <% }) %>
-          </tbody>
-        </table>
-      </div>
+      <section class="mb-4">
+        <h2 class="step-title"><i class="bi bi-person-gear"></i> 2. Trabajo por mecánico</h2>
+        <div class="mechanic-list">
+          <% mecanicos.forEach(m => { %>
+            <article class="mechanic-card">
+              <div class="mechanic-head">
+                <input class="form-check-input mec-check" type="checkbox" name="mecanicos[]" value="<%= m.id %>" id="mec_<%= m.id %>">
+                <label class="fw-bold" for="mec_<%= m.id %>"><%= m.nombre %></label>
+              </div>
+              <div class="row g-3">
+                <div class="col-lg-7">
+                  <label class="form-label">Trabajo realizado</label>
+                  <textarea name="trabajos[<%= m.id %>]" class="form-control trabajo-text" rows="3" placeholder="Ej: ajuste de frenos, cambio de manguera, revisión de fuga..."></textarea>
+                </div>
+                <div class="col-lg-5">
+                  <label class="form-label">Repuestos usados</label>
+                  <input type="text" name="repuestos[<%= m.id %>]" class="form-control" placeholder="Ej: abrazaderas, manguera o -">
+                </div>
+              </div>
+            </article>
+          <% }) %>
+        </div>
+      </section>
 
-      <div class="mb-4">
+      <section class="mb-4">
+        <h2 class="step-title"><i class="bi bi-exclamation-circle"></i> 3. Pendiente</h2>
         <label class="form-label">Pendiente general</label>
-        <textarea name="pendiente" class="form-control" rows="4" placeholder="Pendientes del vehículo..."></textarea>
-      </div>
+        <textarea name="pendiente" class="form-control" rows="4" placeholder="Si quedó algo pendiente, escríbalo aquí. Si no, puede dejarlo vacío."></textarea>
+      </section>
 
-      <div class="d-flex flex-column flex-sm-row gap-2">
+      <div class="sticky-actions">
         <button type="submit" class="btn btn-success"><i class="bi bi-save"></i> Guardar correctivo</button>
         <a href="/mantenimientos" class="btn btn-secondary">Cancelar</a>
       </div>
@@ -97,6 +186,18 @@
 <script>
   document.addEventListener('DOMContentLoaded', function() {
     const form = document.getElementById('formCorrectivo');
+    document.querySelectorAll('.mechanic-card').forEach(card => {
+      const check = card.querySelector('.mec-check');
+      const sync = () => card.classList.toggle('selected', check.checked);
+      check.addEventListener('change', sync);
+      card.addEventListener('click', function(e) {
+        if (['TEXTAREA', 'INPUT', 'LABEL'].includes(e.target.tagName)) return;
+        check.checked = !check.checked;
+        check.dispatchEvent(new Event('change'));
+      });
+      sync();
+    });
+
     form.addEventListener('submit', function(e) {
       const checks = document.querySelectorAll('.mec-check');
       const algunoSeleccionado = Array.from(checks).some(cb => cb.checked);
@@ -107,15 +208,24 @@
       }
       const trabajos = document.querySelectorAll('.trabajo-text');
       let tieneTrabajo = false;
+      const resumen = [];
       trabajos.forEach(t => {
         if (t.value && t.value.trim().length > 0) {
-          tieneTrabajo = true;
+          const row = t.closest('tr');
+          const check = row ? row.querySelector('.mec-check') : null;
+          if (!check || check.checked) {
+            tieneTrabajo = true;
+            resumen.push(t.value.trim());
+          }
         }
       });
       if (!tieneTrabajo) {
         e.preventDefault();
-        alert('Debe escribir al menos un trabajo.');
+        alert('Debe escribir al menos un trabajo en un mecánico seleccionado.');
+        return;
       }
+
+      document.getElementById('trabajoGeneral').value = resumen.join(' | ');
     });
   });
 </script>
