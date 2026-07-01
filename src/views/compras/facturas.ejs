@@ -333,6 +333,9 @@
     if (filtros.orden) reporteParams.set('orden', filtros.orden);
     const reportePendientesUrl = '/compras/facturas/reporte/pdf' + (reporteParams.toString() ? `?${reporteParams.toString()}` : '');
     const reportePendientesExcelUrl = '/compras/facturas/reporte/excel' + (reporteParams.toString() ? `?${reporteParams.toString()}` : '');
+    const listaParams = new URLSearchParams(reporteParams);
+    if (filtros.pagada) listaParams.set('pagada', filtros.pagada);
+    var returnToFacturas = '/compras/facturas' + (listaParams.toString() ? `?${listaParams.toString()}` : '');
   %>
   <div class="summary-grid">
     <div class="summary-card">
@@ -423,7 +426,18 @@
                     <% } %>
                   </div>
                 </td>
-                <td data-label="N° Factura"><%= f.numero_factura %></td>
+                <td data-label="N° Factura">
+                  <strong><%= f.numero_factura %></strong>
+                  <% if (puedeModificarCompras) { %>
+                    <button
+                      type="button"
+                      class="btn btn-link btn-sm p-0 ms-1 align-baseline"
+                      data-bs-toggle="modal"
+                      data-bs-target="#editar-numero-<%= f.tipo %>-<%= f.id %>">
+                      Editar
+                    </button>
+                  <% } %>
+                </td>
                 <td data-label="Monto" class="monto-factura money" data-val="<%= f.saldo ?? f.monto %>">
                   <div class="amount-stack">
                     <% if (f.tiene_nc || f.tiene_abono) { %>
@@ -467,6 +481,13 @@
                 </td>
                 <td data-label="Acciones">
                   <% if (puedeModificarCompras) { %>
+                    <button
+                      type="button"
+                      class="btn btn-sm btn-outline-dark mb-1"
+                      data-bs-toggle="modal"
+                      data-bs-target="#editar-numero-<%= f.tipo %>-<%= f.id %>">
+                      <i class="bi bi-pencil-square"></i> N°
+                    </button>
                     <button
                       type="button"
                       class="btn btn-sm btn-outline-primary mb-1"
@@ -544,6 +565,33 @@
 
 <% if (puedeModificarCompras) { %>
   <% facturas.forEach(f => { %>
+    <div class="modal fade" id="editar-numero-<%= f.tipo %>-<%= f.id %>" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <form method="POST" action="/compras/facturas/<%= f.id %>/numero">
+          <div class="modal-header">
+            <div>
+              <h5 class="modal-title"><i class="bi bi-pencil-square me-1"></i> Editar número de factura</h5>
+              <small class="text-muted"><%= f.proveedor_nombre %> · <%= f.po_numero || 'Factura independiente' %></small>
+            </div>
+            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body">
+            <input type="hidden" name="tipo" value="<%= f.tipo %>">
+            <input type="hidden" name="return_to" value="<%= returnToFacturas %>">
+            <label class="form-label">Número de factura</label>
+            <input type="text" name="numero_factura" class="form-control" value="<%= f.numero_factura || '' %>" required>
+            <small class="text-muted">Solo se cambiará el número de factura. No modifica monto, proveedor, fecha, pago, NC ni abonos.</small>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+            <button class="btn btn-dark">Guardar número</button>
+          </div>
+        </form>
+      </div>
+    </div>
+    </div>
+
     <div class="modal fade" id="nc-<%= f.tipo %>-<%= f.id %>" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog">
       <div class="modal-content">

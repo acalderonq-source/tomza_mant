@@ -160,6 +160,25 @@
       text-align: center;
     }
 
+    .revision-photo {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      margin-top: .85rem;
+      max-height: 260px;
+      max-width: 100%;
+      object-fit: cover;
+    }
+
+    .detail-photo {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      display: block;
+      margin-top: .4rem;
+      max-height: 180px;
+      max-width: 100%;
+      object-fit: cover;
+    }
+
     @media (max-width: 820px) {
       .summary-grid,
       .quick-grid {
@@ -295,6 +314,12 @@
           <div class="alert alert-light border mt-3 mb-0"><strong>Observación:</strong> <%= r.observaciones_generales %></div>
         <% } %>
 
+        <% if (r.foto_base64) { %>
+          <div>
+            <img class="revision-photo" src="<%= r.foto_base64 %>" alt="Foto de la revisión <%= r.placa %>">
+          </div>
+        <% } %>
+
         <div class="mt-3">
           <button class="btn btn-sm btn-outline-dark" type="button" data-bs-toggle="collapse" data-bs-target="#detalle_<%= r.id %>">
             Ver detalle
@@ -306,7 +331,12 @@
             <div class="detail-row">
               <div class="fw-bold"><%= d.item_nombre %></div>
               <div><span class="badge badge-<%= d.estado %>"><%= etiquetaEstado(d.estado) %></span></div>
-              <div class="small-muted"><%= d.observacion || '-' %></div>
+              <div class="small-muted">
+                <%= d.observacion || '-' %>
+                <% if (d.foto_base64) { %>
+                  <img class="detail-photo" src="<%= d.foto_base64 %>" alt="Foto de <%= d.item_nombre %>">
+                <% } %>
+              </div>
             </div>
           <% }) %>
         </div>

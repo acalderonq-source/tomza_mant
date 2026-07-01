@@ -220,6 +220,14 @@ function calcularSaldoFactura(monto, notaCredito = 0, abono = 0, pagada = 0) {
   };
 }
 
+function redirectFacturas(req, res) {
+  const returnTo = String(req.body.return_to || "");
+  if (returnTo.startsWith("/compras/facturas")) {
+    return res.redirect(returnTo);
+  }
+  return res.redirect("/compras/facturas");
+}
+
 async function obtenerOrdenesDisponiblesFactura() {
   const [ordenesDisponibles] = await queryWithRetry(`
     SELECT
@@ -1374,6 +1382,54 @@ router.get("/facturas/reporte/excel", requireAuth, allowRoles("ADMIN", "TALLER",
   } catch (error) {
     console.error("Error descargando Excel de facturas pendientes:", error);
     res.status(500).send("Error descargando Excel");
+  }
+});
+
+router.post("/facturas/:id/numero", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER"), async (req, res) => {
+  try {
+    const id = req.params.id;
+    const { tipo, numero_factura } = req.body;
+    const nuevoNumero = String(numero_factura || "").trim();
+
+    if (!["orden", "independiente"].includes(tipo)) {
+      req.session.error = "Tipo de factura inválido.";
+      return redirectFacturas(req, res);
+    }
+
+    if (!nuevoNumero) {
+      req.session.error = "Debe indicar el número de factura.";
+      return redirectFacturas(req, res);
+    }
+
+    const table = tipo === "orden" ? "ordenes_compra" : "facturas";
+    const numeroColumn = tipo === "orden" ? "factura" : "numero_factura";
+    const extraWhere = tipo === "orden" ? "AND facturada = 1" : "";
+
+    const [[factura]] = await pool.query(
+      `SELECT id, ${numeroColumn} AS numero_actual
+       FROM ${table}
+       WHERE id = ? ${extraWhere}`,
+      [id]
+    );
+
+    if (!factura) {
+      req.session.error = "Factura no encontrada.";
+      return redirectFacturas(req, res);
+    }
+
+    await pool.query(
+      `UPDATE ${table}
+       SET ${numeroColumn} = ?
+       WHERE id = ?`,
+      [nuevoNumero, id]
+    );
+
+    req.session.success = `Número de factura actualizado de ${factura.numero_actual || "sin número"} a ${nuevoNumero}.`;
+    return redirectFacturas(req, res);
+  } catch (error) {
+    console.error("Error editando número de factura:", error);
+    req.session.error = "Error interno al editar el número de factura.";
+    return redirectFacturas(req, res);
   }
 });
 
