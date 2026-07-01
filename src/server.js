@@ -85,6 +85,7 @@ const unidadesRoutes = require("./routes/unidades.routes");
 const sedeRoutes = require("./routes/sede.routes");
 const kpisRoutes = require("./routes/kpis.routes");
 const aceiteRoutes = require("./routes/aceite.routes");
+const airesRoutes = require("./routes/aires.routes");
 const dekraRoutes = require("./routes/dekra.routes");
 const minaeRoutes = require("./routes/minae.routes");
 const comprasRoutes = require("./routes/compras.routes");
@@ -92,6 +93,7 @@ const llantasRoutes = require("./routes/llantas.routes");
 const notificacionesRoutes = require("./routes/notificaciones.routes");
 const iaRoutes = require("./routes/ia.routes");
 const reportesSupervisoresRoutes = require("./routes/reportesSupervisores.routes");
+const revisionRutaRoutes = require("./routes/revisionRuta.routes");
 
 // ===================== USAR RUTAS =====================
 app.use("/", authRoutes);
@@ -103,6 +105,7 @@ app.use("/mantenimientos", mantenimientosRoutes);
 app.use("/unidades", unidadesRoutes);
 app.use("/kpis", kpisRoutes);
 app.use("/aceite", aceiteRoutes);
+app.use("/aires", airesRoutes);
 app.use("/dekra", dekraRoutes);
 app.use("/minae", minaeRoutes);
 app.use("/compras", comprasRoutes);
@@ -110,6 +113,7 @@ app.use("/llantas", llantasRoutes);
 app.use("/notificaciones", notificacionesRoutes);
 app.use("/ia", iaRoutes);
 app.use("/reportes-supervisores", reportesSupervisoresRoutes);
+app.use("/revision-ruta", revisionRutaRoutes);
 
 // ===================== CRON JOBS =====================
 ensurePushTables().catch(error => {

@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Aires acondicionados - Gas Tomza</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <style>
+    :root {
+      --bg: #f3f6fa;
+      --card: #fff;
+      --ink: #111827;
+      --muted: #64748b;
+      --line: #dbe3ef;
+      --dark: #111827;
+      --blue: #2563eb;
+      --green: #16a34a;
+      --red: #dc2626;
+      --amber: #d97706;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--ink);
+      font-family: "Segoe UI", Roboto, Arial, sans-serif;
+    }
+
+    .topbar {
+      background: var(--dark);
+      border-bottom: 3px solid var(--blue);
+    }
+
+    .shell {
+      max-width: 1180px;
+    }
+
+    .hero,
+    .panel,
+    .air-card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+    }
+
+    .hero {
+      padding: 1rem;
+    }
+
+    .page-title {
+      font-size: 1.45rem;
+      font-weight: 900;
+      margin: 0;
+    }
+
+    .small-muted {
+      color: var(--muted);
+    }
+
+    .summary-grid {
+      display: grid;
+      gap: .75rem;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .summary-card {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: .9rem;
+    }
+
+    .summary-label {
+      color: var(--muted);
+      font-size: .75rem;
+      font-weight: 850;
+      text-transform: uppercase;
+    }
+
+    .summary-value {
+      font-size: 1.65rem;
+      font-weight: 900;
+      line-height: 1.1;
+      margin-top: .2rem;
+    }
+
+    .air-list {
+      display: grid;
+      gap: .8rem;
+    }
+
+    .air-card {
+      padding: 1rem;
+    }
+
+    .air-head {
+      align-items: flex-start;
+      display: flex;
+      gap: 1rem;
+      justify-content: space-between;
+    }
+
+    .plate {
+      font-size: 1.05rem;
+      font-weight: 900;
+    }
+
+    .meta-grid {
+      display: grid;
+      gap: .65rem;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      margin-top: .85rem;
+    }
+
+    .meta-box {
+      background: #f8fafc;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: .65rem;
+    }
+
+    .meta-label {
+      color: #52637a;
+      font-size: .7rem;
+      font-weight: 900;
+      text-transform: uppercase;
+    }
+
+    .meta-value {
+      font-weight: 850;
+      margin-top: .15rem;
+    }
+
+    .badge-work {
+      border-radius: 999px;
+      font-weight: 850;
+      padding: .45rem .65rem;
+    }
+
+    .badge-REPARACION { background: #fee2e2; color: #991b1b; }
+    .badge-CARGA { background: #dbeafe; color: #1d4ed8; }
+    .badge-MANTENIMIENTO { background: #dcfce7; color: #166534; }
+
+    .due-warning { color: var(--amber); }
+    .due-danger { color: var(--red); }
+    .empty-state {
+      color: var(--muted);
+      font-weight: 750;
+      padding: 2rem;
+      text-align: center;
+    }
+
+    @media (max-width: 840px) {
+      .summary-grid,
+      .meta-grid {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+
+    @media (max-width: 560px) {
+      .summary-grid,
+      .meta-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .air-head {
+        flex-direction: column;
+      }
+
+      .btn-mobile {
+        width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+<nav class="navbar navbar-dark topbar px-3 py-2">
+  <span class="navbar-brand fw-semibold"><i class="bi bi-snow2 me-2"></i>Aires acondicionados</span>
+  <div class="text-white d-flex align-items-center gap-2 flex-wrap">
+    <span class="small"><%= user.usuario %> · <%= user.rol %></span>
+    <a href="/dashboard" class="btn btn-warning btn-sm rounded-pill px-3">Dashboard</a>
+  </div>
+</nav>
+
+<main class="container-fluid shell py-4">
+  <section class="hero mb-3">
+    <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
+      <div>
+        <h1 class="page-title">Control de aires acondicionados</h1>
+        <div class="small-muted">Registra reparación, carga o mantenimiento por placa y próximo mantenimiento.</div>
+      </div>
+      <% if (puedeEditar) { %>
+        <a href="/aires/nuevo" class="btn btn-success rounded-pill px-3 btn-mobile">
+          <i class="bi bi-plus-circle"></i> Nuevo registro
+        </a>
+      <% } %>
+    </div>
+  </section>
+
+  <section class="summary-grid mb-3">
+    <div class="summary-card">
+      <div class="summary-label">Registros</div>
+      <div class="summary-value"><%= resumen.total %></div>
+    </div>
+    <div class="summary-card">
+      <div class="summary-label">Próximos</div>
+      <div class="summary-value text-success"><%= resumen.proximos %></div>
+    </div>
+    <div class="summary-card">
+      <div class="summary-label">Vencidos</div>
+      <div class="summary-value text-danger"><%= resumen.vencidos %></div>
+    </div>
+  </section>
+
+  <section class="panel p-3 mb-3">
+    <form method="GET" action="/aires" class="row g-2 align-items-end">
+      <div class="col-12 col-md-5">
+        <label class="form-label fw-bold">Placa</label>
+        <input class="form-control" name="placa" value="<%= filtros.placa || '' %>" placeholder="Buscar placa">
+      </div>
+      <div class="col-12 col-md-4">
+        <label class="form-label fw-bold">Trabajo</label>
+        <select class="form-select" name="tipo">
+          <option value="">Todos</option>
+          <option value="REPARACION" <%= filtros.tipo === 'REPARACION' ? 'selected' : '' %>>Reparación</option>
+          <option value="CARGA" <%= filtros.tipo === 'CARGA' ? 'selected' : '' %>>Carga</option>
+          <option value="MANTENIMIENTO" <%= filtros.tipo === 'MANTENIMIENTO' ? 'selected' : '' %>>Mantenimiento</option>
+        </select>
+      </div>
+      <div class="col-12 col-md-3 d-grid">
+        <button class="btn btn-dark"><i class="bi bi-funnel"></i> Filtrar</button>
+      </div>
+      <% if (filtros.placa || filtros.tipo) { %>
+        <div class="col-12">
+          <a href="/aires" class="btn btn-sm btn-outline-secondary">Limpiar filtros</a>
+        </div>
+      <% } %>
+    </form>
+  </section>
+
+  <section class="air-list">
+    <% if (!registros.length) { %>
+      <div class="panel empty-state">No hay registros de aires acondicionados.</div>
+    <% } %>
+
+    <% registros.forEach(r => { %>
+      <article class="air-card">
+        <div class="air-head">
+          <div>
+            <div class="plate"><%= r.placa %></div>
+            <div class="small-muted"><%= r.sede %> · Trabajo realizado el <%= r.fecha_formato %></div>
+          </div>
+          <span class="badge-work badge-<%= r.tipo_trabajo %>"><%= etiquetaTipoTrabajo(r.tipo_trabajo) %></span>
+        </div>
+
+        <div class="meta-grid">
+          <div class="meta-box">
+            <div class="meta-label">Quién lo hizo</div>
+            <div class="meta-value"><%= r.realizado_por %></div>
+          </div>
+          <div class="meta-box">
+            <div class="meta-label">Próximo mantenimiento</div>
+            <div class="meta-value <%= r.proximo_vencido ? 'due-danger' : 'due-warning' %>"><%= r.proximo_formato || 'Sin fecha' %></div>
+          </div>
+          <div class="meta-box">
+            <div class="meta-label">Fecha</div>
+            <div class="meta-value"><%= r.fecha_formato %></div>
+          </div>
+          <div class="meta-box">
+            <div class="meta-label">Observaciones</div>
+            <div class="meta-value"><%= r.observaciones || '-' %></div>
+          </div>
+        </div>
+      </article>
+    <% }) %>
+  </section>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
