@@ -131,6 +131,33 @@
       margin-top: .15rem;
     }
 
+    .work-summary {
+      background: #f8fafc;
+      border: 1px solid var(--line);
+      border-left: 5px solid var(--blue);
+      border-radius: 10px;
+      margin-top: .85rem;
+      padding: .75rem .85rem;
+    }
+
+    .work-summary.empty {
+      border-left-color: #cbd5e1;
+    }
+
+    .work-summary-label {
+      color: #475569;
+      font-size: .72rem;
+      font-weight: 900;
+      margin-bottom: .2rem;
+      text-transform: uppercase;
+    }
+
+    .work-summary-text {
+      color: var(--ink);
+      font-weight: 750;
+      line-height: 1.35;
+    }
+
     .status-pill {
       border-radius: 999px;
       font-weight: 900;
@@ -301,7 +328,7 @@
             <div class="quick-value"><%= r.kilometraje || '-' %></div>
           </div>
           <div class="quick-box">
-          <div class="quick-label">Puntos mal</div>
+            <div class="quick-label">Puntos mal</div>
             <div class="quick-value text-danger"><%= r.malos || 0 %></div>
           </div>
           <div class="quick-box">
@@ -310,9 +337,10 @@
           </div>
         </div>
 
-        <% if (r.observaciones_generales) { %>
-          <div class="alert alert-light border mt-3 mb-0"><strong>Observación:</strong> <%= r.observaciones_generales %></div>
-        <% } %>
+        <div class="work-summary <%= r.tiene_observaciones ? '' : 'empty' %>">
+          <div class="work-summary-label">Observaciones / trabajos</div>
+          <div class="work-summary-text"><%= r.observaciones_resumen || '—' %></div>
+        </div>
 
         <% if (r.foto_base64) { %>
           <div>

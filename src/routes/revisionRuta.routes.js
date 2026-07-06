@@ -222,6 +222,25 @@ router.get("/", async (req, res) => {
       });
     }
 
+    revisiones.forEach(revision => {
+      const detalles = detallesPorRevision[revision.id] || [];
+      const observaciones = [];
+
+      if (revision.observaciones_generales) {
+        observaciones.push(`General: ${revision.observaciones_generales}`);
+      }
+
+      detalles.forEach(detalle => {
+        const observacion = String(detalle.observacion || "").trim();
+        if (observacion) {
+          observaciones.push(`${detalle.item_nombre}: ${observacion}`);
+        }
+      });
+
+      revision.observaciones_resumen = observaciones.length ? observaciones.join(" · ") : "—";
+      revision.tiene_observaciones = observaciones.length > 0;
+    });
+
     res.render("revision_ruta_listado", {
       revisiones,
       detallesPorRevision,
