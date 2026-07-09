@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title><%= gira ? 'Editar gira' : 'Nueva gira' %> - Gas Tomza</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <style>
+    :root {
+      --bg: #f3f6fa;
+      --card: #fff;
+      --ink: #111827;
+      --muted: #64748b;
+      --line: #dbe3ef;
+      --dark: #111827;
+      --blue: #2563eb;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--ink);
+      font-family: "Segoe UI", Roboto, Arial, sans-serif;
+    }
+
+    .topbar {
+      background: var(--dark);
+      border-bottom: 3px solid var(--blue);
+    }
+
+    .shell {
+      max-width: 980px;
+    }
+
+    .hero,
+    .panel {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+    }
+
+    .hero {
+      padding: 1rem;
+    }
+
+    .page-title {
+      font-size: 1.45rem;
+      font-weight: 900;
+      margin: 0;
+    }
+
+    .small-muted {
+      color: var(--muted);
+    }
+
+    .form-label {
+      color: #334155;
+      font-size: .84rem;
+      font-weight: 850;
+    }
+
+    .sticky-actions {
+      background: rgba(243, 246, 250, .96);
+      border-top: 1px solid var(--line);
+      bottom: 0;
+      padding: .8rem 0;
+      position: sticky;
+    }
+
+    @media (max-width: 720px) {
+      .action-btn {
+        width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+<%
+  const esEdicion = !!gira;
+  const data = gira || {};
+  const fecha = data.fecha_input || hoy;
+  const inspector = data.inspector || (user.nombre || user.usuario || '');
+  const action = esEdicion ? `/giras/${data.id}/editar` : '/giras';
+%>
+
+<nav class="navbar navbar-dark topbar px-3 py-2">
+  <span class="navbar-brand fw-semibold"><i class="bi bi-geo-alt me-2"></i><%= esEdicion ? 'Editar gira' : 'Nueva gira' %></span>
+  <div class="text-white d-flex align-items-center gap-2 flex-wrap">
+    <span class="small"><%= user.usuario %> · <%= user.rol %></span>
+    <a href="/giras" class="btn btn-secondary btn-sm rounded-pill px-3">Volver</a>
+  </div>
+</nav>
+
+<main class="container-fluid shell py-4">
+  <section class="hero mb-3">
+    <h1 class="page-title"><%= esEdicion ? 'Actualizar inspección de taller' : 'Registrar inspección de taller' %></h1>
+    <div class="small-muted">Anota lo visto en la sede, pendientes y acciones recomendadas para dar seguimiento.</div>
+  </section>
+
+  <section class="panel p-3">
+    <form method="POST" action="<%= action %>">
+      <div class="row g-3">
+        <div class="col-12 col-md-4">
+          <label class="form-label">Sede inspeccionada</label>
+          <select name="sede" class="form-select" required>
+            <option value="">Seleccione sede</option>
+            <% sedesPermitidas.forEach(sede => { %>
+              <option value="<%= sede %>" <%= data.sede === sede ? 'selected' : '' %>><%= sede %></option>
+            <% }) %>
+          </select>
+        </div>
+        <div class="col-12 col-md-4">
+          <label class="form-label">Fecha de la gira</label>
+          <input type="date" name="fecha" class="form-control" value="<%= fecha %>" required>
+        </div>
+        <div class="col-12 col-md-4">
+          <label class="form-label">Estado</label>
+          <select name="estado" class="form-select">
+            <option value="ABIERTA" <%= (data.estado || 'ABIERTA') === 'ABIERTA' ? 'selected' : '' %>>Abierta</option>
+            <option value="EN_SEGUIMIENTO" <%= data.estado === 'EN_SEGUIMIENTO' ? 'selected' : '' %>>En seguimiento</option>
+            <option value="CERRADA" <%= data.estado === 'CERRADA' ? 'selected' : '' %>>Cerrada</option>
+          </select>
+        </div>
+        <div class="col-12">
+          <label class="form-label">Quién realizó la inspección</label>
+          <input name="inspector" class="form-control" value="<%= inspector %>" placeholder="Nombre del jefe de taller" required>
+        </div>
+      </div>
+
+      <hr>
+
+      <div class="row g-3 mt-1">
+        <div class="col-12">
+          <label class="form-label">Observaciones de la gira</label>
+          <textarea name="observaciones" class="form-control" rows="8" placeholder="Escriba libremente todo lo observado en el taller: orden, herramientas, repuestos, seguridad, unidades pendientes, condiciones generales, comentarios del personal..." required><%= data.observaciones || '' %></textarea>
+        </div>
+        <div class="col-12 col-md-6">
+          <label class="form-label">Pendientes</label>
+          <textarea name="pendientes" class="form-control" rows="5" placeholder="Pendientes que quedan para resolver en esa sede..."><%= data.pendientes || '' %></textarea>
+        </div>
+        <div class="col-12 col-md-6">
+          <label class="form-label">Acciones recomendadas</label>
+          <textarea name="acciones_recomendadas" class="form-control" rows="5" placeholder="Qué se recomienda hacer, quién debería verlo o qué prioridad tiene..."><%= data.acciones_recomendadas || '' %></textarea>
+        </div>
+      </div>
+
+      <div class="sticky-actions mt-4">
+        <div class="d-flex gap-2 justify-content-between flex-wrap">
+          <div>
+            <% if (esEdicion && user.rol === 'ADMIN') { %>
+              <button type="submit" formaction="/giras/<%= data.id %>/eliminar" class="btn btn-outline-danger action-btn" onclick="return confirm('¿Eliminar esta gira?')">
+                <i class="bi bi-trash"></i> Eliminar
+              </button>
+            <% } %>
+          </div>
+          <div class="d-flex gap-2 flex-wrap">
+            <a href="/giras" class="btn btn-outline-secondary action-btn">Cancelar</a>
+            <button class="btn btn-success action-btn"><i class="bi bi-check-circle"></i> Guardar gira</button>
+          </div>
+        </div>
+      </div>
+    </form>
+  </section>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
