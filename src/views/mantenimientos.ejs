@@ -32,6 +32,16 @@
   }).length;
   const tipos = [...new Set(mantenimientos.map(m => m.tipo).filter(Boolean))];
   const prioridades = ['ALTA', 'MEDIA', 'BAJA'];
+  const puedeReprogramarLista = typeof puedeReprogramar !== 'undefined' ? puedeReprogramar : ['ADMIN','TALLER'].includes(user.rol);
+  const paramsRetorno = new URLSearchParams();
+  if (filtrosActuales.filtro) paramsRetorno.set('filtro', filtrosActuales.filtro);
+  if (filtrosActuales.placa) paramsRetorno.set('placa', filtrosActuales.placa);
+  if (filtrosActuales.tipo) paramsRetorno.set('tipo', filtrosActuales.tipo);
+  if (filtrosActuales.prioridad) paramsRetorno.set('prioridad', filtrosActuales.prioridad);
+  if (filtrosActuales.mecanico_id) paramsRetorno.set('mecanico_id', filtrosActuales.mecanico_id);
+  if (filtrosActuales.fecha_desde) paramsRetorno.set('fecha_desde', filtrosActuales.fecha_desde);
+  if (filtrosActuales.fecha_hasta) paramsRetorno.set('fecha_hasta', filtrosActuales.fecha_hasta);
+  const returnToMantenimientos = '/mantenimientos' + (paramsRetorno.toString() ? `?${paramsRetorno.toString()}` : '');
 %>
 
 <nav class="navbar navbar-dark px-3 py-2">
@@ -44,6 +54,19 @@
 </nav>
 
 <div class="container-fluid py-4">
+  <% if (typeof success !== 'undefined' && success) { %>
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+      <%= success %>
+      <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+  <% } %>
+  <% if (typeof error !== 'undefined' && error) { %>
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+      <%= error %>
+      <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+  <% } %>
+
   <div class="page-heading">
     <div>
       <h1 class="page-title">Mantenimientos preventivos</h1>
@@ -139,11 +162,26 @@
         <h2 class="page-title fs-5">Listado</h2>
         <p class="page-subtitle"><%= cerrados %> cerrados · <%= pendientes %> pendientes</p>
       </div>
+      <% if (puedeReprogramarLista) { %>
+        <form method="POST" action="/mantenimientos/reprogramar" id="formReprogramarMasivo" class="d-flex gap-2 flex-wrap align-items-end">
+          <input type="hidden" name="return_to" value="<%= returnToMantenimientos %>">
+          <div>
+            <label class="form-label small mb-1">Nueva fecha</label>
+            <input type="date" name="nueva_fecha" class="form-control form-control-sm" required>
+          </div>
+          <button class="btn btn-sm btn-warning" id="btnReprogramarSeleccionados" disabled>
+            <i class="bi bi-calendar2-week"></i> Reprogramar seleccionados
+          </button>
+        </form>
+      <% } %>
     </div>
     <div class="table-responsive">
       <table class="table table-hover align-middle">
         <thead>
           <tr>
+            <% if (puedeReprogramarLista) { %>
+              <th style="width: 42px;"><input type="checkbox" id="seleccionarReprogramar"></th>
+            <% } %>
             <th>Placa</th>
             <th>Sede</th>
             <th>Tipo</th>
@@ -158,7 +196,7 @@
         </thead>
         <tbody>
           <% if (mantenimientos.length === 0) { %>
-            <tr><td colspan="10" class="empty-state">No hay mantenimientos con los filtros seleccionados.</td></tr>
+            <tr><td colspan="<%= puedeReprogramarLista ? 11 : 10 %>" class="empty-state">No hay mantenimientos con los filtros seleccionados.</td></tr>
           <% } %>
 
           <% mantenimientos.forEach(m => { %>
@@ -169,6 +207,13 @@
               const esHoy = fecha && fecha.getTime() === hoy.getTime();
             %>
             <tr>
+              <% if (puedeReprogramarLista) { %>
+                <td data-label="Sel." class="text-center">
+                  <% if (m.estado !== 'CERRADO') { %>
+                    <input type="checkbox" name="mantenimientos_ids" value="<%= m.id %>" class="check-reprogramar" form="formReprogramarMasivo">
+                  <% } %>
+                </td>
+              <% } %>
               <td data-label="Placa"><strong><%= m.placa %></strong></td>
               <td data-label="Sede"><%= m.sede %></td>
               <td data-label="Tipo"><%= m.tipo %></td>
@@ -190,6 +235,11 @@
                   <div class="dropdown-menu dropdown-menu-end action-menu p-2">
                     <a href="/mantenimientos/<%= m.id %>" class="dropdown-item"><i class="bi bi-folder2-open me-1"></i> Abrir detalle</a>
                     <% if (m.estado !== 'CERRADO') { %>
+                      <% if (puedeReprogramarLista) { %>
+                        <button type="button" class="dropdown-item text-warning" data-bs-toggle="modal" data-bs-target="#reprogramar-<%= m.id %>">
+                          <i class="bi bi-calendar2-week me-1"></i> Reprogramar
+                        </button>
+                      <% } %>
                       <a href="/mantenimientos/<%= m.id %>" class="dropdown-item text-success"><i class="bi bi-check-circle me-1"></i> Cerrar mantenimiento</a>
                     <% } %>
                   </div>
@@ -201,8 +251,64 @@
       </table>
     </div>
   </div>
+
+  <% if (puedeReprogramarLista) { %>
+    <% mantenimientos.forEach(m => { %>
+      <% if (m.estado !== 'CERRADO') { %>
+        <div class="modal fade" id="reprogramar-<%= m.id %>" tabindex="-1" aria-hidden="true">
+          <div class="modal-dialog">
+            <div class="modal-content">
+              <form method="POST" action="/mantenimientos/<%= m.id %>/reprogramar">
+                <div class="modal-header">
+                  <div>
+                    <h5 class="modal-title"><i class="bi bi-calendar2-week me-1"></i> Reprogramar mantenimiento</h5>
+                    <small class="text-muted"><%= m.placa %> · <%= m.sede %> · actual: <%= m.fecha_formato %></small>
+                  </div>
+                  <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                  <input type="hidden" name="return_to" value="<%= returnToMantenimientos %>">
+                  <label class="form-label">Nueva fecha</label>
+                  <input type="date" name="nueva_fecha" class="form-control" required>
+                  <small class="text-muted">Solo cambia la fecha programada. No cierra ni modifica la ejecución.</small>
+                </div>
+                <div class="modal-footer">
+                  <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                  <button class="btn btn-warning">Guardar fecha</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      <% } %>
+    <% }) %>
+  <% } %>
 </div>
 
+<script>
+  const checksReprogramar = document.querySelectorAll('.check-reprogramar');
+  const seleccionarReprogramar = document.getElementById('seleccionarReprogramar');
+  const btnReprogramarSeleccionados = document.getElementById('btnReprogramarSeleccionados');
+
+  function actualizarReprogramacion() {
+    if (!btnReprogramarSeleccionados) return;
+    const seleccionados = Array.from(checksReprogramar).filter(cb => cb.checked).length;
+    btnReprogramarSeleccionados.disabled = seleccionados === 0;
+  }
+
+  if (seleccionarReprogramar) {
+    seleccionarReprogramar.addEventListener('change', () => {
+      checksReprogramar.forEach(cb => { cb.checked = seleccionarReprogramar.checked; });
+      actualizarReprogramacion();
+    });
+  }
+
+  checksReprogramar.forEach(cb => {
+    cb.addEventListener('change', actualizarReprogramacion);
+  });
+
+  actualizarReprogramacion();
+</script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

@@ -29,6 +29,24 @@ function obtenerSedeFiltro(req) {
   return req.session.sedeSeleccionada || req.session.user.sede || null;
 }
 
+function puedeReprogramarMantenimientos(user) {
+  return ["ADMIN", "TALLER"].includes(user.rol);
+}
+
+function redirectMantenimientos(req, res) {
+  const returnTo = String(req.body.return_to || "");
+  if (returnTo.startsWith("/mantenimientos")) {
+    return res.redirect(returnTo);
+  }
+  return res.redirect("/mantenimientos");
+}
+
+function obtenerIdsMantenimiento(value) {
+  if (value === undefined || value === null) return [];
+  const values = Array.isArray(value) ? value : [value];
+  return [...new Set(values.map(id => String(id)).filter(id => /^\d+$/.test(id)))];
+}
+
 function obtenerValoresSeleccionados(body) {
   const seleccion = body.mecanicos !== undefined ? body.mecanicos : body["mecanicos[]"];
   if (seleccion === undefined) return [];
@@ -476,6 +494,10 @@ router.get("/", requireAuth, async (req, res) => {
     }
     sqlMecanicos += " ORDER BY nombre";
     const [mecanicos] = await pool.query(sqlMecanicos, paramsMecanicos);
+    const success = req.session.success;
+    const error = req.session.error;
+    delete req.session.success;
+    delete req.session.error;
 
     res.render("mantenimientos", {
       mantenimientos,
@@ -483,11 +505,99 @@ router.get("/", requireAuth, async (req, res) => {
       filtro,
       filtros: { filtro, placa, tipo, prioridad, fecha_desde, fecha_hasta, mecanico_id },
       mecanicos,
-      sedeSeleccionada: sedeFiltro || "TODAS"
+      sedeSeleccionada: sedeFiltro || "TODAS",
+      puedeReprogramar: puedeReprogramarMantenimientos(req.session.user),
+      success,
+      error
     });
   } catch (error) {
     console.error("❌ ERROR listado mantenimientos:", error);
     res.status(500).send("Error interno");
+  }
+});
+
+router.post("/reprogramar", requireAuth, async (req, res) => {
+  try {
+    if (!puedeReprogramarMantenimientos(req.session.user)) {
+      return res.status(403).send("No autorizado");
+    }
+
+    const ids = obtenerIdsMantenimiento(req.body.mantenimientos_ids);
+    const nuevaFecha = String(req.body.nueva_fecha || "").trim();
+
+    if (!ids.length) {
+      req.session.error = "Debe seleccionar al menos un mantenimiento.";
+      return redirectMantenimientos(req, res);
+    }
+
+    if (!nuevaFecha) {
+      req.session.error = "Debe indicar la nueva fecha.";
+      return redirectMantenimientos(req, res);
+    }
+
+    const sedeFiltro = obtenerSedeFiltro(req);
+    let sql = `
+      UPDATE mantenimientos m
+      JOIN unidades u ON u.id = m.unidad_id
+      SET m.fecha_programada = ?
+      WHERE m.id IN (?)
+        AND m.estado != 'CERRADO'
+    `;
+    const params = [nuevaFecha, ids];
+
+    if (sedeFiltro) {
+      sql += " AND u.sede = ?";
+      params.push(sedeFiltro);
+    }
+
+    const [result] = await pool.query(sql, params);
+    req.session.success = `${result.affectedRows} mantenimiento${result.affectedRows === 1 ? "" : "s"} reprogramado${result.affectedRows === 1 ? "" : "s"} para ${nuevaFecha}.`;
+    return redirectMantenimientos(req, res);
+  } catch (error) {
+    console.error("❌ ERROR reprogramando mantenimientos:", error);
+    req.session.error = "Error interno al reprogramar mantenimientos.";
+    return redirectMantenimientos(req, res);
+  }
+});
+
+router.post("/:id/reprogramar", requireAuth, async (req, res) => {
+  try {
+    if (!puedeReprogramarMantenimientos(req.session.user)) {
+      return res.status(403).send("No autorizado");
+    }
+
+    const id = String(req.params.id || "");
+    const nuevaFecha = String(req.body.nueva_fecha || "").trim();
+
+    if (!/^\d+$/.test(id) || !nuevaFecha) {
+      req.session.error = "Debe indicar el mantenimiento y la nueva fecha.";
+      return redirectMantenimientos(req, res);
+    }
+
+    const sedeFiltro = obtenerSedeFiltro(req);
+    let sql = `
+      UPDATE mantenimientos m
+      JOIN unidades u ON u.id = m.unidad_id
+      SET m.fecha_programada = ?
+      WHERE m.id = ?
+        AND m.estado != 'CERRADO'
+    `;
+    const params = [nuevaFecha, id];
+
+    if (sedeFiltro) {
+      sql += " AND u.sede = ?";
+      params.push(sedeFiltro);
+    }
+
+    const [result] = await pool.query(sql, params);
+    req.session.success = result.affectedRows
+      ? `Mantenimiento reprogramado para ${nuevaFecha}.`
+      : "No se reprogramó. Puede que ya esté cerrado o no tengas permiso para esa sede.";
+    return redirectMantenimientos(req, res);
+  } catch (error) {
+    console.error("❌ ERROR reprogramando mantenimiento:", error);
+    req.session.error = "Error interno al reprogramar mantenimiento.";
+    return redirectMantenimientos(req, res);
   }
 });
 

@@ -72,6 +72,94 @@ function obtenerPlacaOrden(lineasOrden, placaUnidad = null) {
   return normalizarPlaca(placaUnidad) || normalizarPlaca((lineasOrden.find(linea => linea.codigo) || {}).codigo);
 }
 
+function normalizarTextoBusqueda(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+}
+
+function extraerJsonRespuestaIA(texto) {
+  const raw = String(texto || "").trim();
+  if (!raw) return null;
+
+  try {
+    return JSON.parse(raw);
+  } catch (_) {
+    const match = raw.match(/\{[\s\S]*\}/);
+    if (!match) return null;
+    try {
+      return JSON.parse(match[0]);
+    } catch (error) {
+      return null;
+    }
+  }
+}
+
+function parseMontoCotizacion(value) {
+  if (typeof value === "number") return Number.isFinite(value) ? value : 0;
+
+  const raw = String(value || "")
+    .replace(/[^\d,.-]/g, "")
+    .trim();
+  if (!raw) return 0;
+
+  const lastComma = raw.lastIndexOf(",");
+  const lastDot = raw.lastIndexOf(".");
+  let normalized = raw;
+
+  if (lastComma > -1 && lastDot > -1) {
+    normalized = lastComma > lastDot
+      ? raw.replace(/\./g, "").replace(",", ".")
+      : raw.replace(/,/g, "");
+  } else if (lastComma > -1) {
+    normalized = raw.replace(",", ".");
+  }
+
+  const monto = parseFloat(normalized);
+  return Number.isFinite(monto) ? monto : 0;
+}
+
+function sanearAnalisisCotizacion(data, proveedores = []) {
+  const resultado = data && typeof data === "object" ? data : {};
+  const proveedorDetectado = String(resultado.proveedor_nombre || "").trim();
+  const proveedorNormalizado = normalizarTextoBusqueda(proveedorDetectado);
+  const proveedorMatch = proveedores.find(p => {
+    const nombre = normalizarTextoBusqueda(p.nombre);
+    return proveedorNormalizado && (nombre === proveedorNormalizado || nombre.includes(proveedorNormalizado) || proveedorNormalizado.includes(nombre));
+  });
+
+  const moneda = String(resultado.moneda || "CRC").toUpperCase().includes("USD") ? "USD" : "CRC";
+  const lineas = Array.isArray(resultado.lineas) ? resultado.lineas : [];
+
+  return {
+    proveedor_id: proveedorMatch ? proveedorMatch.id : null,
+    proveedor_nombre: proveedorDetectado,
+    forma_pago: String(resultado.forma_pago || "").trim(),
+    moneda,
+    placa_unidad: normalizarPlaca(resultado.placa_unidad),
+    descuento: parseMontoCotizacion(resultado.descuento),
+    transporte: parseMontoCotizacion(resultado.transporte),
+    iva: resultado.iva === null || resultado.iva === undefined || resultado.iva === "" ? 13 : parseMontoCotizacion(resultado.iva),
+    observaciones: String(resultado.observaciones || "").trim(),
+    lineas: lineas
+      .map(linea => {
+        const cantidad = parseMontoCotizacion(linea.cantidad || 1) || 1;
+        const precio = parseMontoCotizacion(linea.precio_unitario || linea.precio || 0);
+        const subtotal = parseMontoCotizacion(linea.subtotal || (cantidad * precio));
+        return {
+          codigo: normalizarPlaca(linea.codigo || linea.placa || ""),
+          descripcion: String(linea.descripcion || linea.detalle || "").trim(),
+          cantidad,
+          precio_unitario: precio,
+          subtotal
+        };
+      })
+      .filter(linea => linea.descripcion)
+  };
+}
+
 async function queryWithRetry(sql, params = []) {
   try {
     return await pool.query(sql, params);
@@ -174,6 +262,20 @@ async function ensureOrdenPlacaColumn() {
   }
 }
 
+async function ensureOrdenCotizacionColumns() {
+  const columns = [
+    ["cotizacion_archivo", "VARCHAR(255) NULL"],
+    ["cotizacion_nombre", "VARCHAR(255) NULL"],
+    ["cotizacion_tipo", "VARCHAR(100) NULL"]
+  ];
+
+  for (const [column, definition] of columns) {
+    if (!(await columnExists("ordenes_compra", column))) {
+      await queryWithRetry(`ALTER TABLE ordenes_compra ADD COLUMN ${column} ${definition}`);
+    }
+  }
+}
+
 function guardarFotoProducto(dataUrl, usuarioId) {
   if (!dataUrl) return null;
 
@@ -197,6 +299,43 @@ function guardarFotoProducto(dataUrl, usuarioId) {
   fs.writeFileSync(path.join(uploadDir, fileName), buffer);
 
   return `/uploads/facturas/${fileName}`;
+}
+
+function guardarCotizacionOrden(dataUrl, originalName, mimeType, usuarioId) {
+  if (!dataUrl) return null;
+
+  const match = String(dataUrl).match(/^data:(application\/pdf|image\/jpeg|image\/jpg|image\/png|image\/webp);base64,(.+)$/);
+  if (!match) {
+    throw new Error("La cotización debe ser PDF, JPG, PNG o WEBP.");
+  }
+
+  const tipo = match[1];
+  const extensionMap = {
+    "application/pdf": "pdf",
+    "image/jpeg": "jpg",
+    "image/jpg": "jpg",
+    "image/png": "png",
+    "image/webp": "webp"
+  };
+  const extension = extensionMap[tipo] || "bin";
+  const buffer = Buffer.from(match[2], "base64");
+  const maxBytes = 5 * 1024 * 1024;
+
+  if (buffer.length > maxBytes) {
+    throw new Error("La cotización supera 5 MB.");
+  }
+
+  const uploadDir = path.join(__dirname, "..", "..", "public", "uploads", "cotizaciones");
+  fs.mkdirSync(uploadDir, { recursive: true });
+
+  const fileName = `cotizacion_${Date.now()}_${usuarioId || "user"}_${Math.round(Math.random() * 1e6)}.${extension}`;
+  fs.writeFileSync(path.join(uploadDir, fileName), buffer);
+
+  return {
+    archivo: `/uploads/cotizaciones/${fileName}`,
+    nombre: String(originalName || `cotizacion.${extension}`).trim().slice(0, 255),
+    tipo: String(mimeType || tipo).trim().slice(0, 100)
+  };
 }
 
 function parseMonto(value) {
@@ -491,6 +630,7 @@ router.get("/proveedores/eliminar/:id", requireAuth, allowRoles("ADMIN", "PROVEE
 router.get("/ordenes/nueva", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER"), async (req, res) => {
   try {
     await ensureOrdenPlacaColumn();
+    await ensureOrdenCotizacionColumns();
     const [proveedores] = await pool.query("SELECT id, nombre FROM proveedores ORDER BY nombre");
     const siguientePO = await generarNumeroPO();
     res.render("compras/orden_form", {
@@ -510,6 +650,7 @@ router.get("/ordenes/nueva", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEED
 router.get("/ordenes/:id/editar", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER"), async (req, res) => {
   try {
     await ensureOrdenPlacaColumn();
+    await ensureOrdenCotizacionColumns();
     const id = req.params.id;
     const [[orden]] = await pool.query("SELECT * FROM ordenes_compra WHERE id = ?", [id]);
     if (!orden) return res.status(404).send("Orden no encontrada");
@@ -535,14 +676,16 @@ router.post("/ordenes", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_
   const connection = await pool.getConnection();
   try {
     await ensureOrdenPlacaColumn();
+    await ensureOrdenCotizacionColumns();
     await connection.beginTransaction();
 
     const po_numero = await generarNumeroPO();
     const fecha = new Date().toISOString().slice(0, 10);
 
-    const { proveedor_id, forma_pago, moneda, placa_unidad, lineas, subtotal, descuento, transporte, iva, total, observaciones, empresa_destino } = req.body;
+    const { proveedor_id, forma_pago, moneda, placa_unidad, lineas, subtotal, descuento, transporte, iva, total, observaciones, empresa_destino, cotizacion_data, cotizacion_nombre, cotizacion_tipo } = req.body;
     const lineasOrden = normalizarLineas(lineas);
     const placaOrden = obtenerPlacaOrden(lineasOrden, placa_unidad);
+    const cotizacion = guardarCotizacionOrden(cotizacion_data, cotizacion_nombre, cotizacion_tipo, req.session.user.id);
 
     if (!lineasOrden.length) {
       await connection.rollback();
@@ -551,9 +694,27 @@ router.post("/ordenes", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_
 
     const [result] = await connection.query(
       `INSERT INTO ordenes_compra
-       (po_numero, fecha, proveedor_id, forma_pago, moneda, placa_unidad, subtotal, descuento, transporte, iva, total, observaciones, creado_por, estado, empresa_destino)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?, 'BORRADOR', ?)`,
-      [po_numero, fecha, proveedor_id, forma_pago, moneda, placaOrden, subtotal, descuento, transporte, iva, total, observaciones || null, req.session.user.id, empresa_destino || 'GAS TOMZA']
+       (po_numero, fecha, proveedor_id, forma_pago, moneda, placa_unidad, subtotal, descuento, transporte, iva, total, observaciones, cotizacion_archivo, cotizacion_nombre, cotizacion_tipo, creado_por, estado, empresa_destino)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?, 'BORRADOR', ?)`,
+      [
+        po_numero,
+        fecha,
+        proveedor_id,
+        forma_pago,
+        moneda,
+        placaOrden,
+        subtotal,
+        descuento,
+        transporte,
+        iva,
+        total,
+        observaciones || null,
+        cotizacion ? cotizacion.archivo : null,
+        cotizacion ? cotizacion.nombre : null,
+        cotizacion ? cotizacion.tipo : null,
+        req.session.user.id,
+        empresa_destino || 'GAS TOMZA'
+      ]
     );
     const ordenId = result.insertId;
 
@@ -580,12 +741,14 @@ router.post("/ordenes/:id/editar", requireAuth, allowRoles("ADMIN", "TALLER", "P
   const connection = await pool.getConnection();
   try {
     await ensureOrdenPlacaColumn();
+    await ensureOrdenCotizacionColumns();
     await connection.beginTransaction();
 
     const id = req.params.id;
-    const { proveedor_id, forma_pago, moneda, placa_unidad, lineas, subtotal, descuento, transporte, iva, total, observaciones, empresa_destino } = req.body;
+    const { proveedor_id, forma_pago, moneda, placa_unidad, lineas, subtotal, descuento, transporte, iva, total, observaciones, empresa_destino, cotizacion_data, cotizacion_nombre, cotizacion_tipo } = req.body;
     const lineasOrden = normalizarLineas(lineas);
     const placaOrden = obtenerPlacaOrden(lineasOrden, placa_unidad);
+    const cotizacion = guardarCotizacionOrden(cotizacion_data, cotizacion_nombre, cotizacion_tipo, req.session.user.id);
 
     if (!lineasOrden.length) {
       await connection.rollback();
@@ -598,8 +761,7 @@ router.post("/ordenes/:id/editar", requireAuth, allowRoles("ADMIN", "TALLER", "P
       return res.status(404).send("Orden no encontrada");
     }
 
-    await connection.query(
-      `UPDATE ordenes_compra
+    let updateSql = `UPDATE ordenes_compra
        SET proveedor_id = ?,
            forma_pago = ?,
            moneda = ?,
@@ -611,9 +773,22 @@ router.post("/ordenes/:id/editar", requireAuth, allowRoles("ADMIN", "TALLER", "P
            total = ?,
            observaciones = ?,
            empresa_destino = ?
-       WHERE id = ?`,
-      [proveedor_id, forma_pago, moneda, placaOrden, subtotal, descuento, transporte, iva, total, observaciones || null, empresa_destino || 'GAS TOMZA', id]
-    );
+    `;
+    const updateParams = [proveedor_id, forma_pago, moneda, placaOrden, subtotal, descuento, transporte, iva, total, observaciones || null, empresa_destino || 'GAS TOMZA'];
+
+    if (cotizacion) {
+      updateSql += `,
+           cotizacion_archivo = ?,
+           cotizacion_nombre = ?,
+           cotizacion_tipo = ?
+      `;
+      updateParams.push(cotizacion.archivo, cotizacion.nombre, cotizacion.tipo);
+    }
+
+    updateSql += " WHERE id = ?";
+    updateParams.push(id);
+
+    await connection.query(updateSql, updateParams);
 
     await connection.query("DELETE FROM ordenes_compra_detalle WHERE orden_compra_id = ?", [id]);
 
@@ -640,6 +815,7 @@ router.post("/ordenes/:id/editar", requireAuth, allowRoles("ADMIN", "TALLER", "P
 router.get("/ordenes", requireAuth, allowRoles(...ROLES_VER_ORDENES), async (req, res) => {
   try {
     await ensureOrdenPlacaColumn();
+    await ensureOrdenCotizacionColumns();
     const { proveedor_id, fecha_desde, fecha_hasta, po_numero, placa_unidad, estado, facturada } = req.query;
     const { sql, params } = construirConsultaOrdenes({ proveedor_id, fecha_desde, fecha_hasta, po_numero, placa_unidad, estado, facturada });
 
@@ -674,6 +850,7 @@ router.get("/ordenes", requireAuth, allowRoles(...ROLES_VER_ORDENES), async (req
 router.get("/ordenes/reporte/pdf", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER", "CONTABILIDAD"), async (req, res) => {
   try {
     await ensureOrdenPlacaColumn();
+    await ensureOrdenCotizacionColumns();
     const { proveedor_id, fecha_desde, fecha_hasta, po_numero, placa_unidad, estado, facturada } = req.query;
     const filtros = { proveedor_id, fecha_desde, fecha_hasta, po_numero, placa_unidad, estado, facturada };
     const { sql, params } = construirConsultaOrdenes(filtros);
@@ -742,6 +919,7 @@ router.get("/ordenes/reporte/pdf", requireAuth, allowRoles("ADMIN", "TALLER", "P
 router.get("/ordenes/:id/detalle", requireAuth, allowRoles(...ROLES_VER_ORDENES), async (req, res) => {
   try {
     await ensureOrdenPlacaColumn();
+    await ensureOrdenCotizacionColumns();
     const id = req.params.id;
     const [[orden]] = await pool.query("SELECT * FROM ordenes_compra WHERE id = ?", [id]);
     if (!orden) return res.status(404).send("Orden no encontrada");
@@ -757,6 +935,7 @@ router.get("/ordenes/:id/detalle", requireAuth, allowRoles(...ROLES_VER_ORDENES)
 router.get("/ordenes/:id/pdf", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER", "CONTABILIDAD"), async (req, res) => {
   try {
     await ensureOrdenPlacaColumn();
+    await ensureOrdenCotizacionColumns();
     const ordenId = req.params.id;
     const [[orden]] = await pool.query("SELECT * FROM ordenes_compra WHERE id = ?", [ordenId]);
     if (!orden) return res.status(404).send("Orden no encontrada");
@@ -769,6 +948,122 @@ router.get("/ordenes/:id/pdf", requireAuth, allowRoles("ADMIN", "TALLER", "PROVE
   } catch (error) {
     console.error(error);
     res.status(500).send("Error generando PDF");
+  }
+});
+
+router.post("/cotizacion/analizar", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER"), async (req, res) => {
+  try {
+    const apiKey = process.env.OPENAI_API_KEY;
+    if (!apiKey) {
+      return res.status(400).json({
+        ok: false,
+        error: "Falta configurar OPENAI_API_KEY para leer cotizaciones automáticamente."
+      });
+    }
+
+    const { archivo_data, archivo_nombre, archivo_tipo } = req.body;
+    const dataUrl = String(archivo_data || "").trim();
+    const mimeType = String(archivo_tipo || "").trim();
+
+    if (!dataUrl) {
+      return res.status(400).json({ ok: false, error: "Debe adjuntar una cotización." });
+    }
+
+    if (!/^data:(application\/pdf|image\/jpeg|image\/jpg|image\/png|image\/webp);base64,/.test(dataUrl)) {
+      return res.status(400).json({ ok: false, error: "La cotización debe ser PDF, JPG, PNG o WEBP." });
+    }
+
+    const base64 = dataUrl.split(",")[1] || "";
+    const buffer = Buffer.from(base64, "base64");
+    if (buffer.length > 5 * 1024 * 1024) {
+      return res.status(400).json({ ok: false, error: "La cotización supera 5 MB." });
+    }
+
+    const [proveedores] = await queryWithRetry("SELECT id, nombre FROM proveedores ORDER BY nombre");
+    const proveedoresTexto = proveedores.map(p => `${p.id}: ${p.nombre}`).join("\n");
+    const contenidoArchivo = mimeType === "application/pdf" || dataUrl.startsWith("data:application/pdf")
+      ? {
+          type: "input_file",
+          filename: archivo_nombre || "cotizacion.pdf",
+          file_data: dataUrl
+        }
+      : {
+          type: "input_image",
+          image_url: dataUrl
+        };
+
+    const prompt = [
+      "Lee esta cotización de compra y devuelve SOLO JSON válido.",
+      "Debe servir para llenar una orden de compra.",
+      "Campos requeridos:",
+      "{",
+      '  "proveedor_nombre": "nombre del proveedor si aparece",',
+      '  "forma_pago": "contado, credito, transferencia, etc si aparece",',
+      '  "moneda": "CRC o USD",',
+      '  "placa_unidad": "placa si aparece, si no null",',
+      '  "descuento": numero porcentaje o 0,',
+      '  "transporte": monto numerico o 0,',
+      '  "iva": porcentaje numerico, normalmente 13 si aplica, 0 si indica exento,',
+      '  "observaciones": "notas utiles breves",',
+      '  "lineas": [',
+      '    {"codigo": "placa o codigo si aparece", "descripcion": "producto/servicio", "cantidad": numero, "precio_unitario": numero, "subtotal": numero}',
+      "  ]",
+      "}",
+      "Reglas:",
+      "- No inventes líneas. Si no puedes leer algo, omítelo o usa 0.",
+      "- Los montos deben ir sin símbolos ni separadores de miles.",
+      "- Si hay varias líneas, sepáralas.",
+      "- Si la descripción contiene llantas/repuestos/trabajo, mantenla clara.",
+      "- Si el proveedor coincide con uno de estos, usa el nombre más parecido:",
+      proveedoresTexto
+    ].join("\n");
+
+    const response = await fetch("https://api.openai.com/v1/responses", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${apiKey}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        model: process.env.OPENAI_MODEL_COTIZACIONES || process.env.OPENAI_MODEL || "gpt-4.1-mini",
+        input: [
+          {
+            role: "user",
+            content: [
+              { type: "input_text", text: prompt },
+              contenidoArchivo
+            ]
+          }
+        ],
+        temperature: 0,
+        max_output_tokens: 1800
+      })
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+      const message = data.error && data.error.message ? data.error.message : "No se pudo analizar la cotización.";
+      throw new Error(message);
+    }
+
+    const texto = data.output_text || (data.output || []).flatMap(item => item.content || []).map(content => content.text || "").join("\n");
+    const json = extraerJsonRespuestaIA(texto);
+    if (!json) {
+      return res.status(422).json({ ok: false, error: "La IA no devolvió datos válidos de la cotización." });
+    }
+
+    const orden = sanearAnalisisCotizacion(json, proveedores);
+    if (!orden.lineas.length) {
+      return res.status(422).json({ ok: false, error: "No se detectaron líneas de productos o servicios en la cotización." });
+    }
+
+    res.json({ ok: true, orden });
+  } catch (error) {
+    console.error("Error analizando cotización:", error);
+    res.status(500).json({
+      ok: false,
+      error: error.message || "No se pudo analizar la cotización."
+    });
   }
 });
 

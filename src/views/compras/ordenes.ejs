@@ -322,6 +322,7 @@
             <th>Placa</th>
             <th>Moneda</th>
             <th>Total</th>
+            <th>Cotización</th>
             <th>Factura</th>
             <th>Estado</th>
             <th class="acciones-col">Acciones</th>
@@ -346,6 +347,15 @@
               <td data-label="Placa"><%= orden.placa_unidad || '—' %></td>
               <td data-label="Moneda"><%= orden.moneda %></td>
               <td data-label="Total" class="money"><%= parseFloat(orden.total).toLocaleString('es-CR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %></td>
+              <td data-label="Cotización">
+                <% if (orden.cotizacion_archivo) { %>
+                  <a href="<%= orden.cotizacion_archivo %>" target="_blank" class="btn btn-sm btn-outline-primary">
+                    <i class="bi bi-paperclip"></i> Ver
+                  </a>
+                <% } else { %>
+                  —
+                <% } %>
+              </td>
               <td data-label="Factura"><%= orden.factura || '—' %></td>
               <td data-label="Estado">
                 <span class="badge badge-estado <%= 
@@ -440,7 +450,7 @@
             </tr>
           <% }) %>
           <% if (ordenes.length === 0) { %>
-            <tr><td colspan="9" class="text-center text-muted py-4">No hay órdenes con los filtros seleccionados</td></tr>
+            <tr><td colspan="10" class="text-center text-muted py-4">No hay órdenes con los filtros seleccionados</td></tr>
           <% } %>
         </tbody>
       </table>

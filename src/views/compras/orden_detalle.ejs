@@ -81,6 +81,18 @@
           </div>
         </div>
         <div class="detail-item">
+          <div class="detail-label">Cotización</div>
+          <div class="detail-value">
+            <% if (orden.cotizacion_archivo) { %>
+              <a href="<%= orden.cotizacion_archivo %>" target="_blank" class="btn btn-sm btn-outline-primary">
+                <i class="bi bi-paperclip"></i> <%= orden.cotizacion_nombre || 'Ver cotización' %>
+              </a>
+            <% } else { %>
+              —
+            <% } %>
+          </div>
+        </div>
+        <div class="detail-item">
           <div class="detail-label">Observaciones</div>
           <div class="detail-value"><%= orden.observaciones || '—' %></div>
         </div>
