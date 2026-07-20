@@ -87,6 +87,27 @@
       gap: .8rem;
     }
 
+    .sede-tabs {
+      display: flex;
+      gap: .45rem;
+      overflow-x: auto;
+      padding-bottom: .25rem;
+    }
+
+    .sede-tabs .nav-link {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      color: var(--ink);
+      font-weight: 850;
+      white-space: nowrap;
+    }
+
+    .sede-tabs .nav-link.active {
+      background: var(--dark);
+      border-color: var(--dark);
+      color: #fff;
+    }
+
     .gira-card {
       padding: 1rem;
     }
@@ -136,6 +157,76 @@
       text-transform: uppercase;
     }
 
+    .rec-grid {
+      display: grid;
+      gap: .75rem;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .plate-card {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-left: 5px solid var(--blue);
+      border-radius: 10px;
+      min-height: 118px;
+      padding: .85rem;
+    }
+
+    .plate-title {
+      color: var(--dark);
+      font-size: 1.05rem;
+      font-weight: 950;
+      letter-spacing: .02em;
+      margin-bottom: .45rem;
+    }
+
+    .recommendation-text {
+      color: #334155;
+      white-space: pre-line;
+    }
+
+    .plate-sections {
+      display: grid;
+      gap: .6rem;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .plate-section {
+      background: #f8fafc;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: .65rem;
+    }
+
+    .plate-section-title {
+      color: #334155;
+      font-size: .72rem;
+      font-weight: 950;
+      margin-bottom: .25rem;
+      text-transform: uppercase;
+    }
+
+    .plate-section.mecanico {
+      border-left: 4px solid var(--blue);
+    }
+
+    .plate-section.estetico {
+      border-left: 4px solid var(--amber);
+    }
+
+    .rec-meta {
+      color: var(--muted);
+      font-size: .76rem;
+      margin-top: .65rem;
+    }
+
+    .plate-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: .4rem;
+      margin-top: .7rem;
+    }
+
     .empty-state {
       color: var(--muted);
       font-weight: 750;
@@ -145,14 +236,18 @@
 
     @media (max-width: 900px) {
       .summary-grid,
-      .note-grid {
+      .note-grid,
+      .rec-grid,
+      .plate-sections {
         grid-template-columns: repeat(2, minmax(0, 1fr));
       }
     }
 
     @media (max-width: 580px) {
       .summary-grid,
-      .note-grid {
+      .note-grid,
+      .rec-grid,
+      .plate-sections {
         grid-template-columns: 1fr;
       }
 
@@ -167,6 +262,14 @@
   </style>
 </head>
 <body>
+<%
+  const excelParams = [];
+  if (filtros.sede) excelParams.push(`sede=${encodeURIComponent(filtros.sede)}`);
+  if (filtros.estado) excelParams.push(`estado=${encodeURIComponent(filtros.estado)}`);
+  if (filtros.fecha_desde) excelParams.push(`fecha_desde=${encodeURIComponent(filtros.fecha_desde)}`);
+  if (filtros.fecha_hasta) excelParams.push(`fecha_hasta=${encodeURIComponent(filtros.fecha_hasta)}`);
+  const excelUrl = `/giras/reporte/excel${excelParams.length ? `?${excelParams.join('&')}` : ''}`;
+%>
 <nav class="navbar navbar-dark topbar px-3 py-2">
   <span class="navbar-brand fw-semibold"><i class="bi bi-geo-alt me-2"></i>Giras de taller</span>
   <div class="text-white d-flex align-items-center gap-2 flex-wrap">
@@ -182,11 +285,16 @@
         <h1 class="page-title">Inspecciones por sede</h1>
         <div class="small-muted">Registro de visitas del jefe de taller, observaciones, pendientes y acciones recomendadas.</div>
       </div>
-      <% if (puedeEditar) { %>
-        <a href="/giras/nuevo" class="btn btn-success rounded-pill px-3 btn-mobile">
-          <i class="bi bi-plus-circle"></i> Nueva gira
+      <div class="d-flex gap-2 flex-wrap">
+        <a href="<%= excelUrl %>" class="btn btn-outline-success rounded-pill px-3 btn-mobile">
+          <i class="bi bi-file-earmark-excel"></i> Descargar Excel
         </a>
-      <% } %>
+        <% if (puedeEditar) { %>
+          <a href="/giras/nuevo" class="btn btn-success rounded-pill px-3 btn-mobile">
+            <i class="bi bi-plus-circle"></i> Nueva gira
+          </a>
+        <% } %>
+      </div>
     </div>
   </section>
 
@@ -204,8 +312,8 @@
       <div class="summary-value text-warning"><%= resumen.seguimiento %></div>
     </div>
     <div class="summary-card">
-      <div class="summary-label">Cerradas</div>
-      <div class="summary-value text-success"><%= resumen.cerradas %></div>
+      <div class="summary-label">Unidades revisadas</div>
+      <div class="summary-value text-success"><%= resumen.recomendaciones || 0 %></div>
     </div>
   </section>
 
@@ -248,44 +356,124 @@
     </form>
   </section>
 
-  <section class="gira-list">
+  <section class="panel p-3">
     <% if (!giras.length) { %>
-      <div class="panel empty-state">No hay giras registradas.</div>
+      <div class="empty-state">No hay giras registradas.</div>
     <% } %>
 
-    <% giras.forEach(gira => { %>
-      <article class="gira-card">
-        <div class="gira-head">
-          <div>
-            <div class="gira-title"><%= gira.sede %> · <%= gira.fecha_formato %></div>
-            <div class="small-muted">Inspeccionó: <strong><%= gira.inspector %></strong> · Registrado por <%= gira.creado_por_usuario || '-' %></div>
-          </div>
-          <div class="d-flex gap-2 flex-wrap align-items-center">
-            <span class="status status-<%= gira.estado %>"><%= etiquetaEstado(gira.estado) %></span>
-            <% if (puedeEditar) { %>
-              <a href="/giras/<%= gira.id %>/editar" class="btn btn-sm btn-outline-dark">
-                <i class="bi bi-pencil"></i> Editar
-              </a>
-            <% } %>
-          </div>
-        </div>
+    <% if (giras.length) { %>
+      <ul class="nav sede-tabs mb-3" role="tablist">
+        <% sedesTabs.forEach((sede, index) => { %>
+          <li class="nav-item" role="presentation">
+            <button class="nav-link <%= sede === sedeActiva || (!sedeActiva && index === 0) ? 'active' : '' %>" data-bs-toggle="tab" data-bs-target="#sede-<%= index %>" type="button" role="tab">
+              <%= sede %>
+            </button>
+          </li>
+        <% }) %>
+      </ul>
 
-        <div class="note-grid">
-          <div class="note-box">
-            <div class="note-title">Observaciones</div>
-            <div><%= gira.observaciones || '-' %></div>
+      <div class="tab-content">
+        <% sedesTabs.forEach((sede, index) => {
+          const recs = recomendacionesPorSede[sede] || [];
+          const girasSede = girasPorSede[sede] || [];
+        %>
+          <div class="tab-pane fade <%= sede === sedeActiva || (!sedeActiva && index === 0) ? 'show active' : '' %>" id="sede-<%= index %>" role="tabpanel">
+            <div class="d-flex justify-content-between align-items-start gap-2 flex-wrap mb-3">
+              <div>
+                <h2 class="h5 fw-bold mb-1"><%= sede %></h2>
+                <div class="small-muted"><%= recs.length %> unidad<%= recs.length === 1 ? '' : 'es' %> con temas · <%= girasSede.length %> gira<%= girasSede.length === 1 ? '' : 's' %></div>
+              </div>
+              <% if (puedeEditar && recs.length) { %>
+                <form method="POST" action="/giras/sede/redividir" onsubmit="return confirm('¿Re-dividir con IA todos los temas de <%= sede %>?')">
+                  <input type="hidden" name="sede" value="<%= sede %>">
+                  <button class="btn btn-sm btn-outline-primary">
+                    <i class="bi bi-stars"></i> Re-dividir sede con IA
+                  </button>
+                </form>
+              <% } %>
+            </div>
+
+            <h3 class="h6 fw-bold mb-2">Temas por unidad</h3>
+            <% if (!recs.length) { %>
+              <div class="empty-state border rounded mb-3">No hay temas por unidad para esta sede.</div>
+            <% } else { %>
+              <div class="rec-grid mb-4">
+                <% recs.forEach(rec => { %>
+                  <article class="plate-card">
+                    <div class="plate-title"><%= rec.placa %></div>
+                    <div class="plate-sections">
+                      <div class="plate-section mecanico">
+                        <div class="plate-section-title">Tema mecánico</div>
+                        <div class="recommendation-text"><%= rec.tema_mecanico || '-' %></div>
+                      </div>
+                      <div class="plate-section estetico">
+                        <div class="plate-section-title">Tema estético</div>
+                        <div class="recommendation-text"><%= rec.tema_estetico || '-' %></div>
+                      </div>
+                    </div>
+                    <div class="rec-meta"><%= rec.fecha_formato %> · <%= rec.inspector || '-' %></div>
+                    <% if (puedeEditar) { %>
+                      <div class="plate-actions">
+                        <form method="POST" action="/giras/recomendaciones/<%= rec.id %>/redividir">
+                          <button class="btn btn-sm btn-outline-primary" title="Volver a separar el texto original con IA">
+                            <i class="bi bi-stars"></i> Dividir IA
+                          </button>
+                        </form>
+                        <form method="POST" action="/giras/recomendaciones/<%= rec.id %>/cambiar-lados">
+                          <button class="btn btn-sm btn-outline-secondary" title="Cambiar mecánico por estético">
+                            <i class="bi bi-arrow-left-right"></i> Cambiar lados
+                          </button>
+                        </form>
+                      </div>
+                    <% } %>
+                  </article>
+                <% }) %>
+              </div>
+            <% } %>
+
+            <h3 class="h6 fw-bold mb-2">Recomendación de taller</h3>
+            <div class="gira-list">
+              <% if (!girasSede.length) { %>
+                <div class="empty-state border rounded">No hay recomendaciones generales de taller para esta sede.</div>
+              <% } %>
+              <% girasSede.forEach(gira => { %>
+                <article class="gira-card">
+                  <div class="gira-head">
+                    <div>
+                      <div class="gira-title"><%= gira.fecha_formato %></div>
+                      <div class="small-muted">Inspeccionó: <strong><%= gira.inspector %></strong> · Registrado por <%= gira.creado_por_usuario || '-' %></div>
+                    </div>
+                    <div class="d-flex gap-2 flex-wrap align-items-center">
+                      <span class="status status-<%= gira.estado %>"><%= etiquetaEstado(gira.estado) %></span>
+                      <% if (puedeEditar) { %>
+                        <a href="/giras/<%= gira.id %>/editar" class="btn btn-sm btn-outline-dark">
+                          <i class="bi bi-pencil"></i> Editar
+                        </a>
+                      <% } %>
+                    </div>
+                  </div>
+
+                  <div class="note-grid">
+                    <div class="note-box">
+                      <div class="note-title">Observaciones</div>
+                      <div><%= gira.observaciones || '-' %></div>
+                    </div>
+                    <div class="note-box">
+                      <div class="note-title">Pendientes</div>
+                      <div><%= gira.pendientes || '-' %></div>
+                    </div>
+                    <div class="note-box">
+                      <div class="note-title">Acciones recomendadas</div>
+                      <div><%= gira.acciones_recomendadas || '-' %></div>
+                    </div>
+                  </div>
+                </article>
+              <% }) %>
+            </div>
           </div>
-          <div class="note-box">
-            <div class="note-title">Pendientes</div>
-            <div><%= gira.pendientes || '-' %></div>
-          </div>
-          <div class="note-box">
-            <div class="note-title">Acciones recomendadas</div>
-            <div><%= gira.acciones_recomendadas || '-' %></div>
-          </div>
-        </div>
-      </article>
-    <% }) %>
+        <% }) %>
+      </div>
+    <% } %>
   </section>
 </main>
 
