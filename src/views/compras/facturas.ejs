@@ -213,6 +213,11 @@
     const puedeRecibirFacturas = puedeGestionarFacturas || rolesMensajeroFacturas.includes(user.rol);
     const modoMensajero = rolesMensajeroFacturas.includes(user.rol);
     const puedeModificarCompras = puedeGestionarFacturas;
+    const fechaInput = (value) => {
+      if (!value) return '';
+      const date = new Date(value);
+      return Number.isNaN(date.getTime()) ? '' : date.toISOString().slice(0, 10);
+    };
   %>
   <div class="page-heading">
     <div>
@@ -486,7 +491,7 @@
                       class="btn btn-sm btn-outline-dark mb-1"
                       data-bs-toggle="modal"
                       data-bs-target="#editar-numero-<%= f.tipo %>-<%= f.id %>">
-                      <i class="bi bi-pencil-square"></i> N°
+                      <i class="bi bi-pencil-square"></i> Editar
                     </button>
                     <button
                       type="button"
@@ -513,6 +518,13 @@
                     <% } else { %>
                       <span class="text-muted d-block"><%= f.cubierta_por_nc ? 'Sin saldo' : 'Pagada' %></span>
                     <% } %>
+                    <button
+                      type="submit"
+                      form="eliminar-factura-<%= f.tipo %>-<%= f.id %>"
+                      class="btn btn-sm btn-outline-danger mt-1"
+                      onclick="return confirm('<%= f.tipo === 'orden' ? '¿Eliminar esta factura? La orden de compra no se elimina, solo se quita la factura ligada.' : '¿Eliminar esta factura independiente? Esta acción no se puede deshacer.' %>')">
+                      <i class="bi bi-trash"></i> Eliminar
+                    </button>
                   <% } else { %>
                     <span class="badge bg-secondary">Solo lectura</span>
                   <% } %>
@@ -547,6 +559,14 @@
 
     <% if (puedeModificarCompras) { %>
       <% facturas.forEach(f => { %>
+        <form
+          id="eliminar-factura-<%= f.tipo %>-<%= f.id %>"
+          method="POST"
+          action="/compras/facturas/<%= f.id %>/eliminar"
+          class="d-none">
+          <input type="hidden" name="tipo" value="<%= f.tipo %>">
+          <input type="hidden" name="return_to" value="<%= returnToFacturas %>">
+        </form>
         <% if (!f.pagada && (parseFloat(f.saldo ?? f.monto) > 0)) { %>
           <form
             id="pagar-factura-<%= f.tipo %>-<%= f.id %>"
@@ -566,12 +586,12 @@
 <% if (puedeModificarCompras) { %>
   <% facturas.forEach(f => { %>
     <div class="modal fade" id="editar-numero-<%= f.tipo %>-<%= f.id %>" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog">
+    <div class="modal-dialog modal-lg receipt-modal">
       <div class="modal-content">
-        <form method="POST" action="/compras/facturas/<%= f.id %>/numero">
+        <form method="POST" action="/compras/facturas/<%= f.id %>/editar">
           <div class="modal-header">
             <div>
-              <h5 class="modal-title"><i class="bi bi-pencil-square me-1"></i> Editar número de factura</h5>
+              <h5 class="modal-title"><i class="bi bi-pencil-square me-1"></i> Editar factura</h5>
               <small class="text-muted"><%= f.proveedor_nombre %> · <%= f.po_numero || 'Factura independiente' %></small>
             </div>
             <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
@@ -579,13 +599,140 @@
           <div class="modal-body">
             <input type="hidden" name="tipo" value="<%= f.tipo %>">
             <input type="hidden" name="return_to" value="<%= returnToFacturas %>">
-            <label class="form-label">Número de factura</label>
-            <input type="text" name="numero_factura" class="form-control" value="<%= f.numero_factura || '' %>" required>
-            <small class="text-muted">Solo se cambiará el número de factura. No modifica monto, proveedor, fecha, pago, NC ni abonos.</small>
+            <div class="row g-3">
+              <% if (f.tipo === 'independiente') { %>
+                <div class="col-md-6">
+                  <label class="form-label">Proveedor</label>
+                  <input type="text" class="form-control provider-search mb-1" data-provider-target="proveedorEditar-<%= f.tipo %>-<%= f.id %>" placeholder="Buscar por letra, ej: L">
+                  <select name="proveedor_id" id="proveedorEditar-<%= f.tipo %>-<%= f.id %>" class="form-select" required>
+                    <% proveedores.forEach(p => { %>
+                      <option value="<%= p.id %>" data-provider-name="<%= p.nombre %>" <%= f.proveedor_id == p.id ? 'selected' : '' %>><%= p.nombre %></option>
+                    <% }) %>
+                  </select>
+                </div>
+              <% } else { %>
+                <div class="col-md-6">
+                  <label class="form-label">Proveedor</label>
+                  <input type="text" class="form-control" value="<%= f.proveedor_nombre || '' %>" readonly>
+                </div>
+              <% } %>
+              <div class="col-md-6">
+                <label class="form-label">Número de factura</label>
+                <input type="text" name="numero_factura" class="form-control" value="<%= f.numero_factura || '' %>" required>
+              </div>
+              <div class="col-md-4">
+                <label class="form-label">Fecha de factura</label>
+                <input type="date" name="fecha_factura" class="form-control" value="<%= fechaInput(f.fecha) || hoy %>" required>
+              </div>
+              <div class="col-md-4">
+                <label class="form-label">Monto</label>
+                <input type="number" step="0.01" min="0.01" name="monto" class="form-control" value="<%= f.monto_original ?? f.monto %>" required>
+              </div>
+              <div class="col-md-4">
+                <label class="form-label">Estado de pago</label>
+                <select name="pagada" class="form-select">
+                  <option value="0" <%= !f.pagada ? 'selected' : '' %>>Pendiente</option>
+                  <option value="1" <%= f.pagada ? 'selected' : '' %>>Pagada</option>
+                </select>
+              </div>
+              <div class="col-md-4">
+                <label class="form-label">Fecha de pago</label>
+                <input type="date" name="fecha_pago" class="form-control" value="<%= fechaInput(f.fecha_pago) %>">
+              </div>
+              <% if (f.tipo === 'orden') { %>
+                <div class="col-md-4">
+                  <label class="form-label">Vencimiento</label>
+                  <input type="date" name="fecha_vencimiento_factura" class="form-control" value="<%= fechaInput(f.fecha_vencimiento_factura) %>">
+                </div>
+              <% } %>
+            </div>
+
+            <hr>
+            <h6 class="fw-bold">Nota de crédito y abonos</h6>
+            <div class="row g-3">
+              <div class="col-md-4">
+                <label class="form-label">Número NC</label>
+                <input type="text" name="numero_nc" class="form-control" value="<%= f.nota_credito_numero || '' %>">
+              </div>
+              <div class="col-md-4">
+                <label class="form-label">Fecha NC</label>
+                <input type="date" name="fecha_nc" class="form-control" value="<%= fechaInput(f.nota_credito_fecha) %>">
+              </div>
+              <div class="col-md-4">
+                <label class="form-label">Monto NC</label>
+                <input type="number" step="0.01" min="0" name="monto_nc" class="form-control" value="<%= f.nota_credito_monto || 0 %>">
+              </div>
+              <div class="col-12">
+                <label class="form-label">Motivo NC</label>
+                <textarea name="motivo_nc" class="form-control" rows="2"><%= f.nota_credito_motivo || '' %></textarea>
+              </div>
+              <div class="col-md-4">
+                <label class="form-label">Monto abonado</label>
+                <input type="number" step="0.01" min="0" name="monto_abono" class="form-control" value="<%= f.abono_monto || 0 %>">
+              </div>
+              <div class="col-md-4">
+                <label class="form-label">Fecha abono</label>
+                <input type="date" name="fecha_abono" class="form-control" value="<%= fechaInput(f.abono_fecha) %>">
+              </div>
+              <div class="col-md-4">
+                <label class="form-label">Placa producto</label>
+                <input type="text" name="placa_producto" class="form-control" value="<%= f.factura_placa_producto || '' %>" placeholder="Ej: CL123456">
+              </div>
+              <div class="col-12">
+                <label class="form-label">Observación abono</label>
+                <textarea name="observacion_abono" class="form-control" rows="2"><%= f.abono_observacion || '' %></textarea>
+              </div>
+            </div>
+
+            <hr>
+            <h6 class="fw-bold">Recepción</h6>
+            <div class="row g-3">
+              <div class="col-md-4">
+                <label class="form-label">Fecha recepción</label>
+                <input type="date" name="fecha_recepcion" class="form-control" value="<%= fechaInput(f.factura_fecha_recepcion) %>">
+              </div>
+              <div class="col-md-4">
+                <label class="form-label">Tipo de entrega</label>
+                <input type="text" name="tipo_entrega" class="form-control" value="<%= f.factura_tipo_entrega || '' %>" placeholder="Proveedor, mensajero...">
+              </div>
+              <div class="col-md-4">
+                <label class="form-label">Producto recibido</label>
+                <select name="producto_recibido" class="form-select">
+                  <option value="1" <%= f.factura_producto_recibido ? 'selected' : '' %>>Sí</option>
+                  <option value="0" <%= !f.factura_producto_recibido ? 'selected' : '' %>>No</option>
+                </select>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">Entregado por</label>
+                <input type="text" name="entregado_por" class="form-control" value="<%= f.factura_entregado_por || '' %>">
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">Recibido por</label>
+                <input type="text" name="recibido_por" class="form-control" value="<%= f.factura_recibido_por || '' %>">
+              </div>
+              <div class="col-12">
+                <label class="form-label">Observación recepción</label>
+                <textarea name="observacion_recepcion" class="form-control" rows="3"><%= f.factura_observacion || '' %></textarea>
+              </div>
+              <div class="col-12 camera-box">
+                <label class="form-label">Cambiar foto del producto</label>
+                <% if (f.factura_foto_producto) { %>
+                  <div class="mb-2">
+                    <a href="<%= f.factura_foto_producto %>" target="_blank" class="btn btn-sm btn-outline-secondary">
+                      <i class="bi bi-image"></i> Ver foto actual
+                    </a>
+                  </div>
+                <% } %>
+                <input type="file" class="form-control foto-producto-input" accept="image/*" capture="environment" data-foto-target="fotoEditarData-<%= f.tipo %>-<%= f.id %>" data-preview-target="fotoEditarPreview-<%= f.tipo %>-<%= f.id %>">
+                <input type="hidden" name="foto_producto_data" id="fotoEditarData-<%= f.tipo %>-<%= f.id %>">
+                <small class="text-muted">Opcional. Si no adjunta una nueva, se conserva la foto actual.</small>
+                <div id="fotoEditarPreview-<%= f.tipo %>-<%= f.id %>" class="mt-2"></div>
+              </div>
+            </div>
           </div>
           <div class="modal-footer">
             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-            <button class="btn btn-dark">Guardar número</button>
+            <button class="btn btn-dark">Guardar cambios</button>
           </div>
         </form>
       </div>
@@ -850,18 +997,19 @@
     });
   }
 
-  if (fotoProductoInput && fotoProductoData) {
-    fotoProductoInput.addEventListener('change', async () => {
-      const file = fotoProductoInput.files && fotoProductoInput.files[0];
-      fotoProductoData.value = '';
-      if (fotoProductoPreview) fotoProductoPreview.innerHTML = '';
+  function conectarFotoProducto(input, hidden, preview) {
+    if (!input || !hidden) return;
+    input.addEventListener('change', async () => {
+      const file = input.files && input.files[0];
+      hidden.value = '';
+      if (preview) preview.innerHTML = '';
       if (!file) return;
 
       try {
         const dataUrl = await comprimirFoto(file);
-        fotoProductoData.value = dataUrl;
-        if (fotoProductoPreview) {
-          fotoProductoPreview.innerHTML = `
+        hidden.value = dataUrl;
+        if (preview) {
+          preview.innerHTML = `
             <div class="photo-preview-card">
               <img src="${dataUrl}" alt="Vista previa">
               <div class="small text-muted mt-1">Foto lista para guardar</div>
@@ -869,10 +1017,18 @@
         }
       } catch (error) {
         alert(error.message || 'No se pudo preparar la foto.');
-        fotoProductoInput.value = '';
+        input.value = '';
       }
     });
   }
+
+  conectarFotoProducto(fotoProductoInput, fotoProductoData, fotoProductoPreview);
+
+  document.querySelectorAll('.foto-producto-input').forEach(input => {
+    const hidden = document.getElementById(input.dataset.fotoTarget);
+    const preview = document.getElementById(input.dataset.previewTarget);
+    conectarFotoProducto(input, hidden, preview);
+  });
 
   const checkboxes = document.querySelectorAll('.check-factura');
   const btnPagar = document.getElementById('btnPagarSeleccionadas');

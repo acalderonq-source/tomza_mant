@@ -417,6 +417,7 @@ async function obtenerFacturasCompras(filtros = {}) {
       o.nota_credito_fecha,
       o.nota_credito_monto,
       o.nota_credito_motivo,
+      o.proveedor_id,
       p.nombre as proveedor_nombre,
       'orden' as tipo
     FROM ordenes_compra o
@@ -448,6 +449,7 @@ async function obtenerFacturasCompras(filtros = {}) {
       f.nota_credito_fecha,
       f.nota_credito_monto,
       f.nota_credito_motivo,
+      f.proveedor_id,
       f.proveedor_nombre,
       'independiente' as tipo
     FROM facturas f
@@ -1169,13 +1171,14 @@ router.post("/ordenes/:id/factura", requireAuth, allowRoles(...ROLES_REGISTRAR_F
        SET factura = ?,
            factura_fecha = ?,
            facturada = 1,
+           estado = 'RECIBIDA_TOTAL',
            fecha_vencimiento_factura = ?,
            pagada = 0,
            factura_fecha_recepcion = ?,
            factura_tipo_entrega = ?,
            factura_entregado_por = ?,
            factura_recibido_por = ?,
-           factura_producto_recibido = ?,
+           factura_producto_recibido = 1,
            factura_observacion = ?,
            factura_foto_producto = ?
        WHERE id = ?`,
@@ -1187,13 +1190,12 @@ router.post("/ordenes/:id/factura", requireAuth, allowRoles(...ROLES_REGISTRAR_F
         tipo_entrega || null,
         entregado_por || null,
         recibido_por || req.session.user.usuario || null,
-        producto_recibido === "1" ? 1 : 0,
         observacion_recepcion || null,
         fotoProductoPath,
         id
       ]
     );
-    req.session.success = `Factura ${factura} registrada en la orden ${orden.po_numero}.`;
+    req.session.success = `Factura ${factura} registrada en la orden ${orden.po_numero}. La orden quedó recibida automáticamente.`;
     res.redirect(redirectUrl);
   } catch (error) {
     console.error("❌ Error al registrar factura:", error);
@@ -1249,13 +1251,14 @@ router.post("/facturas/agregar", requireAuth, allowRoles(...ROLES_RECEPCION_FACT
            SET factura = ?,
                factura_fecha = ?,
                facturada = 1,
+               estado = 'RECIBIDA_TOTAL',
                fecha_vencimiento_factura = ?,
                pagada = 0,
                factura_fecha_recepcion = ?,
                factura_tipo_entrega = ?,
                factura_entregado_por = ?,
                factura_recibido_por = ?,
-               factura_producto_recibido = ?,
+               factura_producto_recibido = 1,
                factura_observacion = ?,
                factura_foto_producto = ?
            WHERE id = ?`,
@@ -1267,13 +1270,12 @@ router.post("/facturas/agregar", requireAuth, allowRoles(...ROLES_RECEPCION_FACT
             tipo_entrega || null,
             entregado_por || null,
             recibido_por || req.session.user.usuario || null,
-            producto_recibido === "1" ? 1 : 0,
             observacion_recepcion || null,
             fotoProductoPath,
             orden.id
           ]
         );
-        req.session.success = `Factura ${factura} asociada a la orden ${orden.po_numero}.`;
+        req.session.success = `Factura ${factura} asociada a la orden ${orden.po_numero}. La orden quedó recibida automáticamente.`;
         return res.redirect("/compras/facturas");
       } else if (orden && orden.facturada) {
         req.session.error = `La orden ${orden.po_numero} ya está facturada.`;
@@ -1682,6 +1684,7 @@ router.get("/facturas/reporte/excel", requireAuth, allowRoles("ADMIN", "TALLER",
 
 router.post("/facturas/:id/numero", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER"), async (req, res) => {
   try {
+    await ensureFacturaRecepcionColumns();
     const id = req.params.id;
     const { tipo, numero_factura } = req.body;
     const nuevoNumero = String(numero_factura || "").trim();
@@ -1712,18 +1715,310 @@ router.post("/facturas/:id/numero", requireAuth, allowRoles("ADMIN", "TALLER", "
       return redirectFacturas(req, res);
     }
 
-    await pool.query(
-      `UPDATE ${table}
-       SET ${numeroColumn} = ?
-       WHERE id = ?`,
-      [nuevoNumero, id]
-    );
+    if (tipo === "orden") {
+      await pool.query(
+        `UPDATE ordenes_compra
+         SET factura = ?,
+             facturada = 1,
+             estado = 'RECIBIDA_TOTAL',
+             factura_producto_recibido = 1,
+             factura_fecha_recepcion = COALESCE(factura_fecha_recepcion, CURDATE())
+         WHERE id = ?`,
+        [nuevoNumero, id]
+      );
+    } else {
+      await pool.query(
+        `UPDATE ${table}
+         SET ${numeroColumn} = ?
+         WHERE id = ?`,
+        [nuevoNumero, id]
+      );
+    }
 
-    req.session.success = `Número de factura actualizado de ${factura.numero_actual || "sin número"} a ${nuevoNumero}.`;
+    req.session.success = tipo === "orden"
+      ? `Número de factura actualizado de ${factura.numero_actual || "sin número"} a ${nuevoNumero}. La orden quedó recibida automáticamente.`
+      : `Número de factura actualizado de ${factura.numero_actual || "sin número"} a ${nuevoNumero}.`;
     return redirectFacturas(req, res);
   } catch (error) {
     console.error("Error editando número de factura:", error);
     req.session.error = "Error interno al editar el número de factura.";
+    return redirectFacturas(req, res);
+  }
+});
+
+router.post("/facturas/:id/editar", requireAuth, allowRoles(...ROLES_GESTION_FACTURAS), async (req, res) => {
+  try {
+    await ensureFacturaRecepcionColumns();
+    await ensureNotaCreditoColumns();
+    await ensureAbonoColumns();
+
+    const id = req.params.id;
+    const {
+      tipo,
+      numero_factura,
+      fecha_factura,
+      fecha_vencimiento_factura,
+      monto,
+      proveedor_id,
+      pagada,
+      fecha_pago,
+      numero_nc,
+      fecha_nc,
+      monto_nc,
+      motivo_nc,
+      monto_abono,
+      fecha_abono,
+      observacion_abono,
+      fecha_recepcion,
+      tipo_entrega,
+      entregado_por,
+      recibido_por,
+      producto_recibido,
+      placa_producto,
+      observacion_recepcion,
+      foto_producto_data
+    } = req.body;
+
+    const facturaNumero = String(numero_factura || "").trim();
+    const fechaFactura = String(fecha_factura || "").trim();
+    const montoFactura = parseMonto(monto);
+    const notaCreditoMonto = parseMonto(monto_nc);
+    const abonoMonto = parseMonto(monto_abono);
+    const pagadaValue = pagada === "1" ? 1 : 0;
+    const fechaPagoFinal = pagadaValue ? (fecha_pago || new Date().toISOString().slice(0, 10)) : null;
+    const fechaNcFinal = notaCreditoMonto > 0 ? (fecha_nc || new Date().toISOString().slice(0, 10)) : null;
+    const fechaAbonoFinal = abonoMonto > 0 ? (fecha_abono || new Date().toISOString().slice(0, 10)) : null;
+    const fotoProductoPath = guardarFotoProducto(foto_producto_data, req.session.user.id);
+
+    if (!["orden", "independiente"].includes(tipo)) {
+      req.session.error = "Tipo de factura inválido.";
+      return redirectFacturas(req, res);
+    }
+
+    if (!facturaNumero || !fechaFactura || montoFactura <= 0) {
+      req.session.error = "Debe indicar número, fecha y monto de la factura.";
+      return redirectFacturas(req, res);
+    }
+
+    if (notaCreditoMonto > montoFactura) {
+      req.session.error = "La nota de crédito no puede ser mayor al monto de la factura.";
+      return redirectFacturas(req, res);
+    }
+
+    const baseDespuesNc = Math.max(montoFactura - notaCreditoMonto, 0);
+    if (abonoMonto > baseDespuesNc) {
+      req.session.error = "El abono no puede ser mayor al saldo después de la nota de crédito.";
+      return redirectFacturas(req, res);
+    }
+
+    if (tipo === "orden") {
+      let sql = `
+        UPDATE ordenes_compra
+        SET factura = ?,
+            factura_fecha = ?,
+            fecha_vencimiento_factura = ?,
+            total = ?,
+            pagada = ?,
+            fecha_pago = ?,
+            nota_credito_numero = ?,
+            nota_credito_fecha = ?,
+            nota_credito_monto = ?,
+            nota_credito_motivo = ?,
+            abono_monto = ?,
+            abono_fecha = ?,
+            abono_observacion = ?,
+            factura_fecha_recepcion = ?,
+            factura_tipo_entrega = ?,
+            factura_entregado_por = ?,
+            factura_recibido_por = ?,
+            factura_producto_recibido = ?,
+            factura_placa_producto = ?,
+            factura_observacion = ?,
+            facturada = 1,
+            estado = 'RECIBIDA_TOTAL'
+      `;
+      const params = [
+        facturaNumero,
+        fechaFactura,
+        fecha_vencimiento_factura || null,
+        montoFactura,
+        pagadaValue,
+        fechaPagoFinal,
+        notaCreditoMonto > 0 ? String(numero_nc || "").trim() || null : null,
+        fechaNcFinal,
+        notaCreditoMonto,
+        notaCreditoMonto > 0 ? motivo_nc || null : null,
+        abonoMonto,
+        fechaAbonoFinal,
+        abonoMonto > 0 ? observacion_abono || null : null,
+        fecha_recepcion || null,
+        tipo_entrega || null,
+        entregado_por || null,
+        recibido_por || null,
+        producto_recibido === "1" ? 1 : 0,
+        normalizarPlaca(placa_producto),
+        observacion_recepcion || null
+      ];
+
+      if (fotoProductoPath) {
+        sql += ", factura_foto_producto = ?";
+        params.push(fotoProductoPath);
+      }
+
+      sql += " WHERE id = ? AND facturada = 1";
+      params.push(id);
+
+      const [result] = await pool.query(sql, params);
+      if (!result.affectedRows) {
+        req.session.error = "Factura de orden no encontrada.";
+        return redirectFacturas(req, res);
+      }
+    } else {
+      if (!proveedor_id) {
+        req.session.error = "Debe seleccionar un proveedor para la factura independiente.";
+        return redirectFacturas(req, res);
+      }
+
+      const [[proveedor]] = await pool.query("SELECT id, nombre FROM proveedores WHERE id = ?", [proveedor_id]);
+      if (!proveedor) {
+        req.session.error = "Proveedor no válido.";
+        return redirectFacturas(req, res);
+      }
+
+      let sql = `
+        UPDATE facturas
+        SET numero_factura = ?,
+            fecha = ?,
+            monto = ?,
+            proveedor_id = ?,
+            proveedor_nombre = ?,
+            pagada = ?,
+            fecha_pago = ?,
+            nota_credito_numero = ?,
+            nota_credito_fecha = ?,
+            nota_credito_monto = ?,
+            nota_credito_motivo = ?,
+            abono_monto = ?,
+            abono_fecha = ?,
+            abono_observacion = ?,
+            factura_fecha_recepcion = ?,
+            factura_tipo_entrega = ?,
+            factura_entregado_por = ?,
+            factura_recibido_por = ?,
+            factura_producto_recibido = ?,
+            factura_placa_producto = ?,
+            factura_observacion = ?
+      `;
+      const params = [
+        facturaNumero,
+        fechaFactura,
+        montoFactura,
+        proveedor.id,
+        proveedor.nombre,
+        pagadaValue,
+        fechaPagoFinal,
+        notaCreditoMonto > 0 ? String(numero_nc || "").trim() || null : null,
+        fechaNcFinal,
+        notaCreditoMonto,
+        notaCreditoMonto > 0 ? motivo_nc || null : null,
+        abonoMonto,
+        fechaAbonoFinal,
+        abonoMonto > 0 ? observacion_abono || null : null,
+        fecha_recepcion || null,
+        tipo_entrega || null,
+        entregado_por || null,
+        recibido_por || null,
+        producto_recibido === "1" ? 1 : 0,
+        normalizarPlaca(placa_producto),
+        observacion_recepcion || null
+      ];
+
+      if (fotoProductoPath) {
+        sql += ", factura_foto_producto = ?";
+        params.push(fotoProductoPath);
+      }
+
+      sql += " WHERE id = ?";
+      params.push(id);
+
+      const [result] = await pool.query(sql, params);
+      if (!result.affectedRows) {
+        req.session.error = "Factura independiente no encontrada.";
+        return redirectFacturas(req, res);
+      }
+    }
+
+    req.session.success = `Factura ${facturaNumero} actualizada correctamente.`;
+    return redirectFacturas(req, res);
+  } catch (error) {
+    console.error("Error editando factura:", error);
+    req.session.error = error.message || "Error interno al editar la factura.";
+    return redirectFacturas(req, res);
+  }
+});
+
+router.post("/facturas/:id/eliminar", requireAuth, allowRoles(...ROLES_GESTION_FACTURAS), async (req, res) => {
+  try {
+    await ensureFacturaRecepcionColumns();
+    await ensureNotaCreditoColumns();
+    await ensureAbonoColumns();
+
+    const id = req.params.id;
+    const { tipo } = req.body;
+
+    if (!["orden", "independiente"].includes(tipo)) {
+      req.session.error = "Tipo de factura inválido.";
+      return redirectFacturas(req, res);
+    }
+
+    if (tipo === "orden") {
+      const [result] = await pool.query(
+        `UPDATE ordenes_compra
+         SET factura = NULL,
+             factura_fecha = NULL,
+             facturada = 0,
+             fecha_vencimiento_factura = NULL,
+             pagada = 0,
+             fecha_pago = NULL,
+             nota_credito_numero = NULL,
+             nota_credito_fecha = NULL,
+             nota_credito_monto = 0,
+             nota_credito_motivo = NULL,
+             abono_monto = 0,
+             abono_fecha = NULL,
+             abono_observacion = NULL,
+             factura_fecha_recepcion = NULL,
+             factura_tipo_entrega = NULL,
+             factura_entregado_por = NULL,
+             factura_recibido_por = NULL,
+             factura_producto_recibido = 0,
+             factura_placa_producto = NULL,
+             factura_observacion = NULL,
+             factura_foto_producto = NULL
+         WHERE id = ? AND facturada = 1`,
+        [id]
+      );
+
+      if (!result.affectedRows) {
+        req.session.error = "Factura de orden no encontrada.";
+        return redirectFacturas(req, res);
+      }
+
+      req.session.success = "Factura eliminada de la orden. La orden de compra se conserva.";
+      return redirectFacturas(req, res);
+    }
+
+    const [result] = await pool.query("DELETE FROM facturas WHERE id = ?", [id]);
+    if (!result.affectedRows) {
+      req.session.error = "Factura independiente no encontrada.";
+      return redirectFacturas(req, res);
+    }
+
+    req.session.success = "Factura independiente eliminada correctamente.";
+    return redirectFacturas(req, res);
+  } catch (error) {
+    console.error("Error eliminando factura:", error);
+    req.session.error = "Error interno al eliminar la factura.";
     return redirectFacturas(req, res);
   }
 });
