@@ -93,6 +93,170 @@
       font-weight: 600;
     }
 
+    .placa-node {
+      background: linear-gradient(135deg, #081f55 0%, #0b3b82 58%, #ef233c 100%);
+      color: white;
+      border-radius: 24px;
+      overflow: hidden;
+      box-shadow: 0 18px 36px rgba(8, 31, 85, 0.18);
+    }
+
+    .placa-node-header {
+      padding: 1.35rem 1.5rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 1rem;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.18);
+    }
+
+    .placa-node-title {
+      margin: 0;
+      font-size: 1.15rem;
+      font-weight: 900;
+    }
+
+    .placa-node-subtitle {
+      margin: .25rem 0 0;
+      color: rgba(255, 255, 255, 0.78);
+      font-size: .9rem;
+    }
+
+    .placa-node-body {
+      background: rgba(255, 255, 255, 0.96);
+      color: #0f172a;
+      padding: 1.25rem;
+    }
+
+    .placa-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: .4rem;
+      padding: .45rem .75rem;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.16);
+      color: white;
+      font-size: .8rem;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+
+    .placa-table th {
+      font-size: .72rem;
+      text-transform: uppercase;
+      color: #475569;
+      letter-spacing: .04em;
+    }
+
+    .placa-table td {
+      vertical-align: middle;
+      font-weight: 600;
+    }
+
+    .placa-link {
+      border: 0;
+      border-radius: 999px;
+      background: #0f172a;
+      color: #fff;
+      font-size: .78rem;
+      font-weight: 900;
+      padding: .28rem .65rem;
+      line-height: 1;
+      transition: transform .15s ease, background .15s ease;
+    }
+
+    .placa-link:hover {
+      background: #ef233c;
+      transform: translateY(-1px);
+    }
+
+    .placa-detail-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 2000;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+      background: rgba(15, 23, 42, .62);
+      backdrop-filter: blur(4px);
+    }
+
+    .placa-detail-backdrop.is-open {
+      display: flex;
+    }
+
+    .placa-detail-modal {
+      width: min(980px, 100%);
+      max-height: 88vh;
+      overflow: hidden;
+      background: #fff;
+      color: #0f172a;
+      border-radius: 22px;
+      box-shadow: 0 24px 70px rgba(0, 0, 0, .28);
+      display: flex;
+      flex-direction: column;
+    }
+
+    .placa-detail-head {
+      background: linear-gradient(135deg, #071a44 0%, #0b3b82 65%, #ef233c 100%);
+      color: #fff;
+      padding: 1.1rem 1.25rem;
+      display: flex;
+      justify-content: space-between;
+      gap: 1rem;
+      align-items: center;
+    }
+
+    .placa-detail-body {
+      padding: 1rem 1.25rem 1.25rem;
+      overflow: auto;
+    }
+
+    .placa-detail-close {
+      border: 1px solid rgba(255,255,255,.35);
+      background: rgba(255,255,255,.12);
+      color: #fff;
+      border-radius: 999px;
+      width: 38px;
+      height: 38px;
+      font-size: 1.2rem;
+      line-height: 1;
+    }
+
+    .orden-detail-card {
+      border: 1px solid #dbe4f0;
+      border-radius: 16px;
+      overflow: hidden;
+      margin-bottom: 1rem;
+      background: #fff;
+    }
+
+    .orden-detail-top {
+      background: #f8fafc;
+      padding: .85rem 1rem;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: .75rem;
+      border-bottom: 1px solid #e2e8f0;
+    }
+
+    .orden-detail-meta {
+      color: #475569;
+      font-size: .86rem;
+      font-weight: 600;
+    }
+
+    .orden-observacion {
+      background: #fff7ed;
+      border: 1px solid #fed7aa;
+      border-radius: 12px;
+      padding: .65rem .8rem;
+      color: #7c2d12;
+      font-size: .88rem;
+      margin: .75rem 1rem 0;
+    }
+
     /* Filtros card */
     .filtros-card {
       background: white;
@@ -108,6 +272,13 @@
         flex-direction: column;
         align-items: flex-start !important;
         gap: .5rem !important;
+      }
+      .placa-node-header {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+      .orden-detail-top {
+        grid-template-columns: 1fr;
       }
     }
   </style>
@@ -125,12 +296,16 @@
   const safeTopProductos = Array.isArray(topProductos) ? topProductos : [];
   const safeOrdenesPorEstado = Array.isArray(ordenesPorEstado) ? ordenesPorEstado : [];
   const safeTodosProveedores = Array.isArray(todosProveedoresGasto) ? todosProveedoresGasto : [];
+  const safeGastosPorPlaca = Array.isArray(gastosPorPlaca) ? gastosPorPlaca : [];
+  const safeComprasPorPlaca = comprasPorPlaca && typeof comprasPorPlaca === 'object' ? comprasPorPlaca : {};
 
   const proveedorTop = safeTopProveedores[0] || {};
   const productoTop = safeTopProductos[0] || {};
+  const placaTop = safeGastosPorPlaca[0] || {};
 
   const gastoProveedorTop = Number(proveedorTop.total_gastado || 0);
   const vecesProveedorTop = gastoProveedorTop > 0 ? (safeTotalGasto / gastoProveedorTop).toFixed(1) : '0.0';
+  const totalGastoPlacas = safeGastosPorPlaca.reduce((total, item) => total + Number(item.total_gastado || 0), 0);
 
   // Proveedores para el selector de filtros
   const proveedoresList = Array.isArray(proveedores) ? proveedores : [];
@@ -234,6 +409,59 @@
         </div>
         <div class="stat-icon"><i class="bi bi-receipt text-info"></i></div>
       </div>
+    </div>
+  </div>
+
+  <!-- Nodo independiente: gastos por placa -->
+  <div class="placa-node mb-4">
+    <div class="placa-node-header">
+      <div>
+        <h2 class="placa-node-title"><i class="bi bi-truck-front me-2"></i>Gastos por placa</h2>
+        <p class="placa-node-subtitle">Calculado desde las órdenes de compra, respetando proveedor, fecha y estado filtrados.</p>
+      </div>
+      <div class="d-flex flex-wrap gap-2">
+        <span class="placa-chip"><i class="bi bi-cash-coin"></i> ₡<%= totalGastoPlacas.toLocaleString('es-CR') %></span>
+        <span class="placa-chip"><i class="bi bi-star-fill"></i> Top: <%= placaTop.placa || '—' %></span>
+      </div>
+    </div>
+    <div class="placa-node-body">
+      <% if (safeGastosPorPlaca.length) { %>
+        <div class="row g-3 align-items-stretch">
+          <div class="col-lg-7">
+            <canvas id="chartGastosPlaca" style="max-height: 380px;"></canvas>
+          </div>
+          <div class="col-lg-5">
+            <div class="table-responsive h-100">
+              <table class="table table-sm table-hover align-middle mb-0 placa-table">
+                <thead>
+                  <tr>
+                    <th>Placa</th>
+                    <th>Sede</th>
+                    <th class="text-center">Órdenes</th>
+                    <th class="text-end">Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <% safeGastosPorPlaca.forEach(item => { %>
+                    <tr>
+                      <td>
+                        <button type="button" class="placa-link js-placa-detail" data-placa="<%= item.placa %>">
+                          <%= item.placa %>
+                        </button>
+                      </td>
+                      <td><%= item.sede || 'Sin sede' %></td>
+                      <td class="text-center"><%= Number(item.ordenes || 0).toLocaleString('es-CR') %></td>
+                      <td class="text-end">₡<%= Number(item.total_gastado || 0).toLocaleString('es-CR') %></td>
+                    </tr>
+                  <% }) %>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      <% } else { %>
+        <div class="empty-msg">No hay órdenes con placa para mostrar en este filtro.</div>
+      <% } %>
     </div>
   </div>
 
@@ -346,11 +574,26 @@
 
 </div>
 
+<div class="placa-detail-backdrop" id="placaDetailBackdrop" aria-hidden="true">
+  <div class="placa-detail-modal" role="dialog" aria-modal="true" aria-labelledby="placaDetailTitle">
+    <div class="placa-detail-head">
+      <div>
+        <div class="small text-white-50 fw-bold text-uppercase">Compras por placa</div>
+        <h3 class="h5 fw-black mb-0" id="placaDetailTitle">Placa</h3>
+      </div>
+      <button type="button" class="placa-detail-close" id="placaDetailClose" aria-label="Cerrar">&times;</button>
+    </div>
+    <div class="placa-detail-body" id="placaDetailBody"></div>
+  </div>
+</div>
+
 <script type="application/json" id="data-top-proveedores"><%- JSON.stringify(safeTopProveedores) %></script>
 <script type="application/json" id="data-gasto-mensual"><%- JSON.stringify(safeGastoMensual) %></script>
 <script type="application/json" id="data-top-productos"><%- JSON.stringify(safeTopProductos) %></script>
 <script type="application/json" id="data-ordenes-estado"><%- JSON.stringify(safeOrdenesPorEstado) %></script>
 <script type="application/json" id="data-todos-proveedores"><%- JSON.stringify(safeTodosProveedores) %></script>
+<script type="application/json" id="data-gastos-placa"><%- JSON.stringify(safeGastosPorPlaca) %></script>
+<script type="application/json" id="data-compras-placa"><%- JSON.stringify(safeComprasPorPlaca) %></script>
 
 <script>
   const leerJSON = (id) => {
@@ -369,16 +612,163 @@
   const topProductos = leerJSON('data-top-productos');
   const ordenesPorEstado = leerJSON('data-ordenes-estado');
   const todosProveedores = leerJSON('data-todos-proveedores');
+  const gastosPorPlaca = leerJSON('data-gastos-placa');
+  const comprasPorPlaca = leerJSON('data-compras-placa');
 
   const formatCurrency = (value) => {
     const number = Number(value || 0);
     return '₡ ' + number.toLocaleString('es-CR');
   };
 
+  const escapeHtml = (value) => String(value || '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#039;');
+
+  const formatDate = (value) => {
+    if (!value) return '-';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return String(value).slice(0, 10);
+    return date.toLocaleDateString('es-CR');
+  };
+
   const cortaTexto = (texto, largo) => {
     texto = String(texto || '');
     return texto.length > largo ? texto.substring(0, largo - 3) + '...' : texto;
   };
+
+  const abrirDetallePlaca = (placa) => {
+    const backdrop = document.getElementById('placaDetailBackdrop');
+    const title = document.getElementById('placaDetailTitle');
+    const body = document.getElementById('placaDetailBody');
+    if (!backdrop || !title || !body) return;
+
+    const ordenes = comprasPorPlaca[placa] || [];
+    const total = ordenes.reduce((sum, orden) => sum + Number(orden.total || 0), 0);
+    title.textContent = `${placa} · ${ordenes.length} orden(es) · ${formatCurrency(total)}`;
+
+    if (!ordenes.length) {
+      body.innerHTML = '<div class="empty-msg">No hay detalle de compras para esta placa.</div>';
+    } else {
+      body.innerHTML = ordenes.map(orden => {
+        const lineas = Array.isArray(orden.lineas) ? orden.lineas : [];
+        const filas = lineas.length
+          ? lineas.map(linea => `
+              <tr>
+                <td>${escapeHtml(linea.codigo || '-')}</td>
+                <td>${escapeHtml(linea.descripcion || '-')}</td>
+                <td class="text-center">${Number(linea.cantidad || 0).toLocaleString('es-CR')}</td>
+                <td class="text-end">${formatCurrency(linea.precio_unitario || 0)}</td>
+                <td class="text-end">${formatCurrency(linea.subtotal || 0)}</td>
+              </tr>
+            `).join('')
+          : '<tr><td colspan="5" class="text-center text-muted">Sin líneas registradas</td></tr>';
+
+        const observacion = orden.observaciones
+          ? `<div class="orden-observacion"><strong>Observación:</strong> ${escapeHtml(orden.observaciones)}</div>`
+          : '';
+
+        return `
+          <section class="orden-detail-card">
+            <div class="orden-detail-top">
+              <div>
+                <div class="fw-black">PO ${escapeHtml(orden.po_numero || orden.id)}</div>
+                <div class="orden-detail-meta">
+                  ${escapeHtml(orden.proveedor || 'Sin proveedor')} · ${formatDate(orden.fecha)} · ${escapeHtml(String(orden.estado || '').replaceAll('_', ' ') || 'Sin estado')}
+                </div>
+              </div>
+              <div class="text-end fw-black">${formatCurrency(orden.total || 0)}</div>
+            </div>
+            ${observacion}
+            <div class="table-responsive p-3">
+              <table class="table table-sm align-middle mb-0">
+                <thead class="table-light">
+                  <tr>
+                    <th>Placa/Código</th>
+                    <th>Compra</th>
+                    <th class="text-center">Cant.</th>
+                    <th class="text-end">Precio</th>
+                    <th class="text-end">Subtotal</th>
+                  </tr>
+                </thead>
+                <tbody>${filas}</tbody>
+              </table>
+            </div>
+          </section>
+        `;
+      }).join('');
+    }
+
+    backdrop.classList.add('is-open');
+    backdrop.setAttribute('aria-hidden', 'false');
+  };
+
+  const cerrarDetallePlaca = () => {
+    const backdrop = document.getElementById('placaDetailBackdrop');
+    if (!backdrop) return;
+    backdrop.classList.remove('is-open');
+    backdrop.setAttribute('aria-hidden', 'true');
+  };
+
+  document.querySelectorAll('.js-placa-detail').forEach(btn => {
+    btn.addEventListener('click', () => abrirDetallePlaca(btn.dataset.placa));
+  });
+
+  document.getElementById('placaDetailClose')?.addEventListener('click', cerrarDetallePlaca);
+  document.getElementById('placaDetailBackdrop')?.addEventListener('click', (event) => {
+    if (event.target.id === 'placaDetailBackdrop') cerrarDetallePlaca();
+  });
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') cerrarDetallePlaca();
+  });
+
+  const canvasGastosPlaca = document.getElementById('chartGastosPlaca');
+  if (canvasGastosPlaca && gastosPorPlaca.length) {
+    const datosPlaca = gastosPorPlaca.slice(0, 12);
+    new Chart(canvasGastosPlaca, {
+      type: 'bar',
+      data: {
+        labels: datosPlaca.map(item => `${item.placa || 'SIN PLACA'} · ${item.sede || 'Sin sede'}`),
+        datasets: [{
+          label: 'Gasto por placa',
+          data: datosPlaca.map(item => Number(item.total_gastado || 0)),
+          backgroundColor: datosPlaca.map((_, index) => index === 0 ? '#ef233c' : '#0b3b82'),
+          borderRadius: 10
+        }]
+      },
+      options: {
+        indexAxis: 'y',
+        responsive: true,
+        maintainAspectRatio: false,
+        onClick: (_, elements) => {
+          if (!elements.length) return;
+          const item = datosPlaca[elements[0].index];
+          if (item?.placa) abrirDetallePlaca(item.placa);
+        },
+        onHover: (event, elements) => {
+          if (event?.native?.target) {
+            event.native.target.style.cursor = elements.length ? 'pointer' : 'default';
+          }
+        },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: ctx => {
+                const item = datosPlaca[ctx.dataIndex] || {};
+                return `${formatCurrency(ctx.raw)} · ${Number(item.ordenes || 0)} orden(es)`;
+              }
+            }
+          }
+        },
+        scales: {
+          x: { ticks: { callback: value => formatCurrency(value) } }
+        }
+      }
+    });
+  }
 
   // Gráfico: Top proveedores
   const canvasProveedores = document.getElementById('chartProveedores');

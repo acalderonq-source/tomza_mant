@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dashboard Taller - Gas Tomza</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <style>
+    :root {
+      --bg: #eaf0f8;
+      --card: #fff;
+      --ink: #10213f;
+      --muted: #5d6b85;
+      --line: #cbd7ea;
+      --dark: #061638;
+      --blue: #07358f;
+      --blue-2: #0b4fb8;
+      --green: #16a34a;
+      --red: #e2232a;
+      --amber: #ffd400;
+    }
+    body {
+      background:
+        radial-gradient(circle at top left, rgba(255, 212, 0, .18), transparent 28rem),
+        linear-gradient(135deg, #eef4fb 0%, #dce7f6 100%);
+      color: var(--ink);
+      font-family: "Segoe UI", Roboto, Arial, sans-serif;
+    }
+    .topbar {
+      background: linear-gradient(120deg, #061638 0%, #07358f 58%, #e2232a 59%, #ffd400 68%, #374151 68%);
+      border-bottom: 4px solid #ffd400;
+      box-shadow: 0 12px 30px rgba(6, 22, 56, .18);
+      min-height: 92px;
+    }
+    .brand-logo {
+      background: #fff;
+      border-radius: 8px;
+      box-shadow: 0 10px 20px rgba(0,0,0,.16);
+      height: 58px;
+      object-fit: contain;
+      padding: .25rem .45rem;
+      width: 178px;
+    }
+    .tv-title {
+      color: #fff;
+      font-size: clamp(1.55rem, 3vw, 2.65rem);
+      font-weight: 950;
+      letter-spacing: .04em;
+      line-height: 1;
+      text-transform: uppercase;
+    }
+    .clock-box {
+      color: #fff;
+      font-size: 1.25rem;
+      font-weight: 800;
+      min-width: 190px;
+      text-align: right;
+    }
+    .clock-time {
+      font-size: 1.75rem;
+      font-weight: 950;
+      line-height: 1.05;
+    }
+    .shell { max-width: 1500px; }
+    .hero, .panel, .kpi-card, .unit-card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: 0 14px 28px rgba(16, 33, 63, .08);
+    }
+    .hero { padding: 1rem; }
+    .page-title { font-size: 1.45rem; font-weight: 900; margin: 0; }
+    .muted { color: var(--muted); }
+    .kpi-grid { display: grid; gap: 1rem; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .kpi-card {
+      align-items: center;
+      display: flex;
+      gap: 1rem;
+      min-height: 112px;
+      padding: 1rem 1.2rem;
+    }
+    .kpi-icon {
+      align-items: center;
+      background: linear-gradient(145deg, #07358f, #0b4fb8);
+      border-radius: 50%;
+      color: #fff;
+      display: inline-flex;
+      flex: 0 0 64px;
+      font-size: 1.9rem;
+      height: 64px;
+      justify-content: center;
+      width: 64px;
+    }
+    .kpi-card.danger .kpi-icon { background: linear-gradient(145deg, #991b1b, #e2232a); }
+    .kpi-card.ok .kpi-icon { background: linear-gradient(145deg, #166534, #16a34a); }
+    .kpi-card.warn .kpi-icon { background: linear-gradient(145deg, #92400e, #ffd400); color: #10213f; }
+    .kpi-label { color: var(--ink); font-size: 1rem; font-weight: 850; }
+    .kpi-value { color: #07183d; font-size: 2.45rem; font-weight: 950; line-height: 1; }
+    .section-title { font-size: 1rem; font-weight: 900; margin: 0; }
+    .latest-strip { display: grid; gap: .7rem; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .latest-card {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-left: 5px solid var(--blue);
+      border-radius: 10px;
+      padding: .85rem;
+    }
+    .latest-plate { font-size: 1.05rem; font-weight: 950; }
+    .latest-work {
+      display: -webkit-box;
+      font-weight: 750;
+      line-height: 1.25;
+      margin-top: .35rem;
+      overflow: hidden;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 3;
+    }
+    .latest-pending {
+      background: #fff7ed;
+      border: 1px solid #fed7aa;
+      border-radius: 8px;
+      color: #9a3412;
+      font-size: .82rem;
+      font-weight: 750;
+      margin-top: .55rem;
+      padding: .45rem;
+    }
+    .board-grid { display: grid; gap: .85rem; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .unit-card { border-left: 6px solid var(--green); overflow: hidden; }
+    .unit-card.in-shop { border-left-color: var(--red); }
+    .unit-head { align-items: flex-start; display: flex; justify-content: space-between; gap: .75rem; padding: .9rem .95rem .5rem; }
+    .plate { font-size: 1.35rem; font-weight: 950; letter-spacing: .02em; }
+    .badge-soft { border-radius: 999px; font-size: .72rem; font-weight: 850; padding: .32rem .55rem; white-space: nowrap; }
+    .badge-shop { background: #fee2e2; color: #991b1b; }
+    .badge-ready { background: #dcfce7; color: #166534; }
+    .unit-body { display: grid; gap: .55rem; padding: 0 .95rem .95rem; }
+    .info-box { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: .65rem; }
+    .info-label { color: var(--muted); font-size: .72rem; font-weight: 850; text-transform: uppercase; }
+    .info-value { font-weight: 750; margin-top: .15rem; white-space: pre-wrap; }
+    .actions { background: #f8fafc; border-top: 1px solid #e2e8f0; padding: .85rem .95rem; }
+    .filter-label { color: #475569; font-size: .75rem; font-weight: 850; text-transform: uppercase; }
+    .empty-state { color: var(--muted); font-weight: 800; padding: 2rem; text-align: center; }
+    .tv-panel-title {
+      background: linear-gradient(90deg, #07358f, #061638);
+      border-radius: 8px 8px 0 0;
+      color: #fff;
+      font-size: 1.08rem;
+      font-weight: 950;
+      padding: .7rem 1rem;
+    }
+    .tv-table { margin: 0; }
+    .tv-table thead th {
+      background: #08275e;
+      color: #fff;
+      font-size: .82rem;
+      font-weight: 900;
+      text-transform: uppercase;
+    }
+    .tv-table td {
+      color: #172b4d;
+      font-size: .94rem;
+      vertical-align: middle;
+    }
+    .status-dot {
+      background: #22c55e;
+      border-radius: 50%;
+      display: inline-block;
+      height: 10px;
+      margin-right: .45rem;
+      width: 10px;
+    }
+    .status-dot.warn { background: #f59e0b; }
+    .work-cell {
+      max-width: 420px;
+      white-space: normal;
+    }
+    .work-list {
+      display: grid;
+      gap: .35rem;
+    }
+    .work-line {
+      align-items: flex-start;
+      display: flex;
+      gap: .45rem;
+      line-height: 1.25;
+    }
+    .work-type {
+      border-radius: 999px;
+      flex: 0 0 auto;
+      font-size: .68rem;
+      font-weight: 950;
+      padding: .22rem .42rem;
+      text-transform: uppercase;
+    }
+    .work-type.correctivo { background: #fee2e2; color: #991b1b; }
+    .work-type.preventivo { background: #dbeafe; color: #1e3a8a; }
+    .priority-panel {
+      border-top: 5px solid var(--red);
+    }
+    .priority-title {
+      background: linear-gradient(90deg, #e2232a, #991b1b);
+    }
+    .priority-form {
+      background: #fff8e1;
+      border-bottom: 1px solid #facc15;
+      padding: 1rem 1.1rem;
+    }
+    .priority-note {
+      color: #991b1b;
+      font-size: 1.08rem;
+      font-weight: 900;
+    }
+    .priority-badge {
+      background: #fee2e2;
+      border-radius: 999px;
+      color: #991b1b;
+      display: inline-block;
+      font-size: .86rem;
+      font-weight: 900;
+      padding: .36rem .62rem;
+      text-transform: uppercase;
+    }
+    .priority-panel .tv-panel-title {
+      font-size: 1.35rem;
+      padding: .9rem 1.1rem;
+    }
+    .priority-panel .tv-table thead th {
+      font-size: .95rem;
+    }
+    .priority-panel .tv-table td {
+      font-size: 1.08rem;
+      padding: .9rem .65rem;
+    }
+    .priority-plate {
+      font-size: 1.18rem;
+      font-weight: 950;
+    }
+    @media (max-width: 1180px) {
+      .kpi-grid,
+      .board-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .latest-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    @media (max-width: 720px) {
+      .kpi-grid, .board-grid, .latest-strip { grid-template-columns: 1fr; }
+      .topbar { background: linear-gradient(135deg, #061638, #07358f); }
+      .topbar .btn { width: 100%; }
+      .brand-logo { width: 145px; }
+      .clock-box { min-width: 0; text-align: left; }
+      .clock-time { font-size: 1.45rem; }
+      .unit-head { align-items: stretch; flex-direction: column; }
+      .actions .d-flex { align-items: stretch !important; flex-direction: column; }
+      .actions .btn, .actions input { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+<%
+  const lista = Array.isArray(unidades) ? unidades : [];
+  const ultimos = Array.isArray(ultimosCorrectivos) ? ultimosCorrectivos : [];
+  const puedeAccionar = Boolean(puedeGestionar);
+  const puedeEditarPrioridades = Boolean(puedeGestionarPrioridades);
+  const prioridadesLista = Array.isArray(prioridades) ? prioridades : [];
+  const preventivosAbiertos = lista.filter(u => u.preventivo_plan).length;
+  const fechaCorta = value => {
+    if (!value) return '—';
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? '—' : date.toLocaleDateString('es-CR');
+  };
+  const fechaHora = value => {
+    if (!value) return '—';
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? '—' : date.toLocaleString('es-CR');
+  };
+%>
+
+<nav class="navbar navbar-dark topbar px-3 py-3">
+  <div class="container-fluid shell d-flex align-items-center justify-content-between gap-3 flex-wrap">
+    <img src="/img/logo_tomza.jpg" alt="Gas Tomza" class="brand-logo">
+    <div class="tv-title text-center flex-grow-1">Control de Taller</div>
+    <div class="clock-box">
+      <div><i class="bi bi-clock me-1"></i><span id="fechaActual">--/--/----</span></div>
+      <div id="horaActual" class="clock-time">--:--</div>
+    </div>
+  </div>
+</nav>
+
+<main class="container-fluid shell py-4">
+  <% if (success) { %>
+    <div class="alert alert-success alert-dismissible fade show">
+      <%= success %>
+      <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+  <% } %>
+  <% if (error) { %>
+    <div class="alert alert-danger alert-dismissible fade show">
+      <%= error %>
+      <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+  <% } %>
+
+  <section class="hero mb-3">
+    <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
+      <div>
+        <h1 class="page-title">Panel operativo</h1>
+        <div class="muted">Sede: <strong><%= sedeSeleccionada %></strong> · Se actualiza automáticamente cada 45 segundos · <%= user.usuario %> (<%= user.rol %>)</div>
+      </div>
+      <div class="d-flex gap-2 flex-wrap">
+        <% if (puedeAccionar) { %>
+          <a href="/mantenimientos/correctivos/nuevo" class="btn btn-danger btn-sm"><i class="bi bi-plus-circle"></i> Registrar trabajo</a>
+        <% } %>
+        <a href="/unidades?varado=1" class="btn btn-outline-dark btn-sm"><i class="bi bi-truck-front"></i> Ver unidades</a>
+        <a href="/dashboard" class="btn btn-outline-primary btn-sm"><i class="bi bi-house"></i> Inicio</a>
+      </div>
+    </div>
+  </section>
+
+  <section class="kpi-grid mb-3">
+    <div class="kpi-card">
+      <span class="kpi-icon"><i class="bi bi-tools"></i></span>
+      <div>
+        <div class="kpi-label">Trabajos recientes</div>
+        <div class="kpi-value"><%= ultimos.length %></div>
+      </div>
+    </div>
+    <div class="kpi-card danger">
+      <span class="kpi-icon"><i class="bi bi-gear"></i></span>
+      <div>
+        <div class="kpi-label">En proceso</div>
+        <div class="kpi-value"><%= resumen.enTaller %></div>
+      </div>
+    </div>
+    <div class="kpi-card ok">
+      <span class="kpi-icon"><i class="bi bi-car-front"></i></span>
+      <div>
+        <div class="kpi-label">Unidades listas</div>
+        <div class="kpi-value"><%= resumen.disponibles %></div>
+      </div>
+    </div>
+    <div class="kpi-card warn">
+      <span class="kpi-icon"><i class="bi bi-clipboard2-pulse"></i></span>
+      <div>
+        <div class="kpi-label">Preventivos abiertos</div>
+        <div class="kpi-value"><%= preventivosAbiertos %></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel priority-panel mb-3">
+    <div class="tv-panel-title priority-title d-flex justify-content-between align-items-center gap-2 flex-wrap">
+      <span><i class="bi bi-exclamation-octagon me-1"></i> Prioridades de taller</span>
+      <span class="badge text-bg-light text-dark">Hoy · <%= prioridadesLista.length %> pendiente<%= prioridadesLista.length === 1 ? '' : 's' %></span>
+    </div>
+
+    <% if (puedeEditarPrioridades) { %>
+      <form method="POST" action="/taller/prioridades" class="priority-form">
+        <div class="row g-2 align-items-end">
+          <div class="col-md-2">
+            <label class="filter-label">Placa</label>
+            <input type="text" name="placa" class="form-control" placeholder="Ej: C173368" required>
+          </div>
+          <div class="col-md-8">
+            <label class="filter-label">Observación / prioridad</label>
+            <input type="text" name="observacion" class="form-control" placeholder="Ej: Revisar fuga antes de enviarlo a ruta" required>
+          </div>
+          <div class="col-md-2">
+            <button class="btn btn-danger w-100"><i class="bi bi-plus-circle"></i> Agregar</button>
+          </div>
+        </div>
+      </form>
+    <% } %>
+
+    <% if (!prioridadesLista.length) { %>
+      <div class="empty-state py-3">No hay prioridades pendientes.</div>
+    <% } else { %>
+      <div class="table-responsive">
+        <table class="table table-bordered tv-table">
+          <thead>
+            <tr>
+              <th>Prioridad</th>
+              <th>Placa</th>
+              <th>Observación</th>
+              <th>Agregado por</th>
+              <th>Fecha</th>
+              <% if (puedeEditarPrioridades) { %><th>Acción</th><% } %>
+            </tr>
+          </thead>
+          <tbody>
+            <% prioridadesLista.forEach(p => { %>
+              <tr>
+                <td><span class="priority-badge">Prioridad</span></td>
+                <td><span class="priority-plate"><%= p.placa %></span><div class="muted small"><%= p.sede || 'Sin sede' %></div></td>
+                <td class="work-cell priority-note"><%= p.observacion %></td>
+                <td><%= p.creado_por_nombre || 'Taller' %></td>
+                <td><%= fechaCorta(p.creado_en) %></td>
+                <% if (puedeEditarPrioridades) { %>
+                  <td>
+                    <form method="POST" action="/taller/prioridades/<%= p.id %>/atendida">
+                      <button class="btn btn-sm btn-success" onclick="return confirm('¿Marcar esta prioridad como atendida?')">
+                        <i class="bi bi-check-circle"></i> Atendida
+                      </button>
+                    </form>
+                  </td>
+                <% } %>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+  </section>
+
+  <section class="panel mb-3">
+    <div class="tv-panel-title d-flex justify-content-between align-items-center gap-2 flex-wrap">
+      <span>Trabajos realizados recientemente</span>
+      <a href="/mantenimientos/correctivos" class="btn btn-sm btn-light">Ver historial</a>
+    </div>
+    <% if (!ultimos.length) { %>
+      <div class="empty-state py-3">Todavía no hay correctivos registrados para esta sede.</div>
+    <% } else { %>
+      <div class="table-responsive">
+        <table class="table table-bordered tv-table">
+          <thead>
+            <tr>
+              <th>Placa</th>
+              <th>Trabajo</th>
+              <th>Estado</th>
+              <th>Mecánico</th>
+              <th>Fecha</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% ultimos.slice(0, 6).forEach(c => { %>
+              <tr>
+                <td>
+                  <strong><%= c.placa %></strong>
+                  <div class="muted small"><%= c.sede || 'Sin sede' %></div>
+                  <div class="muted small"><%= c.registros || 1 %> registro<%= Number(c.registros || 1) === 1 ? '' : 's' %> unido<%= Number(c.registros || 1) === 1 ? '' : 's' %></div>
+                </td>
+                <td class="work-cell">
+                  <% if (Array.isArray(c.trabajos) && c.trabajos.length) { %>
+                    <div class="work-list">
+                      <% c.trabajos.forEach(t => { %>
+                        <div class="work-line">
+                          <span class="work-type <%= String(t.tipo || '').toLowerCase() %>"><%= t.tipo %></span>
+                          <span><%= t.texto %></span>
+                        </div>
+                      <% }) %>
+                    </div>
+                  <% } else { %>
+                    <%= c.trabajo_realizado || '—' %>
+                  <% } %>
+                </td>
+                <td>
+                  <% if (c.pendiente) { %>
+                    <span class="status-dot warn"></span>Pendiente
+                    <div class="muted small"><%= c.pendiente %></div>
+                  <% } else { %>
+                    <span class="status-dot"></span>Finalizado
+                  <% } %>
+                </td>
+                <td><%= c.mecanicos || 'Sin asignar' %></td>
+                <td>
+                  <%= fechaCorta(c.fecha_inicio || c.fecha) %>
+                  <% if (fechaCorta(c.fecha_inicio) !== fechaCorta(c.fecha_fin)) { %>
+                    <div class="muted small">al <%= fechaCorta(c.fecha_fin) %></div>
+                  <% } %>
+                </td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+  </section>
+
+  <section class="panel p-3 mb-3">
+    <form method="GET" action="/taller/dashboard" class="row g-3 align-items-end">
+      <div class="col-md-4">
+        <label class="filter-label">Placa</label>
+        <input type="text" name="placa" class="form-control" value="<%= filtros.placa || '' %>" placeholder="Buscar placa">
+      </div>
+      <div class="col-md-4">
+        <label class="filter-label">Vista</label>
+        <select name="estado" class="form-select">
+          <option value="taller" <%= filtros.estado === 'taller' ? 'selected' : '' %>>Solo en taller</option>
+          <option value="todas" <%= filtros.estado === 'todas' ? 'selected' : '' %>>Todas las activas</option>
+          <option value="disponibles" <%= filtros.estado === 'disponibles' ? 'selected' : '' %>>Solo disponibles</option>
+        </select>
+      </div>
+      <div class="col-md-2">
+        <button class="btn btn-dark w-100"><i class="bi bi-funnel"></i> Filtrar</button>
+      </div>
+      <div class="col-md-2">
+        <a href="/taller/dashboard" class="btn btn-secondary w-100">Limpiar</a>
+      </div>
+    </form>
+  </section>
+
+  <section class="board-grid">
+    <% if (!lista.length) { %>
+      <div class="panel empty-state">
+        No hay unidades para mostrar con este filtro.
+      </div>
+    <% } %>
+
+    <% lista.forEach(u => { %>
+      <% const enTaller = Number(u.varada) === 1; %>
+      <article class="unit-card <%= enTaller ? 'in-shop' : '' %>">
+        <div class="unit-head">
+          <div>
+            <div class="plate"><%= u.placa %></div>
+            <div class="muted"><%= u.sede || 'Sin sede' %></div>
+          </div>
+          <% if (enTaller) { %>
+            <span class="badge-soft badge-shop">EN TALLER</span>
+          <% } else { %>
+            <span class="badge-soft badge-ready">LISTA</span>
+          <% } %>
+        </div>
+
+        <div class="unit-body">
+          <div class="info-box">
+            <div class="info-label">Motivo actual</div>
+            <div class="info-value <%= enTaller ? 'text-danger' : 'text-muted' %>"><%= u.razon_varada || (enTaller ? 'En taller sin detalle' : '—') %></div>
+          </div>
+
+          <div class="info-box">
+            <div class="info-label">Último trabajo realizado</div>
+            <div class="info-value"><%= u.ultimo_trabajo || '—' %></div>
+            <div class="muted small mt-1"><%= fechaHora(u.ultimo_correctivo_fecha) %></div>
+          </div>
+
+          <div class="info-box">
+            <div class="info-label">Pendiente correctivo</div>
+            <div class="info-value"><%= u.ultimo_pendiente || '—' %></div>
+          </div>
+
+          <div class="info-box">
+            <div class="info-label">Preventivo abierto</div>
+            <div class="info-value"><%= u.preventivo_plan || '—' %></div>
+            <div class="muted small mt-1"><%= u.preventivo_estado || 'Sin preventivo abierto' %> · <%= fechaCorta(u.preventivo_fecha) %></div>
+          </div>
+        </div>
+
+        <% if (puedeAccionar) { %>
+          <div class="actions">
+            <% if (enTaller) { %>
+              <form method="POST" action="/taller/unidades/<%= u.id %>/estado">
+                <input type="hidden" name="varada" value="0">
+                <button class="btn btn-success w-100" onclick="return confirm('¿Marcar <%= u.placa %> como lista para ruta?')">
+                  <i class="bi bi-check-circle"></i> Lista para ruta
+                </button>
+              </form>
+            <% } else { %>
+              <form method="POST" action="/taller/unidades/<%= u.id %>/estado">
+                <input type="hidden" name="varada" value="1">
+                <div class="d-flex gap-2 align-items-center">
+                  <input type="text" name="razon_varada" class="form-control" placeholder="Motivo de ingreso a taller" required>
+                  <button class="btn btn-danger">
+                    <i class="bi bi-tools"></i> En taller
+                  </button>
+                </div>
+              </form>
+            <% } %>
+          </div>
+        <% } %>
+      </article>
+    <% }) %>
+  </section>
+</main>
+
+<script>
+  function actualizarRelojTaller() {
+    const ahora = new Date();
+    const fecha = new Intl.DateTimeFormat('es-CR', {
+      timeZone: 'America/Costa_Rica',
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric'
+    }).format(ahora);
+    const hora = new Intl.DateTimeFormat('es-CR', {
+      timeZone: 'America/Costa_Rica',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: true
+    }).format(ahora);
+
+    const fechaEl = document.getElementById('fechaActual');
+    const horaEl = document.getElementById('horaActual');
+    if (fechaEl) fechaEl.textContent = fecha;
+    if (horaEl) horaEl.textContent = hora;
+  }
+
+  actualizarRelojTaller();
+  setInterval(actualizarRelojTaller, 1000);
+
+  setTimeout(() => {
+    if (!document.hidden) window.location.reload();
+  }, 45000);
+</script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

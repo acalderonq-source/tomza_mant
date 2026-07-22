@@ -242,6 +242,7 @@
   const puedeVerAires = ['ADMIN', 'TALLER', 'MECANICO'].includes(user.rol);
   const puedeVerRevisionRuta = ['ADMIN', 'TALLER', 'MECANICO', 'SUPERVISOR', 'SUPERVISOR_PESADO'].includes(user.rol);
   const puedeVerGiras = ['ADMIN', 'TALLER', 'MECANICO', 'SUPERVISOR', 'SUPERVISOR_PESADO'].includes(user.rol);
+  const puedeVerDashboardTaller = ['ADMIN', 'TALLER', 'MECANICO', 'SUPERVISOR', 'SUPERVISOR_PESADO'].includes(user.rol);
   const llantasEnProceso = Number(exec.llantasSolicitadas || 0) + Number(exec.llantasCotizadas || 0) + Number(exec.llantasCompradas || 0);
   const unidadesActivas = Number(exec.unidadesActivas ?? exec.unidades ?? 0);
   const unidadesVaradas = Number(exec.unidadesVaradas || 0);
@@ -359,6 +360,12 @@
           <span class="module-icon icon-green"><i class="bi bi-truck-front"></i></span>
           <div><div class="module-title">Unidades</div><p class="module-copy">Activas, inactivas y varadas.</p></div>
         </a>
+        <% if (puedeVerDashboardTaller) { %>
+          <a href="/taller/dashboard" class="module-card">
+            <span class="module-icon icon-red"><i class="bi bi-display"></i></span>
+            <div><div class="module-title">Dashboard taller</div><p class="module-copy">Unidades en taller y listas para ruta.</p></div>
+          </a>
+        <% } %>
         <% if (puedeVerRevisionRuta) { %>
           <a href="/revision-ruta" class="module-card">
             <span class="module-icon icon-green"><i class="bi bi-clipboard-check"></i></span>

@@ -33,6 +33,32 @@ function puedeReprogramarMantenimientos(user) {
   return ["ADMIN", "TALLER"].includes(user.rol);
 }
 
+async function unidadColumnExists(columnName) {
+  const [[row]] = await pool.query(
+    `SELECT COUNT(*) AS count
+     FROM INFORMATION_SCHEMA.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE()
+       AND TABLE_NAME = 'unidades'
+       AND COLUMN_NAME = ?`,
+    [columnName]
+  );
+  return Number(row.count) > 0;
+}
+
+async function ensureUnidadEstadoColumns() {
+  const columns = [
+    ["activa", "TINYINT(1) NOT NULL DEFAULT 1"],
+    ["varada", "TINYINT(1) NOT NULL DEFAULT 0"],
+    ["razon_varada", "TEXT NULL"]
+  ];
+
+  for (const [column, definition] of columns) {
+    if (!(await unidadColumnExists(column))) {
+      await pool.query(`ALTER TABLE unidades ADD COLUMN ${column} ${definition}`);
+    }
+  }
+}
+
 function redirectMantenimientos(req, res) {
   const returnTo = String(req.body.return_to || "");
   if (returnTo.startsWith("/mantenimientos")) {
@@ -258,7 +284,9 @@ router.post("/correctivos", requireAuth, async (req, res) => {
     if (!["MECANICO", "ADMIN", "TALLER"].includes(req.session.user.rol)) {
       return res.status(403).send("No autorizado");
     }
+    await ensureUnidadEstadoColumns();
     const { unidad_id, pendiente, trabajo_general, reporte_id } = req.body;
+    const pendienteTexto = String(pendiente || "").trim();
     if (!unidad_id) return res.status(400).send("Debe seleccionar una unidad.");
     const mecanicosArray = obtenerValoresSeleccionados(req.body);
     if (mecanicosArray.length === 0) return res.status(400).send("Debe seleccionar al menos un mecánico.");
@@ -296,9 +324,27 @@ router.post("/correctivos", requireAuth, async (req, res) => {
     const [result] = await pool.query(
       `INSERT INTO correctivos (unidad_id, sede, trabajo_realizado, pendiente, creado_por, puntos)
        VALUES (?, ?, ?, ?, ?, ?)`,
-      [unidad_id, sedeCorrectivo, resumenGeneral, pendiente || null, req.session.user.id, puntos]
+      [unidad_id, sedeCorrectivo, resumenGeneral, pendienteTexto || null, req.session.user.id, puntos]
     );
     const correctivoId = result.insertId;
+
+    if (pendienteTexto) {
+      await pool.query(
+        `UPDATE unidades
+         SET varada = 1,
+             razon_varada = ?
+         WHERE id = ?`,
+        [`Pendiente de taller: ${pendienteTexto}`, unidad_id]
+      );
+    } else {
+      await pool.query(
+        `UPDATE unidades
+         SET varada = 0,
+             razon_varada = NULL
+         WHERE id = ?`,
+        [unidad_id]
+      );
+    }
 
     for (const idMec of mecanicosArray) {
       let trabajo = null, repuesto = null;

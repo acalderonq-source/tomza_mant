@@ -2372,6 +2372,8 @@ router.post("/facturas/pagar-multiple", requireAuth, allowRoles("ADMIN", "TALLER
 // ===================== DASHBOARD DE ANÁLISIS =====================
 router.get("/dashboard", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER"), async (req, res) => {
   try {
+    await ensureOrdenPlacaColumn();
+
     const { proveedor_id, fecha_desde, fecha_hasta, estado } = req.query;
     const condiciones = [];
     const params = [];
@@ -2474,6 +2476,142 @@ router.get("/dashboard", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA
       HAVING total_gastado > 0
       ORDER BY total_gastado DESC
     `, params);
+    const [gastosPorPlaca] = await pool.query(`
+      SELECT
+        compras.placa,
+        CASE
+          WHEN compras.placa = 'GENERALES TALLER' THEN 'General'
+          ELSE COALESCE(MAX(u.sede), 'Sin sede')
+        END AS sede,
+        COUNT(DISTINCT compras.id) AS ordenes,
+        COALESCE(SUM(compras.monto_linea), 0) AS total_gastado,
+        MAX(compras.ultima_fecha) AS ultima_fecha
+      FROM (
+        SELECT
+          o.id,
+          UPPER(TRIM(COALESCE(
+            REGEXP_SUBSTR(UPPER(COALESCE(d.codigo, '')), 'C[L]?[0-9]{5,6}'),
+            CASE
+              WHEN UPPER(TRIM(COALESCE(d.codigo, ''))) IN ('GENERAL', 'GENERALES', 'GENERAL TALLER', 'GENERALES TALLER') THEN 'GENERALES TALLER'
+            END,
+            CASE
+              WHEN UPPER(TRIM(COALESCE(o.placa_unidad, ''))) IN ('GENERAL', 'GENERALES', 'GENERAL TALLER', 'GENERALES TALLER') THEN 'GENERALES TALLER'
+            END,
+            CASE WHEN COALESCE(placas_detalle.tiene_placas, 0) = 0 THEN NULLIF(UPPER(TRIM(o.placa_unidad)), '') END,
+            CASE WHEN COALESCE(placas_detalle.tiene_placas, 0) = 0 THEN REGEXP_SUBSTR(UPPER(COALESCE(o.observaciones, '')), 'C[L]?[0-9]{5,6}') END,
+            'SIN PLACA'
+          ))) AS placa,
+          CASE
+            WHEN d.id IS NULL THEN COALESCE(o.total, 0)
+            ELSE COALESCE(d.subtotal, d.cantidad * d.precio_unitario, 0)
+          END AS monto_linea,
+          o.fecha AS ultima_fecha
+        FROM ordenes_compra o
+        LEFT JOIN ordenes_compra_detalle d ON d.orden_compra_id = o.id
+        LEFT JOIN (
+          SELECT orden_compra_id, COUNT(*) AS tiene_placas
+          FROM ordenes_compra_detalle
+          WHERE REGEXP_SUBSTR(UPPER(COALESCE(codigo, '')), 'C[L]?[0-9]{5,6}') IS NOT NULL
+          GROUP BY orden_compra_id
+        ) placas_detalle ON placas_detalle.orden_compra_id = o.id
+        ${whereClause}
+      ) compras
+      LEFT JOIN unidades u ON UPPER(TRIM(u.placa)) = compras.placa
+      WHERE compras.placa <> 'SIN PLACA'
+      GROUP BY compras.placa
+      ORDER BY total_gastado DESC
+      LIMIT 15
+    `, params);
+
+    const comprasPorPlaca = {};
+    const placasDashboard = (gastosPorPlaca || []).map(item => item.placa).filter(Boolean);
+    if (placasDashboard.length) {
+      const [detalleComprasPorPlaca] = await pool.query(`
+        SELECT
+          base.placa,
+          o.id,
+          o.po_numero,
+          o.fecha,
+          o.estado,
+          o.total AS total_orden,
+          o.observaciones,
+          p.nombre AS proveedor,
+          d.id AS detalle_id,
+          d.codigo,
+          d.descripcion,
+          d.cantidad,
+          d.precio_unitario,
+          d.subtotal,
+          base.monto_linea
+        FROM (
+          SELECT
+            o.id,
+            d.id AS detalle_id,
+            UPPER(TRIM(COALESCE(
+              REGEXP_SUBSTR(UPPER(COALESCE(d.codigo, '')), 'C[L]?[0-9]{5,6}'),
+              CASE
+                WHEN UPPER(TRIM(COALESCE(d.codigo, ''))) IN ('GENERAL', 'GENERALES', 'GENERAL TALLER', 'GENERALES TALLER') THEN 'GENERALES TALLER'
+              END,
+              CASE
+                WHEN UPPER(TRIM(COALESCE(o.placa_unidad, ''))) IN ('GENERAL', 'GENERALES', 'GENERAL TALLER', 'GENERALES TALLER') THEN 'GENERALES TALLER'
+              END,
+              CASE WHEN COALESCE(placas_detalle.tiene_placas, 0) = 0 THEN NULLIF(UPPER(TRIM(o.placa_unidad)), '') END,
+              CASE WHEN COALESCE(placas_detalle.tiene_placas, 0) = 0 THEN REGEXP_SUBSTR(UPPER(COALESCE(o.observaciones, '')), 'C[L]?[0-9]{5,6}') END,
+              'SIN PLACA'
+            ))) AS placa,
+            CASE
+              WHEN d.id IS NULL THEN COALESCE(o.total, 0)
+              ELSE COALESCE(d.subtotal, d.cantidad * d.precio_unitario, 0)
+            END AS monto_linea
+          FROM ordenes_compra o
+          LEFT JOIN ordenes_compra_detalle d ON d.orden_compra_id = o.id
+          LEFT JOIN (
+            SELECT orden_compra_id, COUNT(*) AS tiene_placas
+            FROM ordenes_compra_detalle
+            WHERE REGEXP_SUBSTR(UPPER(COALESCE(codigo, '')), 'C[L]?[0-9]{5,6}') IS NOT NULL
+            GROUP BY orden_compra_id
+          ) placas_detalle ON placas_detalle.orden_compra_id = o.id
+          ${whereClause}
+        ) base
+        JOIN ordenes_compra o ON o.id = base.id
+        LEFT JOIN proveedores p ON p.id = o.proveedor_id
+        LEFT JOIN ordenes_compra_detalle d ON d.id = base.detalle_id
+        WHERE base.placa IN (?)
+        ORDER BY base.placa ASC, o.fecha DESC, o.id DESC, d.id ASC
+      `, [...params, placasDashboard]);
+
+      detalleComprasPorPlaca.forEach(row => {
+        if (!comprasPorPlaca[row.placa]) comprasPorPlaca[row.placa] = [];
+        let orden = comprasPorPlaca[row.placa].find(item => item.id === row.id);
+        if (!orden) {
+          orden = {
+            id: row.id,
+            po_numero: row.po_numero,
+            fecha: row.fecha,
+            estado: row.estado,
+            total: 0,
+            total_orden: row.total_orden,
+            observaciones: row.observaciones,
+            proveedor: row.proveedor,
+            lineas: []
+          };
+          comprasPorPlaca[row.placa].push(orden);
+        }
+
+        orden.total += Number(row.monto_linea || 0);
+
+        if (row.detalle_id) {
+          orden.lineas.push({
+            codigo: row.codigo,
+            descripcion: row.descripcion,
+            cantidad: row.cantidad,
+            precio_unitario: row.precio_unitario,
+            subtotal: row.monto_linea || row.subtotal
+          });
+        }
+      });
+    }
+
     const [proveedores] = await pool.query("SELECT id, nombre FROM proveedores ORDER BY nombre");
     const estadosList = ['BORRADOR', 'ENVIADA', 'RECIBIDA_PARCIAL', 'RECIBIDA_TOTAL'];
     res.render("compras/dashboard_compras", {
@@ -2485,6 +2623,8 @@ router.get("/dashboard", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA
       ordenesPorEstado: ordenesPorEstado || [],
       gastoPorProveedor: gastoPorProveedor || [],
       todosProveedoresGasto: todosProveedoresGasto || [],
+      gastosPorPlaca: gastosPorPlaca || [],
+      comprasPorPlaca,
       proveedores: proveedores,
       estados: estadosList,
       filtros: { proveedor_id, fecha_desde, fecha_hasta, estado }

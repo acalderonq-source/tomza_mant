@@ -95,6 +95,7 @@ const iaRoutes = require("./routes/ia.routes");
 const reportesSupervisoresRoutes = require("./routes/reportesSupervisores.routes");
 const revisionRutaRoutes = require("./routes/revisionRuta.routes");
 const girasRoutes = require("./routes/giras.routes");
+const tallerRoutes = require("./routes/taller.routes");
 
 // ===================== USAR RUTAS =====================
 app.use("/", authRoutes);
@@ -116,6 +117,7 @@ app.use("/ia", iaRoutes);
 app.use("/reportes-supervisores", reportesSupervisoresRoutes);
 app.use("/revision-ruta", revisionRutaRoutes);
 app.use("/giras", girasRoutes);
+app.use("/taller", tallerRoutes);
 
 // ===================== CRON JOBS =====================
 ensurePushTables().catch(error => {

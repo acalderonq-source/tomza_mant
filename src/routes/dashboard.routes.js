@@ -12,6 +12,20 @@ async function safeQuery(sql, params = [], fallback = []) {
   }
 }
 
+const SEDES_TRANSPORTE = ["Transportadora", "Granel"];
+
+function expandirSedeFiltro(sede) {
+  if (!sede) return [];
+  if (SEDES_TRANSPORTE.includes(sede)) return SEDES_TRANSPORTE;
+  return [sede];
+}
+
+function etiquetaSede(sede) {
+  if (!sede) return "TODAS";
+  if (SEDES_TRANSPORTE.includes(sede)) return "Transportadora + Granel";
+  return sede;
+}
+
 // =========================================================
 // DASHBOARD PRINCIPAL
 // =========================================================
@@ -75,9 +89,12 @@ router.get("/", async (req, res) => {
       }
     }
 
+    const sedesFiltro = expandirSedeFiltro(sedeFiltro);
+    const sedeSeleccionadaVista = etiquetaSede(sedeFiltro);
+
     console.log("👤 Usuario:", req.session.user.usuario);
     console.log("📍 Sedes permitidas:", sedesPermitidas);
-    console.log("📍 Sede actual:", sedeFiltro);
+    console.log("📍 Sede actual:", sedeSeleccionadaVista);
 
     // =========================
     // QUERY HOY
@@ -88,11 +105,11 @@ router.get("/", async (req, res) => {
     let condicionesStats = ["1=1"];
     let paramsStats = [];
 
-    if (sedeFiltro) {
-      condicionesHoy.push("u.sede = ?");
-      paramsHoy.push(sedeFiltro);
-      condicionesStats.push("u.sede = ?");
-      paramsStats.push(sedeFiltro);
+    if (sedesFiltro.length) {
+      condicionesHoy.push("u.sede IN (?)");
+      paramsHoy.push(sedesFiltro);
+      condicionesStats.push("u.sede IN (?)");
+      paramsStats.push(sedesFiltro);
     }
 
     // =========================
@@ -131,8 +148,8 @@ router.get("/", async (req, res) => {
     // =========================
     // KPIs EJECUTIVOS
     // =========================
-    const sedeUnidadWhere = sedeFiltro ? "WHERE sede = ?" : "";
-    const sedeUnidadParams = sedeFiltro ? [sedeFiltro] : [];
+    const sedeUnidadWhere = sedesFiltro.length ? "WHERE sede IN (?)" : "";
+    const sedeUnidadParams = sedesFiltro.length ? [sedesFiltro] : [];
 
     const [unidadesRow] = await safeQuery(
       `SELECT COUNT(*) AS total FROM unidades ${sedeUnidadWhere}`,
@@ -158,8 +175,8 @@ router.get("/", async (req, res) => {
        JOIN unidades u ON u.id = m.unidad_id
        WHERE m.estado != 'CERRADO'
          AND m.fecha_programada < ?
-         ${sedeFiltro ? "AND u.sede = ?" : ""}`,
-      sedeFiltro ? [fechaHoy, sedeFiltro] : [fechaHoy],
+         ${sedesFiltro.length ? "AND u.sede IN (?)" : ""}`,
+      sedesFiltro.length ? [fechaHoy, sedesFiltro] : [fechaHoy],
       [{ total: 0 }]
     );
 
@@ -169,8 +186,8 @@ router.get("/", async (req, res) => {
        JOIN unidades u ON u.id = m.unidad_id
        WHERE m.estado != 'CERRADO'
          AND DATE(m.fecha_programada) = DATE_ADD(?, INTERVAL 1 DAY)
-         ${sedeFiltro ? "AND u.sede = ?" : ""}`,
-      sedeFiltro ? [fechaHoy, sedeFiltro] : [fechaHoy],
+         ${sedesFiltro.length ? "AND u.sede IN (?)" : ""}`,
+      sedesFiltro.length ? [fechaHoy, sedesFiltro] : [fechaHoy],
       [{ total: 0 }]
     );
 
@@ -220,8 +237,8 @@ router.get("/", async (req, res) => {
          SUM(CASE WHEN estado = 'COTIZADA' THEN 1 ELSE 0 END) AS cotizadas,
          SUM(CASE WHEN estado = 'COMPRADA' THEN 1 ELSE 0 END) AS compradas
        FROM solicitudes_llantas
-       ${sedeFiltro ? "WHERE sede = ?" : ""}`,
-      sedeFiltro ? [sedeFiltro] : [],
+       ${sedesFiltro.length ? "WHERE sede IN (?)" : ""}`,
+      sedesFiltro.length ? [sedesFiltro] : [],
       [{ solicitadas: 0, cotizadas: 0, compradas: 0 }]
     );
 
@@ -277,7 +294,7 @@ router.get("/", async (req, res) => {
       user: req.session.user,
       hoy: hoyMantenimientos,
       stats,
-      sedeSeleccionada: sedeFiltro || "TODAS",
+      sedeSeleccionada: sedeSeleccionadaVista,
       sedesMultiples: sedesPermitidas,
       // Variables para evitar errores si la vista tiene bloques de trámites
       totalPendientes: 0,
