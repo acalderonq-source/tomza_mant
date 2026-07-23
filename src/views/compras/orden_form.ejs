@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title><%= orden ? 'Editar Orden de Compra' : 'Nueva Orden de Compra' %></title>
+  <title><%= (typeof tituloOrden !== 'undefined' ? tituloOrden : null) || (orden ? 'Editar Orden de Compra' : 'Nueva Orden de Compra') %></title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
   <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
@@ -24,18 +24,24 @@
   const safeOrden = orden || {};
   const lineasIniciales = Array.isArray(lineas) ? lineas : [];
   const fechaOrden = safeOrden.fecha ? new Date(safeOrden.fecha).toLocaleDateString('es-CR') : new Date().toLocaleDateString('es-CR');
+  const tituloPantalla = (typeof tituloOrden !== 'undefined' ? tituloOrden : null) || (esEdicion ? 'Editar orden de compra' : 'Nueva orden de compra');
+  const subtituloPantalla = (typeof subtituloOrden !== 'undefined' ? subtituloOrden : null) || 'Completa el encabezado, líneas y totales de la orden.';
+  const urlVolver = (typeof volverUrl !== 'undefined' ? volverUrl : null) || '/compras/ordenes';
+  const urlCancelar = (typeof cancelarUrl !== 'undefined' ? cancelarUrl : null) || '/compras/ordenes';
+  const accionFormulario = (typeof formAction !== 'undefined' ? formAction : null) || (esEdicion ? `/compras/ordenes/${safeOrden.id}/editar` : '/compras/ordenes');
+  const textoBotonGuardar = (typeof textoGuardar !== 'undefined' ? textoGuardar : null) || (esEdicion ? 'Actualizar orden' : 'Guardar orden');
 %>
 <div class="container mt-4">
   <div class="page-heading">
     <div>
-      <h1 class="page-title"><%= esEdicion ? 'Editar orden de compra' : 'Nueva orden de compra' %></h1>
-      <p class="page-subtitle">Completa el encabezado, líneas y totales de la orden.</p>
+      <h1 class="page-title"><%= tituloPantalla %></h1>
+      <p class="page-subtitle"><%= subtituloPantalla %></p>
     </div>
-    <a href="/compras/ordenes" class="btn btn-secondary btn-sm">Volver al listado</a>
+    <a href="<%= urlVolver %>" class="btn btn-secondary btn-sm">Volver al listado</a>
   </div>
 
   <div class="form-card">
-    <form id="ordenForm" method="POST" action="<%= esEdicion ? `/compras/ordenes/${safeOrden.id}/editar` : '/compras/ordenes' %>">
+    <form id="ordenForm" method="POST" action="<%= accionFormulario %>">
       <div class="row">
         <div class="col-md-3">
           <label>N° PO <%= esEdicion ? '' : '(se genera automático)' %></label>
@@ -126,8 +132,8 @@
       </div>
 
       <button type="button" class="btn btn-secondary" id="addRowBtn">➕ Agregar línea</button>
-      <button type="submit" class="btn btn-primary"><%= esEdicion ? 'Actualizar orden' : 'Guardar orden' %></button>
-      <a href="/compras/ordenes" class="btn btn-danger">Cancelar</a>
+      <button type="submit" class="btn btn-primary"><%= textoBotonGuardar %></button>
+      <a href="<%= urlCancelar %>" class="btn btn-danger">Cancelar</a>
     </form>
   </div>
 </div>

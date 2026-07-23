@@ -246,6 +246,7 @@
   const puedeVerRevisionRuta = ['ADMIN', 'TALLER', 'MECANICO', 'SUPERVISOR', 'SUPERVISOR_PESADO'].includes(user.rol);
   const puedeVerGiras = ['ADMIN', 'TALLER', 'MECANICO', 'SUPERVISOR', 'SUPERVISOR_PESADO'].includes(user.rol);
   const puedeVerDashboardTaller = ['ADMIN', 'TALLER', 'MECANICO', 'SUPERVISOR', 'SUPERVISOR_PESADO'].includes(user.rol);
+  const puedeVerOrdenesMotor = ['ADMIN', 'TALLER', 'PROVEEDURIA_TALLER'].includes(user.rol);
   const llantasEnProceso = Number(exec.llantasSolicitadas || 0) + Number(exec.llantasCotizadas || 0) + Number(exec.llantasCompradas || 0);
   const unidadesActivas = Number(exec.unidadesActivas ?? exec.unidades ?? 0);
   const unidadesVaradas = Number(exec.unidadesVaradas || 0);
@@ -385,6 +386,12 @@
           <span class="module-icon icon-dark"><i class="bi bi-circle"></i></span>
           <div><div class="module-title">Llantas</div><p class="module-copy">Solicitudes, compras y llegadas.</p></div>
         </a>
+        <% if (puedeVerOrdenesMotor) { %>
+          <a href="/ordenes-motor" class="module-card">
+            <span class="module-icon icon-red"><i class="bi bi-gear-wide-connected"></i></span>
+            <div><div class="module-title">Órdenes Motor</div><p class="module-copy">Presupuesto separado de compras.</p></div>
+          </a>
+        <% } %>
         <% if (mostrarOficinaDiaDia) { %>
           <a href="/oficina-dia-dia" class="module-card">
             <span class="module-icon icon-blue"><i class="bi bi-person-workspace"></i></span>

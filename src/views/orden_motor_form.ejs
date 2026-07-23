@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title><%= orden ? 'Editar' : 'Nueva' %> Orden Motor</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <style>
+    body { background: #f3f6fa; color: #111827; font-family: "Segoe UI", Roboto, Arial, sans-serif; }
+    .topbar { background: #111827; border-bottom: 3px solid #dc2626; }
+    .shell { max-width: 1100px; }
+    .panel { background: #fff; border: 1px solid #dbe3ef; border-radius: 10px; }
+    .section-title { font-size: 1rem; font-weight: 900; margin: 0; }
+    .table thead th { background: #f8fafc; color: #475569; font-size: .75rem; font-weight: 900; text-transform: uppercase; }
+  </style>
+</head>
+<body>
+<%
+  const esEdicion = Boolean(orden);
+  const lineasActuales = Array.isArray(lineas) && lineas.length ? lineas : [{ descripcion: '', cantidad: 1, precio_unitario: 0, subtotal: 0 }];
+  const fechaValor = orden && orden.fecha ? new Date(orden.fecha).toISOString().slice(0, 10) : fechaActual;
+%>
+<nav class="navbar navbar-dark topbar px-3 py-2">
+  <span class="navbar-brand fw-semibold"><i class="bi bi-gear-wide-connected me-2"></i><%= esEdicion ? 'Editar' : 'Nueva' %> Orden Motor</span>
+  <div class="text-white d-flex align-items-center gap-2 flex-wrap">
+    <span class="small"><%= user.usuario %> · <%= user.rol %></span>
+    <a href="/ordenes-motor" class="btn btn-outline-light btn-sm rounded-pill px-3">Volver</a>
+  </div>
+</nav>
+
+<main class="container-fluid shell py-4">
+  <form method="POST" action="<%= esEdicion ? `/ordenes-motor/${orden.id}/editar` : '/ordenes-motor' %>" class="panel p-3">
+    <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-3">
+      <div>
+        <h1 class="h4 fw-black mb-1">Orden Motor <%= siguienteNumero %></h1>
+        <div class="text-muted small">Esta orden usa presupuesto separado y no suma al gasto normal de compras.</div>
+      </div>
+      <button class="btn btn-dark btn-sm"><i class="bi bi-save"></i> Guardar</button>
+    </div>
+
+    <div class="row g-3 mb-3">
+      <div class="col-md-3">
+        <label class="form-label small fw-bold">Fecha</label>
+        <input type="date" name="fecha" class="form-control form-control-sm" value="<%= fechaValor || '' %>" required>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label small fw-bold">Proveedor</label>
+        <select name="proveedor_id" class="form-select form-select-sm">
+          <option value="">Sin proveedor</option>
+          <% proveedores.forEach(p => { %>
+            <option value="<%= p.id %>" <%= orden && orden.proveedor_id == p.id ? 'selected' : '' %>><%= p.nombre %></option>
+          <% }) %>
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label small fw-bold">Placa</label>
+        <input type="text" name="placa_unidad" class="form-control form-control-sm text-uppercase" value="<%= orden ? (orden.placa_unidad || '') : '' %>">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label small fw-bold">Motor</label>
+        <input type="text" name="motor" class="form-control form-control-sm" placeholder="Ej: motor 4D34" value="<%= orden ? (orden.motor || '') : '' %>">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label small fw-bold">Moneda</label>
+        <select name="moneda" class="form-select form-select-sm">
+          <option value="CRC" <%= !orden || orden.moneda === 'CRC' ? 'selected' : '' %>>CRC</option>
+          <option value="USD" <%= orden && orden.moneda === 'USD' ? 'selected' : '' %>>USD</option>
+        </select>
+      </div>
+      <% if (esEdicion) { %>
+        <div class="col-md-3">
+          <label class="form-label small fw-bold">Estado</label>
+          <select name="estado" class="form-select form-select-sm">
+            <% ['BORRADOR', 'ENVIADA', 'RECIBIDA_TOTAL', 'ANULADA'].forEach(est => { %>
+              <option value="<%= est %>" <%= orden.estado === est ? 'selected' : '' %>><%= est.replace('_', ' ') %></option>
+            <% }) %>
+          </select>
+        </div>
+      <% } %>
+      <div class="col-12">
+        <label class="form-label small fw-bold">Observaciones</label>
+        <textarea name="observaciones" class="form-control form-control-sm" rows="2"><%= orden ? (orden.observaciones || '') : '' %></textarea>
+      </div>
+    </div>
+
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <h2 class="section-title">Detalle</h2>
+      <button type="button" class="btn btn-outline-dark btn-sm" id="btnAddLinea"><i class="bi bi-plus-lg"></i> Línea</button>
+    </div>
+
+    <div class="table-responsive mb-3">
+      <table class="table table-sm align-middle" id="tablaLineas">
+        <thead>
+          <tr>
+            <th>Descripción</th>
+            <th style="width:110px;">Cantidad</th>
+            <th style="width:150px;">Precio</th>
+            <th style="width:150px;">Subtotal</th>
+            <th style="width:50px;"></th>
+          </tr>
+        </thead>
+        <tbody>
+          <% lineasActuales.forEach((linea, index) => { %>
+            <tr>
+              <td><input name="lineas[<%= index %>][descripcion]" class="form-control form-control-sm descripcion" value="<%= linea.descripcion || '' %>" required></td>
+              <td><input type="number" step="0.01" name="lineas[<%= index %>][cantidad]" class="form-control form-control-sm cantidad" value="<%= linea.cantidad || 1 %>"></td>
+              <td><input type="number" step="0.01" name="lineas[<%= index %>][precio_unitario]" class="form-control form-control-sm precio" value="<%= linea.precio_unitario || 0 %>"></td>
+              <td><input type="number" step="0.01" name="lineas[<%= index %>][subtotal]" class="form-control form-control-sm subtotal-linea" value="<%= linea.subtotal || 0 %>" readonly></td>
+              <td><button type="button" class="btn btn-outline-danger btn-sm btn-del-linea"><i class="bi bi-x"></i></button></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="row g-3 justify-content-end">
+      <div class="col-md-3">
+        <label class="form-label small fw-bold">Subtotal</label>
+        <input type="number" step="0.01" id="subtotal" class="form-control form-control-sm" value="<%= orden ? orden.subtotal : 0 %>" readonly>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label small fw-bold">IVA</label>
+        <input type="number" step="0.01" name="iva" id="iva" class="form-control form-control-sm" value="<%= orden ? orden.iva : 0 %>">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label small fw-bold">Total</label>
+        <input type="number" step="0.01" name="total" id="total" class="form-control form-control-sm fw-bold" value="<%= orden ? orden.total : 0 %>" readonly>
+      </div>
+    </div>
+  </form>
+</main>
+
+<script>
+  const tbody = document.querySelector('#tablaLineas tbody');
+  const subtotalInput = document.getElementById('subtotal');
+  const ivaInput = document.getElementById('iva');
+  const totalInput = document.getElementById('total');
+  const btnAdd = document.getElementById('btnAddLinea');
+
+  function renombrarLineas() {
+    tbody.querySelectorAll('tr').forEach((row, index) => {
+      row.querySelector('.descripcion').name = `lineas[${index}][descripcion]`;
+      row.querySelector('.cantidad').name = `lineas[${index}][cantidad]`;
+      row.querySelector('.precio').name = `lineas[${index}][precio_unitario]`;
+      row.querySelector('.subtotal-linea').name = `lineas[${index}][subtotal]`;
+    });
+  }
+
+  function recalcular() {
+    let subtotal = 0;
+    tbody.querySelectorAll('tr').forEach(row => {
+      const cantidad = Number(row.querySelector('.cantidad').value || 0);
+      const precio = Number(row.querySelector('.precio').value || 0);
+      const lineaSubtotal = cantidad * precio;
+      row.querySelector('.subtotal-linea').value = lineaSubtotal.toFixed(2);
+      subtotal += lineaSubtotal;
+    });
+    const iva = Number(ivaInput.value || 0);
+    subtotalInput.value = subtotal.toFixed(2);
+    totalInput.value = (subtotal + iva).toFixed(2);
+  }
+
+  btnAdd.addEventListener('click', () => {
+    const row = document.createElement('tr');
+    row.innerHTML = `
+      <td><input class="form-control form-control-sm descripcion" required></td>
+      <td><input type="number" step="0.01" class="form-control form-control-sm cantidad" value="1"></td>
+      <td><input type="number" step="0.01" class="form-control form-control-sm precio" value="0"></td>
+      <td><input type="number" step="0.01" class="form-control form-control-sm subtotal-linea" value="0" readonly></td>
+      <td><button type="button" class="btn btn-outline-danger btn-sm btn-del-linea"><i class="bi bi-x"></i></button></td>
+    `;
+    tbody.appendChild(row);
+    renombrarLineas();
+    recalcular();
+  });
+
+  tbody.addEventListener('input', event => {
+    if (event.target.classList.contains('cantidad') || event.target.classList.contains('precio')) recalcular();
+  });
+
+  tbody.addEventListener('click', event => {
+    const button = event.target.closest('.btn-del-linea');
+    if (!button) return;
+    if (tbody.querySelectorAll('tr').length > 1) button.closest('tr').remove();
+    renombrarLineas();
+    recalcular();
+  });
+
+  ivaInput.addEventListener('input', recalcular);
+  recalcular();
+</script>
+</body>
+</html>

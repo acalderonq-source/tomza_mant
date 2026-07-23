@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Detalle Orden - <%= orden.po_numero %></title>
+  <title><%= (typeof tituloDetalle !== 'undefined' ? tituloDetalle : null) || 'Detalle Orden' %> - <%= orden.po_numero %></title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
   <style>
@@ -16,10 +16,10 @@
 <body>
 
 <nav class="navbar navbar-dark bg-dark px-3">
-  <span class="navbar-brand">🛒 Detalle de Orden</span>
+  <span class="navbar-brand">🛒 <%= (typeof tituloDetalle !== 'undefined' ? tituloDetalle : null) || 'Detalle de Orden' %></span>
   <div class="text-white">
     <%= user.usuario %> (<%= user.rol %>)
-    <a href="/compras/ordenes" class="btn btn-secondary btn-sm ms-2">Volver</a>
+    <a href="<%= (typeof volverUrl !== 'undefined' ? volverUrl : null) || '/compras/ordenes' %>" class="btn btn-secondary btn-sm ms-2">Volver</a>
   </div>
 </nav>
 
@@ -27,6 +27,10 @@
   <%
     const puedeModificarCompras = ['ADMIN', 'TALLER', 'PROVEEDURIA_TALLER'].includes(user.rol);
     const esMensajero = ['MENSAJERO', 'MENSAJERIA', 'MENSAJERO_FACTURAS'].includes(user.rol);
+    const urlEditar = (typeof editarUrl !== 'undefined' ? editarUrl : null) || `/compras/ordenes/${orden.id}/editar`;
+    const urlPdf = (typeof pdfUrl !== 'undefined' ? pdfUrl : null) || `/compras/ordenes/${orden.id}/pdf`;
+    const mostrarPdf = typeof permitePdf !== 'undefined' ? permitePdf : !esMensajero;
+    const proveedorSeguro = proveedor || { nombre: orden.proveedor_nombre || '—' };
   %>
   <div class="page-heading">
     <div>
@@ -35,10 +39,10 @@
     </div>
     <div class="d-flex gap-2 flex-wrap">
       <% if (puedeModificarCompras) { %>
-        <a href="/compras/ordenes/<%= orden.id %>/editar" class="btn btn-outline-warning btn-sm"><i class="bi bi-pencil"></i> Editar</a>
+        <a href="<%= urlEditar %>" class="btn btn-outline-warning btn-sm"><i class="bi bi-pencil"></i> Editar</a>
       <% } %>
-      <% if (!esMensajero) { %>
-        <a href="/compras/ordenes/<%= orden.id %>/pdf" class="btn btn-primary btn-sm"><i class="bi bi-file-pdf"></i> PDF</a>
+      <% if (mostrarPdf) { %>
+        <a href="<%= urlPdf %>" class="btn btn-primary btn-sm"><i class="bi bi-file-pdf"></i> PDF</a>
       <% } %>
     </div>
   </div>
@@ -55,7 +59,7 @@
         </div>
         <div class="detail-item">
           <div class="detail-label">Proveedor</div>
-          <div class="detail-value"><%= proveedor.nombre %></div>
+          <div class="detail-value"><%= proveedorSeguro.nombre %></div>
         </div>
         <div class="detail-item">
           <div class="detail-label">Forma de pago</div>
