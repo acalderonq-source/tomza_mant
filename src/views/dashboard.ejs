@@ -230,6 +230,9 @@
   const safeStats = stats || {};
   const exec = ejecutivo || {};
   const mantenimientosHoy = Array.isArray(hoy) ? hoy : [];
+  const mostrarOficinaDiaDia = typeof puedeVerOficinaDiaDia !== 'undefined'
+    ? puedeVerOficinaDiaDia
+    : ['ADMIN', 'TALLER', 'PROVEEDURIA_TALLER'].includes(user.rol);
   const sedeActual = sedeSeleccionada || user.sede || 'TODAS';
   const sedes = user.rol === 'ADMIN'
     ? ['Cartago', 'Guapiles', 'La Cruz', 'Alajuela', 'San Carlos', 'Rio Claro', 'Perez Zeledon', 'Nicoya', 'Tecnicos', 'Taller', 'Transportadora', 'Granel']
@@ -382,6 +385,12 @@
           <span class="module-icon icon-dark"><i class="bi bi-circle"></i></span>
           <div><div class="module-title">Llantas</div><p class="module-copy">Solicitudes, compras y llegadas.</p></div>
         </a>
+        <% if (mostrarOficinaDiaDia) { %>
+          <a href="/oficina-dia-dia" class="module-card">
+            <span class="module-icon icon-blue"><i class="bi bi-person-workspace"></i></span>
+            <div><div class="module-title">Oficina día a día</div><p class="module-copy">Registro diario de tareas de oficina.</p></div>
+          </a>
+        <% } %>
         <a href="/dekra" class="module-card">
           <span class="module-icon icon-blue"><i class="bi bi-clipboard-check"></i></span>
           <div><div class="module-title">DEKRA</div><p class="module-copy">Revisión técnica y vencimientos.</p></div>

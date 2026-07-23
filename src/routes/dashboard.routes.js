@@ -13,6 +13,16 @@ async function safeQuery(sql, params = [], fallback = []) {
 }
 
 const SEDES_TRANSPORTE = ["Transportadora", "Granel"];
+const ROLES_OFICINA_DIA_DIA = ["ADMIN", "TALLER", "PROVEEDURIA_TALLER"];
+
+function fechaCostaRica(date = new Date()) {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Costa_Rica",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).format(date);
+}
 
 function expandirSedeFiltro(sede) {
   if (!sede) return [];
@@ -24,6 +34,10 @@ function etiquetaSede(sede) {
   if (!sede) return "TODAS";
   if (SEDES_TRANSPORTE.includes(sede)) return "Transportadora + Granel";
   return sede;
+}
+
+function puedeUsarOficinaDiaDia(user) {
+  return user && ROLES_OFICINA_DIA_DIA.includes(user.rol);
 }
 
 // =========================================================
@@ -49,7 +63,7 @@ router.get("/", async (req, res) => {
     // FECHA HOY
     // =========================
     const hoy = new Date();
-    const fechaHoy = hoy.toISOString().split("T")[0];
+    const fechaHoy = fechaCostaRica(hoy);
 
     // =========================
     // TRAER SEDES EXTRA
@@ -287,6 +301,8 @@ router.get("/", async (req, res) => {
       } : null
     ].filter(Boolean);
 
+    const puedeVerOficinaDiaDia = puedeUsarOficinaDiaDia(req.session.user);
+
     // =========================
     // RENDER (se pasan TODAS las variables que la vista pueda esperar)
     // =========================
@@ -302,7 +318,8 @@ router.get("/", async (req, res) => {
       citasProximas: [],
       ultimosTramites: [],
       ejecutivo,
-      alertasEjecutivas
+      alertasEjecutivas,
+      puedeVerOficinaDiaDia
     });
 
   } catch (error) {
