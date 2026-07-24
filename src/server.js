@@ -16,6 +16,28 @@ app.use(express.json({ limit: "10mb" }));
 // ✅ CORREGIDO: Apunta a la carpeta public en la raíz del proyecto
 app.use(express.static(path.join(__dirname, "..", "public")));
 
+app.get("/.well-known/assetlinks.json", (req, res) => {
+  const packageName = process.env.ANDROID_PACKAGE_NAME || "com.gastomza.taller";
+  const fingerprints = String(process.env.ANDROID_SHA256_CERT_FINGERPRINT || "")
+    .split(",")
+    .map(item => item.trim())
+    .filter(Boolean);
+
+  res.type("application/json");
+  if (!fingerprints.length) {
+    return res.json([]);
+  }
+
+  res.json([{
+    relation: ["delegate_permission/common.handle_all_urls"],
+    target: {
+      namespace: "android_app",
+      package_name: packageName,
+      sha256_cert_fingerprints: fingerprints
+    }
+  }]);
+});
+
 // ===================== SESSION =====================
 app.use(session({
   secret: "tomza_secret_key",

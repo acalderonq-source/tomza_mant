@@ -44,6 +44,7 @@
       <% } %>
 
       <form method="POST" action="/login" class="d-grid gap-3">
+        <input type="hidden" name="next" value="<%= typeof next !== 'undefined' ? next : '' %>">
         <div>
           <label class="form-label">Usuario</label>
           <input class="form-control" name="usuario" placeholder="Ingrese su usuario" autocomplete="username" required>

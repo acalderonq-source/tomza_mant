@@ -2,3 +2,9 @@ node_modules/
 src/.env 
 .env 
 .env.* 
+android/.gradle/
+android/local.properties
+android/app/build/
+android/build/
+*.jks
+*.keystore

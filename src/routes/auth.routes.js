@@ -8,7 +8,7 @@ const router = express.Router();
  * MOSTRAR LOGIN
  */
 router.get("/login", (req, res) => {
-  res.render("login", { error: null });
+  res.render("login", { error: null, next: req.query.next || "" });
 });
 
 /**
@@ -17,11 +17,13 @@ router.get("/login", (req, res) => {
 router.post("/login", async (req, res) => {
   try {
     const { usuario, password } = req.body;
+    const nextUrl = getSafeNextUrl(req.body.next);
 
     // Validación básica
     if (!usuario || !password) {
       return res.render("login", {
-        error: "Debe ingresar usuario y contraseña"
+        error: "Debe ingresar usuario y contraseña",
+        next: nextUrl
       });
     }
 
@@ -37,7 +39,8 @@ router.post("/login", async (req, res) => {
     // Usuario no existe
     if (rows.length === 0) {
       return res.render("login", {
-        error: "Usuario o contraseña incorrecta"
+        error: "Usuario o contraseña incorrecta",
+        next: nextUrl
       });
     }
 
@@ -53,7 +56,8 @@ router.post("/login", async (req, res) => {
 
     if (!match) {
       return res.render("login", {
-        error: "Usuario o contraseña incorrecta"
+        error: "Usuario o contraseña incorrecta",
+        next: nextUrl
       });
     }
 
@@ -66,14 +70,19 @@ router.post("/login", async (req, res) => {
       sede: user.sede
     };
 
-    // Todos los roles van al dashboard principal
-    res.redirect('/dashboard');
+    res.redirect(nextUrl || "/dashboard");
 
   } catch (error) {
     console.error("❌ ERROR LOGIN COMPLETO:", error);
     return res.status(500).send(error.message);
   }
 });
+
+function getSafeNextUrl(value) {
+  const nextUrl = String(value || "").trim();
+  if (!nextUrl || !nextUrl.startsWith("/") || nextUrl.startsWith("//")) return "";
+  return nextUrl;
+}
 
 /**
  * LOGOUT
