@@ -24,6 +24,7 @@
       background: var(--bg);
       color: var(--ink);
       font-family: "Segoe UI", Roboto, Arial, sans-serif;
+      font-size: .92rem;
     }
 
     .topbar {
@@ -44,18 +45,18 @@
     }
 
     .shell {
-      max-width: 1180px;
+      max-width: 1540px;
     }
 
     .simple-hero {
       background: var(--card);
       border: 1px solid var(--line);
       border-radius: 10px;
-      padding: 1rem;
+      padding: .7rem .85rem;
     }
 
     .page-title {
-      font-size: 1.45rem;
+      font-size: 1.2rem;
       font-weight: 900;
       margin: 0;
     }
@@ -66,9 +67,9 @@
     }
 
     .section-title {
-      font-size: 1rem;
+      font-size: .9rem;
       font-weight: 900;
-      margin: 0 0 .65rem;
+      margin: 0 0 .45rem;
     }
 
     .sede-selector {
@@ -85,7 +86,7 @@
 
     .summary-grid {
       display: grid;
-      gap: .75rem;
+      gap: .55rem;
       grid-template-columns: repeat(4, minmax(0, 1fr));
     }
 
@@ -98,41 +99,41 @@
     }
 
     .summary-card {
-      padding: .85rem;
+      padding: .65rem .75rem;
     }
 
     .summary-label {
       color: var(--muted);
-      font-size: .75rem;
+      font-size: .68rem;
       font-weight: 800;
       text-transform: uppercase;
     }
 
     .summary-value {
-      font-size: 1.7rem;
+      font-size: 1.35rem;
       font-weight: 900;
       line-height: 1.1;
-      margin-top: .25rem;
+      margin-top: .1rem;
     }
 
     .summary-foot {
       color: var(--muted);
-      font-size: .82rem;
-      margin-top: .25rem;
+      font-size: .74rem;
+      margin-top: .15rem;
     }
 
     .module-grid {
       display: grid;
-      gap: .8rem;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: .55rem;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
     }
 
     .module-card {
       color: var(--ink);
       display: flex;
-      gap: .8rem;
-      min-height: 92px;
-      padding: 1rem;
+      gap: .55rem;
+      min-height: 66px;
+      padding: .65rem;
       text-decoration: none;
       transition: border-color .12s ease, transform .12s ease;
     }
@@ -147,11 +148,11 @@
       align-items: center;
       border-radius: 10px;
       display: inline-flex;
-      flex: 0 0 42px;
-      font-size: 1.25rem;
-      height: 42px;
+      flex: 0 0 34px;
+      font-size: 1rem;
+      height: 34px;
       justify-content: center;
-      width: 42px;
+      width: 34px;
     }
 
     .icon-blue { background: #dbeafe; color: #1d4ed8; }
@@ -161,30 +162,86 @@
     .icon-dark { background: #e5e7eb; color: #111827; }
 
     .module-title {
+      font-size: .9rem;
       font-weight: 900;
     }
 
     .module-copy {
       color: var(--muted);
-      font-size: .84rem;
+      font-size: .74rem;
+      line-height: 1.2;
       margin: .1rem 0 0;
+    }
+
+    .top-info-grid {
+      display: grid;
+      gap: .65rem;
+      grid-template-columns: minmax(0, 1.15fr) minmax(0, .85fr);
+    }
+
+    .priority-panel,
+    .alerts-panel {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      min-height: 100%;
+      padding: .75rem;
+    }
+
+    .priority-list {
+      display: grid;
+      gap: .45rem;
+      max-height: 245px;
+      overflow: auto;
+      padding-right: .15rem;
+    }
+
+    .priority-item {
+      align-items: start;
+      background: #fff7ed;
+      border: 1px solid #fed7aa;
+      border-left: 5px solid var(--red);
+      border-radius: 9px;
+      display: grid;
+      gap: .4rem;
+      grid-template-columns: 110px minmax(0, 1fr) auto;
+      padding: .5rem .6rem;
+    }
+
+    .priority-plate {
+      color: #111827;
+      font-size: .95rem;
+      font-weight: 900;
+      line-height: 1.1;
+    }
+
+    .priority-note {
+      color: #1f2937;
+      font-size: .82rem;
+      line-height: 1.25;
+    }
+
+    .priority-meta {
+      color: var(--muted);
+      font-size: .7rem;
+      white-space: nowrap;
     }
 
     .alert-list {
       display: grid;
-      gap: .6rem;
+      gap: .45rem;
     }
 
     .alert-item {
       align-items: center;
       background: #fff;
       border: 1px solid var(--line);
-      border-left: 5px solid var(--blue);
+      border-left: 4px solid var(--blue);
       border-radius: 10px;
       display: flex;
-      gap: .8rem;
+      gap: .6rem;
       justify-content: space-between;
-      padding: .75rem;
+      padding: .5rem .6rem;
     }
 
     .alert-item.danger { border-left-color: var(--red); }
@@ -194,33 +251,48 @@
     .table thead th {
       background: #f8fafc;
       color: #475569;
-      font-size: .75rem;
+      font-size: .68rem;
       font-weight: 900;
       text-transform: uppercase;
+    }
+
+    .table-sm {
+      font-size: .82rem;
     }
 
     .empty-state {
       color: var(--muted);
       font-weight: 700;
-      padding: 1.4rem;
+      padding: .8rem;
       text-align: center;
+    }
+
+    @media (max-width: 1180px) {
+      .module-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
     }
 
     @media (max-width: 960px) {
       .summary-grid,
-      .module-grid {
+      .module-grid,
+      .top-info-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
       }
     }
 
     @media (max-width: 620px) {
       .summary-grid,
-      .module-grid {
+      .module-grid,
+      .top-info-grid {
         grid-template-columns: 1fr;
       }
       .alert-item {
         align-items: flex-start;
         flex-direction: column;
+      }
+      .priority-item {
+        grid-template-columns: 1fr;
       }
     }
   </style>
@@ -247,6 +319,7 @@
   const puedeVerGiras = ['ADMIN', 'TALLER', 'MECANICO', 'SUPERVISOR', 'SUPERVISOR_PESADO'].includes(user.rol);
   const puedeVerDashboardTaller = ['ADMIN', 'TALLER', 'MECANICO', 'SUPERVISOR', 'SUPERVISOR_PESADO'].includes(user.rol);
   const puedeVerOrdenesMotor = ['ADMIN', 'TALLER', 'PROVEEDURIA_TALLER'].includes(user.rol);
+  const prioridadesLista = Array.isArray(prioridadesTaller) ? prioridadesTaller : [];
   const llantasEnProceso = Number(exec.llantasSolicitadas || 0) + Number(exec.llantasCotizadas || 0) + Number(exec.llantasCompradas || 0);
   const unidadesActivas = Number(exec.unidadesActivas ?? exec.unidades ?? 0);
   const unidadesVaradas = Number(exec.unidadesVaradas || 0);
@@ -260,6 +333,11 @@
     unidadesVaradas > 0 ? { cls: 'danger', titulo: 'Unidades varadas', detalle: `${unidadesVaradas} unidad${unidadesVaradas === 1 ? '' : 'es'} marcada como varada.`, url: '/unidades?varado=1' } : null,
     Number(exec.llantasCompradas || 0) > 0 ? { cls: 'warn', titulo: 'Llantas compradas sin recibir', detalle: `${exec.llantasCompradas} solicitud${Number(exec.llantasCompradas) === 1 ? '' : 'es'} pendiente de llegada.`, url: '/llantas' } : null
   ].filter(Boolean);
+  const fechaHoraCorta = (value) => {
+    if (!value) return '-';
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? '-' : date.toLocaleTimeString('es-CR', { hour: '2-digit', minute: '2-digit' });
+  };
 %>
 
 <nav class="navbar navbar-dark topbar px-3 py-2">
@@ -270,8 +348,8 @@
   </div>
 </nav>
 
-<main class="container-fluid shell py-4">
-  <section class="simple-hero mb-3">
+<main class="container-fluid shell py-3">
+  <section class="simple-hero mb-2">
     <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
       <div>
         <h1 class="page-title">Inicio</h1>
@@ -282,7 +360,7 @@
   </section>
 
   <% if ((user.rol === 'ADMIN' || sedes.length > 1) && sedes.length) { %>
-    <section class="plain-card p-3 mb-3">
+    <section class="plain-card p-2 mb-2">
       <h2 class="section-title">Cambiar sede</h2>
       <div class="sede-selector">
         <% sedes.forEach(sede => { %>
@@ -299,7 +377,7 @@
     </section>
   <% } %>
 
-  <section class="summary-grid mb-3">
+  <section class="summary-grid mb-2">
     <div class="summary-card">
       <div class="summary-label">Mantenimientos</div>
       <div class="summary-value"><%= mantenimientosPendientes %></div>
@@ -322,31 +400,58 @@
     </div>
   </section>
 
-  <section class="mb-3">
-    <h2 class="section-title">Alertas</h2>
-    <div class="alert-list">
-      <% if (!alertas.length) { %>
-        <div class="alert-item ok">
-          <div>
-            <div class="fw-bold">Todo se ve estable</div>
-            <div class="small-muted">No hay alertas críticas para esta sede.</div>
-          </div>
-          <a href="/mantenimientos" class="btn btn-sm btn-outline-dark">Revisar</a>
+  <% if (puedeVerOperaciones) { %>
+    <section class="top-info-grid mb-2">
+      <div class="priority-panel">
+        <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap mb-2">
+          <h2 class="section-title mb-0"><i class="bi bi-exclamation-octagon text-danger"></i> Prioridades de taller</h2>
+          <a href="/taller/dashboard" class="btn btn-sm btn-outline-dark py-0">Abrir panel</a>
         </div>
-      <% } %>
-      <% alertas.forEach(a => { %>
-        <div class="alert-item <%= a.cls %>">
-          <div>
-            <div class="fw-bold"><%= a.titulo %></div>
-            <div class="small-muted"><%= a.detalle %></div>
+        <% if (!prioridadesLista.length) { %>
+          <div class="empty-state">No hay prioridades pendientes de hoy.</div>
+        <% } else { %>
+          <div class="priority-list">
+            <% prioridadesLista.forEach(p => { %>
+              <div class="priority-item">
+                <div>
+                  <div class="priority-plate"><%= p.placa %></div>
+                  <div class="small-muted"><%= p.sede || 'Sin sede' %></div>
+                </div>
+                <div class="priority-note"><%= p.observacion %></div>
+                <div class="priority-meta"><%= fechaHoraCorta(p.creado_en) %><br><%= p.creado_por_nombre || 'Taller' %></div>
+              </div>
+            <% }) %>
           </div>
-          <a href="<%= a.url %>" class="btn btn-sm btn-dark">Abrir</a>
-        </div>
-      <% }) %>
-    </div>
-  </section>
+        <% } %>
+      </div>
 
-  <section class="mb-3">
+      <div class="alerts-panel">
+        <h2 class="section-title">Alertas</h2>
+        <div class="alert-list">
+          <% if (!alertas.length) { %>
+            <div class="alert-item ok">
+              <div>
+                <div class="fw-bold">Todo se ve estable</div>
+                <div class="small-muted">No hay alertas críticas.</div>
+              </div>
+              <a href="/mantenimientos" class="btn btn-sm btn-outline-dark">Revisar</a>
+            </div>
+          <% } %>
+          <% alertas.forEach(a => { %>
+            <div class="alert-item <%= a.cls %>">
+              <div>
+                <div class="fw-bold"><%= a.titulo %></div>
+                <div class="small-muted"><%= a.detalle %></div>
+              </div>
+              <a href="<%= a.url %>" class="btn btn-sm btn-dark">Abrir</a>
+            </div>
+          <% }) %>
+        </div>
+      </div>
+    </section>
+  <% } %>
+
+  <section class="mb-2">
     <h2 class="section-title">Módulos</h2>
     <div class="module-grid">
       <% if (puedeVerOperaciones) { %>

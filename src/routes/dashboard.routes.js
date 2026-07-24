@@ -301,6 +301,28 @@ router.get("/", async (req, res) => {
       } : null
     ].filter(Boolean);
 
+    let prioridadesSql = `
+      SELECT
+        tp.id,
+        tp.placa,
+        tp.sede,
+        tp.observacion,
+        tp.creado_en,
+        u.usuario AS creado_por_nombre
+      FROM taller_prioridades tp
+      LEFT JOIN usuarios u ON u.id = tp.creado_por
+      WHERE tp.estado = 'PENDIENTE'
+        AND DATE(tp.creado_en) = ?
+    `;
+    const prioridadesParams = [fechaHoy];
+    if (sedesFiltro.length) {
+      prioridadesSql += " AND (tp.sede IN (?) OR tp.sede IS NULL OR tp.sede = '')";
+      prioridadesParams.push(sedesFiltro);
+    }
+    prioridadesSql += " ORDER BY tp.creado_en DESC, tp.id DESC LIMIT 8";
+
+    const prioridadesTaller = await safeQuery(prioridadesSql, prioridadesParams, []);
+
     const puedeVerOficinaDiaDia = puedeUsarOficinaDiaDia(req.session.user);
 
     // =========================
@@ -319,6 +341,7 @@ router.get("/", async (req, res) => {
       ultimosTramites: [],
       ejecutivo,
       alertasEjecutivas,
+      prioridadesTaller,
       puedeVerOficinaDiaDia
     });
 
