@@ -1364,6 +1364,142 @@ router.get("/facturas", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_
   }
 });
 
+router.get("/facturas/dashboard", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER", "CONTABILIDAD"), async (req, res) => {
+  try {
+    await ensureFacturaRecepcionColumns();
+    await ensureNotaCreditoColumns();
+    await ensureAbonoColumns();
+
+    const { proveedor_id, fecha_desde, fecha_hasta, pagada, vencida } = req.query;
+    const orden = req.query.orden === "asc" ? "asc" : "desc";
+    const filtros = { proveedor_id, fecha_desde, fecha_hasta, pagada, vencida, orden };
+    const facturas = await obtenerFacturasCompras(filtros);
+    const [proveedores] = await queryWithRetry("SELECT id, nombre FROM proveedores ORDER BY nombre");
+
+    const resumen = facturas.reduce((acc, factura) => {
+      const montoOriginal = parseMonto(factura.monto_original ?? factura.monto);
+      const notaCredito = parseMonto(factura.nota_credito_monto);
+      const abono = parseMonto(factura.abono_monto);
+      const saldo = factura.pagada || factura.cubierta_por_nc ? 0 : parseMonto(factura.saldo ?? factura.monto);
+
+      acc.totalFacturas += 1;
+      acc.montoOriginal += montoOriginal;
+      acc.notasCredito += notaCredito;
+      acc.abonos += abono;
+      acc.saldo += saldo;
+
+      if (factura.pagada || factura.cubierta_por_nc) acc.pagadas += 1;
+      else acc.pendientes += 1;
+      if (factura.vencida) acc.vencidas += 1;
+      if (notaCredito > 0) acc.conNotaCredito += 1;
+      if (abono > 0) acc.conAbono += 1;
+
+      return acc;
+    }, {
+      totalFacturas: 0,
+      pagadas: 0,
+      pendientes: 0,
+      vencidas: 0,
+      conNotaCredito: 0,
+      conAbono: 0,
+      montoOriginal: 0,
+      notasCredito: 0,
+      abonos: 0,
+      saldo: 0
+    });
+
+    const porProveedorMap = new Map();
+    const porMesMap = new Map();
+    const porEstadoMap = new Map([
+      ["Pagadas", { estado: "Pagadas", cantidad: 0, monto: 0 }],
+      ["Pendientes", { estado: "Pendientes", cantidad: 0, monto: 0 }],
+      ["Vencidas", { estado: "Vencidas", cantidad: 0, monto: 0 }],
+      ["Con NC", { estado: "Con NC", cantidad: 0, monto: 0 }],
+      ["Con abono", { estado: "Con abono", cantidad: 0, monto: 0 }]
+    ]);
+
+    facturas.forEach(factura => {
+      const proveedor = factura.proveedor_nombre || "Sin proveedor";
+      const montoOriginal = parseMonto(factura.monto_original ?? factura.monto);
+      const saldo = factura.pagada || factura.cubierta_por_nc ? 0 : parseMonto(factura.saldo ?? factura.monto);
+      const notaCredito = parseMonto(factura.nota_credito_monto);
+      const abono = parseMonto(factura.abono_monto);
+
+      if (!porProveedorMap.has(proveedor)) {
+        porProveedorMap.set(proveedor, {
+          proveedor,
+          facturas: 0,
+          pagadas: 0,
+          pendientes: 0,
+          vencidas: 0,
+          montoOriginal: 0,
+          saldo: 0
+        });
+      }
+      const grupoProveedor = porProveedorMap.get(proveedor);
+      grupoProveedor.facturas += 1;
+      grupoProveedor.montoOriginal += montoOriginal;
+      grupoProveedor.saldo += saldo;
+      if (factura.pagada || factura.cubierta_por_nc) grupoProveedor.pagadas += 1;
+      else grupoProveedor.pendientes += 1;
+      if (factura.vencida) grupoProveedor.vencidas += 1;
+
+      const fecha = factura.fecha ? new Date(factura.fecha) : null;
+      const mes = fecha && !Number.isNaN(fecha.getTime())
+        ? `${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, "0")}`
+        : "Sin fecha";
+      if (!porMesMap.has(mes)) {
+        porMesMap.set(mes, { mes, facturas: 0, montoOriginal: 0, saldo: 0 });
+      }
+      const grupoMes = porMesMap.get(mes);
+      grupoMes.facturas += 1;
+      grupoMes.montoOriginal += montoOriginal;
+      grupoMes.saldo += saldo;
+
+      if (factura.pagada || factura.cubierta_por_nc) {
+        porEstadoMap.get("Pagadas").cantidad += 1;
+        porEstadoMap.get("Pagadas").monto += montoOriginal;
+      } else {
+        porEstadoMap.get("Pendientes").cantidad += 1;
+        porEstadoMap.get("Pendientes").monto += saldo;
+      }
+      if (factura.vencida) {
+        porEstadoMap.get("Vencidas").cantidad += 1;
+        porEstadoMap.get("Vencidas").monto += saldo;
+      }
+      if (notaCredito > 0) {
+        porEstadoMap.get("Con NC").cantidad += 1;
+        porEstadoMap.get("Con NC").monto += notaCredito;
+      }
+      if (abono > 0) {
+        porEstadoMap.get("Con abono").cantidad += 1;
+        porEstadoMap.get("Con abono").monto += abono;
+      }
+    });
+
+    const porProveedor = Array.from(porProveedorMap.values())
+      .sort((a, b) => b.saldo - a.saldo || b.montoOriginal - a.montoOriginal)
+      .slice(0, 15);
+    const porMes = Array.from(porMesMap.values()).sort((a, b) => a.mes.localeCompare(b.mes, "es"));
+    const porEstado = Array.from(porEstadoMap.values()).filter(item => item.cantidad > 0);
+    const facturasRecientes = facturas.slice(0, 12);
+
+    res.render("compras/dashboard_facturas", {
+      user: req.session.user,
+      proveedores,
+      filtros,
+      resumen,
+      porProveedor,
+      porMes,
+      porEstado,
+      facturasRecientes
+    });
+  } catch (error) {
+    console.error("Error en dashboard de facturas:", error);
+    res.status(500).send("Error cargando dashboard de facturas");
+  }
+});
+
 router.get("/facturas/reporte/pdf", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER", "CONTABILIDAD"), async (req, res) => {
   try {
     await ensureFacturaRecepcionColumns();
