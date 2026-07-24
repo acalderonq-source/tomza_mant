@@ -26,7 +26,7 @@
         linear-gradient(135deg, #eef4fb 0%, #dce7f6 100%);
       color: var(--ink);
       font-family: "Segoe UI", Roboto, Arial, sans-serif;
-      font-size: .78rem;
+      font-size: .95rem;
       overflow: hidden;
     }
     .topbar {
@@ -72,15 +72,15 @@
       box-shadow: 0 14px 28px rgba(16, 33, 63, .08);
     }
     .hero { display: none; padding: .35rem .5rem; }
-    .page-title { font-size: .82rem; font-weight: 900; margin: 0; }
+    .page-title { font-size: 1rem; font-weight: 900; margin: 0; }
     .muted { color: var(--muted); }
-    .kpi-grid { display: grid; gap: .35rem; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .kpi-grid { display: grid; gap: .45rem; grid-template-columns: repeat(4, minmax(0, 1fr)); }
     .kpi-card {
       align-items: center;
       display: flex;
       gap: .55rem;
-      min-height: 42px;
-      padding: .36rem .5rem;
+      min-height: 50px;
+      padding: .42rem .55rem;
     }
     .kpi-icon {
       align-items: center;
@@ -88,17 +88,17 @@
       border-radius: 50%;
       color: #fff;
       display: inline-flex;
-      flex: 0 0 28px;
-      font-size: .85rem;
-      height: 28px;
+      flex: 0 0 34px;
+      font-size: 1rem;
+      height: 34px;
       justify-content: center;
-      width: 28px;
+      width: 34px;
     }
     .kpi-card.danger .kpi-icon { background: linear-gradient(145deg, #991b1b, #e2232a); }
     .kpi-card.ok .kpi-icon { background: linear-gradient(145deg, #166534, #16a34a); }
     .kpi-card.warn .kpi-icon { background: linear-gradient(145deg, #92400e, #ffd400); color: #10213f; }
-    .kpi-label { color: var(--ink); font-size: .63rem; font-weight: 850; }
-    .kpi-value { color: #07183d; font-size: 1.05rem; font-weight: 950; line-height: 1; }
+    .kpi-label { color: var(--ink); font-size: .72rem; font-weight: 850; }
+    .kpi-value { color: #07183d; font-size: 1.28rem; font-weight: 950; line-height: 1; }
     .section-title { font-size: .85rem; font-weight: 900; margin: 0; }
     .latest-strip { display: grid; gap: .7rem; grid-template-columns: repeat(4, minmax(0, 1fr)); }
     .latest-card {
@@ -128,7 +128,7 @@
       margin-top: .55rem;
       padding: .45rem;
     }
-    .dashboard-layout { display: grid; gap: .45rem; grid-template-columns: minmax(0, .95fr) minmax(0, 1.25fr); align-items: start; }
+    .dashboard-layout { display: grid; gap: .75rem; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; }
     .left-stack { display: grid; gap: .45rem; }
     .board-grid { display: grid; gap: .5rem; grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .unit-card { border-left: 4px solid var(--green); overflow: hidden; }
@@ -155,23 +155,23 @@
       background: linear-gradient(90deg, #07358f, #061638);
       border-radius: 8px 8px 0 0;
       color: #fff;
-      font-size: .86rem;
+      font-size: 1.15rem;
       font-weight: 950;
-      padding: .45rem .65rem;
+      padding: .7rem .85rem;
     }
     .tv-table { margin: 0; }
     .tv-table thead th {
       background: #08275e;
       color: #fff;
-      font-size: .65rem;
+      font-size: .85rem;
       font-weight: 900;
       text-transform: uppercase;
     }
     .tv-table td {
       color: #172b4d;
-      font-size: .76rem;
-      line-height: 1.2;
-      padding: .34rem .42rem;
+      font-size: 1rem;
+      line-height: 1.25;
+      padding: .58rem .65rem;
       vertical-align: middle;
     }
     .status-dot {
@@ -197,9 +197,9 @@
     .work-type {
       border-radius: 999px;
       flex: 0 0 auto;
-      font-size: .58rem;
+      font-size: .72rem;
       font-weight: 950;
-      padding: .16rem .32rem;
+      padding: .22rem .42rem;
       text-transform: uppercase;
     }
     .work-type.correctivo { background: #fee2e2; color: #991b1b; }
@@ -217,8 +217,8 @@
     }
     .priority-note {
       color: #991b1b;
-      font-size: .82rem;
-      line-height: 1.15;
+      font-size: 1.08rem;
+      line-height: 1.25;
       font-weight: 900;
     }
     .priority-badge {
@@ -226,45 +226,27 @@
       border-radius: 999px;
       color: #991b1b;
       display: inline-block;
-      font-size: .62rem;
+      font-size: .78rem;
       font-weight: 900;
       padding: .2rem .38rem;
       text-transform: uppercase;
     }
     .priority-panel .tv-panel-title {
-      font-size: .98rem;
-      padding: .52rem .65rem;
+      font-size: 1.25rem;
+      padding: .72rem .85rem;
     }
     .priority-panel .tv-table thead th {
-      font-size: .68rem;
+      font-size: .85rem;
     }
     .priority-panel .tv-table td {
-      font-size: .78rem;
-      padding: .36rem .42rem;
+      font-size: 1rem;
+      padding: .58rem .65rem;
     }
     .priority-plate {
-      font-size: .9rem;
+      font-size: 1.18rem;
       font-weight: 950;
     }
-    .compact-panel-body { max-height: 172px; overflow: auto; }
-    .units-panel-body { max-height: calc(100vh - 108px); overflow: auto; padding: .45rem; }
-    .screen-controls {
-      align-items: end;
-      background: var(--card);
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      display: grid;
-      gap: .5rem;
-      grid-template-columns: 1.1fr 1fr auto auto;
-      padding: .55rem;
-    }
-    .screen-controls .form-control,
-    .screen-controls .form-select,
-    .screen-controls .btn {
-      font-size: .78rem;
-      min-height: 32px;
-      padding: .25rem .45rem;
-    }
+    .compact-panel-body { max-height: calc(100vh - 185px); overflow: auto; }
     @media (max-width: 1180px) {
       .kpi-grid,
       .board-grid,
@@ -272,7 +254,7 @@
       .latest-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     }
     @media (max-width: 720px) {
-      .kpi-grid, .board-grid, .latest-strip, .dashboard-layout, .screen-controls { grid-template-columns: 1fr; }
+      .kpi-grid, .board-grid, .latest-strip, .dashboard-layout { grid-template-columns: 1fr; }
       .topbar { background: linear-gradient(135deg, #061638, #07358f); }
       .topbar .btn { width: 100%; }
       .brand-logo { width: 145px; }
@@ -345,8 +327,38 @@
     </div>
   </section>
 
+  <section class="kpi-grid mb-2">
+    <div class="kpi-card">
+      <span class="kpi-icon"><i class="bi bi-tools"></i></span>
+      <div>
+        <div class="kpi-label">Trabajos</div>
+        <div class="kpi-value"><%= ultimos.length %></div>
+      </div>
+    </div>
+    <div class="kpi-card danger">
+      <span class="kpi-icon"><i class="bi bi-gear"></i></span>
+      <div>
+        <div class="kpi-label">En proceso</div>
+        <div class="kpi-value"><%= resumen.enTaller %></div>
+      </div>
+    </div>
+    <div class="kpi-card ok">
+      <span class="kpi-icon"><i class="bi bi-car-front"></i></span>
+      <div>
+        <div class="kpi-label">Listas</div>
+        <div class="kpi-value"><%= resumen.disponibles %></div>
+      </div>
+    </div>
+    <div class="kpi-card warn">
+      <span class="kpi-icon"><i class="bi bi-clipboard2-pulse"></i></span>
+      <div>
+        <div class="kpi-label">Preventivos</div>
+        <div class="kpi-value"><%= preventivosAbiertos %></div>
+      </div>
+    </div>
+  </section>
+
   <section class="dashboard-layout">
-    <div class="left-stack">
       <section class="panel priority-panel">
         <div class="tv-panel-title priority-title d-flex justify-content-between align-items-center gap-2 flex-wrap">
           <span><i class="bi bi-exclamation-octagon me-1"></i> Prioridades</span>
@@ -405,39 +417,6 @@
             </table>
           </div>
         <% } %>
-      </section>
-
-      <section class="kpi-grid">
-        <div class="kpi-card">
-          <span class="kpi-icon"><i class="bi bi-tools"></i></span>
-          <div>
-            <div class="kpi-label">Trabajos</div>
-            <div class="kpi-value"><%= ultimos.length %></div>
-          </div>
-        </div>
-        <div class="kpi-card danger">
-          <span class="kpi-icon"><i class="bi bi-gear"></i></span>
-          <div>
-            <div class="kpi-label">En proceso</div>
-            <div class="kpi-value"><%= resumen.enTaller %></div>
-          </div>
-        </div>
-        <div class="kpi-card ok">
-          <span class="kpi-icon"><i class="bi bi-car-front"></i></span>
-          <div>
-            <div class="kpi-label">Listas</div>
-            <div class="kpi-value"><%= resumen.disponibles %></div>
-          </div>
-        </div>
-        <div class="kpi-card warn">
-          <span class="kpi-icon"><i class="bi bi-clipboard2-pulse"></i></span>
-          <div>
-            <div class="kpi-label">Preventivos</div>
-            <div class="kpi-value"><%= preventivosAbiertos %></div>
-          </div>
-        </div>
-      </section>
-
       <section class="panel">
         <div class="tv-panel-title d-flex justify-content-between align-items-center gap-2 flex-wrap">
           <span>Trabajos recientes</span>
@@ -493,103 +472,6 @@
           </div>
         <% } %>
       </section>
-    </div>
-
-    <section class="panel">
-      <div class="tv-panel-title d-flex justify-content-between align-items-center gap-2 flex-wrap">
-        <span>Unidades</span>
-        <span class="badge text-bg-light text-dark"><%= lista.length %> visibles</span>
-      </div>
-
-      <form method="GET" action="/taller/dashboard" class="screen-controls">
-        <div>
-          <label class="filter-label">Placa</label>
-          <input type="text" name="placa" class="form-control" value="<%= filtros.placa || '' %>" placeholder="Buscar placa">
-        </div>
-        <div>
-          <label class="filter-label">Vista</label>
-          <select name="estado" class="form-select">
-            <option value="taller" <%= filtros.estado === 'taller' ? 'selected' : '' %>>Solo en taller</option>
-            <option value="todas" <%= filtros.estado === 'todas' ? 'selected' : '' %>>Todas las activas</option>
-            <option value="disponibles" <%= filtros.estado === 'disponibles' ? 'selected' : '' %>>Solo disponibles</option>
-          </select>
-        </div>
-        <button class="btn btn-dark"><i class="bi bi-funnel"></i></button>
-        <a href="/taller/dashboard" class="btn btn-secondary">Limpiar</a>
-      </form>
-
-      <div class="units-panel-body">
-        <div class="board-grid">
-          <% if (!lista.length) { %>
-            <div class="panel empty-state">
-              No hay unidades para mostrar con este filtro.
-            </div>
-          <% } %>
-
-          <% lista.forEach(u => { %>
-            <% const enTaller = Number(u.varada) === 1; %>
-            <article class="unit-card <%= enTaller ? 'in-shop' : '' %>">
-              <div class="unit-head">
-                <div>
-                  <div class="plate"><%= u.placa %></div>
-                  <div class="muted"><%= u.sede || 'Sin sede' %></div>
-                </div>
-                <% if (enTaller) { %>
-                  <span class="badge-soft badge-shop">EN TALLER</span>
-                <% } else { %>
-                  <span class="badge-soft badge-ready">LISTA</span>
-                <% } %>
-              </div>
-
-              <div class="unit-body">
-                <div class="info-box">
-                  <div class="info-label">Motivo actual</div>
-                  <div class="info-value <%= enTaller ? 'text-danger' : 'text-muted' %>"><%= u.razon_varada || (enTaller ? 'En taller sin detalle' : '—') %></div>
-                </div>
-
-                <div class="info-box">
-                  <div class="info-label">Último trabajo</div>
-                  <div class="info-value"><%= u.ultimo_trabajo || '—' %></div>
-                </div>
-
-                <div class="info-box">
-                  <div class="info-label">Pendiente</div>
-                  <div class="info-value"><%= u.ultimo_pendiente || '—' %></div>
-                </div>
-
-                <div class="info-box">
-                  <div class="info-label">Preventivo</div>
-                  <div class="info-value"><%= u.preventivo_plan || '—' %></div>
-                </div>
-              </div>
-
-              <% if (puedeAccionar) { %>
-                <div class="actions">
-                  <% if (enTaller) { %>
-                    <form method="POST" action="/taller/unidades/<%= u.id %>/estado">
-                      <input type="hidden" name="varada" value="0">
-                      <button class="btn btn-success w-100" onclick="return confirm('¿Marcar <%= u.placa %> como lista para ruta?')">
-                        <i class="bi bi-check-circle"></i> Lista
-                      </button>
-                    </form>
-                  <% } else { %>
-                    <form method="POST" action="/taller/unidades/<%= u.id %>/estado">
-                      <input type="hidden" name="varada" value="1">
-                      <div class="d-flex gap-2 align-items-center">
-                        <input type="text" name="razon_varada" class="form-control" placeholder="Motivo" required>
-                        <button class="btn btn-danger">
-                          <i class="bi bi-tools"></i>
-                        </button>
-                      </div>
-                    </form>
-                  <% } %>
-                </div>
-              <% } %>
-            </article>
-          <% }) %>
-        </div>
-      </div>
-    </section>
   </section>
 </main>
 
