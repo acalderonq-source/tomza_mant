@@ -433,22 +433,22 @@
                             <i class="bi bi-check-circle"></i> Marcar recibido
                           </button>
                         </form>
-
-                        <form method="POST" action="/compras/ordenes/<%= orden.id %>/eliminar">
-                          <input type="hidden" name="proveedor_id" value="<%= proveedor_id %>">
-                          <input type="hidden" name="fecha_desde" value="<%= fecha_desde %>">
-                          <input type="hidden" name="fecha_hasta" value="<%= fecha_hasta %>">
-                          <input type="hidden" name="po_numero" value="<%= po_numero %>">
-                          <input type="hidden" name="placa_unidad" value="<%= placa_unidad %>">
-                          <input type="hidden" name="estado" value="<%= estado %>">
-                          <input type="hidden" name="facturada" value="<%= facturada %>">
-                          <button type="submit" class="dropdown-item text-danger" onclick="return confirm('¿Eliminar esta orden permanentemente?')">
-                            <i class="bi bi-trash"></i> Eliminar orden
-                          </button>
-                        </form>
                       <% } else { %>
                         <div class="px-2 py-1"><span class="badge bg-success">Recibido</span></div>
                       <% } %>
+
+                      <form method="POST" action="/compras/ordenes/<%= orden.id %>/eliminar">
+                        <input type="hidden" name="proveedor_id" value="<%= proveedor_id %>">
+                        <input type="hidden" name="fecha_desde" value="<%= fecha_desde %>">
+                        <input type="hidden" name="fecha_hasta" value="<%= fecha_hasta %>">
+                        <input type="hidden" name="po_numero" value="<%= po_numero %>">
+                        <input type="hidden" name="placa_unidad" value="<%= placa_unidad %>">
+                        <input type="hidden" name="estado" value="<%= estado %>">
+                        <input type="hidden" name="facturada" value="<%= facturada %>">
+                        <button type="submit" class="dropdown-item text-danger" onclick="return confirm('¿Eliminar esta orden permanentemente? Si tiene factura ligada también se quitará de compras.')">
+                          <i class="bi bi-trash"></i> Eliminar orden
+                        </button>
+                      </form>
                     <% } %>
                   </div>
                 </div>
