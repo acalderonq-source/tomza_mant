@@ -13,8 +13,23 @@ const {
   normalizarPrioridad
 } = require("../utils/repuestosSolicitudes");
 
-const ROLES_VER_REPUESTOS = ["ADMIN", "TALLER", "PROVEEDURIA_TALLER"];
-const ROLES_GESTION_REPUESTOS = ["ADMIN", "PROVEEDURIA_TALLER"];
+const ROLES_PROVEEDURIA = ["PROVEEDURIA_TALLER", "PROVEEDURIA"];
+const ROLES_VER_REPUESTOS = ["ADMIN", "TALLER", ...ROLES_PROVEEDURIA];
+const ROLES_GESTION_REPUESTOS = ["ADMIN", ...ROLES_PROVEEDURIA];
+const TODAS_SEDES = [
+  "Cartago",
+  "Guapiles",
+  "La Cruz",
+  "Transportadora",
+  "Granel",
+  "Alajuela",
+  "Tecnicos",
+  "Taller",
+  "San Carlos",
+  "Rio Claro",
+  "Perez Zeledon",
+  "Nicoya"
+];
 
 function requireAuth(req, res, next) {
   if (!req.session.user) return res.redirect("/login");
@@ -56,6 +71,10 @@ function redirectConFiltros(req, res) {
 }
 
 function sedesDisponibles(req) {
+  if (req.session.user.rol === "ADMIN" || ROLES_PROVEEDURIA.includes(req.session.user.rol)) {
+    return TODAS_SEDES;
+  }
+
   const sedes = getSedesPermitidas(req);
   return [...new Set(sedes.filter(Boolean))];
 }

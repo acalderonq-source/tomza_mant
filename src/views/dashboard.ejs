@@ -319,7 +319,7 @@
   const puedeVerGiras = ['ADMIN', 'TALLER', 'MECANICO', 'SUPERVISOR', 'SUPERVISOR_PESADO'].includes(user.rol);
   const puedeVerDashboardTaller = ['ADMIN', 'TALLER', 'MECANICO', 'SUPERVISOR', 'SUPERVISOR_PESADO'].includes(user.rol);
   const puedeVerOrdenesMotor = ['ADMIN', 'TALLER', 'PROVEEDURIA_TALLER'].includes(user.rol);
-  const puedeVerRepuestos = ['ADMIN', 'TALLER', 'PROVEEDURIA_TALLER'].includes(user.rol);
+  const puedeVerRepuestos = ['ADMIN', 'TALLER', 'PROVEEDURIA_TALLER', 'PROVEEDURIA'].includes(user.rol);
   const prioridadesLista = Array.isArray(prioridadesTaller) ? prioridadesTaller : [];
   const llantasEnProceso = Number(exec.llantasSolicitadas || 0) + Number(exec.llantasCotizadas || 0) + Number(exec.llantasCompradas || 0);
   const unidadesActivas = Number(exec.unidadesActivas ?? exec.unidades ?? 0);
