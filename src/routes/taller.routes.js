@@ -1,6 +1,10 @@
 const express = require("express");
 const router = express.Router();
 const pool = require("../db");
+const {
+  ensureRepuestosSolicitudesTable,
+  etiquetaEstadoRepuesto
+} = require("../utils/repuestosSolicitudes");
 
 function requireAuth(req, res, next) {
   if (!req.session.user) return res.redirect("/login");
@@ -293,6 +297,7 @@ router.get("/dashboard", async (req, res) => {
 
     await ensureUnidadEstadoColumns();
     await ensurePrioridadesTallerTable();
+    await ensureRepuestosSolicitudesTable(pool);
     const sedesPermitidas = expandirSedesTransporte(await obtenerSedesPermitidas(req));
     const placaFiltro = String(req.query.placa || "").trim().toUpperCase();
     const estadoFiltro = req.query.estado || "taller";
@@ -354,23 +359,63 @@ router.get("/dashboard", async (req, res) => {
       SELECT
         tp.id,
         tp.placa,
-        tp.sede,
+        COALESCE(NULLIF(tp.sede, ''), un.sede) AS sede,
         tp.observacion,
         tp.estado,
         tp.creado_en,
-        u.usuario AS creado_por_nombre
+        usr.usuario AS creado_por_nombre
       FROM taller_prioridades tp
-      LEFT JOIN usuarios u ON u.id = tp.creado_por
+      LEFT JOIN usuarios usr ON usr.id = tp.creado_por
+      LEFT JOIN unidades un ON UPPER(TRIM(un.placa)) = UPPER(TRIM(tp.placa))
       WHERE tp.estado = 'PENDIENTE'
         AND DATE(tp.creado_en) = CURDATE()
     `;
     let prioridadesParams = [];
     if (sedesPermitidas.length > 0) {
-      prioridadesSql += " AND (tp.sede IN (?) OR tp.sede IS NULL OR tp.sede = '')";
+      prioridadesSql += " AND (COALESCE(NULLIF(tp.sede, ''), un.sede) IN (?) OR tp.sede IS NULL OR tp.sede = '')";
       prioridadesParams.push(sedesPermitidas);
     }
-    prioridadesSql += " ORDER BY tp.creado_en DESC, tp.id DESC LIMIT 10";
+    prioridadesSql += " ORDER BY tp.creado_en DESC, tp.id DESC LIMIT 20";
     const [prioridades] = await pool.query(prioridadesSql, prioridadesParams);
+    const prioridadesPesados = prioridades.filter(p =>
+      SEDES_TRANSPORTE.includes(p.sede) ||
+      String(p.creado_por_nombre || "").toLowerCase() === "pesados"
+    );
+    const prioridadesMecanico = prioridades.filter(p => !prioridadesPesados.some(pesado => pesado.id === p.id));
+
+    let repuestosSql = `
+      SELECT
+        id,
+        fecha_solicitud,
+        sede,
+        placa,
+        repuesto_solicitado,
+        cantidad,
+        prioridad,
+        estado,
+        proveedor
+      FROM solicitudes_repuestos
+      WHERE estado <> 'ENTREGADO'
+    `;
+    const repuestosParams = [];
+    if (sedesPermitidas.length > 0) {
+      repuestosSql += " AND sede IN (?)";
+      repuestosParams.push(sedesPermitidas);
+    }
+    repuestosSql += `
+      ORDER BY
+        CASE estado
+          WHEN 'PENDIENTE_COMPRAR' THEN 1
+          WHEN 'PEDIDO' THEN 2
+          WHEN 'EN_TRANSITO' THEN 3
+          ELSE 4
+        END,
+        CASE prioridad WHEN 'ALTA' THEN 1 WHEN 'MEDIA' THEN 2 ELSE 3 END,
+        fecha_solicitud DESC,
+        id DESC
+      LIMIT 8
+    `;
+    const [solicitudesRepuestos] = await pool.query(repuestosSql, repuestosParams);
 
     let resumenSql = `
       SELECT
@@ -400,6 +445,10 @@ router.get("/dashboard", async (req, res) => {
       },
       ultimosCorrectivos,
       prioridades,
+      prioridadesPesados,
+      prioridadesMecanico,
+      solicitudesRepuestos,
+      etiquetaEstadoRepuesto,
       sedeSeleccionada: sedesPermitidas.length > 1 && sedesPermitidas.some(sede => SEDES_TRANSPORTE.includes(sede))
         ? "Transportadora + Granel"
         : req.session.sedeSeleccionada || "TODAS",

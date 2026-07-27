@@ -130,6 +130,7 @@
     }
     .dashboard-layout { display: grid; gap: .75rem; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; }
     .left-stack { display: grid; gap: .45rem; }
+    .right-stack { display: grid; gap: .75rem; }
     .board-grid { display: grid; gap: .5rem; grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .unit-card { border-left: 4px solid var(--green); overflow: hidden; }
     .unit-card.in-shop { border-left-color: var(--red); }
@@ -246,7 +247,72 @@
       font-size: 1.18rem;
       font-weight: 950;
     }
+    .priority-groups {
+      display: grid;
+      gap: .55rem;
+    }
+    .priority-group-title {
+      align-items: center;
+      background: #fff7ed;
+      border-bottom: 1px solid #fed7aa;
+      color: #7c2d12;
+      display: flex;
+      font-size: .9rem;
+      font-weight: 950;
+      justify-content: space-between;
+      padding: .45rem .65rem;
+      text-transform: uppercase;
+    }
+    .priority-group {
+      border-top: 1px solid #fed7aa;
+    }
     .compact-panel-body { max-height: calc(100vh - 185px); overflow: auto; }
+    .parts-panel .tv-panel-title {
+      background: linear-gradient(90deg, #0f6684, #07358f);
+      font-size: 1.25rem;
+      padding: .72rem .85rem;
+    }
+    .parts-panel .compact-panel-body { max-height: calc(100vh - 185px); }
+    .parts-table td,
+    .parts-table thead th {
+      font-size: 1rem;
+      padding: .58rem .65rem;
+    }
+    .parts-plate {
+      color: #07183d;
+      font-size: 1.18rem;
+      font-weight: 950;
+    }
+    .parts-text {
+      display: -webkit-box;
+      font-weight: 850;
+      overflow: hidden;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 2;
+    }
+    .parts-status {
+      border-radius: 999px;
+      display: inline-block;
+      font-size: .68rem;
+      font-weight: 950;
+      padding: .2rem .42rem;
+      white-space: nowrap;
+    }
+    .parts-status.pendiente_comprar { background: #e5e7eb; color: #111827; }
+    .parts-status.pedido { background: #ccfbf1; color: #115e59; }
+    .parts-status.en_transito { background: #fef08a; color: #854d0e; }
+    .parts-priority {
+      border-radius: 999px;
+      display: inline-block;
+      font-size: .62rem;
+      font-weight: 950;
+      margin-top: .2rem;
+      padding: .14rem .35rem;
+      text-transform: uppercase;
+    }
+    .parts-priority.alta { background: #fee2e2; color: #991b1b; }
+    .parts-priority.media { background: #fef9c3; color: #854d0e; }
+    .parts-priority.baja { background: #dcfce7; color: #166534; }
     @media (max-width: 1180px) {
       .kpi-grid,
       .board-grid,
@@ -273,6 +339,9 @@
   const puedeAccionar = Boolean(puedeGestionar);
   const puedeEditarPrioridades = Boolean(puedeGestionarPrioridades);
   const prioridadesLista = Array.isArray(prioridades) ? prioridades : [];
+  const prioridadesPesadosLista = Array.isArray(prioridadesPesados) ? prioridadesPesados : [];
+  const prioridadesMecanicoLista = Array.isArray(prioridadesMecanico) ? prioridadesMecanico : prioridadesLista;
+  const repuestosLista = Array.isArray(solicitudesRepuestos) ? solicitudesRepuestos : [];
   const preventivosAbiertos = lista.filter(u => u.preventivo_plan).length;
   const fechaCorta = value => {
     if (!value) return '—';
@@ -331,8 +400,8 @@
     <div class="kpi-card">
       <span class="kpi-icon"><i class="bi bi-tools"></i></span>
       <div>
-        <div class="kpi-label">Trabajos</div>
-        <div class="kpi-value"><%= ultimos.length %></div>
+        <div class="kpi-label">Repuestos</div>
+        <div class="kpi-value"><%= repuestosLista.length %></div>
       </div>
     </div>
     <div class="kpi-card danger">
@@ -386,87 +455,124 @@
         <% if (!prioridadesLista.length) { %>
           <div class="empty-state">No hay prioridades pendientes.</div>
         <% } else { %>
-          <div class="table-responsive compact-panel-body">
-            <table class="table table-bordered tv-table">
-              <thead>
-                <tr>
-                  <th>Placa</th>
-                  <th>Observación</th>
-                  <th>Por</th>
-                  <% if (puedeEditarPrioridades) { %><th>OK</th><% } %>
-                </tr>
-              </thead>
-              <tbody>
-                <% prioridadesLista.forEach(p => { %>
-                  <tr>
-                    <td><span class="priority-plate"><%= p.placa %></span><div class="muted small"><%= p.sede || 'Sin sede' %></div></td>
-                    <td class="work-cell priority-note"><%= p.observacion %></td>
-                    <td><%= p.creado_por_nombre || 'Taller' %><div class="muted small"><%= fechaCorta(p.creado_en) %></div></td>
-                    <% if (puedeEditarPrioridades) { %>
-                      <td>
-                        <form method="POST" action="/taller/prioridades/<%= p.id %>/atendida">
-                          <button class="btn btn-sm btn-success py-0 px-2" onclick="return confirm('¿Marcar esta prioridad como atendida?')">
-                            <i class="bi bi-check"></i>
-                          </button>
-                        </form>
-                      </td>
-                    <% } %>
-                  </tr>
-                <% }) %>
-              </tbody>
-            </table>
+          <div class="compact-panel-body priority-groups">
+            <div class="priority-group">
+              <div class="priority-group-title">
+                <span>Pesados · Granel + Transportadora</span>
+                <span><%= prioridadesPesadosLista.length %></span>
+              </div>
+              <% if (!prioridadesPesadosLista.length) { %>
+                <div class="empty-state py-2">Sin prioridades de pesados.</div>
+              <% } else { %>
+                <div class="table-responsive">
+                  <table class="table table-bordered tv-table mb-0">
+                    <thead>
+                      <tr>
+                        <th>Placa</th>
+                        <th>Observación</th>
+                        <th>Por</th>
+                        <% if (puedeEditarPrioridades) { %><th>OK</th><% } %>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <% prioridadesPesadosLista.forEach(p => { %>
+                        <tr>
+                          <td><span class="priority-plate"><%= p.placa %></span><div class="muted small"><%= p.sede || 'Sin sede' %></div></td>
+                          <td class="work-cell priority-note"><%= p.observacion %></td>
+                          <td><%= p.creado_por_nombre || 'Taller' %><div class="muted small"><%= fechaCorta(p.creado_en) %></div></td>
+                          <% if (puedeEditarPrioridades) { %>
+                            <td>
+                              <form method="POST" action="/taller/prioridades/<%= p.id %>/atendida">
+                                <button class="btn btn-sm btn-success py-0 px-2" onclick="return confirm('¿Marcar esta prioridad como atendida?')">
+                                  <i class="bi bi-check"></i>
+                                </button>
+                              </form>
+                            </td>
+                          <% } %>
+                        </tr>
+                      <% }) %>
+                    </tbody>
+                  </table>
+                </div>
+              <% } %>
+            </div>
+
+            <div class="priority-group">
+              <div class="priority-group-title">
+                <span>Mecánico / Taller</span>
+                <span><%= prioridadesMecanicoLista.length %></span>
+              </div>
+              <% if (!prioridadesMecanicoLista.length) { %>
+                <div class="empty-state py-2">Sin prioridades de mecánico.</div>
+              <% } else { %>
+                <div class="table-responsive">
+                  <table class="table table-bordered tv-table mb-0">
+                    <thead>
+                      <tr>
+                        <th>Placa</th>
+                        <th>Observación</th>
+                        <th>Por</th>
+                        <% if (puedeEditarPrioridades) { %><th>OK</th><% } %>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <% prioridadesMecanicoLista.forEach(p => { %>
+                        <tr>
+                          <td><span class="priority-plate"><%= p.placa %></span><div class="muted small"><%= p.sede || 'Sin sede' %></div></td>
+                          <td class="work-cell priority-note"><%= p.observacion %></td>
+                          <td><%= p.creado_por_nombre || 'Taller' %><div class="muted small"><%= fechaCorta(p.creado_en) %></div></td>
+                          <% if (puedeEditarPrioridades) { %>
+                            <td>
+                              <form method="POST" action="/taller/prioridades/<%= p.id %>/atendida">
+                                <button class="btn btn-sm btn-success py-0 px-2" onclick="return confirm('¿Marcar esta prioridad como atendida?')">
+                                  <i class="bi bi-check"></i>
+                                </button>
+                              </form>
+                            </td>
+                          <% } %>
+                        </tr>
+                      <% }) %>
+                    </tbody>
+                  </table>
+                </div>
+              <% } %>
+            </div>
           </div>
         <% } %>
       </section>
 
-      <section class="panel">
+      <section class="panel parts-panel">
         <div class="tv-panel-title d-flex justify-content-between align-items-center gap-2 flex-wrap">
-          <span>Trabajos recientes</span>
-          <a href="/mantenimientos/correctivos" class="btn btn-sm btn-light py-0">Historial</a>
+          <span><i class="bi bi-box-seam me-1"></i> Repuestos solicitados</span>
+          <a href="/repuestos" class="btn btn-sm btn-light py-0">Abrir</a>
         </div>
-        <% if (!ultimos.length) { %>
-          <div class="empty-state">Todavía no hay correctivos registrados para esta sede.</div>
+        <% if (!repuestosLista.length) { %>
+          <div class="empty-state">No hay repuestos pendientes.</div>
         <% } else { %>
           <div class="table-responsive compact-panel-body">
-            <table class="table table-bordered tv-table">
+            <table class="table table-bordered tv-table parts-table">
               <thead>
                 <tr>
                   <th>Placa</th>
-                  <th>Trabajo</th>
+                  <th>Repuesto</th>
                   <th>Estado</th>
-                  <th>Mecánico</th>
                 </tr>
               </thead>
               <tbody>
-                <% ultimos.slice(0, 8).forEach(c => { %>
+                <% repuestosLista.forEach(r => { %>
                   <tr>
                     <td>
-                      <strong><%= c.placa %></strong>
-                      <div class="muted small"><%= c.sede || 'Sin sede' %></div>
+                      <span class="parts-plate"><%= r.placa %></span>
+                      <div class="muted small"><%= r.sede || '-' %></div>
                     </td>
                     <td class="work-cell">
-                      <% if (Array.isArray(c.trabajos) && c.trabajos.length) { %>
-                        <div class="work-list">
-                          <% c.trabajos.slice(0, 3).forEach(t => { %>
-                            <div class="work-line">
-                              <span class="work-type <%= String(t.tipo || '').toLowerCase() %>"><%= t.tipo %></span>
-                              <span><%= t.texto %></span>
-                            </div>
-                          <% }) %>
-                        </div>
-                      <% } else { %>
-                        <%= c.trabajo_realizado || '—' %>
-                      <% } %>
+                      <div class="parts-text"><%= r.repuesto_solicitado %></div>
+                      <div class="muted small">Cant. <%= Number(r.cantidad || 0).toLocaleString('es-CR') %> · <%= r.proveedor || 'Sin proveedor' %></div>
                     </td>
                     <td>
-                      <% if (c.pendiente) { %>
-                        <span class="status-dot warn"></span>Pendiente
-                        <div class="muted small"><%= c.pendiente %></div>
-                      <% } else { %>
-                        <span class="status-dot"></span>Finalizado
-                      <% } %>
+                      <span class="parts-status <%= String(r.estado || '').toLowerCase() %>"><%= etiquetaEstadoRepuesto(r.estado) %></span>
+                      <div><span class="parts-priority <%= String(r.prioridad || '').toLowerCase() %>"><%= r.prioridad || 'MEDIA' %></span></div>
                     </td>
-                    <td><%= c.mecanicos || 'Sin asignar' %><div class="muted small"><%= fechaCorta(c.fecha_inicio || c.fecha) %></div></td>
                   </tr>
                 <% }) %>
               </tbody>

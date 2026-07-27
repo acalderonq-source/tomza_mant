@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Solicitud de repuestos - Gas Tomza</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <style>
+    :root {
+      --bg: #eef4f8;
+      --dark: #10213f;
+      --head: #0f6684;
+      --stripe: #c9ecf8;
+      --line: #9fc7d7;
+      --yellow: #f2ff43;
+      --green: #74f27e;
+      --orange: #f58a69;
+    }
+
+    body {
+      background: var(--bg);
+      color: #0f172a;
+      font-family: "Segoe UI", Roboto, Arial, sans-serif;
+      font-size: .92rem;
+    }
+
+    .topbar {
+      background: #111827;
+      border-bottom: 3px solid #e2232a;
+    }
+
+    .shell { max-width: 1480px; }
+
+    .hero {
+      background: linear-gradient(135deg, #10213f, #0f6684 70%, #e2232a);
+      border-radius: 12px;
+      color: #fff;
+      padding: 1rem;
+    }
+
+    .page-title {
+      font-size: 1.35rem;
+      font-weight: 950;
+      margin: 0;
+    }
+
+    .panel {
+      background: #fff;
+      border: 1px solid #d7e4ee;
+      border-radius: 12px;
+      box-shadow: 0 10px 24px rgba(15, 23, 42, .06);
+      overflow: hidden;
+    }
+
+    .panel-head {
+      border-bottom: 1px solid #d7e4ee;
+      padding: .85rem 1rem;
+    }
+
+    .section-title {
+      font-size: 1rem;
+      font-weight: 900;
+      margin: 0;
+    }
+
+    .modal-form-grid {
+      display: grid;
+      gap: .65rem;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .modal-form-grid .grid-span {
+      grid-column: 1 / -1;
+    }
+
+    .modal-form-grid label,
+    .filter-form label {
+      color: #334155;
+      font-size: .68rem;
+      font-weight: 900;
+      text-transform: uppercase;
+    }
+
+    .modal-form-grid .form-control,
+    .modal-form-grid .form-select,
+    .filter-form .form-control,
+    .filter-form .form-select {
+      font-size: .82rem;
+      min-height: 34px;
+      padding: .3rem .5rem;
+    }
+
+    .filter-form {
+      display: grid;
+      gap: .7rem;
+      grid-template-columns: 180px 190px 1fr auto auto;
+      padding: .85rem 1rem;
+    }
+
+    .summary-grid {
+      display: grid;
+      gap: .65rem;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+
+    .summary-card {
+      background: #fff;
+      border: 1px solid #d7e4ee;
+      border-radius: 10px;
+      padding: .85rem;
+    }
+
+    .summary-label {
+      color: #64748b;
+      font-size: .7rem;
+      font-weight: 900;
+      text-transform: uppercase;
+    }
+
+    .summary-value {
+      font-size: 1.55rem;
+      font-weight: 950;
+      line-height: 1;
+      margin-top: .15rem;
+    }
+
+    .table-wrap {
+      overflow: auto;
+    }
+
+    .repuestos-table {
+      border-collapse: collapse;
+      min-width: 1160px;
+      width: 100%;
+    }
+
+    .repuestos-table th {
+      background: var(--head);
+      border: 1px solid #125873;
+      color: #fff;
+      font-size: .72rem;
+      font-weight: 900;
+      line-height: 1.05;
+      padding: .5rem .55rem;
+      text-align: center;
+      vertical-align: middle;
+    }
+
+    .repuestos-table td {
+      border: 1px solid var(--line);
+      font-size: .8rem;
+      padding: .35rem .5rem;
+      vertical-align: middle;
+    }
+
+    .repuestos-table tbody tr:nth-child(odd) td {
+      background: var(--stripe);
+    }
+
+    .repuestos-table tbody tr:nth-child(even) td {
+      background: #f8fdff;
+    }
+
+    .cell-placa,
+    .cell-cantidad {
+      font-weight: 850;
+      text-align: center;
+      white-space: nowrap;
+    }
+
+    .priority-baja { background: #b7f68b !important; }
+    .priority-media { background: var(--yellow) !important; }
+    .priority-alta { background: var(--orange) !important; color: #7f1d1d; font-weight: 900; }
+    .estado-pendiente_comprar { background: #e5e7eb !important; font-weight: 850; }
+    .estado-pedido { background: #65f3c1 !important; font-weight: 850; }
+    .estado-en_transito { background: var(--yellow) !important; font-weight: 850; }
+    .estado-entregado { background: var(--green) !important; font-weight: 850; }
+
+    .inline-status {
+      display: grid;
+      gap: .3rem;
+      grid-template-columns: 135px minmax(140px, 1fr) auto;
+    }
+
+    .inline-status .form-select,
+    .inline-status .form-control {
+      font-size: .76rem;
+      min-height: 30px;
+      padding: .2rem .4rem;
+    }
+
+    .empty-state {
+      color: #64748b;
+      font-weight: 800;
+      padding: 1.4rem;
+      text-align: center;
+    }
+
+    .modal-content {
+      border: 0;
+      border-radius: 16px;
+      overflow: hidden;
+    }
+
+    .modal-header {
+      background: linear-gradient(135deg, #10213f, #0f6684);
+      color: #fff;
+    }
+
+    .modal-header .btn-close {
+      filter: invert(1);
+      opacity: .95;
+    }
+
+    @media (max-width: 980px) {
+      .filter-form,
+      .summary-grid {
+        grid-template-columns: 1fr 1fr;
+      }
+      .filter-form .actions-wrap {
+        grid-column: 1 / -1;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .modal-form-grid,
+      .filter-form,
+      .summary-grid {
+        grid-template-columns: 1fr;
+      }
+      .repuestos-table,
+      .repuestos-table tbody,
+      .repuestos-table tr,
+      .repuestos-table td {
+        display: block;
+        min-width: 0;
+        width: 100%;
+      }
+      .repuestos-table thead {
+        display: none;
+      }
+      .repuestos-table tr {
+        border: 1px solid #d7e4ee;
+        border-radius: 12px;
+        margin: .75rem;
+        overflow: hidden;
+      }
+      .repuestos-table td {
+        align-items: flex-start;
+        display: grid;
+        gap: .75rem;
+        grid-template-columns: 42% minmax(0, 1fr);
+        text-align: left;
+      }
+      .repuestos-table td::before {
+        color: #475569;
+        content: attr(data-label);
+        font-size: .7rem;
+        font-weight: 900;
+        text-transform: uppercase;
+      }
+      .inline-status {
+        grid-template-columns: 1fr;
+      }
+      .modal-dialog {
+        margin: 0;
+        max-width: 100%;
+      }
+      .modal-content {
+        border-radius: 0;
+        min-height: 100vh;
+      }
+    }
+  </style>
+</head>
+<body>
+<%
+  const lista = Array.isArray(solicitudes) ? solicitudes : [];
+  const puedeEditar = Boolean(puedeGestionar);
+  const unidadesLista = Array.isArray(unidades) ? unidades : [];
+  const proveedoresLista = Array.isArray(proveedores) ? proveedores : [];
+  const estadoClass = estado => String(estado || '').toLowerCase();
+  const prioridadClass = prioridad => String(prioridad || '').toLowerCase();
+%>
+
+<nav class="navbar navbar-dark topbar px-3 py-2">
+  <span class="navbar-brand fw-semibold"><i class="bi bi-box-seam me-2"></i>Solicitud de repuestos</span>
+  <div class="text-white d-flex align-items-center gap-2 flex-wrap">
+    <span class="small"><%= user.usuario %> · <%= user.rol %></span>
+    <a href="/dashboard" class="btn btn-outline-light btn-sm rounded-pill px-3">Dashboard</a>
+    <a href="/taller/dashboard" class="btn btn-outline-light btn-sm rounded-pill px-3">Pantalla</a>
+    <a href="/logout" class="btn btn-warning btn-sm rounded-pill px-3">Salir</a>
+  </div>
+</nav>
+
+<main class="container-fluid shell py-3">
+  <section class="hero mb-3">
+    <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
+      <div>
+        <h1 class="page-title">Solicitud de repuestos</h1>
+        <div class="opacity-75">Control por fecha, sede, placa, cantidad, estado y proveedor.</div>
+      </div>
+      <div class="d-flex gap-2 align-items-center flex-wrap">
+        <span class="badge text-bg-light text-dark"><%= lista.length %> registros visibles</span>
+        <% if (puedeEditar) { %>
+          <button type="button" class="btn btn-warning btn-sm rounded-pill fw-bold px-3" data-bs-toggle="modal" data-bs-target="#agregarRepuestoModal">
+            <i class="bi bi-plus-circle"></i> Agregar solicitud
+          </button>
+        <% } %>
+      </div>
+    </div>
+  </section>
+
+  <% if (success) { %>
+    <div class="alert alert-success"><%= success %></div>
+  <% } %>
+  <% if (error) { %>
+    <div class="alert alert-danger"><%= error %></div>
+  <% } %>
+
+  <section class="summary-grid mb-3">
+    <div class="summary-card"><div class="summary-label">Total</div><div class="summary-value"><%= resumen.total || 0 %></div></div>
+    <div class="summary-card"><div class="summary-label">Pendiente comprar</div><div class="summary-value"><%= resumen.PENDIENTE_COMPRAR || 0 %></div></div>
+    <div class="summary-card"><div class="summary-label">Pedido / tránsito</div><div class="summary-value"><%= (resumen.PEDIDO || 0) + (resumen.EN_TRANSITO || 0) %></div></div>
+    <div class="summary-card"><div class="summary-label">Entregado</div><div class="summary-value"><%= resumen.ENTREGADO || 0 %></div></div>
+  </section>
+
+  <% if (!puedeEditar) { %>
+    <div class="alert alert-info">Su usuario puede ver las solicitudes de repuestos, pero solo ADMIN y PROVEEDURIA_TALLER pueden agregar o actualizar.</div>
+  <% } %>
+
+  <section class="panel mb-3">
+    <form method="GET" action="/repuestos" class="filter-form">
+      <div>
+        <label class="form-label mb-1">Sede</label>
+        <select name="sede" class="form-select form-select-sm">
+          <option value="">Todas permitidas</option>
+          <% sedes.forEach(sede => { %>
+            <option value="<%= sede %>" <%= filtros.sede === sede ? 'selected' : '' %>><%= sede %></option>
+          <% }) %>
+        </select>
+      </div>
+      <div>
+        <label class="form-label mb-1">Estado</label>
+        <select name="estado" class="form-select form-select-sm">
+          <option value="">Todos</option>
+          <% estados.forEach(estado => { %>
+            <option value="<%= estado %>" <%= filtros.estado === estado ? 'selected' : '' %>><%= etiquetaEstadoRepuesto(estado) %></option>
+          <% }) %>
+        </select>
+      </div>
+      <div>
+        <label class="form-label mb-1">Placa</label>
+        <input type="text" name="placa" class="form-control form-control-sm text-uppercase" value="<%= filtros.placa || '' %>" placeholder="Buscar placa">
+      </div>
+      <div class="actions-wrap d-flex align-items-end">
+        <button class="btn btn-primary btn-sm w-100"><i class="bi bi-funnel"></i> Filtrar</button>
+      </div>
+      <div class="actions-wrap d-flex align-items-end">
+        <a href="/repuestos" class="btn btn-secondary btn-sm w-100">Limpiar</a>
+      </div>
+    </form>
+  </section>
+
+  <section class="panel">
+    <div class="panel-head d-flex justify-content-between align-items-center gap-2 flex-wrap">
+      <div>
+        <h2 class="section-title">Listado de solicitudes</h2>
+        <div class="text-muted small">Ordenado por estado, prioridad y fecha.</div>
+      </div>
+    </div>
+
+    <% if (!lista.length) { %>
+      <div class="empty-state">No hay solicitudes con los filtros seleccionados.</div>
+    <% } else { %>
+      <div class="table-wrap">
+        <table class="repuestos-table">
+          <thead>
+            <tr>
+              <th>Fecha de<br>solicitud</th>
+              <th>Sede</th>
+              <th>Placa / Unidad</th>
+              <th>Solicitado por</th>
+              <th>Repuesto solicitado</th>
+              <th>Cantidad</th>
+              <th>Prioridad</th>
+              <th>Estado</th>
+              <th>Proveedor</th>
+              <% if (puedeEditar) { %><th>Acción</th><% } %>
+            </tr>
+          </thead>
+          <tbody>
+            <% lista.forEach(item => { %>
+              <tr>
+                <td data-label="Fecha"><%= item.fecha_formato %></td>
+                <td data-label="Sede"><%= item.sede %></td>
+                <td data-label="Placa" class="cell-placa"><%= item.placa %></td>
+                <td data-label="Solicitado por"><%= item.solicitado_por %></td>
+                <td data-label="Repuesto"><%= item.repuesto_solicitado %></td>
+                <td data-label="Cantidad" class="cell-cantidad"><%= Number(item.cantidad || 0).toLocaleString('es-CR') %></td>
+                <td data-label="Prioridad" class="priority-<%= prioridadClass(item.prioridad) %>"><%= etiquetaPrioridadRepuesto(item.prioridad) %></td>
+                <td data-label="Estado" class="estado-<%= estadoClass(item.estado) %>"><%= etiquetaEstadoRepuesto(item.estado) %></td>
+                <td data-label="Proveedor"><%= item.proveedor_nombre || item.proveedor || '-' %></td>
+                <% if (puedeEditar) { %>
+                  <td data-label="Acción">
+                    <form method="POST" action="/repuestos/<%= item.id %>/estado" class="inline-status">
+                      <input type="hidden" name="sede" value="<%= filtros.sede || '' %>">
+                      <input type="hidden" name="estado_filtro" value="<%= filtros.estado || '' %>">
+                      <input type="hidden" name="placa" value="<%= filtros.placa || '' %>">
+                      <select name="estado" class="form-select form-select-sm">
+                        <% estados.forEach(estado => { %>
+                          <option value="<%= estado %>" <%= item.estado === estado ? 'selected' : '' %>><%= etiquetaEstadoRepuesto(estado) %></option>
+                        <% }) %>
+                      </select>
+                      <select name="proveedor_id" class="form-select form-select-sm">
+                        <option value="">Sin proveedor</option>
+                        <% proveedoresLista.forEach(proveedor => { %>
+                          <option value="<%= proveedor.id %>" <%= Number(item.proveedor_id || 0) === Number(proveedor.id) ? 'selected' : '' %>><%= proveedor.nombre %></option>
+                        <% }) %>
+                      </select>
+                      <button class="btn btn-sm btn-dark"><i class="bi bi-save"></i></button>
+                    </form>
+                    <form method="POST" action="/repuestos/<%= item.id %>/eliminar" class="mt-1" onsubmit="return confirm('¿Eliminar esta solicitud de repuesto?')">
+                      <input type="hidden" name="sede" value="<%= filtros.sede || '' %>">
+                      <input type="hidden" name="estado" value="<%= filtros.estado || '' %>">
+                      <input type="hidden" name="placa" value="<%= filtros.placa || '' %>">
+                      <button class="btn btn-sm btn-outline-danger w-100"><i class="bi bi-trash"></i> Eliminar</button>
+                    </form>
+                  </td>
+                <% } %>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+  </section>
+</main>
+
+<% if (puedeEditar) { %>
+  <div class="modal fade" id="agregarRepuestoModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+      <div class="modal-content">
+        <form method="POST" action="/repuestos">
+          <div class="modal-header">
+            <div>
+              <h5 class="modal-title fw-bold mb-0"><i class="bi bi-box-seam me-1"></i> Agregar solicitud de repuesto</h5>
+              <div class="small opacity-75">Complete la información como en el control de repuestos.</div>
+            </div>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+          </div>
+          <div class="modal-body">
+            <div class="modal-form-grid">
+              <div>
+                <label class="form-label mb-1">Fecha de solicitud</label>
+                <input type="date" name="fecha_solicitud" class="form-control" value="<%= fechaHoy %>" required>
+              </div>
+              <div>
+                <label class="form-label mb-1">Sede</label>
+                <input type="text" id="sedeUnidadSeleccionada" class="form-control" value="" placeholder="Se llena al seleccionar placa" readonly>
+              </div>
+              <div>
+                <label class="form-label mb-1">Placa / Unidad</label>
+                <select name="placa" id="placaUnidadSelect" class="form-select" required>
+                  <option value="">Seleccione placa</option>
+                  <% unidadesLista.forEach(unidad => { %>
+                    <option value="<%= unidad.placa %>" data-sede="<%= unidad.sede || '' %>"><%= unidad.placa %> · <%= unidad.sede || 'Sin sede' %></option>
+                  <% }) %>
+                </select>
+              </div>
+              <div>
+                <label class="form-label mb-1">Solicitado por</label>
+                <input type="text" name="solicitado_por" class="form-control" value="<%= user.usuario %>" required>
+              </div>
+              <div class="grid-span">
+                <label class="form-label mb-1">Repuesto solicitado</label>
+                <textarea name="repuesto_solicitado" class="form-control" rows="3" placeholder="Ej: luces amarillas y rojas 4 y 4" required></textarea>
+              </div>
+              <div>
+                <label class="form-label mb-1">Cantidad</label>
+                <input type="number" name="cantidad" class="form-control" value="1" min="0.01" step="0.01" required>
+              </div>
+              <div>
+                <label class="form-label mb-1">Prioridad</label>
+                <select name="prioridad" class="form-select">
+                  <% prioridades.forEach(prioridad => { %>
+                    <option value="<%= prioridad %>" <%= prioridad === 'MEDIA' ? 'selected' : '' %>><%= etiquetaPrioridadRepuesto(prioridad) %></option>
+                  <% }) %>
+                </select>
+              </div>
+              <div>
+                <label class="form-label mb-1">Estado</label>
+                <select name="estado" class="form-select">
+                  <% estados.forEach(estado => { %>
+                    <option value="<%= estado %>"><%= etiquetaEstadoRepuesto(estado) %></option>
+                  <% }) %>
+                </select>
+              </div>
+              <div>
+                <label class="form-label mb-1">Proveedor</label>
+                <select name="proveedor_id" class="form-select">
+                  <option value="">Sin proveedor</option>
+                  <% proveedoresLista.forEach(proveedor => { %>
+                    <option value="<%= proveedor.id %>"><%= proveedor.nombre %></option>
+                  <% }) %>
+                </select>
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+            <button class="btn btn-dark"><i class="bi bi-save"></i> Guardar solicitud</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+<% } %>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+  const placaUnidadSelect = document.getElementById('placaUnidadSelect');
+  const sedeUnidadSeleccionada = document.getElementById('sedeUnidadSeleccionada');
+
+  function actualizarSedeUnidad() {
+    if (!placaUnidadSelect || !sedeUnidadSeleccionada) return;
+    const option = placaUnidadSelect.options[placaUnidadSelect.selectedIndex];
+    sedeUnidadSeleccionada.value = option ? (option.dataset.sede || '') : '';
+  }
+
+  if (placaUnidadSelect) {
+    placaUnidadSelect.addEventListener('change', actualizarSedeUnidad);
+    actualizarSedeUnidad();
+  }
+</script>
+</body>
+</html>
