@@ -17,6 +17,18 @@ const ROLES_VER_TALLER = ["ADMIN", "TALLER", "MECANICO", "SUPERVISOR", "SUPERVIS
 const ROLES_GESTION_TALLER = ["ADMIN", "TALLER", "MECANICO"];
 const ROLES_PRIORIDADES_TALLER = ["ADMIN", "TALLER"];
 const SEDES_TRANSPORTE = ["Transportadora", "Granel"];
+const SEDES_TRANSPORTE_NORMALIZADAS = SEDES_TRANSPORTE.map(sede => sede.toUpperCase());
+
+function fechaCostaRica(offsetDays = 0) {
+  const date = new Date();
+  date.setDate(date.getDate() + offsetDays);
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Costa_Rica",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).format(date);
+}
 
 function puedeVerTaller(user) {
   return ROLES_VER_TALLER.includes(user.rol);
@@ -28,6 +40,32 @@ function puedeGestionarTaller(user) {
 
 function puedeGestionarPrioridades(user) {
   return ROLES_PRIORIDADES_TALLER.includes(user.rol);
+}
+
+function esUsuarioPesados(user) {
+  const usuario = String(user.usuario || user.nombre || "").trim().toLowerCase();
+  return (
+    user.rol === "SUPERVISOR_PESADO" ||
+    usuario.includes("pesado")
+  );
+}
+
+function esUsuarioMecanico(user) {
+  return (
+    !esUsuarioPesados(user) &&
+    (
+      user.rol === "MECANICO" ||
+      String(user.usuario || "").trim().toLowerCase() === "mecanico"
+    )
+  );
+}
+
+function esPrioridadPesados(prioridad) {
+  return (
+    prioridad.grupo_prioridad === "PESADOS" ||
+    SEDES_TRANSPORTE_NORMALIZADAS.includes(String(prioridad.sede || "").trim().toUpperCase()) ||
+    String(prioridad.creado_por_nombre || "").trim().toLowerCase().includes("pesado")
+  );
 }
 
 async function columnExists(tableName, columnName) {
@@ -62,6 +100,7 @@ async function ensurePrioridadesTallerTable() {
       id INT AUTO_INCREMENT PRIMARY KEY,
       placa VARCHAR(50) NOT NULL,
       sede VARCHAR(80) NULL,
+      fecha_prioridad DATE NULL,
       observacion TEXT NOT NULL,
       estado ENUM('PENDIENTE','ATENDIDA') NOT NULL DEFAULT 'PENDIENTE',
       creado_por INT NULL,
@@ -70,9 +109,15 @@ async function ensurePrioridadesTallerTable() {
       atendido_en DATETIME NULL,
       INDEX idx_taller_prioridades_estado (estado),
       INDEX idx_taller_prioridades_sede (sede),
+      INDEX idx_taller_prioridades_fecha (fecha_prioridad),
       INDEX idx_taller_prioridades_creado (creado_en)
     )
   `);
+
+  if (!(await columnExists("taller_prioridades", "fecha_prioridad"))) {
+    await pool.query("ALTER TABLE taller_prioridades ADD COLUMN fecha_prioridad DATE NULL AFTER sede");
+    await pool.query("UPDATE taller_prioridades SET fecha_prioridad = DATE(creado_en) WHERE fecha_prioridad IS NULL");
+  }
 }
 
 async function obtenerSedesPermitidas(req) {
@@ -83,6 +128,10 @@ async function obtenerSedesPermitidas(req) {
       return [req.session.sedeSeleccionada];
     }
     return [];
+  }
+
+  if (esUsuarioPesados(user)) {
+    return [...SEDES_TRANSPORTE];
   }
 
   const [extras] = await pool.query(
@@ -354,12 +403,21 @@ router.get("/dashboard", async (req, res) => {
     const [unidades] = await pool.query(sql, params);
 
     const ultimosCorrectivos = await obtenerUltimosTrabajosAgrupados(sedesPermitidas);
+    const fechaPrioridadHoy = fechaCostaRica();
+    const fechaPrioridadDefault = fechaCostaRica(1);
 
     let prioridadesSql = `
       SELECT
         tp.id,
         tp.placa,
         COALESCE(NULLIF(tp.sede, ''), un.sede) AS sede,
+        CASE
+          WHEN UPPER(TRIM(COALESCE(NULLIF(tp.sede, ''), un.sede, ''))) IN ('TRANSPORTADORA', 'GRANEL')
+            OR LOWER(TRIM(COALESCE(usr.usuario, ''))) LIKE '%pesado%'
+          THEN 'PESADOS'
+          ELSE 'MECANICO'
+        END AS grupo_prioridad,
+        COALESCE(tp.fecha_prioridad, DATE(tp.creado_en)) AS fecha_prioridad,
         tp.observacion,
         tp.estado,
         tp.creado_en,
@@ -368,20 +426,41 @@ router.get("/dashboard", async (req, res) => {
       LEFT JOIN usuarios usr ON usr.id = tp.creado_por
       LEFT JOIN unidades un ON UPPER(TRIM(un.placa)) = UPPER(TRIM(tp.placa))
       WHERE tp.estado = 'PENDIENTE'
-        AND DATE(tp.creado_en) = CURDATE()
+        AND COALESCE(tp.fecha_prioridad, DATE(tp.creado_en)) = ?
     `;
-    let prioridadesParams = [];
-    if (sedesPermitidas.length > 0) {
-      prioridadesSql += " AND (COALESCE(NULLIF(tp.sede, ''), un.sede) IN (?) OR tp.sede IS NULL OR tp.sede = '')";
-      prioridadesParams.push(sedesPermitidas);
+    let prioridadesParams = [fechaPrioridadHoy];
+    if (sedesPermitidas.length > 0 && !esUsuarioPesados(req.session.user)) {
+      prioridadesSql += " AND (UPPER(TRIM(COALESCE(NULLIF(tp.sede, ''), un.sede))) IN (?) OR tp.sede IS NULL OR tp.sede = '')";
+      prioridadesParams.push(sedesPermitidas.map(sede => String(sede).trim().toUpperCase()));
     }
-    prioridadesSql += " ORDER BY tp.creado_en DESC, tp.id DESC LIMIT 20";
-    const [prioridades] = await pool.query(prioridadesSql, prioridadesParams);
-    const prioridadesPesados = prioridades.filter(p =>
-      SEDES_TRANSPORTE.includes(p.sede) ||
-      String(p.creado_por_nombre || "").toLowerCase() === "pesados"
+    if (esUsuarioPesados(req.session.user)) {
+      prioridadesSql += `
+        ORDER BY
+          CASE
+            WHEN UPPER(TRIM(COALESCE(NULLIF(tp.sede, ''), un.sede, ''))) IN ('TRANSPORTADORA', 'GRANEL')
+              OR LOWER(TRIM(COALESCE(usr.usuario, ''))) LIKE '%pesado%'
+            THEN 0
+            ELSE 1
+          END,
+          tp.creado_en DESC,
+          tp.id DESC
+        LIMIT 20
+      `;
+    } else {
+      prioridadesSql += " ORDER BY tp.creado_en DESC, tp.id DESC LIMIT 20";
+    }
+    const [prioridadesTodas] = await pool.query(prioridadesSql, prioridadesParams);
+    const prioridadesPesadosTodas = prioridadesTodas.filter(p =>
+      esPrioridadPesados(p) || (esUsuarioPesados(req.session.user) && !p.sede)
     );
-    const prioridadesMecanico = prioridades.filter(p => !prioridadesPesados.some(pesado => pesado.id === p.id));
+    const prioridadesMecanicoTodas = prioridadesTodas.filter(p => !prioridadesPesadosTodas.some(pesado => pesado.id === p.id));
+    const prioridades = esUsuarioPesados(req.session.user)
+      ? prioridadesPesadosTodas
+      : esUsuarioMecanico(req.session.user)
+        ? prioridadesMecanicoTodas
+        : prioridadesTodas;
+    const prioridadesPesados = esUsuarioMecanico(req.session.user) ? [] : prioridadesPesadosTodas;
+    const prioridadesMecanico = esUsuarioPesados(req.session.user) ? [] : prioridadesMecanicoTodas;
 
     let repuestosSql = `
       SELECT
@@ -449,6 +528,8 @@ router.get("/dashboard", async (req, res) => {
       prioridadesMecanico,
       solicitudesRepuestos,
       etiquetaEstadoRepuesto,
+      fechaPrioridadHoy,
+      fechaPrioridadDefault,
       sedeSeleccionada: sedesPermitidas.length > 1 && sedesPermitidas.some(sede => SEDES_TRANSPORTE.includes(sede))
         ? "Transportadora + Granel"
         : req.session.sedeSeleccionada || "TODAS",
@@ -472,6 +553,9 @@ router.post("/prioridades", async (req, res) => {
     await ensurePrioridadesTallerTable();
     const placa = String(req.body.placa || "").trim().toUpperCase();
     const observacion = String(req.body.observacion || "").trim();
+    const fechaPrioridad = /^\d{4}-\d{2}-\d{2}$/.test(String(req.body.fecha_prioridad || ""))
+      ? req.body.fecha_prioridad
+      : fechaCostaRica(1);
     const sedesPermitidas = expandirSedesTransporte(await obtenerSedesPermitidas(req));
 
     if (!placa || !observacion) {
@@ -479,21 +563,44 @@ router.post("/prioridades", async (req, res) => {
       return res.redirect("/taller/dashboard");
     }
 
-    let sedeAsignada = req.session.sedeSeleccionada && req.session.sedeSeleccionada !== "TODAS"
-      ? req.session.sedeSeleccionada
-      : req.session.user.sede || null;
+    const [[unidadPrioridad]] = await pool.query(
+      "SELECT sede FROM unidades WHERE UPPER(TRIM(placa)) = ? LIMIT 1",
+      [placa]
+    );
 
-    if (sedesPermitidas.length === 1) {
+    let sedeAsignada = unidadPrioridad?.sede || (
+      req.session.sedeSeleccionada && req.session.sedeSeleccionada !== "TODAS"
+      ? req.session.sedeSeleccionada
+      : req.session.user.sede || null
+    );
+
+    if (!unidadPrioridad?.sede && sedesPermitidas.length === 1) {
       sedeAsignada = sedesPermitidas[0];
     }
 
+    if (!unidadPrioridad?.sede && esUsuarioPesados(req.session.user)) {
+      sedeAsignada = SEDES_TRANSPORTE_NORMALIZADAS.includes(String(req.session.sedeSeleccionada || "").trim().toUpperCase())
+        ? req.session.sedeSeleccionada
+        : "Transportadora";
+    }
+
+    if (esUsuarioPesados(req.session.user) && !SEDES_TRANSPORTE_NORMALIZADAS.includes(String(sedeAsignada || "").trim().toUpperCase())) {
+      req.session.error = "El usuario de Pesados solo puede agregar prioridades de Granel o Transportadora.";
+      return res.redirect("/taller/dashboard");
+    }
+
+    if (esUsuarioMecanico(req.session.user) && SEDES_TRANSPORTE_NORMALIZADAS.includes(String(sedeAsignada || "").trim().toUpperCase())) {
+      req.session.error = "El usuario mecánico solo puede agregar prioridades de taller/Cartago.";
+      return res.redirect("/taller/dashboard");
+    }
+
     await pool.query(
-      `INSERT INTO taller_prioridades (placa, sede, observacion, creado_por)
-       VALUES (?, ?, ?, ?)`,
-      [placa, sedeAsignada, observacion, req.session.user.id]
+      `INSERT INTO taller_prioridades (placa, sede, fecha_prioridad, observacion, creado_por)
+       VALUES (?, ?, ?, ?, ?)`,
+      [placa, sedeAsignada, fechaPrioridad, observacion, req.session.user.id]
     );
 
-    req.session.success = `Prioridad agregada para la unidad ${placa}.`;
+    req.session.success = `Prioridad agregada para la unidad ${placa} el ${fechaPrioridad}.`;
     res.redirect("/taller/dashboard");
   } catch (error) {
     console.error("ERROR agregando prioridad taller:", error);
@@ -517,22 +624,56 @@ router.post("/prioridades/:id/atendida", async (req, res) => {
       return res.redirect("/taller/dashboard");
     }
 
-    let sql = `
-      UPDATE taller_prioridades
-      SET estado = 'ATENDIDA',
-          atendido_por = ?,
-          atendido_en = NOW()
-      WHERE id = ?
-        AND estado = 'PENDIENTE'
-    `;
-    const params = [req.session.user.id, id];
+    const [[prioridadActual]] = await pool.query(
+      `SELECT
+         tp.id,
+         COALESCE(NULLIF(tp.sede, ''), un.sede) AS sede,
+         usr.usuario AS creado_por_nombre
+       FROM taller_prioridades tp
+       LEFT JOIN usuarios usr ON usr.id = tp.creado_por
+       LEFT JOIN unidades un ON UPPER(TRIM(un.placa)) = UPPER(TRIM(tp.placa))
+       WHERE tp.id = ?
+         AND tp.estado = 'PENDIENTE'
+       LIMIT 1`,
+      [id]
+    );
 
-    if (sedesPermitidas.length > 0) {
-      sql += " AND (sede IN (?) OR sede IS NULL OR sede = '')";
-      params.push(sedesPermitidas);
+    if (!prioridadActual) {
+      req.session.error = "No se encontró la prioridad pendiente.";
+      return res.redirect("/taller/dashboard");
     }
 
-    const [result] = await pool.query(sql, params);
+    if (esUsuarioPesados(req.session.user) && !esPrioridadPesados(prioridadActual)) {
+      req.session.error = "El usuario de Pesados solo puede atender prioridades de Granel o Transportadora.";
+      return res.redirect("/taller/dashboard");
+    }
+
+    if (esUsuarioMecanico(req.session.user) && esPrioridadPesados(prioridadActual)) {
+      req.session.error = "El usuario mecánico solo puede atender prioridades de taller/Cartago.";
+      return res.redirect("/taller/dashboard");
+    }
+
+    if (
+      sedesPermitidas.length > 0 &&
+      prioridadActual.sede &&
+      !sedesPermitidas
+        .map(sede => String(sede).trim().toUpperCase())
+        .includes(String(prioridadActual.sede).trim().toUpperCase())
+    ) {
+      req.session.error = "No tiene permiso para atender prioridades de esta sede.";
+      return res.redirect("/taller/dashboard");
+    }
+
+    const [result] = await pool.query(
+      `UPDATE taller_prioridades
+       SET estado = 'ATENDIDA',
+           atendido_por = ?,
+           atendido_en = NOW()
+       WHERE id = ?
+         AND estado = 'PENDIENTE'`,
+      [req.session.user.id, id]
+    );
+
     req.session[result.affectedRows ? "success" : "error"] = result.affectedRows
       ? "Prioridad marcada como atendida."
       : "No se encontró la prioridad o no tiene permiso para atenderla.";

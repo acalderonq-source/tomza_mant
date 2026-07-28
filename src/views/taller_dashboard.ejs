@@ -27,7 +27,7 @@
       color: var(--ink);
       font-family: "Segoe UI", Roboto, Arial, sans-serif;
       font-size: .95rem;
-      overflow: hidden;
+      overflow: auto;
     }
     .topbar {
       background: linear-gradient(120deg, #061638 0%, #07358f 58%, #e2232a 59%, #ffd400 68%, #374151 68%);
@@ -221,6 +221,9 @@
       font-size: 1.08rem;
       line-height: 1.25;
       font-weight: 900;
+      max-width: none;
+      overflow-wrap: anywhere;
+      white-space: normal;
     }
     .priority-badge {
       background: #fee2e2;
@@ -242,10 +245,39 @@
     .priority-panel .tv-table td {
       font-size: 1rem;
       padding: .58rem .65rem;
+      white-space: normal;
     }
     .priority-plate {
       font-size: 1.18rem;
       font-weight: 950;
+      overflow-wrap: normal;
+      white-space: nowrap;
+      word-break: keep-all;
+    }
+    .priority-table {
+      table-layout: fixed;
+      width: 100%;
+    }
+    .priority-table th:nth-child(1),
+    .priority-table td:nth-child(1) {
+      width: 26%;
+    }
+    .priority-table th:nth-child(2),
+    .priority-table td:nth-child(2) {
+      width: 45%;
+    }
+    .priority-table th:nth-child(3),
+    .priority-table td:nth-child(3) {
+      width: 20%;
+    }
+    .priority-table th:nth-child(4),
+    .priority-table td:nth-child(4) {
+      text-align: center;
+      width: 9%;
+    }
+    .priority-meta {
+      overflow-wrap: anywhere;
+      white-space: normal;
     }
     .priority-groups {
       display: grid;
@@ -266,29 +298,103 @@
     .priority-group {
       border-top: 1px solid #fed7aa;
     }
+    .priority-card-grid {
+      display: grid;
+      gap: .35rem;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      padding: .45rem;
+    }
+    .priority-card {
+      align-items: stretch;
+      background: #fff;
+      border: 1px solid #dbe3ef;
+      border-left: 4px solid #e2232a;
+      border-radius: 8px;
+      display: grid;
+      gap: .4rem;
+      grid-template-columns: minmax(95px, 28%) minmax(0, 1fr) auto;
+      min-height: 48px;
+      padding: .42rem .5rem;
+    }
+    .priority-card .priority-plate {
+      display: block;
+      font-size: 1.02rem;
+      line-height: 1.05;
+    }
+    .priority-card .priority-note {
+      color: #07183d;
+      font-size: .9rem;
+      line-height: 1.12;
+    }
+    .priority-card .priority-meta {
+      font-size: .7rem;
+      line-height: 1.1;
+    }
+    .priority-card .btn {
+      min-width: 30px;
+    }
+    .priority-modal .modal-content {
+      border: 0;
+      border-radius: 14px;
+      overflow: hidden;
+    }
+    .priority-modal .modal-header {
+      background: linear-gradient(90deg, #e2232a, #991b1b);
+      color: #fff;
+    }
+    .priority-modal .btn-close {
+      filter: invert(1);
+      opacity: .95;
+    }
     .compact-panel-body { max-height: calc(100vh - 185px); overflow: auto; }
+    .priority-panel .compact-panel-body {
+      overflow-x: hidden;
+      overflow-y: auto;
+    }
     .parts-panel .tv-panel-title {
       background: linear-gradient(90deg, #0f6684, #07358f);
       font-size: 1.25rem;
       padding: .72rem .85rem;
     }
     .parts-panel .compact-panel-body { max-height: calc(100vh - 185px); }
+    .parts-panel .compact-panel-body {
+      overflow-x: hidden;
+      overflow-y: auto;
+    }
+    .parts-table {
+      table-layout: fixed;
+      width: 100%;
+    }
+    .parts-table th:nth-child(1),
+    .parts-table td:nth-child(1) {
+      width: 25%;
+    }
+    .parts-table th:nth-child(2),
+    .parts-table td:nth-child(2) {
+      width: 55%;
+    }
+    .parts-table th:nth-child(3),
+    .parts-table td:nth-child(3) {
+      width: 20%;
+    }
     .parts-table td,
     .parts-table thead th {
       font-size: 1rem;
       padding: .58rem .65rem;
+      white-space: normal;
     }
     .parts-plate {
       color: #07183d;
       font-size: 1.18rem;
       font-weight: 950;
+      white-space: nowrap;
     }
     .parts-text {
-      display: -webkit-box;
+      display: block;
       font-weight: 850;
-      overflow: hidden;
-      -webkit-box-orient: vertical;
-      -webkit-line-clamp: 2;
+      overflow: visible;
+      overflow-wrap: anywhere;
+      white-space: normal;
     }
     .parts-status {
       border-radius: 999px;
@@ -318,6 +424,7 @@
       .board-grid,
       .dashboard-layout { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .latest-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .priority-card-grid { grid-template-columns: 1fr; }
     }
     @media (max-width: 720px) {
       .kpi-grid, .board-grid, .latest-strip, .dashboard-layout { grid-template-columns: 1fr; }
@@ -339,9 +446,27 @@
   const puedeAccionar = Boolean(puedeGestionar);
   const puedeEditarPrioridades = Boolean(puedeGestionarPrioridades);
   const prioridadesLista = Array.isArray(prioridades) ? prioridades : [];
-  const prioridadesPesadosLista = Array.isArray(prioridadesPesados) ? prioridadesPesados : [];
-  const prioridadesMecanicoLista = Array.isArray(prioridadesMecanico) ? prioridadesMecanico : prioridadesLista;
+  const usuarioDashboard = String(user.usuario || '').trim().toLowerCase();
+  const rolDashboard = String(user.rol || '').trim().toUpperCase();
+  const esPantallaPesados = usuarioDashboard.includes('pesado') || rolDashboard === 'SUPERVISOR_PESADO';
+  const esPantallaMecanico = !esPantallaPesados && (usuarioDashboard === 'mecanico' || rolDashboard === 'MECANICO');
+  const prioridadesPesadosBase = Array.isArray(prioridadesPesados) ? prioridadesPesados : [];
+  const prioridadesMecanicoBase = Array.isArray(prioridadesMecanico) ? prioridadesMecanico : [];
+  const prioridadesPesadosLista = esPantallaPesados && !prioridadesPesadosBase.length
+    ? prioridadesLista
+    : prioridadesPesadosBase;
+  const prioridadesMecanicoLista = esPantallaMecanico && !prioridadesMecanicoBase.length
+    ? prioridadesLista
+    : prioridadesMecanicoBase;
+  const mostrarPrioridadesPesados = esPantallaPesados || (!esPantallaPesados && !esPantallaMecanico);
+  const mostrarPrioridadesMecanico = esPantallaMecanico || (!esPantallaPesados && !esPantallaMecanico);
+  const prioridadesVisiblesLista = [
+    ...(mostrarPrioridadesPesados ? prioridadesPesadosLista : []),
+    ...(mostrarPrioridadesMecanico ? prioridadesMecanicoLista : [])
+  ];
   const repuestosLista = Array.isArray(solicitudesRepuestos) ? solicitudesRepuestos : [];
+  const fechaPrioridadModal = typeof fechaPrioridadDefault !== 'undefined' && fechaPrioridadDefault ? fechaPrioridadDefault : '';
+  const fechaPrioridadActual = typeof fechaPrioridadHoy !== 'undefined' && fechaPrioridadHoy ? fechaPrioridadHoy : '';
   const preventivosAbiertos = lista.filter(u => u.preventivo_plan).length;
   const fechaCorta = value => {
     if (!value) return '—';
@@ -431,112 +556,87 @@
       <section class="panel priority-panel">
         <div class="tv-panel-title priority-title d-flex justify-content-between align-items-center gap-2 flex-wrap">
           <span><i class="bi bi-exclamation-octagon me-1"></i> Prioridades</span>
-          <span class="badge text-bg-light text-dark">Hoy · <%= prioridadesLista.length %></span>
+          <div class="d-flex align-items-center gap-2 flex-wrap">
+            <span class="badge text-bg-light text-dark"><%= fechaPrioridadActual || 'Hoy' %> · <%= prioridadesVisiblesLista.length %></span>
+            <% if (puedeEditarPrioridades) { %>
+              <button type="button" class="btn btn-sm btn-light fw-bold py-0" data-bs-toggle="modal" data-bs-target="#agregarPrioridadModal">
+                <i class="bi bi-plus-circle"></i> Agregar
+              </button>
+            <% } %>
+          </div>
         </div>
 
-        <% if (puedeEditarPrioridades) { %>
-          <form method="POST" action="/taller/prioridades" class="priority-form">
-            <div class="row g-2 align-items-end">
-              <div class="col-md-3">
-                <label class="filter-label">Placa</label>
-                <input type="text" name="placa" class="form-control form-control-sm" placeholder="C173368" required>
-              </div>
-              <div class="col-md-7">
-                <label class="filter-label">Observación</label>
-                <input type="text" name="observacion" class="form-control form-control-sm" placeholder="Prioridad del día" required>
-              </div>
-              <div class="col-md-2">
-                <button class="btn btn-danger btn-sm w-100"><i class="bi bi-plus-circle"></i></button>
-              </div>
-            </div>
-          </form>
-        <% } %>
-
-        <% if (!prioridadesLista.length) { %>
+        <% if (!prioridadesVisiblesLista.length) { %>
           <div class="empty-state">No hay prioridades pendientes.</div>
         <% } else { %>
           <div class="compact-panel-body priority-groups">
-            <div class="priority-group">
-              <div class="priority-group-title">
-                <span>Pesados · Granel + Transportadora</span>
-                <span><%= prioridadesPesadosLista.length %></span>
-              </div>
-              <% if (!prioridadesPesadosLista.length) { %>
-                <div class="empty-state py-2">Sin prioridades de pesados.</div>
-              <% } else { %>
-                <div class="table-responsive">
-                  <table class="table table-bordered tv-table mb-0">
-                    <thead>
-                      <tr>
-                        <th>Placa</th>
-                        <th>Observación</th>
-                        <th>Por</th>
-                        <% if (puedeEditarPrioridades) { %><th>OK</th><% } %>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <% prioridadesPesadosLista.forEach(p => { %>
-                        <tr>
-                          <td><span class="priority-plate"><%= p.placa %></span><div class="muted small"><%= p.sede || 'Sin sede' %></div></td>
-                          <td class="work-cell priority-note"><%= p.observacion %></td>
-                          <td><%= p.creado_por_nombre || 'Taller' %><div class="muted small"><%= fechaCorta(p.creado_en) %></div></td>
-                          <% if (puedeEditarPrioridades) { %>
-                            <td>
-                              <form method="POST" action="/taller/prioridades/<%= p.id %>/atendida">
-                                <button class="btn btn-sm btn-success py-0 px-2" onclick="return confirm('¿Marcar esta prioridad como atendida?')">
-                                  <i class="bi bi-check"></i>
-                                </button>
-                              </form>
-                            </td>
-                          <% } %>
-                        </tr>
-                      <% }) %>
-                    </tbody>
-                  </table>
+            <% if (mostrarPrioridadesPesados) { %>
+              <div class="priority-group">
+                <div class="priority-group-title">
+                  <span>Pesados · Granel + Transportadora</span>
+                  <span><%= prioridadesPesadosLista.length %></span>
                 </div>
-              <% } %>
-            </div>
+                <% if (!prioridadesPesadosLista.length) { %>
+                  <div class="empty-state py-2">Sin prioridades de pesados.</div>
+                <% } else { %>
+                  <div class="priority-card-grid">
+                    <% prioridadesPesadosLista.forEach(p => { %>
+                      <article class="priority-card">
+                        <div>
+                          <span class="priority-plate"><%= p.placa %></span>
+                          <div class="muted priority-meta"><%= p.sede || 'Sin sede' %></div>
+                        </div>
+                        <div>
+                          <div class="priority-note"><%= p.observacion %></div>
+                          <div class="muted priority-meta"><%= p.creado_por_nombre || 'Taller' %> · <%= fechaCorta(p.creado_en) %></div>
+                        </div>
+                        <% if (puedeEditarPrioridades) { %>
+                          <form method="POST" action="/taller/prioridades/<%= p.id %>/atendida">
+                            <button class="btn btn-sm btn-success py-0 px-2" onclick="return confirm('¿Marcar esta prioridad como atendida?')">
+                              <i class="bi bi-check"></i>
+                            </button>
+                          </form>
+                        <% } %>
+                      </article>
+                    <% }) %>
+                  </div>
+                <% } %>
+              </div>
+            <% } %>
 
-            <div class="priority-group">
-              <div class="priority-group-title">
-                <span>Mecánico / Taller</span>
-                <span><%= prioridadesMecanicoLista.length %></span>
-              </div>
-              <% if (!prioridadesMecanicoLista.length) { %>
-                <div class="empty-state py-2">Sin prioridades de mecánico.</div>
-              <% } else { %>
-                <div class="table-responsive">
-                  <table class="table table-bordered tv-table mb-0">
-                    <thead>
-                      <tr>
-                        <th>Placa</th>
-                        <th>Observación</th>
-                        <th>Por</th>
-                        <% if (puedeEditarPrioridades) { %><th>OK</th><% } %>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <% prioridadesMecanicoLista.forEach(p => { %>
-                        <tr>
-                          <td><span class="priority-plate"><%= p.placa %></span><div class="muted small"><%= p.sede || 'Sin sede' %></div></td>
-                          <td class="work-cell priority-note"><%= p.observacion %></td>
-                          <td><%= p.creado_por_nombre || 'Taller' %><div class="muted small"><%= fechaCorta(p.creado_en) %></div></td>
-                          <% if (puedeEditarPrioridades) { %>
-                            <td>
-                              <form method="POST" action="/taller/prioridades/<%= p.id %>/atendida">
-                                <button class="btn btn-sm btn-success py-0 px-2" onclick="return confirm('¿Marcar esta prioridad como atendida?')">
-                                  <i class="bi bi-check"></i>
-                                </button>
-                              </form>
-                            </td>
-                          <% } %>
-                        </tr>
-                      <% }) %>
-                    </tbody>
-                  </table>
+            <% if (mostrarPrioridadesMecanico) { %>
+              <div class="priority-group">
+                <div class="priority-group-title">
+                  <span>Mecánico / Taller</span>
+                  <span><%= prioridadesMecanicoLista.length %></span>
                 </div>
-              <% } %>
-            </div>
+                <% if (!prioridadesMecanicoLista.length) { %>
+                  <div class="empty-state py-2">Sin prioridades de mecánico.</div>
+                <% } else { %>
+                  <div class="priority-card-grid">
+                    <% prioridadesMecanicoLista.forEach(p => { %>
+                      <article class="priority-card">
+                        <div>
+                          <span class="priority-plate"><%= p.placa %></span>
+                          <div class="muted priority-meta"><%= p.sede || 'Sin sede' %></div>
+                        </div>
+                        <div>
+                          <div class="priority-note"><%= p.observacion %></div>
+                          <div class="muted priority-meta"><%= p.creado_por_nombre || 'Taller' %> · <%= fechaCorta(p.creado_en) %></div>
+                        </div>
+                        <% if (puedeEditarPrioridades) { %>
+                          <form method="POST" action="/taller/prioridades/<%= p.id %>/atendida">
+                            <button class="btn btn-sm btn-success py-0 px-2" onclick="return confirm('¿Marcar esta prioridad como atendida?')">
+                              <i class="bi bi-check"></i>
+                            </button>
+                          </form>
+                        <% } %>
+                      </article>
+                    <% }) %>
+                  </div>
+                <% } %>
+              </div>
+            <% } %>
           </div>
         <% } %>
       </section>
@@ -582,6 +682,43 @@
       </section>
   </section>
 </main>
+
+<% if (puedeEditarPrioridades) { %>
+  <div class="modal fade priority-modal" id="agregarPrioridadModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <form method="POST" action="/taller/prioridades">
+          <div class="modal-header">
+            <div>
+              <h5 class="modal-title fw-bold mb-0"><i class="bi bi-exclamation-octagon me-1"></i> Agregar prioridad</h5>
+              <div class="small opacity-75">Seleccione la fecha para que aparezca en pantalla.</div>
+            </div>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+          </div>
+          <div class="modal-body">
+            <div class="mb-3">
+              <label class="form-label fw-bold">Fecha de prioridad</label>
+              <input type="date" name="fecha_prioridad" class="form-control" value="<%= fechaPrioridadModal %>" required>
+              <div class="form-text">Por defecto queda para mañana, útil cuando se cargan prioridades en la noche.</div>
+            </div>
+            <div class="mb-3">
+              <label class="form-label fw-bold">Placa</label>
+              <input type="text" name="placa" class="form-control text-uppercase" placeholder="C173368" required>
+            </div>
+            <div>
+              <label class="form-label fw-bold">Observación</label>
+              <textarea name="observacion" class="form-control" rows="3" placeholder="Prioridad para el día programado" required></textarea>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+            <button class="btn btn-danger"><i class="bi bi-save"></i> Guardar prioridad</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+<% } %>
 
 <script>
   function actualizarRelojTaller() {
