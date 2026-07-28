@@ -14,7 +14,7 @@ const {
 } = require("../utils/repuestosSolicitudes");
 
 const ROLES_PROVEEDURIA = ["PROVEEDURIA_TALLER", "PROVEEDURIA"];
-const ROLES_VER_REPUESTOS = ["ADMIN", "TALLER", ...ROLES_PROVEEDURIA];
+const ROLES_VER_REPUESTOS = ["ADMIN", "TALLER", "SUPERVISOR_PESADO", ...ROLES_PROVEEDURIA];
 const ROLES_GESTION_REPUESTOS = ["ADMIN", ...ROLES_PROVEEDURIA];
 const TODAS_SEDES = [
   "Cartago",
@@ -36,8 +36,15 @@ function requireAuth(req, res, next) {
   next();
 }
 
+function esUsuarioPesado(user) {
+  return user && (
+    user.rol === "SUPERVISOR_PESADO" ||
+    String(user.usuario || "").trim().toLowerCase() === "pesados"
+  );
+}
+
 function requireVerRepuestos(req, res, next) {
-  if (!ROLES_VER_REPUESTOS.includes(req.session.user.rol)) {
+  if (!ROLES_VER_REPUESTOS.includes(req.session.user.rol) && !esUsuarioPesado(req.session.user)) {
     return res.status(403).send("No autorizado");
   }
   next();
@@ -73,6 +80,10 @@ function redirectConFiltros(req, res) {
 function sedesDisponibles(req) {
   if (req.session.user.rol === "ADMIN" || ROLES_PROVEEDURIA.includes(req.session.user.rol)) {
     return TODAS_SEDES;
+  }
+
+  if (esUsuarioPesado(req.session.user)) {
+    return ["Transportadora", "Granel"];
   }
 
   const sedes = getSedesPermitidas(req);
