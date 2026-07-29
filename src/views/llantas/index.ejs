@@ -193,7 +193,7 @@
   const cotizadas = solicitudes.filter(s => s.estado === 'COTIZADA').length;
   const compradas = solicitudes.filter(s => s.estado === 'COMPRADA').length;
   const recibidas = solicitudes.filter(s => s.estado === 'RECIBIDA').length;
-  const puedeSolicitar = ['ADMIN', 'SUPERVISOR_PESADO', 'TALLER', 'MECANICO'].includes(user.rol);
+  const puedeSolicitar = ['ADMIN', 'SUPERVISOR', 'SUPERVISOR_PESADO', 'TALLER', 'MECANICO'].includes(user.rol);
   const badgeEstado = (estado) => {
     if (estado === 'RECIBIDA') return 'badge-closed';
     if (estado === 'COMPRADA') return 'badge-today';

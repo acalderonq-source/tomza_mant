@@ -313,7 +313,8 @@
   const puedeVerCompras = ['ADMIN', 'TALLER', 'PROVEEDURIA_TALLER', 'CONTABILIDAD'].includes(user.rol);
   const puedeVerOperaciones = user.rol !== 'CONTABILIDAD';
   const puedeVerReportesSupervisores = ['ADMIN', 'TALLER', 'MECANICO', 'SUPERVISOR', 'SUPERVISOR_PESADO'].includes(user.rol);
-  const puedeVerAceite = ['ADMIN', 'MECANICO'].includes(user.rol);
+  const puedeVerAceite = ['ADMIN', 'MECANICO'].includes(user.rol)
+    || String(user.usuario || '').trim().toLowerCase() === 'supervisor_rio_claro';
   const puedeVerAires = ['ADMIN', 'TALLER', 'MECANICO'].includes(user.rol);
   const puedeVerRevisionRuta = ['ADMIN', 'TALLER', 'MECANICO', 'SUPERVISOR', 'SUPERVISOR_PESADO'].includes(user.rol);
   const puedeVerGiras = ['ADMIN', 'TALLER', 'MECANICO', 'SUPERVISOR', 'SUPERVISOR_PESADO'].includes(user.rol);

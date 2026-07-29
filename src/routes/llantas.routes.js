@@ -12,7 +12,8 @@ const PDF_TMP_DIR = path.join(process.cwd(), "tmp");
 const ROLES_COTIZAR = ["ADMIN", "PROVEEDURIA_TALLER", "PROVEEDURIA"];
 const ROLES_COMPRAR = ["ADMIN", "PROVEEDURIA_TALLER", "PROVEEDURIA"];
 const ROLES_RECIBIR = ["ADMIN", "TALLER", "MECANICO"];
-const ROLES_VER_COTIZACION = ["ADMIN", "TALLER", "PROVEEDURIA_TALLER", "PROVEEDURIA", "SUPERVISOR_PESADO", "MECANICO"];
+const ROLES_VER_COTIZACION = ["ADMIN", "TALLER", "PROVEEDURIA_TALLER", "PROVEEDURIA", "SUPERVISOR", "SUPERVISOR_PESADO", "MECANICO"];
+const ROLES_SOLICITAR = ["ADMIN", "SUPERVISOR", "SUPERVISOR_PESADO", "TALLER", "MECANICO"];
 const TODAS_SEDES = [
   "Cartago",
   "Guapiles",
@@ -428,7 +429,7 @@ router.post("/comprar-multiple", allowRoles(...ROLES_COMPRAR), async (req, res) 
   }
 });
 
-router.post("/solicitar", allowRoles("ADMIN", "SUPERVISOR_PESADO", "TALLER", "MECANICO"), async (req, res) => {
+router.post("/solicitar", allowRoles(...ROLES_SOLICITAR), async (req, res) => {
   try {
     await ensureTables();
     const { unidad_id, medida, cantidad, posicion, marca_sugerida, motivo, observaciones } = req.body;
