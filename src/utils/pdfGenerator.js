@@ -32,7 +32,7 @@ function generarPDFOrden(orden, lineas, proveedor) {
         }
       },
       { text: `Subtotal: ${orden.subtotal}`, alignment: 'right', margin: [0, 10, 0, 0] },
-      { text: `Descuento: ${orden.descuento}%`, alignment: 'right' },
+      { text: `Descuento: ${orden.descuento}`, alignment: 'right' },
       { text: `Transporte: ${orden.transporte}`, alignment: 'right' },
       { text: `IVA (${orden.iva}%): ${(orden.total - (orden.subtotal - orden.descuento + orden.transporte)).toFixed(2)}`, alignment: 'right' },
       { text: `TOTAL: ${orden.total}`, style: 'total', alignment: 'right' },

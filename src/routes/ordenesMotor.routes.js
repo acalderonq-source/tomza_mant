@@ -3,6 +3,7 @@ const router = express.Router();
 const pool = require("../db");
 const fs = require("fs");
 const path = require("path");
+const { generarPDFOrden } = require("../utils/pdfOrdenCompra");
 
 const ROLES_MOTOR = ["ADMIN", "TALLER", "PROVEEDURIA_TALLER"];
 
@@ -126,6 +127,25 @@ function normalizarLineas(lineas = []) {
       };
     })
     .filter(linea => linea.descripcion);
+}
+
+function calcularTotalesOrden(lineasOrden, valores = {}) {
+  const subtotal = lineasOrden.reduce((sum, linea) => sum + Number(linea.subtotal || 0), 0);
+  const descuento = Math.max(Number(valores.descuento || 0), 0);
+  const transporte = Number(valores.transporte || 0);
+  const iva = valores.iva === null || valores.iva === undefined || valores.iva === ""
+    ? 13
+    : Number(valores.iva || 0);
+  const baseIva = Math.max(subtotal - descuento, 0) + transporte;
+  const total = baseIva + (baseIva * iva / 100);
+
+  return {
+    subtotal: subtotal.toFixed(2),
+    descuento: descuento.toFixed(2),
+    transporte: transporte.toFixed(2),
+    iva: iva.toFixed(2),
+    total: total.toFixed(2)
+  };
 }
 
 function obtenerPlacaOrden(lineasOrden, placaUnidad = null) {
@@ -289,11 +309,7 @@ router.post("/", requireAuth, requireMotor, async (req, res) => {
       return res.status(400).send("Debe agregar al menos una línea");
     }
 
-    const subtotal = Number(req.body.subtotal || lineas.reduce((sum, linea) => sum + Number(linea.subtotal || 0), 0));
-    const descuento = Number(req.body.descuento || 0);
-    const transporte = Number(req.body.transporte || 0);
-    const iva = Number(req.body.iva || 0);
-    const total = Number(req.body.total || 0);
+    const totalesOrden = calcularTotalesOrden(lineas, req.body);
     const numero = await generarNumeroMotor();
     const placaOrden = obtenerPlacaOrden(lineas, req.body.placa_unidad);
     const cotizacion = guardarCotizacionMotor(req.body.cotizacion_data, req.body.cotizacion_nombre, req.body.cotizacion_tipo, req.session.user.id);
@@ -311,11 +327,11 @@ router.post("/", requireAuth, requireMotor, async (req, res) => {
         String(req.body.motor || "").trim() || null,
         req.body.forma_pago || null,
         req.body.moneda || "CRC",
-        subtotal,
-        descuento,
-        transporte,
-        iva,
-        total,
+        totalesOrden.subtotal,
+        totalesOrden.descuento,
+        totalesOrden.transporte,
+        totalesOrden.iva,
+        totalesOrden.total,
         req.body.observaciones || null,
         cotizacion ? cotizacion.archivo : null,
         cotizacion ? cotizacion.nombre : null,
@@ -357,11 +373,7 @@ router.post("/:id/editar", requireAuth, requireMotor, async (req, res) => {
       return res.status(400).send("Debe agregar al menos una línea");
     }
 
-    const subtotal = Number(req.body.subtotal || lineas.reduce((sum, linea) => sum + Number(linea.subtotal || 0), 0));
-    const descuento = Number(req.body.descuento || 0);
-    const transporte = Number(req.body.transporte || 0);
-    const iva = Number(req.body.iva || 0);
-    const total = Number(req.body.total || 0);
+    const totalesOrden = calcularTotalesOrden(lineas, req.body);
     const placaOrden = obtenerPlacaOrden(lineas, req.body.placa_unidad);
     const cotizacion = guardarCotizacionMotor(req.body.cotizacion_data, req.body.cotizacion_nombre, req.body.cotizacion_tipo, req.session.user.id);
 
@@ -376,11 +388,11 @@ router.post("/:id/editar", requireAuth, requireMotor, async (req, res) => {
       String(req.body.motor || "").trim() || null,
       req.body.forma_pago || null,
       req.body.moneda || "CRC",
-      subtotal,
-      descuento,
-      transporte,
-      iva,
-      total,
+      totalesOrden.subtotal,
+      totalesOrden.descuento,
+      totalesOrden.transporte,
+      totalesOrden.iva,
+      totalesOrden.total,
       req.body.observaciones || null,
       req.body.empresa_destino || "GAS TOMZA"
     ];
@@ -441,6 +453,37 @@ router.post("/:id/eliminar", requireAuth, requireMotor, async (req, res) => {
   }
 });
 
+router.get("/:id/pdf", requireAuth, requireMotor, async (req, res) => {
+  try {
+    await ensureOrdenesMotorTables();
+    const [[orden]] = await pool.query(
+      `SELECT om.*, p.nombre AS proveedor_nombre, p.cedula_juridica, p.telefono, p.email
+       FROM ordenes_motor om
+       LEFT JOIN proveedores p ON p.id = om.proveedor_id
+       WHERE om.id = ?`,
+      [req.params.id]
+    );
+    if (!orden) return res.status(404).send("Orden motor no encontrada");
+
+    orden.po_numero = orden.numero;
+    const proveedor = {
+      nombre: orden.proveedor_nombre || "Sin proveedor",
+      cedula: orden.cedula_juridica,
+      telefono: orden.telefono,
+      email: orden.email
+    };
+    const [lineas] = await pool.query("SELECT * FROM ordenes_motor_detalle WHERE orden_motor_id = ? ORDER BY id", [req.params.id]);
+    const pdfBuffer = await generarPDFOrden(orden, proveedor, lineas);
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename=orden_motor_${orden.numero}.pdf`);
+    res.send(pdfBuffer);
+  } catch (error) {
+    console.error("Error generando PDF de orden motor:", error);
+    res.status(500).send("Error generando PDF de orden motor");
+  }
+});
+
 router.get("/:id", requireAuth, requireMotor, async (req, res) => {
   try {
     await ensureOrdenesMotorTables();
@@ -464,7 +507,8 @@ router.get("/:id", requireAuth, requireMotor, async (req, res) => {
       tituloDetalle: "Detalle de Orden Motor",
       volverUrl: "/ordenes-motor",
       editarUrl: `/ordenes-motor/${orden.id}/editar`,
-      permitePdf: false
+      permitePdf: true,
+      pdfUrl: `/ordenes-motor/${orden.id}/pdf`
     });
   } catch (error) {
     console.error("Error cargando detalle motor:", error);

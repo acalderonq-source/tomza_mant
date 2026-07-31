@@ -101,11 +101,10 @@ function generarBuffer(docDefinition) {
 async function generarPDFOrden(orden, proveedor = {}, lineas = []) {
   const empresa = getEmpresa(orden);
   const subtotal = toNumber(orden.subtotal);
-  const descuentoPorc = toNumber(orden.descuento);
+  const montoDescuento = toNumber(orden.descuento);
   const transporte = toNumber(orden.transporte);
   const ivaPorc = orden.iva === null || orden.iva === undefined || orden.iva === "" ? 13 : toNumber(orden.iva);
-  const montoDescuento = subtotal * descuentoPorc / 100;
-  const subtotalConDescuento = subtotal - montoDescuento;
+  const subtotalConDescuento = Math.max(subtotal - montoDescuento, 0);
   const baseIva = subtotalConDescuento + transporte;
   const montoIva = baseIva * ivaPorc / 100;
   const total = toNumber(orden.total) || (baseIva + montoIva);
@@ -224,7 +223,7 @@ async function generarPDFOrden(orden, proveedor = {}, lineas = []) {
               widths: ["*", 90],
               body: [
                 ["Subtotal", { text: formatMoney(subtotal), alignment: "right" }],
-                [`Descuento (${formatMoney(descuentoPorc)}%)`, { text: formatMoney(montoDescuento), alignment: "right" }],
+                ["Descuento", { text: formatMoney(montoDescuento), alignment: "right" }],
                 ["Transporte", { text: formatMoney(transporte), alignment: "right" }],
                 ["Subtotal gravable", { text: formatMoney(baseIva), alignment: "right" }],
                 [`IVA (${formatMoney(ivaPorc)}%)`, { text: formatMoney(montoIva), alignment: "right" }],

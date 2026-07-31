@@ -94,7 +94,7 @@
           </tbody>
           <tfoot>
             <tr><td colspan="4" class="text-end"><strong>Subtotal</strong></td><td><input type="text" id="subtotal" name="subtotal" readonly class="form-control-plaintext money" value="<%= safeOrden.subtotal || '' %>"></td><td></td></tr>
-            <tr><td colspan="4" class="text-end"><strong>Descuento (%)</strong></td><td><input type="number" id="descuento" name="descuento" step="0.01" value="<%= safeOrden.descuento ?? 0 %>" class="form-control"></td><td></td></tr>
+            <tr><td colspan="4" class="text-end"><strong>Descuento monto</strong></td><td><input type="number" id="descuento" name="descuento" step="0.01" min="0" value="<%= safeOrden.descuento ?? 0 %>" class="form-control"></td><td></td></tr>
             <tr><td colspan="4" class="text-end"><strong>Transporte</strong></td><td><input type="number" id="transporte" name="transporte" step="0.01" value="<%= safeOrden.transporte ?? 0 %>" class="form-control"></td><td></td></tr>
             <tr><td colspan="4" class="text-end"><strong>IVA (%)</strong></td><td><input type="number" id="iva" name="iva" step="0.01" value="<%= safeOrden.iva ?? 13 %>" class="form-control"></td><td></td></tr>
             <tr><td colspan="4" class="text-end"><strong>Total</strong></td><td><input type="text" id="total" name="total" readonly class="form-control-plaintext fw-bold money" value="<%= safeOrden.total || '' %>"></td><td></td></tr>
@@ -188,10 +188,10 @@
     document.querySelectorAll(".subtotal").forEach(el => {
       subtotal += parseFloat(el.value) || 0;
     });
-    const descuento = parseFloat(document.getElementById("descuento").value) || 0;
+    const descuento = Math.max(parseFloat(document.getElementById("descuento").value) || 0, 0);
     const transporte = parseFloat(document.getElementById("transporte").value) || 0;
     const ivaPorc = parseFloat(document.getElementById("iva").value) || 0;
-    const subtotalDespuesDescuento = subtotal - (subtotal * descuento / 100);
+    const subtotalDespuesDescuento = Math.max(subtotal - descuento, 0);
     const totalConTransporte = subtotalDespuesDescuento + transporte;
     const iva = totalConTransporte * ivaPorc / 100;
     const total = totalConTransporte + iva;

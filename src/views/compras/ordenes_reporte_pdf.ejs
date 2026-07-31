@@ -219,7 +219,7 @@
           <td><%= orden.forma_pago || '—' %></td>
           <td><%= orden.moneda || '—' %></td>
           <td class="money"><%= Number(orden.subtotal || 0).toLocaleString('es-CR') %></td>
-          <td class="money"><%= Number(orden.descuento || 0).toLocaleString('es-CR') %>%</td>
+          <td class="money"><%= Number(orden.descuento || 0).toLocaleString('es-CR') %></td>
           <td class="money"><%= Number(orden.transporte || 0).toLocaleString('es-CR') %></td>
           <td class="money"><%= Number(orden.iva || 0).toLocaleString('es-CR') %>%</td>
           <td class="money"><strong><%= Number(orden.total || 0).toLocaleString('es-CR') %></strong></td>

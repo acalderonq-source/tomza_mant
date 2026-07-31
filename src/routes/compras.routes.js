@@ -53,14 +53,38 @@ function normalizarLineas(lineas) {
   const lineasArray = Array.isArray(lineas) ? lineas : Object.values(lineas);
 
   return lineasArray
-    .map(linea => ({
-      codigo: normalizarPlaca(linea.codigo),
-      descripcion: String(linea.descripcion || "").trim(),
-      cantidad: linea.cantidad || 0,
-      precio_unitario: linea.precio_unitario || 0,
-      subtotal: linea.subtotal || 0
-    }))
+    .map(linea => {
+      const cantidad = parseMontoCotizacion(linea.cantidad) || 0;
+      const precioUnitario = parseMontoCotizacion(linea.precio_unitario) || 0;
+      const subtotal = cantidad * precioUnitario;
+      return {
+        codigo: normalizarPlaca(linea.codigo),
+        descripcion: String(linea.descripcion || "").trim(),
+        cantidad,
+        precio_unitario: precioUnitario,
+        subtotal
+      };
+    })
     .filter(linea => linea.descripcion);
+}
+
+function calcularTotalesOrden(lineasOrden, valores = {}) {
+  const subtotal = lineasOrden.reduce((sum, linea) => sum + (parseMontoCotizacion(linea.subtotal) || 0), 0);
+  const descuento = Math.max(parseMontoCotizacion(valores.descuento), 0);
+  const transporte = parseMontoCotizacion(valores.transporte);
+  const iva = valores.iva === null || valores.iva === undefined || valores.iva === ""
+    ? 13
+    : parseMontoCotizacion(valores.iva);
+  const baseIva = Math.max(subtotal - descuento, 0) + transporte;
+  const total = baseIva + (baseIva * iva / 100);
+
+  return {
+    subtotal: subtotal.toFixed(2),
+    descuento: descuento.toFixed(2),
+    transporte: transporte.toFixed(2),
+    iva: iva.toFixed(2),
+    total: total.toFixed(2)
+  };
 }
 
 function normalizarPlaca(value) {
@@ -684,7 +708,7 @@ router.post("/ordenes", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_
     const po_numero = await generarNumeroPO();
     const fecha = new Date().toISOString().slice(0, 10);
 
-    const { proveedor_id, forma_pago, moneda, placa_unidad, lineas, subtotal, descuento, transporte, iva, total, observaciones, empresa_destino, cotizacion_data, cotizacion_nombre, cotizacion_tipo } = req.body;
+    const { proveedor_id, forma_pago, moneda, placa_unidad, lineas, observaciones, empresa_destino, cotizacion_data, cotizacion_nombre, cotizacion_tipo } = req.body;
     const lineasOrden = normalizarLineas(lineas);
     const placaOrden = obtenerPlacaOrden(lineasOrden, placa_unidad);
     const cotizacion = guardarCotizacionOrden(cotizacion_data, cotizacion_nombre, cotizacion_tipo, req.session.user.id);
@@ -693,6 +717,8 @@ router.post("/ordenes", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_
       await connection.rollback();
       return res.status(400).send("Debe agregar al menos una línea a la orden");
     }
+
+    const totalesOrden = calcularTotalesOrden(lineasOrden, req.body);
 
     const [result] = await connection.query(
       `INSERT INTO ordenes_compra
@@ -705,11 +731,11 @@ router.post("/ordenes", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_
         forma_pago,
         moneda,
         placaOrden,
-        subtotal,
-        descuento,
-        transporte,
-        iva,
-        total,
+        totalesOrden.subtotal,
+        totalesOrden.descuento,
+        totalesOrden.transporte,
+        totalesOrden.iva,
+        totalesOrden.total,
         observaciones || null,
         cotizacion ? cotizacion.archivo : null,
         cotizacion ? cotizacion.nombre : null,
@@ -747,7 +773,7 @@ router.post("/ordenes/:id/editar", requireAuth, allowRoles("ADMIN", "TALLER", "P
     await connection.beginTransaction();
 
     const id = req.params.id;
-    const { proveedor_id, forma_pago, moneda, placa_unidad, lineas, subtotal, descuento, transporte, iva, total, observaciones, empresa_destino, cotizacion_data, cotizacion_nombre, cotizacion_tipo } = req.body;
+    const { proveedor_id, forma_pago, moneda, placa_unidad, lineas, observaciones, empresa_destino, cotizacion_data, cotizacion_nombre, cotizacion_tipo } = req.body;
     const lineasOrden = normalizarLineas(lineas);
     const placaOrden = obtenerPlacaOrden(lineasOrden, placa_unidad);
     const cotizacion = guardarCotizacionOrden(cotizacion_data, cotizacion_nombre, cotizacion_tipo, req.session.user.id);
@@ -756,6 +782,8 @@ router.post("/ordenes/:id/editar", requireAuth, allowRoles("ADMIN", "TALLER", "P
       await connection.rollback();
       return res.status(400).send("Debe agregar al menos una línea a la orden");
     }
+
+    const totalesOrden = calcularTotalesOrden(lineasOrden, req.body);
 
     const [[orden]] = await connection.query("SELECT id FROM ordenes_compra WHERE id = ?", [id]);
     if (!orden) {
@@ -776,7 +804,19 @@ router.post("/ordenes/:id/editar", requireAuth, allowRoles("ADMIN", "TALLER", "P
            observaciones = ?,
            empresa_destino = ?
     `;
-    const updateParams = [proveedor_id, forma_pago, moneda, placaOrden, subtotal, descuento, transporte, iva, total, observaciones || null, empresa_destino || 'GAS TOMZA'];
+    const updateParams = [
+      proveedor_id,
+      forma_pago,
+      moneda,
+      placaOrden,
+      totalesOrden.subtotal,
+      totalesOrden.descuento,
+      totalesOrden.transporte,
+      totalesOrden.iva,
+      totalesOrden.total,
+      observaciones || null,
+      empresa_destino || 'GAS TOMZA'
+    ];
 
     if (cotizacion) {
       updateSql += `,
@@ -1003,7 +1043,7 @@ router.post("/cotizacion/analizar", requireAuth, allowRoles("ADMIN", "TALLER", "
       '  "forma_pago": "contado, credito, transferencia, etc si aparece",',
       '  "moneda": "CRC o USD",',
       '  "placa_unidad": "placa si aparece, si no null",',
-      '  "descuento": numero porcentaje o 0,',
+      '  "descuento": monto numerico de descuento o 0, no porcentaje,',
       '  "transporte": monto numerico o 0,',
       '  "iva": porcentaje numerico, normalmente 13 si aplica, 0 si indica exento,',
       '  "observaciones": "notas utiles breves",',

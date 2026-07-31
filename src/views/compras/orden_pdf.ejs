@@ -360,12 +360,11 @@ table{
 
   <% 
     const subtotal = parseFloat(orden.subtotal) || 0;
-    const descuentoPorc = parseFloat(orden.descuento) || 0;
+    const montoDescuento = parseFloat(orden.descuento) || 0;
     const transporte = parseFloat(orden.transporte) || 0;
     const ivaPorc = parseFloat(orden.iva) || 13;
 
-    const montoDescuento = subtotal * descuentoPorc / 100;
-    const subtotalConDescuento = subtotal - montoDescuento;
+    const subtotalConDescuento = Math.max(subtotal - montoDescuento, 0);
     const totalConTransporte = subtotalConDescuento + transporte;
     const montoIVA = totalConTransporte * ivaPorc / 100;
     const total = totalConTransporte + montoIVA;
@@ -386,7 +385,7 @@ table{
         <td class="amount"><%= subtotal.toLocaleString('es-CR') %></td>
       </tr>
       <tr>
-        <td>Descuento (%) <span class="percent"><%= descuentoPorc %></span></td>
+        <td>Descuento</td>
         <td class="amount"><%= montoDescuento.toLocaleString('es-CR') %></td>
       </tr>
       <tr>

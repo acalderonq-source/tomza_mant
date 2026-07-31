@@ -130,7 +130,7 @@
         <div class="col-md-4">
           <table class="table table-sm table-borderless">
             <tr><td><strong>Subtotal</strong></td><td class="money"><%= parseFloat(orden.subtotal).toLocaleString('es-CR') %></td></tr>
-            <tr><td><strong>Descuento</strong></td><td class="text-end"><%= orden.descuento %>%</td></tr>
+            <tr><td><strong>Descuento</strong></td><td class="money"><%= parseFloat(orden.descuento || 0).toLocaleString('es-CR') %></td></tr>
             <tr><td><strong>Transporte</strong></td><td class="money"><%= parseFloat(orden.transporte).toLocaleString('es-CR') %></td></tr>
             <tr><td><strong>IVA</strong></td><td class="text-end"><%= orden.iva %>%</td></tr>
             <tr class="bg-light"><td><strong>TOTAL</strong></td><td class="money fw-bold"><%= parseFloat(orden.total).toLocaleString('es-CR') %></td></tr>
