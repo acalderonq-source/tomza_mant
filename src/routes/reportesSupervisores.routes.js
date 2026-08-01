@@ -26,10 +26,7 @@ function allowRoles(...roles) {
 
 async function obtenerSedesPermitidas(req) {
   const user = req.session.user;
-  if (user.rol === "ADMIN") {
-    if (req.session.sedeSeleccionada && req.session.sedeSeleccionada !== "TODAS") {
-      return [req.session.sedeSeleccionada];
-    }
+  if (["ADMIN", "TALLER"].includes(user.rol)) {
     return [];
   }
 
@@ -104,10 +101,13 @@ function htmlATextoPlano(value) {
     .replace(/<\/(?:div|p|li)>/gi, ", ")
     .replace(/<[^>]+>/g, "")
   )
+    .replace(/[\p{Extended_Pictographic}\uFE0F]/gu, " ")
+    .replace(/[★☆✦✧❖◆◇■□●○]/g, " ")
     .replace(/\s+/g, " ")
     .replace(/\s*,\s*/g, ", ")
     .replace(/,+/g, ",")
     .replace(/,\s*$/g, "")
+    .toLowerCase()
     .trim();
 }
 
@@ -145,7 +145,7 @@ function sanitizarReporteHtml(value) {
   }
 
   resultado += sanitizarFragmentoHtml(preparado.slice(ultimoIndice));
-  return resultado
+  const limpio = resultado
     .replace(/([A-Za-zÁÉÍÓÚÑáéíóúñ0-9])<span/g, "$1 <span")
     .replace(/<\/span>([A-Za-zÁÉÍÓÚÑáéíóúñ0-9])/g, "</span> $1")
     .replace(/\s+/g, " ")
@@ -154,6 +154,9 @@ function sanitizarReporteHtml(value) {
     .replace(/,+/g, ",")
     .replace(/,\s*$/g, "")
     .trim();
+
+  if (!limpio) return "";
+  return /[.!?]\s*(?:<\/span>)?\s*$/.test(limpio) ? limpio : `${limpio}.`;
 }
 
 function renderReporteHtml(value) {

@@ -101,19 +101,24 @@ function tokenizar(texto) {
     .filter(token => token.length > 2 && !PALABRAS_VACIAS.has(token));
 }
 
-function capitalizarFrase(texto) {
-  const limpio = String(texto || "").trim();
-  if (!limpio) return "";
-  return limpio.charAt(0).toUpperCase() + limpio.slice(1);
+function quitarEmojis(texto) {
+  return String(texto || "")
+    .replace(/[\p{Extended_Pictographic}\uFE0F]/gu, " ")
+    .replace(/[★☆✦✧❖◆◇■□●○]/g, " ");
 }
 
 function limpiarTextoReporte(texto) {
   let limpio = String(texto || "")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/gi, " ")
     .replace(/[“”"']/g, "")
+    .replace(/[_*~`]+/g, " ")
     .replace(/\r?\n+/g, ", ")
     .replace(/[;|]+/g, ", ")
     .replace(/\s+/g, " ")
     .trim();
+
+  limpio = quitarEmojis(limpio);
 
   limpio = limpio
     .replace(/^\s*(?:#?\d+[\).:-]?|[-•])\s*/g, "")
@@ -150,7 +155,10 @@ function limpiarTextoReporte(texto) {
     .replace(/\s+\./g, ".")
     .trim();
 
-  limpio = capitalizarFrase(limpio);
+  limpio = quitarEmojis(limpio)
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim();
   if (!/[.!?]$/.test(limpio)) limpio += ".";
   return limpio;
 }

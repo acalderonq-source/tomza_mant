@@ -57,7 +57,7 @@
 </head>
 <body>
 <nav class="navbar navbar-dark px-3 py-2">
-  <span class="navbar-brand fw-semibold"><i class="bi bi-clipboard-pulse"></i> Reportes de supervisores</span>
+  <span class="navbar-brand fw-semibold">Reportes de supervisores</span>
   <div class="d-flex align-items-center gap-2 flex-wrap">
     <span class="text-white small"><%= user.usuario %> (<%= user.rol %>)</span>
     <a href="/mantenimientos" class="btn btn-outline-light btn-sm">Mantenimientos</a>
@@ -82,12 +82,8 @@
       <p class="page-subtitle">Taller/admin edita, marca lo importante y confirma cuando un correctivo resolvió el reporte.</p>
     </div>
     <div class="d-flex gap-2 flex-wrap">
-      <a href="<%= excelGeneralUrl %>" class="btn btn-success btn-sm">
-        <i class="bi bi-file-earmark-excel"></i> Descargar todo
-      </a>
-      <a href="/reportes-supervisores/historial" class="btn btn-outline-dark btn-sm">
-        <i class="bi bi-clock-history"></i> Historial
-      </a>
+      <a href="<%= excelGeneralUrl %>" class="btn btn-success btn-sm">Descargar todo</a>
+      <a href="/reportes-supervisores/historial" class="btn btn-outline-dark btn-sm">Historial</a>
     </div>
   </div>
 
@@ -96,7 +92,7 @@
 
   <% if (puedeCrear) { %>
     <section class="surface-card p-3 mb-3">
-      <h2 class="page-title fs-5 mb-3"><i class="bi bi-plus-circle"></i> Nuevo reporte</h2>
+      <h2 class="page-title fs-5 mb-3">Nuevo reporte</h2>
       <form method="POST" action="/reportes-supervisores" class="row g-3">
         <div class="col-lg-4">
           <label class="form-label">Unidad</label>
@@ -112,7 +108,7 @@
           <textarea name="descripcion_original" class="form-control" placeholder="Ej: revisar frenos, fuga de aceite..." required></textarea>
         </div>
         <div class="col-lg-2 d-flex align-items-end">
-          <button class="btn btn-dark w-100"><i class="bi bi-save"></i> Guardar</button>
+          <button class="btn btn-dark w-100">Guardar</button>
         </div>
       </form>
     </section>
@@ -120,7 +116,7 @@
 
   <% if (puedeEditar && sugerencias.length) { %>
     <section class="mb-3">
-      <h2 class="page-title fs-5 mb-2"><i class="bi bi-stars"></i> Sugerencias por correctivos</h2>
+      <h2 class="page-title fs-5 mb-2">Sugerencias por correctivos</h2>
       <% sugerencias.forEach(s => { %>
         <article class="suggestion-card">
           <div class="d-flex justify-content-between gap-3 flex-wrap">
@@ -207,15 +203,11 @@
                   <div class="sheet-title-row">
                     <span><%= sedeNombre %></span>
                     <span class="sheet-actions">
-                      <a href="<%= excelSedeUrl %>" class="btn btn-success btn-sm py-0 px-2">
-                        <i class="bi bi-file-earmark-excel"></i> Excel
-                      </a>
+                      <a href="<%= excelSedeUrl %>" class="btn btn-success btn-sm py-0 px-2">Excel</a>
                       <% if (puedeEditar) { %>
                         <form method="POST" action="/reportes-supervisores/limpiar-tabla" class="d-inline" onsubmit="return confirm('¿Reescribir con IA toda esta tabla?');">
                           <input type="hidden" name="sede" value="<%= sedeNombre %>">
-                          <button class="btn btn-primary btn-sm py-0 px-2">
-                            <i class="bi bi-stars"></i> Reescribir IA
-                          </button>
+                          <button class="btn btn-primary btn-sm py-0 px-2">Reescribir IA</button>
                         </form>
                       <% } %>
                     </span>
@@ -248,7 +240,7 @@
                           <div class="row g-3">
                             <div class="col-lg-4">
                               <div class="meta">Original</div>
-                              <div><%= r.descripcion_original %></div>
+                              <div><%- pintarReporte(r.descripcion_original) %></div>
                               <div class="meta mt-2">
                                 <%= r.supervisor_nombre || 'Supervisor' %> ·
                                 <%= r.fecha_reporte ? new Date(r.fecha_reporte).toLocaleString('es-CR') : '' %> ·
@@ -259,16 +251,14 @@
                               <form method="POST" action="/reportes-supervisores/<%= r.id %>/editar" class="rich-report-form">
                                 <label class="form-label small fw-bold">Texto corregido</label>
                                 <div class="format-toolbar">
-                                  <button type="button" class="btn btn-outline-danger btn-sm js-mark-red">
-                                    <i class="bi bi-type"></i> Rojo
-                                  </button>
+                                  <button type="button" class="btn btn-outline-danger btn-sm js-mark-red">Rojo</button>
                                   <button type="button" class="btn btn-outline-secondary btn-sm js-remove-format">
                                     Quitar formato
                                   </button>
                                   <span class="meta">Seleccione letras, palabra o frase y presione Rojo.</span>
                                 </div>
-                                <div class="rich-editor mb-2" contenteditable="true"><%- pintarReporte(r.descripcion_limpia || r.descripcion_original) %></div>
-                                <input type="hidden" name="descripcion_limpia" class="rich-editor-value" value="<%= r.descripcion_limpia || r.descripcion_original || '' %>">
+                                <div class="rich-editor mb-2" contenteditable="true"><%- reporteHtml %></div>
+                                <input type="hidden" name="descripcion_limpia" class="rich-editor-value" value="<%= reporteHtml %>">
                                 <label class="form-label small fw-bold">Nota taller/admin</label>
                                 <textarea name="nota_taller" class="form-control mb-2" rows="2"><%= r.nota_taller || '' %></textarea>
                                 <div class="d-flex gap-2 flex-wrap align-items-center">
@@ -285,7 +275,7 @@
                               </form>
                               <div class="d-flex gap-2 flex-wrap mt-2">
                                 <form method="POST" action="/reportes-supervisores/<%= r.id %>/limpiar-ia">
-                                  <button class="btn btn-outline-primary btn-sm"><i class="bi bi-stars"></i> Limpiar texto</button>
+                                  <button class="btn btn-outline-primary btn-sm">Limpiar texto</button>
                                 </form>
                                 <form method="POST" action="/reportes-supervisores/<%= r.id %>/cerrar" class="d-flex gap-2">
                                   <input type="text" name="motivo" class="form-control form-control-sm" placeholder="Motivo de cierre manual">
