@@ -7,23 +7,43 @@ const PALABRAS_VACIAS = new Set([
 const CORRECCIONES = [
   [/\bfrenos?\b/gi, "frenos"],
   [/\bengrase\b/gi, "engrase"],
+  [/\bengras[ae]r?\b/gi, "engrase"],
   [/\baceyte\b/gi, "aceite"],
+  [/\baceit[e]?\b/gi, "aceite"],
   [/\bdirrec?cion\b/gi, "dirección"],
+  [/\bdirecion\b/gi, "dirección"],
+  [/\bhidraulica\b/gi, "hidráulica"],
   [/\bhidraulico\b/gi, "hidráulico"],
+  [/\bbaterias?\b/gi, "baterías"],
   [/\bbateria\b/gi, "batería"],
   [/\bradiador\b/gi, "radiador"],
   [/\bmanib?ela\b/gi, "manivela"],
   [/\bclucth\b/gi, "clutch"],
+  [/\bcluth\b/gi, "clutch"],
   [/\bcaja\b/gi, "caja"],
   [/\bdiferencial\b/gi, "diferencial"],
   [/\bfuga\b/gi, "fuga"],
   [/\bluces?\b/gi, "luces"],
   [/\bquemad[ao]s?\b/gi, "quemadas"],
+  [/\bextrañ[ao]\b/gi, "extraño"],
   [/\basientos?\b/gi, "asientos"],
+  [/\bacompañante\b/gi, "acompañante"],
   [/\bllantas?\b/gi, "llantas"],
   [/\btemperatura\b/gi, "temperatura"],
   [/\bconsumo\b/gi, "consumo"],
-  [/\bgradas?\b/gi, "gradas"]
+  [/\bgradas?\b/gi, "gradas"],
+  [/\bveloc[ií]metro\b/gi, "velocímetro"],
+  [/\btac[oó]metro\b/gi, "tacómetro"],
+  [/\bcombustible\b/gi, "combustible"],
+  [/\binyecci[oó]n\b/gi, "inyección"],
+  [/\bp[eé]rdida\b/gi, "pérdida"],
+  [/\bfibras?\b/gi, "fibras"],
+  [/\besco?billas?\b/gi, "escobillas"],
+  [/\bparabrisas\b/gi, "parabrisas"],
+  [/\barrancador\b/gi, "arrancador"],
+  [/\barranque\b/gi, "arranque"],
+  [/\br[oó]tulas?\b/gi, "rótulas"],
+  [/\baveces\b/gi, "a veces"]
 ];
 
 const SINONIMOS = {
@@ -81,18 +101,56 @@ function tokenizar(texto) {
     .filter(token => token.length > 2 && !PALABRAS_VACIAS.has(token));
 }
 
+function capitalizarFrase(texto) {
+  const limpio = String(texto || "").trim();
+  if (!limpio) return "";
+  return limpio.charAt(0).toUpperCase() + limpio.slice(1);
+}
+
 function limpiarTextoReporte(texto) {
-  let limpio = String(texto || "").trim();
-  limpio = limpio.replace(/\s+/g, " ");
-  limpio = limpio.replace(/\s*,\s*/g, ", ");
-  limpio = limpio.replace(/\s*\.\s*/g, ". ");
+  let limpio = String(texto || "")
+    .replace(/[“”"']/g, "")
+    .replace(/\r?\n+/g, ", ")
+    .replace(/[;|]+/g, ", ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  limpio = limpio
+    .replace(/^\s*(?:#?\d+[\).:-]?|[-•])\s*/g, "")
+    .replace(/([,.;:-])\s*(?:#?\d+[\).:-]?|[-•])\s+(?=[A-Za-zÁÉÍÓÚÑáéíóúñ])/g, "$1 ")
+    .replace(/\s+#?\d+[\).:-]?\s*(?=[A-Za-zÁÉÍÓÚÑáéíóúñ])/g, ", ")
+    .replace(/\s*-\s*/g, ", ")
+    .replace(/\s*,\s*/g, ", ")
+    .replace(/\s*\.\s*/g, ", ");
 
   CORRECCIONES.forEach(([regex, reemplazo]) => {
     limpio = limpio.replace(regex, reemplazo);
   });
 
   if (!limpio) return "";
-  limpio = limpio.charAt(0).toUpperCase() + limpio.slice(1);
+
+  const vistos = new Set();
+  const partes = limpio
+    .split(",")
+    .map(parte => parte.trim())
+    .filter(Boolean)
+    .map(parte => parte.replace(/^[\d\s.)-]+/, "").trim())
+    .filter(Boolean)
+    .filter(parte => {
+      const clave = normalizarTexto(parte);
+      if (!clave || vistos.has(clave)) return false;
+      vistos.add(clave);
+      return true;
+    });
+
+  limpio = partes.join(", ")
+    .replace(/\s+/g, " ")
+    .replace(/\s*,\s*/g, ", ")
+    .replace(/,+/g, ",")
+    .replace(/\s+\./g, ".")
+    .trim();
+
+  limpio = capitalizarFrase(limpio);
   if (!/[.!?]$/.test(limpio)) limpio += ".";
   return limpio;
 }

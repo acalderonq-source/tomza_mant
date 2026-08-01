@@ -17,9 +17,33 @@
     .sheet-table .placa-cell { font-weight: 700; width: 95px; white-space: nowrap; }
     .sheet-table .reporte-cell { color: #000; min-height: 18px; }
     .sheet-table .reporte-cell.important { color: #dc2626; font-weight: 700; }
+    .sheet-table .mark-red,
+    .rich-editor .mark-red { color: #dc2626; font-weight: 800; }
     .sheet-table .action-cell { width: 120px; text-align: center; }
     .sheet-table .detail-row td { background: #f8fafc; border-top: 0; padding: 0; }
     .sheet-table .detail-panel { padding: .75rem; }
+    .sheet-actions { align-items: center; display: flex; gap: .35rem; justify-content: flex-end; }
+    .sheet-title-row { align-items: center; display: flex; gap: .75rem; justify-content: space-between; }
+    .rich-editor {
+      background: #fff;
+      border: 1px solid #ced4da;
+      border-radius: .375rem;
+      min-height: 92px;
+      padding: .55rem .75rem;
+      white-space: pre-wrap;
+    }
+    .rich-editor:focus {
+      border-color: #86b7fe;
+      box-shadow: 0 0 0 .25rem rgba(13,110,253,.25);
+      outline: 0;
+    }
+    .format-toolbar {
+      align-items: center;
+      display: flex;
+      flex-wrap: wrap;
+      gap: .35rem;
+      margin-bottom: .35rem;
+    }
     .sheet-note { color: #64748b; font-size: .8rem; margin: .35rem 0 .75rem; }
     .suggestion-card { border: 1px solid #bfdbfe; border-left: 5px solid #2563eb; border-radius: 14px; background: #eff6ff; padding: 1rem; margin-bottom: .8rem; }
     .meta { color: #64748b; font-size: .82rem; }
@@ -42,14 +66,29 @@
 </nav>
 
 <main class="container-fluid py-4">
+  <%
+    const pintarReporte = typeof renderReporteHtml === 'function'
+      ? renderReporteHtml
+      : value => String(value || '');
+    const excelGeneralParams = [];
+    if (filtros.sede) excelGeneralParams.push(`sede=${encodeURIComponent(filtros.sede)}`);
+    if (filtros.placa) excelGeneralParams.push(`placa=${encodeURIComponent(filtros.placa)}`);
+    if (filtros.importante) excelGeneralParams.push(`importante=${encodeURIComponent(filtros.importante)}`);
+    const excelGeneralUrl = `/reportes-supervisores/reporte/excel${excelGeneralParams.length ? `?${excelGeneralParams.join('&')}` : ''}`;
+  %>
   <div class="page-heading">
     <div>
       <h1 class="page-title">Reportes pendientes</h1>
       <p class="page-subtitle">Taller/admin edita, marca lo importante y confirma cuando un correctivo resolvió el reporte.</p>
     </div>
-    <a href="/reportes-supervisores/historial" class="btn btn-outline-dark btn-sm">
-      <i class="bi bi-clock-history"></i> Historial
-    </a>
+    <div class="d-flex gap-2 flex-wrap">
+      <a href="<%= excelGeneralUrl %>" class="btn btn-success btn-sm">
+        <i class="bi bi-file-earmark-excel"></i> Descargar todo
+      </a>
+      <a href="/reportes-supervisores/historial" class="btn btn-outline-dark btn-sm">
+        <i class="bi bi-clock-history"></i> Historial
+      </a>
+    </div>
   </div>
 
   <% if (success) { %><div class="alert alert-success"><%= success %></div><% } %>
@@ -101,7 +140,7 @@
           <div class="row g-2 mt-2">
             <div class="col-md-6">
               <div class="meta">Reporte</div>
-              <div><%= s.descripcion_limpia || s.descripcion_original %></div>
+              <div><%- pintarReporte(s.descripcion_limpia || s.descripcion_original) %></div>
             </div>
             <div class="col-md-6">
               <div class="meta">Correctivo realizado</div>
@@ -152,19 +191,46 @@
           return map;
         }, new Map()).entries()).sort((a, b) => a[0].localeCompare(b[0], 'es'));
       %>
-      <p class="sheet-note">Formato compacto por sede. La línea roja corresponde a reportes marcados como importantes por taller/admin.</p>
+      <p class="sheet-note">Formato compacto por sede. Puede marcar en rojo solo una palabra o frase desde Editar, igual que en Excel.</p>
       <div class="sheet-wrap">
         <table class="sheet-table">
           <tbody>
             <% gruposSede.forEach(([sedeNombre, items]) => { %>
+              <%
+                const excelSedeParams = [`sede=${encodeURIComponent(sedeNombre)}`];
+                if (filtros.placa) excelSedeParams.push(`placa=${encodeURIComponent(filtros.placa)}`);
+                if (filtros.importante) excelSedeParams.push(`importante=${encodeURIComponent(filtros.importante)}`);
+                const excelSedeUrl = `/reportes-supervisores/reporte/excel?${excelSedeParams.join('&')}`;
+              %>
               <tr class="sede-row">
-                <td colspan="<%= puedeEditar ? 3 : 2 %>"><%= sedeNombre %></td>
+                <td colspan="<%= puedeEditar ? 3 : 2 %>">
+                  <div class="sheet-title-row">
+                    <span><%= sedeNombre %></span>
+                    <span class="sheet-actions">
+                      <a href="<%= excelSedeUrl %>" class="btn btn-success btn-sm py-0 px-2">
+                        <i class="bi bi-file-earmark-excel"></i> Excel
+                      </a>
+                      <% if (puedeEditar) { %>
+                        <form method="POST" action="/reportes-supervisores/limpiar-tabla" class="d-inline" onsubmit="return confirm('¿Reescribir con IA toda esta tabla?');">
+                          <input type="hidden" name="sede" value="<%= sedeNombre %>">
+                          <button class="btn btn-primary btn-sm py-0 px-2">
+                            <i class="bi bi-stars"></i> Reescribir IA
+                          </button>
+                        </form>
+                      <% } %>
+                    </span>
+                  </div>
+                </td>
               </tr>
               <% items.forEach(r => { %>
                 <tr>
                   <td class="placa-cell"><%= r.placa %></td>
-                  <td class="reporte-cell <%= r.importante ? 'important' : '' %>">
-                    <%= r.descripcion_limpia || r.descripcion_original %>
+                  <%
+                    const reporteHtml = pintarReporte(r.descripcion_limpia || r.descripcion_original);
+                    const tieneRojoParcial = /<span class="mark-red">/i.test(reporteHtml);
+                  %>
+                  <td class="reporte-cell <%= r.importante && !tieneRojoParcial ? 'important' : '' %>">
+                    <%- reporteHtml %>
                   </td>
                   <% if (puedeEditar) { %>
                     <td class="action-cell">
@@ -190,15 +256,25 @@
                               </div>
                             </div>
                             <div class="col-lg-8">
-                              <form method="POST" action="/reportes-supervisores/<%= r.id %>/editar">
+                              <form method="POST" action="/reportes-supervisores/<%= r.id %>/editar" class="rich-report-form">
                                 <label class="form-label small fw-bold">Texto corregido</label>
-                                <textarea name="descripcion_limpia" class="form-control mb-2 <%= r.importante ? 'report-text important' : '' %>"><%= r.descripcion_limpia || '' %></textarea>
+                                <div class="format-toolbar">
+                                  <button type="button" class="btn btn-outline-danger btn-sm js-mark-red">
+                                    <i class="bi bi-type"></i> Rojo
+                                  </button>
+                                  <button type="button" class="btn btn-outline-secondary btn-sm js-remove-format">
+                                    Quitar formato
+                                  </button>
+                                  <span class="meta">Seleccione letras, palabra o frase y presione Rojo.</span>
+                                </div>
+                                <div class="rich-editor mb-2" contenteditable="true"><%- pintarReporte(r.descripcion_limpia || r.descripcion_original) %></div>
+                                <input type="hidden" name="descripcion_limpia" class="rich-editor-value" value="<%= r.descripcion_limpia || r.descripcion_original || '' %>">
                                 <label class="form-label small fw-bold">Nota taller/admin</label>
                                 <textarea name="nota_taller" class="form-control mb-2" rows="2"><%= r.nota_taller || '' %></textarea>
                                 <div class="d-flex gap-2 flex-wrap align-items-center">
                                   <label class="form-check mb-0">
                                     <input class="form-check-input" type="checkbox" name="importante" value="1" <%= r.importante ? 'checked' : '' %>>
-                                    <span class="form-check-label">Marcar en rojo</span>
+                                    <span class="form-check-label">Marcar todo rojo</span>
                                   </label>
                                   <select name="estado" class="form-select form-select-sm" style="max-width: 180px;">
                                     <option value="PENDIENTE" <%= r.estado === 'PENDIENTE' ? 'selected' : '' %>>Pendiente</option>
@@ -239,6 +315,59 @@
   </section>
 </main>
 
+<script>
+  function selectionDentroDeEditor(editor, selection) {
+    if (!selection || !selection.rangeCount) return false;
+    const range = selection.getRangeAt(0);
+    const start = range.startContainer.nodeType === Node.ELEMENT_NODE ? range.startContainer : range.startContainer.parentNode;
+    const end = range.endContainer.nodeType === Node.ELEMENT_NODE ? range.endContainer : range.endContainer.parentNode;
+    return editor.contains(start) && editor.contains(end);
+  }
+
+  function marcarSeleccionRoja(editor) {
+    const selection = window.getSelection();
+    if (!selectionDentroDeEditor(editor, selection)) {
+      editor.focus();
+      return;
+    }
+    const range = selection.getRangeAt(0);
+    if (range.collapsed) return;
+
+    const span = document.createElement("span");
+    span.className = "mark-red";
+    try {
+      range.surroundContents(span);
+    } catch (_) {
+      const contenido = range.extractContents();
+      span.appendChild(contenido);
+      range.insertNode(span);
+    }
+
+    selection.removeAllRanges();
+    const nuevaSeleccion = document.createRange();
+    nuevaSeleccion.selectNodeContents(span);
+    selection.addRange(nuevaSeleccion);
+  }
+
+  function limpiarFormatoSeleccion(editor) {
+    const selection = window.getSelection();
+    if (!selectionDentroDeEditor(editor, selection)) {
+      editor.focus();
+      return;
+    }
+    document.execCommand("removeFormat", false, null);
+  }
+
+  document.querySelectorAll(".rich-report-form").forEach(form => {
+    const editor = form.querySelector(".rich-editor");
+    const hidden = form.querySelector(".rich-editor-value");
+    form.querySelector(".js-mark-red")?.addEventListener("click", () => marcarSeleccionRoja(editor));
+    form.querySelector(".js-remove-format")?.addEventListener("click", () => limpiarFormatoSeleccion(editor));
+    form.addEventListener("submit", () => {
+      if (editor && hidden) hidden.value = editor.innerHTML;
+    });
+  });
+</script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
