@@ -644,6 +644,38 @@ router.post("/:id/cerrar", allowRoles(...ROLES_EDITAR), async (req, res) => {
   }
 });
 
+router.post("/:id/eliminar", allowRoles(...ROLES_EDITAR), async (req, res) => {
+  try {
+    await ensureReportesSupervisoresTables(pool);
+    const sedesPermitidas = await obtenerSedesPermitidas(req);
+    const params = [req.params.id];
+    let sqlReporte = `
+      SELECT id
+      FROM reportes_supervisores
+      WHERE id = ?
+        AND estado IN ('PENDIENTE','EN_REVISION')
+    `;
+
+    sqlReporte = aplicarFiltroSedes(sqlReporte, params, sedesPermitidas, "reportes_supervisores");
+    const [[reporte]] = await pool.query(sqlReporte, params);
+
+    if (!reporte) {
+      req.session.error = "Reporte no encontrado o sin permiso para eliminarlo.";
+      return res.redirect("/reportes-supervisores");
+    }
+
+    await pool.query("DELETE FROM reportes_supervisores_sugerencias WHERE reporte_id = ?", [reporte.id]);
+    await pool.query("DELETE FROM reportes_supervisores WHERE id = ?", [reporte.id]);
+
+    req.session.success = "Reporte eliminado.";
+    res.redirect("/reportes-supervisores");
+  } catch (error) {
+    console.error("Error eliminando reporte:", error);
+    req.session.error = "No se pudo eliminar el reporte.";
+    res.redirect("/reportes-supervisores");
+  }
+});
+
 router.post("/:id/reabrir", allowRoles(...ROLES_EDITAR), async (req, res) => {
   try {
     await ensureReportesSupervisoresTables(pool);

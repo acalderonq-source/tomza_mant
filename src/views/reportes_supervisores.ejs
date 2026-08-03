@@ -281,6 +281,9 @@
                                   <input type="text" name="motivo" class="form-control form-control-sm" placeholder="Motivo de cierre manual">
                                   <button class="btn btn-outline-success btn-sm" onclick="return confirm('¿Mover al historial?')">Cerrar</button>
                                 </form>
+                                <form method="POST" action="/reportes-supervisores/<%= r.id %>/eliminar">
+                                  <button class="btn btn-outline-danger btn-sm" onclick="return confirm('¿Eliminar definitivamente este reporte? Esta acción no se puede deshacer.')">Eliminar</button>
+                                </form>
                               </div>
                             </div>
                           </div>
