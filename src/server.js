@@ -66,6 +66,7 @@ function injectPwaAssets(html) {
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" href="/img/app-icon.svg" type="image/svg+xml">`;
   const pwaScript = `\n<script src="/js/pwa.js" defer></script>`;
+  const placaSearchScript = `\n<script src="/js/placa-search.js?v=20260803-2" defer></script>`;
 
   if (!output.includes('href="/manifest.webmanifest"') && output.includes("</head>")) {
     output = output.replace("</head>", `${pwaHead}\n</head>`);
@@ -73,6 +74,10 @@ function injectPwaAssets(html) {
 
   if (!output.includes('src="/js/pwa.js"') && output.includes("</body>")) {
     output = output.replace("</body>", `${pwaScript}\n</body>`);
+  }
+
+  if (!output.includes('src="/js/placa-search.js"') && output.includes("</body>")) {
+    output = output.replace("</body>", `${placaSearchScript}\n</body>`);
   }
 
   return output;
@@ -121,6 +126,7 @@ const tallerRoutes = require("./routes/taller.routes");
 const oficinaRoutes = require("./routes/oficina.routes");
 const ordenesMotorRoutes = require("./routes/ordenesMotor.routes");
 const repuestosRoutes = require("./routes/repuestos.routes");
+const apiRoutes = require("./routes/api.routes");
 
 // ===================== USAR RUTAS =====================
 app.use("/", authRoutes);
@@ -146,6 +152,7 @@ app.use("/taller", tallerRoutes);
 app.use("/oficina-dia-dia", oficinaRoutes);
 app.use("/ordenes-motor", ordenesMotorRoutes);
 app.use("/repuestos", repuestosRoutes);
+app.use("/api", apiRoutes);
 
 // ===================== CRON JOBS =====================
 ensurePushTables().catch(error => {

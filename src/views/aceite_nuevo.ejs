@@ -22,11 +22,12 @@
     <form method="POST" action="/aceite">
 
       <label class="form-label">Placa</label>
-      <select name="unidad_id" class="form-select" required>
-        <% unidades.forEach(u => { %>
-          <option value="<%= u.id %>"><%= u.placa %></option>
-        <% }) %>
-      </select>
+      <div data-placa-search data-placa-mode="unidad" data-placa-target="#unidadAceiteId">
+        <input type="text" class="form-control" data-placa-input data-placa-autocomplete placeholder="Escriba la placa" required>
+        <input type="hidden" name="unidad_id" id="unidadAceiteId" required>
+        <div data-placa-results></div>
+        <div data-placa-selected></div>
+      </div>
 
       <label class="form-label mt-3">KM actual</label>
       <input type="number" name="km_actual" class="form-control" required>

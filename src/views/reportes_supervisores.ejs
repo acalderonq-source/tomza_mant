@@ -96,12 +96,12 @@
       <form method="POST" action="/reportes-supervisores" class="row g-3">
         <div class="col-lg-4">
           <label class="form-label">Unidad</label>
-          <select name="unidad_id" class="form-select" required>
-            <option value="">Seleccione placa</option>
-            <% unidades.forEach(u => { %>
-              <option value="<%= u.id %>"><%= u.placa %> · <%= u.sede %></option>
-            <% }) %>
-          </select>
+          <div data-placa-search data-placa-mode="unidad" data-placa-target="#unidadReporteSupervisorId">
+            <input type="text" class="form-control" data-placa-input data-placa-autocomplete placeholder="Escriba la placa" required>
+            <input type="hidden" name="unidad_id" id="unidadReporteSupervisorId" required>
+            <div data-placa-results></div>
+            <div data-placa-selected></div>
+          </div>
         </div>
         <div class="col-lg-6">
           <label class="form-label">Reporte del supervisor</label>

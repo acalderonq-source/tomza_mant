@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const pool = require("../db");
 const {
+  agregarTallerParaMecanico,
   etiquetaSede,
   esSedeTransporte,
   obtenerTodasSedes,
@@ -76,7 +77,7 @@ async function obtenerSedesPermitidas(req) {
   );
 
   const sedesExtras = extras.map(e => e.sede);
-  const todasLasSedes = [...new Set([user.sede, ...sedesExtras].filter(Boolean))];
+  const todasLasSedes = agregarTallerParaMecanico(user, [user.sede, ...sedesExtras]);
 
   if (
     req.session.sedeSeleccionada &&
@@ -90,6 +91,10 @@ async function obtenerSedesPermitidas(req) {
 
 function puedeVerUnidad(unidad, sedesPermitidas) {
   return sedesPermitidas.length === 0 || sedesPermitidas.includes(unidad.sede);
+}
+
+function normalizarPlacaUnidad(value) {
+  return String(value || "").trim().toUpperCase().replace(/\s+/g, "");
 }
 
 async function obtenerUnidadAutorizada(req, id) {
@@ -183,6 +188,8 @@ router.get("/", async (req, res) => {
       sedesFormulario,
       etiquetaSede,
       puedeEditar: puedeEditarUnidades(user),
+      success: req.query.success || "",
+      error: req.query.error || "",
       filtros: {
         estado: estadoFiltro,
         varado: varadoFiltro,
@@ -210,7 +217,7 @@ async function agregarUnidad(req, res) {
     }
 
     const { placa, sede } = req.body;
-    const placaNormalizada = String(placa || "").trim().toUpperCase();
+    const placaNormalizada = normalizarPlacaUnidad(placa);
 
     if (!placaNormalizada) {
       return res.status(400).send("La placa es obligatoria");
@@ -227,13 +234,49 @@ async function agregarUnidad(req, res) {
       return res.status(400).send("No se pudo determinar la sede de la unidad");
     }
 
+    const [[existente]] = await pool.query(
+      "SELECT id, placa, sede, activa FROM unidades WHERE placa = ? LIMIT 1",
+      [placaNormalizada]
+    );
+
+    if (existente) {
+      const sedesPermitidas = await obtenerSedesPermitidas(req);
+
+      if (!puedeVerUnidad(existente, sedesPermitidas)) {
+        return res.redirect(
+          `/unidades?error=${encodeURIComponent(`La unidad ${placaNormalizada} ya existe en otra sede.`)}&placa=${encodeURIComponent(placaNormalizada)}&estado=todas`
+        );
+      }
+
+      await pool.query(
+        `UPDATE unidades
+         SET sede = ?,
+             activa = 1
+         WHERE id = ?`,
+        [sedeAsignada, existente.id]
+      );
+
+      return res.redirect(
+        `/unidades?success=${encodeURIComponent(`La unidad ${placaNormalizada} ya existía. Se actualizó y quedó activa.`)}&placa=${encodeURIComponent(placaNormalizada)}&estado=todas`
+      );
+    }
+
     await pool.query(
       "INSERT INTO unidades (placa, sede, activa, varada, razon_varada) VALUES (?, ?, 1, 0, NULL)",
       [placaNormalizada, sedeAsignada]
     );
 
-    res.redirect("/unidades");
+    res.redirect(
+      `/unidades?success=${encodeURIComponent(`Unidad ${placaNormalizada} agregada correctamente.`)}&placa=${encodeURIComponent(placaNormalizada)}`
+    );
   } catch (error) {
+    if (error.code === "ER_DUP_ENTRY") {
+      const placaNormalizada = normalizarPlacaUnidad(req.body.placa);
+      return res.redirect(
+        `/unidades?error=${encodeURIComponent(`La unidad ${placaNormalizada} ya está registrada.`)}&placa=${encodeURIComponent(placaNormalizada)}&estado=todas`
+      );
+    }
+
     console.error("ERROR agregar unidad:", error);
     res.status(500).send("Error interno");
   }

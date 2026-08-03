@@ -157,6 +157,65 @@
       color: #64748b;
       font-size: .8rem;
     }
+    .tomza-plate-search {
+      position: relative;
+    }
+    .tomza-plate-results {
+      background: #fff;
+      border: 1px solid #dbe3ef;
+      border-radius: 10px;
+      box-shadow: 0 14px 32px rgba(15, 23, 42, .16);
+      display: none;
+      left: 0;
+      max-height: 230px;
+      overflow-y: auto;
+      position: absolute;
+      right: 0;
+      top: calc(100% + 4px);
+      z-index: 2000;
+    }
+    .tomza-plate-results.is-open {
+      display: block;
+    }
+    .tomza-plate-option {
+      align-items: center;
+      background: transparent;
+      border: 0;
+      border-bottom: 1px solid #eef2f7;
+      display: flex;
+      gap: .75rem;
+      justify-content: space-between;
+      padding: .55rem .7rem;
+      text-align: left;
+      width: 100%;
+    }
+    .tomza-plate-option:hover,
+    .tomza-plate-option:focus {
+      background: #eef2ff;
+      outline: 0;
+    }
+    .tomza-plate-option strong {
+      color: #111827;
+      font-size: .92rem;
+      white-space: nowrap;
+    }
+    .tomza-plate-option span {
+      color: #64748b;
+      font-size: .78rem;
+      text-align: right;
+    }
+    .tomza-plate-selected {
+      color: #166534;
+      font-size: .82rem;
+      font-weight: 800;
+      margin-top: .35rem;
+      min-height: 1.2rem;
+    }
+    .tomza-plate-empty {
+      color: #64748b;
+      font-size: .82rem;
+      padding: .6rem .7rem;
+    }
     @media (max-width: 1100px) {
       .llanta-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -217,19 +276,40 @@
     fin.setDate(fin.getDate() + 6);
     return fin;
   };
+  const inicioPeriodoCotizacion = (date) => {
+    const inicio = new Date(date);
+    const dia = inicio.getDay();
+    inicio.setHours(0, 0, 0, 0);
+
+    if (dia === 3) return inicio;
+
+    const diasDesdeJueves = dia >= 4 ? dia - 4 : dia + 3;
+    inicio.setDate(inicio.getDate() - diasDesdeJueves);
+    return inicio;
+  };
+  const llavePeriodoCotizacion = (date) => {
+    const inicio = inicioPeriodoCotizacion(date);
+    return `${inicio.getFullYear()}-${String(inicio.getMonth() + 1).padStart(2, '0')}-${String(inicio.getDate()).padStart(2, '0')}`;
+  };
+  const finPeriodoCotizacion = (date) => {
+    const inicio = inicioPeriodoCotizacion(date);
+    const fin = new Date(inicio);
+    fin.setDate(fin.getDate() + (inicio.getDay() === 3 ? 0 : 5));
+    return fin;
+  };
   const ordenEstado = (estado) => estados.indexOf(estado) === -1 ? 99 : estados.indexOf(estado);
   const gruposSemana = [];
   [...solicitudes]
     .sort((a, b) => new Date(b.fecha_solicitud) - new Date(a.fecha_solicitud) || ordenEstado(a.estado) - ordenEstado(b.estado))
     .forEach(s => {
-      const key = llaveSemana(s.fecha_solicitud);
+      const key = llavePeriodoCotizacion(s.fecha_solicitud);
       let grupo = gruposSemana.find(item => item.key === key);
       if (!grupo) {
-        const inicio = inicioSemana(s.fecha_solicitud);
+        const inicio = inicioPeriodoCotizacion(s.fecha_solicitud);
         grupo = {
           key,
           inicio,
-          fin: finSemana(s.fecha_solicitud),
+          fin: finPeriodoCotizacion(s.fecha_solicitud),
           solicitudes: []
         };
         gruposSemana.push(grupo);
@@ -238,7 +318,7 @@
     });
   const cotizacionSemanaUrl = (grupo) => {
     const params = new URLSearchParams();
-    params.set('semana', grupo.key);
+    grupo.solicitudes.forEach(s => params.append('solicitud_ids', s.id));
     if (filtros.sede) params.set('sede', filtros.sede);
     if (filtros.placa) params.set('placa', filtros.placa);
     return `/llantas/cotizacion.pdf?${params.toString()}`;
@@ -341,7 +421,7 @@
           <div class="week-heading">
             <div>
               <h3 class="week-title">Cotización <%= grupoIndex + 1 %></h3>
-              <div class="bulk-meta">Semana del <%= fechaCorta(grupo.inicio) %> al <%= fechaCorta(grupo.fin) %></div>
+              <div class="bulk-meta">Del <%= fechaCorta(grupo.inicio) %> al <%= fechaCorta(grupo.fin) %></div>
             </div>
             <div class="week-actions">
               <span class="week-count"><%= grupo.solicitudes.length %> solicitud<%= grupo.solicitudes.length === 1 ? '' : 'es' %></span>
@@ -357,14 +437,14 @@
                 <div class="modal-header">
                   <div>
                     <h5 class="modal-title">Cotización <%= grupoIndex + 1 %></h5>
-                    <div class="bulk-meta">Semana del <%= fechaCorta(grupo.inicio) %> al <%= fechaCorta(grupo.fin) %></div>
+                    <div class="bulk-meta">Del <%= fechaCorta(grupo.inicio) %> al <%= fechaCorta(grupo.fin) %></div>
                   </div>
                   <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
                   <div class="week-actions mb-3">
                     <a href="<%= cotizacionSemanaUrl(grupo) %>" class="btn btn-sm btn-outline-dark">
-                      <i class="bi bi-file-earmark-pdf me-1"></i> Descargar cotización semana
+                      <i class="bi bi-file-earmark-pdf me-1"></i> Descargar cotización
                     </a>
                     <% if (puedeCotizar && pendientesCotizarSemana.length) { %>
                       <button class="btn btn-sm btn-primary" type="button" data-bs-toggle="collapse" data-bs-target="#cotizarSemana<%= collapseId %>">
@@ -536,12 +616,12 @@
           <div class="row g-3">
             <div class="col-md-5">
               <label class="form-label">Placa / sede</label>
-              <select name="unidad_id" class="form-select" required>
-                <option value="">Seleccione unidad</option>
-                <% unidades.forEach(u => { %>
-                  <option value="<%= u.id %>"><%= u.placa %> · <%= u.sede %></option>
-                <% }) %>
-              </select>
+              <div class="tomza-plate-search">
+                <input type="text" id="llantaPlacaSearch" class="form-control text-uppercase" placeholder="Escriba la placa" autocomplete="off" required>
+                <input type="hidden" name="unidad_id" id="llantaUnidadId" required>
+                <div class="tomza-plate-results" id="llantaPlacaResults"></div>
+                <div class="tomza-plate-selected" id="llantaPlacaSelected"></div>
+              </div>
             </div>
             <div class="col-md-4">
               <label class="form-label">Medida</label>
@@ -579,5 +659,96 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script type="application/json" id="llantasUnidadesData"><%- JSON.stringify(unidades.map(u => ({ id: u.id, placa: u.placa, sede: u.sede || '' }))) %></script>
+<script>
+  (() => {
+    const input = document.getElementById("llantaPlacaSearch");
+    const unidadId = document.getElementById("llantaUnidadId");
+    const results = document.getElementById("llantaPlacaResults");
+    const selected = document.getElementById("llantaPlacaSelected");
+    const source = document.getElementById("llantasUnidadesData");
+    const form = document.querySelector("#solicitudModal form");
+
+    if (!input || !unidadId || !results || !selected || !source) return;
+
+    let unidades = [];
+    try {
+      unidades = JSON.parse(source.textContent || "[]");
+    } catch (_) {
+      unidades = [];
+    }
+
+    function normalizar(value) {
+      return String(value || "").trim().toUpperCase();
+    }
+
+    function cerrar() {
+      results.classList.remove("is-open");
+    }
+
+    function seleccionar(unidad) {
+      input.value = unidad.placa || "";
+      unidadId.value = unidad.id || "";
+      selected.textContent = `${unidad.placa || ""} · ${unidad.sede || "Sin sede"}`;
+      results.innerHTML = "";
+      cerrar();
+    }
+
+    function mensaje(texto) {
+      results.innerHTML = `<div class="tomza-plate-empty">${texto}</div>`;
+      results.classList.add("is-open");
+    }
+
+    function render() {
+      const texto = normalizar(input.value);
+      unidadId.value = "";
+      selected.textContent = "";
+
+      if (texto.length < 2) {
+        results.innerHTML = "";
+        cerrar();
+        return;
+      }
+
+      const encontradas = unidades
+        .filter(unidad => normalizar(unidad.placa).includes(texto))
+        .slice(0, 20);
+
+      results.innerHTML = "";
+
+      if (!encontradas.length) {
+        mensaje("No hay placas con esa busqueda.");
+        return;
+      }
+
+      encontradas.forEach(unidad => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "tomza-plate-option";
+        button.innerHTML = `<strong>${unidad.placa || ""}</strong><span>${unidad.sede || "Sin sede"}</span>`;
+        button.addEventListener("click", () => seleccionar(unidad));
+        results.appendChild(button);
+      });
+
+      results.classList.add("is-open");
+    }
+
+    input.addEventListener("input", render);
+    input.addEventListener("focus", render);
+
+    document.addEventListener("click", event => {
+      if (!event.target.closest(".tomza-plate-search")) cerrar();
+    });
+
+    form?.addEventListener("submit", event => {
+      if (!unidadId.value) {
+        event.preventDefault();
+        selected.textContent = "Seleccione una placa de la lista.";
+        input.focus();
+        render();
+      }
+    });
+  })();
+</script>
 </body>
 </html>

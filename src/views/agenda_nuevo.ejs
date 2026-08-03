@@ -24,11 +24,12 @@
         <!-- Unidad -->
         <div class="mb-3">
           <label class="form-label">Unidad</label>
-          <select name="unidad_id" class="form-select" required>
-            <% unidades.forEach(u => { %>
-              <option value="<%= u.id %>"><%= u.placa %></option>
-            <% }) %>
-          </select>
+          <div data-placa-search data-placa-mode="unidad" data-placa-target="#unidadAgendaId">
+            <input type="text" class="form-control" data-placa-input data-placa-autocomplete placeholder="Escriba la placa" required>
+            <input type="hidden" name="unidad_id" id="unidadAgendaId" required>
+            <div data-placa-results></div>
+            <div data-placa-selected></div>
+          </div>
         </div>
 
         <!-- Tipo -->

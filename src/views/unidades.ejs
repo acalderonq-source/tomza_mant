@@ -63,6 +63,14 @@
     </div>
   </section>
 
+  <% if (success) { %>
+    <div class="alert alert-success"><i class="bi bi-check-circle me-1"></i><%= success %></div>
+  <% } %>
+
+  <% if (error) { %>
+    <div class="alert alert-danger"><i class="bi bi-exclamation-triangle me-1"></i><%= error %></div>
+  <% } %>
+
   <section class="kpi-grid mb-3">
     <div class="kpi-card">
       <div class="kpi-label">Total</div>

@@ -129,12 +129,12 @@
         <div class="row g-3">
         <div class="col-lg-5">
           <label class="form-label">Unidad</label>
-          <select name="unidad_id" class="form-select" required>
-            <option value="">Seleccione una unidad</option>
-            <% unidades.forEach(u => { %>
-              <option value="<%= u.id %>" <%= reporte && String(reporte.unidad_id) === String(u.id) ? 'selected' : '' %>><%= u.placa %></option>
-            <% }) %>
-          </select>
+          <div data-placa-search data-placa-mode="unidad" data-placa-target="#unidadCorrectivoId">
+            <input type="text" class="form-control" data-placa-input data-placa-autocomplete placeholder="Escriba la placa" value="<%= reporte ? reporte.placa : '' %>" required>
+            <input type="hidden" name="unidad_id" id="unidadCorrectivoId" value="<%= reporte ? reporte.unidad_id : '' %>" required>
+            <div data-placa-results></div>
+            <div data-placa-selected><%= reporte ? `${reporte.placa} · ${reporte.sede}` : '' %></div>
+          </div>
         </div>
         <div class="col-lg-7">
           <div class="helper-box h-100">

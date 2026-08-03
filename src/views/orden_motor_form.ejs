@@ -55,7 +55,7 @@
       </div>
       <div class="col-md-2">
         <label class="form-label small fw-bold">Placa</label>
-        <input type="text" name="placa_unidad" class="form-control form-control-sm text-uppercase" value="<%= orden ? (orden.placa_unidad || '') : '' %>">
+        <input type="text" name="placa_unidad" class="form-control form-control-sm text-uppercase" value="<%= orden ? (orden.placa_unidad || '') : '' %>" data-placa-autocomplete data-placa-mode="placa" data-placa-allow-free="true">
       </div>
       <div class="col-md-3">
         <label class="form-label small fw-bold">Motor</label>

@@ -209,7 +209,7 @@
       <div class="row g-2 align-items-start">
         <div class="col-12 col-md-2">
           <label class="form-label">Placa</label>
-          <input name="recomendaciones[${recIndex}][placa]" class="form-control text-uppercase" placeholder="Ej: C176258" value="${escapeHtml(data.placa)}">
+          <input name="recomendaciones[${recIndex}][placa]" class="form-control text-uppercase" placeholder="Ej: C176258" value="${escapeHtml(data.placa)}" data-placa-autocomplete data-placa-mode="placa" data-placa-allow-free="true">
         </div>
         <div class="col-12 col-md-8">
           <label class="form-label">Observación completa</label>
@@ -240,6 +240,7 @@
     recWrap.appendChild(row);
     row.querySelector(".remove-rec").addEventListener("click", () => row.remove());
     row.querySelector(".dividir-ia").addEventListener("click", () => dividirFilaConIA(row));
+    window.TomzaPlacaSearch?.initAll(row);
     recIndex++;
   }
 

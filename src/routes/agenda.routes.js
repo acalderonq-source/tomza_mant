@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const pool = require("../db");
+const { agregarTallerParaMecanico } = require("../utils/sedes");
 
 // ================= FUNCIONES AUXILIARES =================
 
@@ -25,12 +26,10 @@ async function obtenerSedesPermitidas(req) {
     `SELECT sede FROM usuarios_sedes WHERE usuario_id = ?`,
     [req.session.user.id]
   );
-  const sedes = [
-    ...new Set([
-      req.session.user.sede,
-      ...extras.map(e => e.sede)
-    ])
-  ].filter(Boolean);
+  const sedes = agregarTallerParaMecanico(req.session.user, [
+    req.session.user.sede,
+    ...extras.map(e => e.sede)
+  ]);
   return sedes;
 }
 

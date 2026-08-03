@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const pool = require("../db");
 const {
+  agregarTallerParaMecanico,
   SEDES_TRANSPORTE,
   etiquetaSede: etiquetaSedeTomza,
   obtenerTodasSedes,
@@ -87,12 +88,10 @@ router.get("/", async (req, res) => {
       String(req.session.user.usuario || "").trim().toLowerCase() === "pesados";
     const sedesPermitidas = esUsuarioPesados
       ? await obtenerSedesTransporte(pool)
-      : [
-          ...new Set([
-            req.session.user.sede,
-            ...extras.map(e => e.sede)
-          ])
-        ];
+      : agregarTallerParaMecanico(req.session.user, [
+          req.session.user.sede,
+          ...extras.map(e => e.sede)
+        ]);
 
     // =========================
     // DEFINIR SEDE ACTUAL

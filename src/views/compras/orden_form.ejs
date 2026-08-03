@@ -146,7 +146,7 @@
     const tbody = document.querySelector("#itemsTable tbody");
     const newRow = document.createElement("tr");
     newRow.innerHTML = `
-      <td><input type="text" name="lineas[${rowIndex}][codigo]" class="form-control text-uppercase" placeholder="Ej: CL279463"></td>
+      <td><input type="text" name="lineas[${rowIndex}][codigo]" class="form-control text-uppercase" placeholder="Ej: CL279463" data-placa-autocomplete data-placa-mode="placa" data-placa-allow-free="true"></td>
       <td><textarea name="lineas[${rowIndex}][descripcion]" class="form-control" rows="2" required></textarea></td>
       <td><input type="number" name="lineas[${rowIndex}][cantidad]" class="form-control cantidad" value="1" step="0.01"></td>
       <td><input type="number" name="lineas[${rowIndex}][precio_unitario]" class="form-control precio" step="0.01"></td>
@@ -161,6 +161,7 @@
     newRow.querySelector(`[name="lineas[${rowIndex}][subtotal]"]`).value = linea.subtotal ?? '';
     rowIndex++;
     attachEventsToRow(newRow);
+    window.TomzaPlacaSearch?.initAll(newRow);
     updateTotals();
   }
 

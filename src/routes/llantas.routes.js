@@ -4,7 +4,7 @@ const path = require("path");
 const ejs = require("ejs");
 const pdf = require("html-pdf");
 const pool = require("../db");
-const { TODAS_SEDES } = require("../utils/sedes");
+const { agregarTallerParaMecanico, TODAS_SEDES } = require("../utils/sedes");
 
 const router = express.Router();
 
@@ -102,12 +102,7 @@ async function obtenerSedesPermitidas(req) {
     [user.id]
   );
 
-  const sedes = [
-    ...new Set([
-      user.sede,
-      ...extras.map(e => e.sede)
-    ])
-  ].filter(Boolean);
+  const sedes = agregarTallerParaMecanico(user, [user.sede, ...extras.map(e => e.sede)]);
 
   if (req.session.sedeSeleccionada && sedes.includes(req.session.sedeSeleccionada)) {
     return [req.session.sedeSeleccionada];
@@ -158,10 +153,15 @@ function normalizarIds(value) {
 function construirFiltrosSolicitudes(sedesPermitidas, filtros = {}) {
   const condiciones = [];
   const params = [];
+  const ids = normalizarIds(filtros.ids);
   const sedesSeleccionadas = Array.isArray(filtros.sedes)
     ? filtros.sedes.filter(sede => sedesPermitidas.includes(sede))
     : [];
 
+  if (ids.length) {
+    condiciones.push("s.id IN (?)");
+    params.push(ids);
+  }
   if (sedesPermitidas.length) {
     condiciones.push("s.sede IN (?)");
     params.push(sedesPermitidas);
@@ -296,9 +296,20 @@ router.get("/", async (req, res) => {
       ORDER BY FIELD(s.estado, 'SOLICITADA', 'COTIZADA', 'COMPRADA', 'RECIBIDA'), s.fecha_solicitud DESC
     `, params);
 
+    const condicionesUnidades = ["placa IS NOT NULL", "TRIM(placa) <> ''"];
+    const paramsUnidades = [];
+
+    if (sedesPermitidas.length) {
+      condicionesUnidades.push("sede IN (?)");
+      paramsUnidades.push(sedesPermitidas);
+    }
+
     const [unidades] = await pool.query(
-      `SELECT id, placa, sede FROM unidades WHERE sede IN (?) ORDER BY sede, placa`,
-      [sedesPermitidas.length ? sedesPermitidas : ["__SIN_SEDE__"]]
+      `SELECT id, placa, sede
+       FROM unidades
+       WHERE ${condicionesUnidades.join(" AND ")}
+       ORDER BY sede, placa`,
+      paramsUnidades
     );
 
     res.render("llantas/index", {
@@ -322,12 +333,13 @@ router.get("/cotizacion.pdf", allowRoles(...ROLES_VER_COTIZACION), async (req, r
     await ensureTables();
     const sedesPermitidas = await obtenerSedesPermitidas(req);
     const { sede, estado, placa, semana } = req.query;
+    const ids = req.query.solicitud_ids;
     const sedes = Array.isArray(req.query.sedes)
       ? req.query.sedes
       : req.query.sedes
         ? [req.query.sedes]
         : [];
-    const { where, params } = construirFiltrosSolicitudes(sedesPermitidas, { sede, sedes, estado, placa, semana });
+    const { where, params } = construirFiltrosSolicitudes(sedesPermitidas, { ids, sede, sedes, estado, placa, semana });
 
     const [solicitudes] = await pool.query(`
       SELECT s.*, u.usuario AS solicitado_por_usuario

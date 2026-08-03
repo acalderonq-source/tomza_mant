@@ -153,12 +153,12 @@
       <div class="row g-3">
         <div class="col-12 col-md-6">
           <label class="form-label">Unidad / placa</label>
-          <select name="unidad_id" class="form-select" required>
-            <option value="">Seleccione una unidad</option>
-            <% unidades.forEach(u => { %>
-              <option value="<%= u.id %>"><%= u.placa %> · <%= u.sede %></option>
-            <% }) %>
-          </select>
+          <div data-placa-search data-placa-mode="unidad" data-placa-target="#unidadRevisionRutaId">
+            <input type="text" class="form-control" data-placa-input data-placa-autocomplete placeholder="Escriba la placa" required>
+            <input type="hidden" name="unidad_id" id="unidadRevisionRutaId" required>
+            <div data-placa-results></div>
+            <div data-placa-selected></div>
+          </div>
         </div>
         <div class="col-12 col-md-3">
           <label class="form-label">Fecha</label>

@@ -6,6 +6,7 @@ const {
   ensureReportesSupervisoresTables,
   limpiarTextoReporte
 } = require("../utils/reportesSupervisoresDb");
+const { agregarTallerParaMecanico } = require("../utils/sedes");
 
 const ROLES_VER = ["ADMIN", "TALLER", "MECANICO", "SUPERVISOR", "SUPERVISOR_PESADO"];
 const ROLES_CREAR = ["ADMIN", "TALLER", "SUPERVISOR", "SUPERVISOR_PESADO"];
@@ -27,11 +28,14 @@ function allowRoles(...roles) {
 async function obtenerSedesPermitidas(req) {
   const user = req.session.user;
   if (["ADMIN", "TALLER"].includes(user.rol)) {
+    if (req.session.sedeSeleccionada && req.session.sedeSeleccionada !== "TODAS") {
+      return [req.session.sedeSeleccionada];
+    }
     return [];
   }
 
   const [extras] = await pool.query("SELECT sede FROM usuarios_sedes WHERE usuario_id = ?", [user.id]);
-  const sedes = [...new Set([user.sede, ...extras.map(e => e.sede)].filter(Boolean))];
+  const sedes = agregarTallerParaMecanico(user, [user.sede, ...extras.map(e => e.sede)]);
 
   if (req.session.sedeSeleccionada && sedes.includes(req.session.sedeSeleccionada)) {
     return [req.session.sedeSeleccionada];

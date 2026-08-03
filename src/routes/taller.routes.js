@@ -6,6 +6,7 @@ const {
   etiquetaEstadoRepuesto
 } = require("../utils/repuestosSolicitudes");
 const {
+  agregarTallerParaMecanico,
   SEDES_TRANSPORTE,
   esSedeTransporte,
   obtenerSedesTransporte
@@ -148,7 +149,7 @@ async function obtenerSedesPermitidas(req) {
   );
 
   const sedesExtras = extras.map(e => e.sede);
-  const sedes = [...new Set([user.sede, ...sedesExtras].filter(Boolean))];
+  const sedes = agregarTallerParaMecanico(user, [user.sede, ...sedesExtras]);
 
   if (req.session.sedeSeleccionada && sedes.includes(req.session.sedeSeleccionada)) {
     return [req.session.sedeSeleccionada];

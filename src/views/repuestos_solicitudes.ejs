@@ -213,66 +213,6 @@
       opacity: .95;
     }
 
-    .plate-search-wrap {
-      position: relative;
-    }
-
-    .plate-results {
-      background: #fff;
-      border: 1px solid #cbd5e1;
-      border-radius: 12px;
-      box-shadow: 0 16px 32px rgba(15, 23, 42, .16);
-      display: none;
-      left: 0;
-      max-height: 230px;
-      overflow: auto;
-      position: absolute;
-      right: 0;
-      top: calc(100% + .35rem);
-      z-index: 1080;
-    }
-
-    .plate-results.is-open {
-      display: block;
-    }
-
-    .plate-option {
-      align-items: center;
-      background: #fff;
-      border: 0;
-      border-bottom: 1px solid #e2e8f0;
-      color: #0f172a;
-      display: flex;
-      justify-content: space-between;
-      gap: .75rem;
-      padding: .55rem .7rem;
-      text-align: left;
-      width: 100%;
-    }
-
-    .plate-option:hover,
-    .plate-option.is-active {
-      background: #e0f2fe;
-    }
-
-    .plate-option strong {
-      font-size: .95rem;
-    }
-
-    .plate-option span {
-      color: #64748b;
-      font-size: .78rem;
-      font-weight: 800;
-      white-space: nowrap;
-    }
-
-    .plate-empty {
-      color: #64748b;
-      font-size: .85rem;
-      font-weight: 800;
-      padding: .7rem;
-    }
-
     @media (max-width: 980px) {
       .filter-form,
       .summary-grid {
@@ -523,10 +463,11 @@
               </div>
               <div>
                 <label class="form-label mb-1">Placa / Unidad</label>
-                <div class="plate-search-wrap">
-                  <input type="text" id="placaUnidadSearch" class="form-control text-uppercase" placeholder="Escriba la placa..." autocomplete="off" required>
+                <div data-placa-search data-placa-mode="placa" data-placa-target="#placaUnidadValue" data-placa-sede-target="#sedeUnidadSeleccionada" data-placa-allow-free="false" data-placa-source="#unidadesRepuestosData">
+                  <input type="text" id="placaUnidadSearch" class="form-control text-uppercase" placeholder="Escriba la placa..." data-placa-input data-placa-autocomplete required>
                   <input type="hidden" name="placa" id="placaUnidadValue">
-                  <div id="placaUnidadResults" class="plate-results" role="listbox"></div>
+                  <div data-placa-results></div>
+                  <div data-placa-selected></div>
                 </div>
               </div>
               <div>
@@ -579,98 +520,6 @@
 <% } %>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-<script type="application/json" id="unidadesRepuestosData"><%- JSON.stringify(unidadesLista.map(unidad => ({ placa: unidad.placa, sede: unidad.sede || '', sedeTexto: mostrarSede(unidad.sede) || '' }))) %></script>
-<script>
-  const placaUnidadSearch = document.getElementById('placaUnidadSearch');
-  const placaUnidadValue = document.getElementById('placaUnidadValue');
-  const placaUnidadResults = document.getElementById('placaUnidadResults');
-  const sedeUnidadSeleccionada = document.getElementById('sedeUnidadSeleccionada');
-  const unidadesRepuestos = (() => {
-    const script = document.getElementById('unidadesRepuestosData');
-    try {
-      return JSON.parse(script ? script.textContent : '[]');
-    } catch (_) {
-      return [];
-    }
-  })();
-
-  function limpiarTexto(value) {
-    return String(value || '').trim().toUpperCase();
-  }
-
-  function seleccionarUnidadRepuesto(unidad) {
-    if (!placaUnidadSearch || !placaUnidadValue || !sedeUnidadSeleccionada) return;
-    placaUnidadSearch.value = unidad.placa;
-    placaUnidadValue.value = unidad.placa;
-    sedeUnidadSeleccionada.value = unidad.sede || '';
-    cerrarResultadosPlaca();
-  }
-
-  function cerrarResultadosPlaca() {
-    if (!placaUnidadResults) return;
-    placaUnidadResults.classList.remove('is-open');
-    placaUnidadResults.innerHTML = '';
-  }
-
-  function renderResultadosPlaca() {
-    if (!placaUnidadSearch || !placaUnidadResults || !placaUnidadValue || !sedeUnidadSeleccionada) return;
-
-    const texto = limpiarTexto(placaUnidadSearch.value);
-    placaUnidadValue.value = '';
-    sedeUnidadSeleccionada.value = '';
-
-    if (!texto) {
-      cerrarResultadosPlaca();
-      return;
-    }
-
-    const resultados = unidadesRepuestos
-      .filter(unidad => limpiarTexto(unidad.placa).includes(texto))
-      .slice(0, 10);
-
-    placaUnidadResults.innerHTML = '';
-
-    if (!resultados.length) {
-      placaUnidadResults.innerHTML = '<div class="plate-empty">No hay placas con esa búsqueda.</div>';
-      placaUnidadResults.classList.add('is-open');
-      return;
-    }
-
-    resultados.forEach(unidad => {
-      const button = document.createElement('button');
-      button.type = 'button';
-      button.className = 'plate-option';
-      button.innerHTML = `<strong>${unidad.placa}</strong><span>${unidad.sedeTexto || unidad.sede || 'Sin sede'}</span>`;
-      button.addEventListener('click', () => seleccionarUnidadRepuesto(unidad));
-      placaUnidadResults.appendChild(button);
-    });
-
-    placaUnidadResults.classList.add('is-open');
-  }
-
-  if (placaUnidadSearch) {
-    placaUnidadSearch.addEventListener('input', renderResultadosPlaca);
-    placaUnidadSearch.addEventListener('focus', renderResultadosPlaca);
-  }
-
-  document.addEventListener('click', event => {
-    if (!placaUnidadResults || !placaUnidadSearch) return;
-    if (!placaUnidadResults.contains(event.target) && event.target !== placaUnidadSearch) {
-      cerrarResultadosPlaca();
-    }
-  });
-
-  const repuestoForm = document.querySelector('#agregarRepuestoModal form');
-  if (repuestoForm) {
-    repuestoForm.addEventListener('submit', event => {
-      if (placaUnidadSearch && placaUnidadValue && !placaUnidadValue.value) {
-        event.preventDefault();
-        placaUnidadSearch.focus();
-        renderResultadosPlaca();
-        alert('Seleccione una placa de la lista que aparece debajo.');
-      }
-    });
-  }
-</script>
+<script type="application/json" id="unidadesRepuestosData"><%- JSON.stringify(unidadesLista.map(unidad => ({ id: unidad.id, placa: unidad.placa, sede: unidad.sede || '', sedeTexto: mostrarSede(unidad.sede) || '' }))) %></script>
 </body>
 </html>

@@ -76,6 +76,16 @@ function unirSedes(...listas) {
   return [...new Set(sedes)];
 }
 
+function esUsuarioMecanico(user) {
+  return user?.rol === "MECANICO" ||
+    limpiarSede(user?.usuario).toLowerCase() === "mecanico";
+}
+
+function agregarTallerParaMecanico(user, sedes) {
+  const lista = Array.isArray(sedes) ? sedes : [];
+  return esUsuarioMecanico(user) ? unirSedes(lista, ["Taller"]) : unirSedes(lista);
+}
+
 async function obtenerSedesRegistradas(pool) {
   const [rows] = await pool.query(`
     SELECT DISTINCT sede
@@ -136,7 +146,7 @@ function getSedesPermitidas(req) {
 
   } else {
 
-    sedes = [user.sede];
+    sedes = agregarTallerParaMecanico(user, [user.sede]);
 
   }
 
@@ -150,6 +160,8 @@ module.exports = {
   etiquetaSede,
   esSedeGranel,
   esSedeTransporte,
+  esUsuarioMecanico,
+  agregarTallerParaMecanico,
   obtenerTodasSedes,
   obtenerSedesTransporte,
   getSedesPermitidas
