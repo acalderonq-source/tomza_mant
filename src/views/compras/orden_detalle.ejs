@@ -31,6 +31,11 @@
     const urlPdf = (typeof pdfUrl !== 'undefined' ? pdfUrl : null) || `/compras/ordenes/${orden.id}/pdf`;
     const mostrarPdf = typeof permitePdf !== 'undefined' ? permitePdf : !esMensajero;
     const proveedorSeguro = proveedor || { nombre: orden.proveedor_nombre || '—' };
+    const empresaDestinoTexto = orden.empresa_destino === 'SUPER GAS'
+      ? 'Envasadora Super Gas GLP S.A.'
+      : orden.empresa_destino === 'GRANEL'
+        ? 'Granel'
+        : 'Gas Tomza de Costa Rica S.A.';
   %>
   <div class="page-heading">
     <div>
@@ -71,7 +76,7 @@
         </div>
         <div class="detail-item">
           <div class="detail-label">Empresa destinataria</div>
-          <div class="detail-value"><%= orden.empresa_destino === 'SUPER GAS' ? 'Envasadora Super Gas GLP S.A.' : 'Gas Tomza de Costa Rica S.A.' %></div>
+          <div class="detail-value"><%= empresaDestinoTexto %></div>
         </div>
         <div class="detail-item">
           <div class="detail-label">Estado</div>

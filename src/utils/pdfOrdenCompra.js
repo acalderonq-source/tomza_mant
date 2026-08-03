@@ -32,6 +32,17 @@ function formatDate(value) {
 }
 
 function getEmpresa(orden) {
+  if (orden.empresa_destino === "GRANEL") {
+    return {
+      nombre: "GRANEL",
+      direccion: "Gas Tomza de Costa Rica S.A.",
+      telefono: "2201-6000",
+      email: "facelectronica@tomza.com",
+      cedula: "",
+      logo: path.join(process.cwd(), "public", "img", "logo_tomza.jpg")
+    };
+  }
+
   if (orden.empresa_destino === "SUPER GAS") {
     return {
       nombre: "ENVASADORA SUPER GAS GLP S.A.",

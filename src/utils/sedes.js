@@ -81,6 +81,11 @@ function esUsuarioMecanico(user) {
     limpiarSede(user?.usuario).toLowerCase() === "mecanico";
 }
 
+function esUsuarioProveeduria(user) {
+  return ["PROVEEDURIA", "PROVEEDURIA_TALLER"].includes(user?.rol) ||
+    ["proveeduria", "proveeduria_taller"].includes(limpiarSede(user?.usuario).toLowerCase());
+}
+
 function agregarTallerParaMecanico(user, sedes) {
   const lista = Array.isArray(sedes) ? sedes : [];
   return esUsuarioMecanico(user) ? unirSedes(lista, ["Taller"]) : unirSedes(lista);
@@ -113,7 +118,7 @@ function getSedesPermitidas(req) {
   const user = req.session.user;
   let sedes = [];
 
-  if (user.rol === "ADMIN") {
+  if (user.rol === "ADMIN" || esUsuarioProveeduria(user)) {
 
     if (
       req.session.sedeSeleccionada &&
@@ -161,6 +166,7 @@ module.exports = {
   esSedeGranel,
   esSedeTransporte,
   esUsuarioMecanico,
+  esUsuarioProveeduria,
   agregarTallerParaMecanico,
   obtenerTodasSedes,
   obtenerSedesTransporte,

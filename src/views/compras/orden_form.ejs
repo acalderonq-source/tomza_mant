@@ -78,6 +78,7 @@
           <select name="empresa_destino" class="form-select" required>
             <option value="GAS TOMZA" <%= (safeOrden.empresa_destino || 'GAS TOMZA') === 'GAS TOMZA' ? 'selected' : '' %>>Gas Tomza de Costa Rica S.A.</option>
             <option value="SUPER GAS" <%= safeOrden.empresa_destino === 'SUPER GAS' ? 'selected' : '' %>>Envasadora Super Gas GLP S.A.</option>
+            <option value="GRANEL" <%= safeOrden.empresa_destino === 'GRANEL' ? 'selected' : '' %>>Granel</option>
           </select>
         </div>
       </div>
