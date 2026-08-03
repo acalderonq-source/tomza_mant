@@ -1,3 +1,104 @@
+const SEDES_GRANEL = [
+  "Granel",
+  "granel_cartago",
+  "granel_alajuela",
+  "granel_la_cruz",
+  "granel_guapiles",
+  "granel_perez_zeledon"
+];
+
+const SEDES_TRANSPORTE = ["Transportadora", ...SEDES_GRANEL];
+
+const TODAS_SEDES = [
+  "Cartago",
+  "Guapiles",
+  "La Cruz",
+  "Transportadora",
+  "Granel",
+  "granel_cartago",
+  "granel_alajuela",
+  "granel_la_cruz",
+  "granel_guapiles",
+  "granel_perez_zeledon",
+  "Alajuela",
+  "Tecnicos",
+  "Taller",
+  "San Carlos",
+  "Rio Claro",
+  "Perez Zeledon",
+  "Nicoya"
+];
+
+const ETIQUETAS_SEDES = {
+  granel_cartago: "Granel Cartago",
+  granel_alajuela: "Granel Alajuela",
+  granel_la_cruz: "Granel La Cruz",
+  granel_guapiles: "Granel Guapiles",
+  granel_perez_zeledon: "Granel Perez Zeledon"
+};
+
+function limpiarSede(sede) {
+  return String(sede || "").trim();
+}
+
+function normalizarSede(sede) {
+  return limpiarSede(sede).toUpperCase();
+}
+
+function tituloDesdeSede(sede) {
+  return limpiarSede(sede)
+    .replace(/_/g, " ")
+    .replace(/\s+/g, " ")
+    .toLowerCase()
+    .replace(/\b\w/g, letra => letra.toUpperCase());
+}
+
+function etiquetaSede(sede) {
+  const sedeLimpia = limpiarSede(sede);
+  if (!sedeLimpia) return "-";
+  return ETIQUETAS_SEDES[sedeLimpia] || (esSedeGranel(sedeLimpia) ? tituloDesdeSede(sedeLimpia) : sedeLimpia);
+}
+
+function esSedeGranel(sede) {
+  return normalizarSede(sede).includes("GRANEL");
+}
+
+function esSedeTransporte(sede) {
+  const sedeNormalizada = normalizarSede(sede);
+  return sedeNormalizada === "TRANSPORTADORA" || esSedeGranel(sedeNormalizada);
+}
+
+function unirSedes(...listas) {
+  const sedes = listas
+    .flat()
+    .map(limpiarSede)
+    .filter(Boolean);
+  return [...new Set(sedes)];
+}
+
+async function obtenerSedesRegistradas(pool) {
+  const [rows] = await pool.query(`
+    SELECT DISTINCT sede
+    FROM unidades
+    WHERE sede IS NOT NULL AND TRIM(sede) <> ''
+    UNION
+    SELECT DISTINCT sede
+    FROM usuarios_sedes
+    WHERE sede IS NOT NULL AND TRIM(sede) <> ''
+    ORDER BY sede
+  `);
+  return rows.map(row => row.sede).filter(Boolean);
+}
+
+async function obtenerTodasSedes(pool) {
+  return unirSedes(TODAS_SEDES, await obtenerSedesRegistradas(pool));
+}
+
+async function obtenerSedesTransporte(pool) {
+  const registradas = await obtenerSedesRegistradas(pool);
+  return unirSedes(SEDES_TRANSPORTE, registradas.filter(esSedeTransporte));
+}
+
 function getSedesPermitidas(req) {
   const user = req.session.user;
   let sedes = [];
@@ -13,32 +114,23 @@ function getSedesPermitidas(req) {
 
     } else {
 
-      sedes = [
-        "Cartago",
-        "Guapiles",
-        "La Cruz",
-        "Transportadora",
-        "Granel",
-        "Alajuela",
-        "Tecnicos",
-        "Taller",
-        "San Carlos",
-        "Rio Claro",
-        "Perez Zeledon",
-        "Nicoya"
-      ];
+      sedes = TODAS_SEDES;
 
     }
 
-  } else if (user.usuario === "pesados") {
+  } else if (String(user.usuario || "").trim().toLowerCase() === "pesados") {
 
-    if (req.session.sedeSeleccionada) {
+    if (
+      req.session.sedeSeleccionada &&
+      req.session.sedeSeleccionada !== "TODAS" &&
+      esSedeTransporte(req.session.sedeSeleccionada)
+    ) {
 
       sedes = [req.session.sedeSeleccionada];
 
     } else {
 
-      sedes = ["Transportadora"];
+      sedes = SEDES_TRANSPORTE;
 
     }
 
@@ -51,4 +143,14 @@ function getSedesPermitidas(req) {
   return sedes;
 }
 
-module.exports = { getSedesPermitidas };
+module.exports = {
+  TODAS_SEDES,
+  SEDES_GRANEL,
+  SEDES_TRANSPORTE,
+  etiquetaSede,
+  esSedeGranel,
+  esSedeTransporte,
+  obtenerTodasSedes,
+  obtenerSedesTransporte,
+  getSedesPermitidas
+};

@@ -1,9 +1,10 @@
 const express = require("express");
 const router = express.Router();
 const pool = require("../db");
+const { SEDES_TRANSPORTE, etiquetaSede: etiquetaSedeTomza } = require("../utils/sedes");
 
 const ROLES_OFICINA_DIA_DIA = ["ADMIN", "TALLER", "PROVEEDURIA_TALLER"];
-const SEDES_TRANSPORTE = ["Transportadora", "Granel"];
+const SEDES_TRANSPORTE_AGRUPADAS = ["Transportadora", "Granel"];
 const PERSONAS_OFICINA = [
   "Emily Fernandez Mora",
   "Michelle Ramirez",
@@ -34,14 +35,14 @@ function requireOficina(req, res, next) {
 
 function expandirSedeFiltro(sede) {
   if (!sede) return [];
-  if (SEDES_TRANSPORTE.includes(sede)) return SEDES_TRANSPORTE;
+  if (SEDES_TRANSPORTE_AGRUPADAS.includes(sede)) return SEDES_TRANSPORTE;
   return [sede];
 }
 
 function etiquetaSede(sede) {
   if (!sede) return "TODAS";
-  if (SEDES_TRANSPORTE.includes(sede)) return "Transportadora + Granel";
-  return sede;
+  if (SEDES_TRANSPORTE_AGRUPADAS.includes(sede)) return "Transportadora + Granel";
+  return etiquetaSedeTomza(sede);
 }
 
 async function ensureOficinaDiaDiaTable() {

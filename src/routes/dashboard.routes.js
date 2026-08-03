@@ -1,6 +1,12 @@
 const express = require("express");
 const router = express.Router();
 const pool = require("../db");
+const {
+  SEDES_TRANSPORTE,
+  etiquetaSede: etiquetaSedeTomza,
+  obtenerTodasSedes,
+  obtenerSedesTransporte
+} = require("../utils/sedes");
 
 async function safeQuery(sql, params = [], fallback = []) {
   try {
@@ -12,8 +18,8 @@ async function safeQuery(sql, params = [], fallback = []) {
   }
 }
 
-const SEDES_TRANSPORTE = ["Transportadora", "Granel"];
 const ROLES_OFICINA_DIA_DIA = ["ADMIN", "TALLER", "PROVEEDURIA_TALLER"];
+const SEDES_TRANSPORTE_AGRUPADAS = ["Transportadora", "Granel"];
 
 function fechaCostaRica(date = new Date()) {
   return new Intl.DateTimeFormat("en-CA", {
@@ -26,14 +32,14 @@ function fechaCostaRica(date = new Date()) {
 
 function expandirSedeFiltro(sede) {
   if (!sede) return [];
-  if (SEDES_TRANSPORTE.includes(sede)) return SEDES_TRANSPORTE;
+  if (SEDES_TRANSPORTE_AGRUPADAS.includes(sede)) return SEDES_TRANSPORTE;
   return [sede];
 }
 
 function etiquetaSede(sede) {
   if (!sede) return "TODAS";
-  if (SEDES_TRANSPORTE.includes(sede)) return "Transportadora + Granel";
-  return sede;
+  if (SEDES_TRANSPORTE_AGRUPADAS.includes(sede)) return "Transportadora + Granel";
+  return etiquetaSedeTomza(sede);
 }
 
 function puedeUsarOficinaDiaDia(user) {
@@ -77,12 +83,16 @@ router.get("/", async (req, res) => {
     // =========================
     // ARMAR LISTA COMPLETA
     // =========================
-    const sedesPermitidas = [
-      ...new Set([
-        req.session.user.sede,
-        ...extras.map(e => e.sede)
-      ])
-    ];
+    const esUsuarioPesados = req.session.user.rol === "SUPERVISOR_PESADO" ||
+      String(req.session.user.usuario || "").trim().toLowerCase() === "pesados";
+    const sedesPermitidas = esUsuarioPesados
+      ? await obtenerSedesTransporte(pool)
+      : [
+          ...new Set([
+            req.session.user.sede,
+            ...extras.map(e => e.sede)
+          ])
+        ];
 
     // =========================
     // DEFINIR SEDE ACTUAL
@@ -328,12 +338,15 @@ router.get("/", async (req, res) => {
     // =========================
     // RENDER (se pasan TODAS las variables que la vista pueda esperar)
     // =========================
+    const sedesDashboard = await obtenerTodasSedes(pool);
     res.render("dashboard", {
       user: req.session.user,
       hoy: hoyMantenimientos,
       stats,
       sedeSeleccionada: sedeSeleccionadaVista,
       sedesMultiples: sedesPermitidas,
+      sedesDashboard,
+      etiquetaSede: etiquetaSedeTomza,
       // Variables para evitar errores si la vista tiene bloques de trámites
       totalPendientes: 0,
       porVencer: 0,

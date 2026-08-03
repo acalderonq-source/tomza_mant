@@ -1,7 +1,12 @@
 const express = require("express");
 const router = express.Router();
 const pool = require("../db");
-const { getSedesPermitidas } = require("../utils/sedes");
+const {
+  etiquetaSede,
+  getSedesPermitidas,
+  obtenerTodasSedes,
+  obtenerSedesTransporte
+} = require("../utils/sedes");
 const {
   ESTADOS_REPUESTOS,
   PRIORIDADES_REPUESTOS,
@@ -16,20 +21,6 @@ const {
 const ROLES_PROVEEDURIA = ["PROVEEDURIA_TALLER", "PROVEEDURIA"];
 const ROLES_VER_REPUESTOS = ["ADMIN", "TALLER", "SUPERVISOR_PESADO", ...ROLES_PROVEEDURIA];
 const ROLES_GESTION_REPUESTOS = ["ADMIN", ...ROLES_PROVEEDURIA];
-const TODAS_SEDES = [
-  "Cartago",
-  "Guapiles",
-  "La Cruz",
-  "Transportadora",
-  "Granel",
-  "Alajuela",
-  "Tecnicos",
-  "Taller",
-  "San Carlos",
-  "Rio Claro",
-  "Perez Zeledon",
-  "Nicoya"
-];
 
 function requireAuth(req, res, next) {
   if (!req.session.user) return res.redirect("/login");
@@ -77,13 +68,13 @@ function redirectConFiltros(req, res) {
   res.redirect(`/repuestos${params.toString() ? `?${params.toString()}` : ""}`);
 }
 
-function sedesDisponibles(req) {
+async function sedesDisponibles(req) {
   if (req.session.user.rol === "ADMIN" || ROLES_PROVEEDURIA.includes(req.session.user.rol)) {
-    return TODAS_SEDES;
+    return obtenerTodasSedes(pool);
   }
 
   if (esUsuarioPesado(req.session.user)) {
-    return ["Transportadora", "Granel"];
+    return obtenerSedesTransporte(pool);
   }
 
   const sedes = getSedesPermitidas(req);
@@ -103,7 +94,7 @@ router.get("/", async (req, res) => {
   try {
     await ensureRepuestosSolicitudesTable(pool);
 
-    const sedes = sedesDisponibles(req);
+    const sedes = await sedesDisponibles(req);
     const sedeFiltro = String(req.query.sede || "").trim();
     const estadoFiltro = String(req.query.estado || "").trim().toUpperCase();
     const placaFiltro = normalizarPlaca(req.query.placa);
@@ -191,7 +182,8 @@ router.get("/", async (req, res) => {
       success,
       error,
       etiquetaEstadoRepuesto,
-      etiquetaPrioridadRepuesto
+      etiquetaPrioridadRepuesto,
+      etiquetaSede
     });
   } catch (error) {
     console.error("Error cargando solicitud de repuestos:", error);
@@ -203,7 +195,7 @@ router.post("/", requireGestionRepuestos, async (req, res) => {
   try {
     await ensureRepuestosSolicitudesTable(pool);
 
-    const sedes = sedesDisponibles(req);
+    const sedes = await sedesDisponibles(req);
     const fecha = req.body.fecha_solicitud || fechaCostaRica();
     const placa = normalizarPlaca(req.body.placa);
     const solicitadoPor = String(req.body.solicitado_por || req.session.user.usuario || "").trim();
@@ -267,7 +259,7 @@ router.post("/:id/estado", requireGestionRepuestos, async (req, res) => {
     const id = req.params.id;
     const estado = normalizarEstado(req.body.estado);
     const proveedorSeleccionado = await obtenerProveedorSeleccionado(req.body.proveedor_id);
-    const sedes = sedesDisponibles(req);
+    const sedes = await sedesDisponibles(req);
 
     const [result] = await pool.query(
       `UPDATE solicitudes_repuestos
@@ -290,7 +282,7 @@ router.post("/:id/estado", requireGestionRepuestos, async (req, res) => {
 router.post("/:id/eliminar", requireGestionRepuestos, async (req, res) => {
   try {
     await ensureRepuestosSolicitudesTable(pool);
-    const sedes = sedesDisponibles(req);
+    const sedes = await sedesDisponibles(req);
     const [result] = await pool.query(
       "DELETE FROM solicitudes_repuestos WHERE id = ? AND sede IN (?)",
       [req.params.id, sedes]

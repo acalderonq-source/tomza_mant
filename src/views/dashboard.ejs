@@ -279,8 +279,9 @@
     ? puedeVerOficinaDiaDia
     : ['ADMIN', 'TALLER', 'PROVEEDURIA_TALLER'].includes(user.rol);
   const sedeActual = sedeSeleccionada || user.sede || 'TODAS';
+  const mostrarSede = typeof etiquetaSede === 'function' ? etiquetaSede : (sede) => sede;
   const sedes = user.rol === 'ADMIN'
-    ? ['Cartago', 'Guapiles', 'La Cruz', 'Alajuela', 'San Carlos', 'Rio Claro', 'Perez Zeledon', 'Nicoya', 'Tecnicos', 'Taller', 'Transportadora', 'Granel']
+    ? (Array.isArray(sedesDashboard) ? sedesDashboard : [])
     : (Array.isArray(sedesMultiples) ? sedesMultiples : []);
   const money = (value) => Number(value || 0).toLocaleString('es-CR', { maximumFractionDigits: 0 });
   const puedeVerCompras = ['ADMIN', 'TALLER', 'PROVEEDURIA_TALLER', 'CONTABILIDAD'].includes(user.rol);
@@ -335,7 +336,7 @@
       <div class="sede-selector">
         <% sedes.forEach(sede => { %>
           <form method="POST" action="/cambiar-sede">
-            <button class="btn btn-sm <%= sedeActual === sede ? 'btn-dark' : 'btn-outline-primary' %>" name="sede" value="<%= sede %>"><%= sede %></button>
+            <button class="btn btn-sm <%= sedeActual === sede ? 'btn-dark' : 'btn-outline-primary' %>" name="sede" value="<%= sede %>"><%= mostrarSede(sede) %></button>
           </form>
         <% }) %>
         <% if (user.rol === 'ADMIN') { %>

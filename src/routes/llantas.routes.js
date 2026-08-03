@@ -4,6 +4,7 @@ const path = require("path");
 const ejs = require("ejs");
 const pdf = require("html-pdf");
 const pool = require("../db");
+const { TODAS_SEDES } = require("../utils/sedes");
 
 const router = express.Router();
 
@@ -14,20 +15,6 @@ const ROLES_COMPRAR = ["ADMIN", "PROVEEDURIA_TALLER", "PROVEEDURIA"];
 const ROLES_RECIBIR = ["ADMIN", "TALLER", "MECANICO"];
 const ROLES_VER_COTIZACION = ["ADMIN", "TALLER", "PROVEEDURIA_TALLER", "PROVEEDURIA", "SUPERVISOR", "SUPERVISOR_PESADO", "MECANICO"];
 const ROLES_SOLICITAR = ["ADMIN", "SUPERVISOR", "SUPERVISOR_PESADO", "TALLER", "MECANICO"];
-const TODAS_SEDES = [
-  "Cartago",
-  "Guapiles",
-  "La Cruz",
-  "Transportadora",
-  "Granel",
-  "Alajuela",
-  "Tecnicos",
-  "Taller",
-  "San Carlos",
-  "Rio Claro",
-  "Perez Zeledon",
-  "Nicoya"
-];
 
 function requireAuth(req, res, next) {
   if (!req.session.user) return res.redirect("/login");

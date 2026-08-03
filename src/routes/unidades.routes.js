@@ -1,6 +1,12 @@
 const express = require("express");
 const router = express.Router();
 const pool = require("../db");
+const {
+  etiquetaSede,
+  esSedeTransporte,
+  obtenerTodasSedes,
+  obtenerSedesTransporte
+} = require("../utils/sedes");
 
 function requireAuth(req, res, next) {
   if (!req.session.user) return res.redirect("/login");
@@ -47,6 +53,19 @@ async function obtenerSedesPermitidas(req) {
       return [req.session.sedeSeleccionada];
     }
     return [];
+  }
+
+  const esUsuarioPesados = user.rol === "SUPERVISOR_PESADO" ||
+    String(user.usuario || "").trim().toLowerCase() === "pesados";
+  if (esUsuarioPesados) {
+    if (
+      req.session.sedeSeleccionada &&
+      req.session.sedeSeleccionada !== "TODAS" &&
+      esSedeTransporte(req.session.sedeSeleccionada)
+    ) {
+      return [req.session.sedeSeleccionada];
+    }
+    return obtenerSedesTransporte(pool);
   }
 
   const [extras] = await pool.query(
@@ -137,6 +156,7 @@ router.get("/", async (req, res) => {
     sql += " ORDER BY activa DESC, varada DESC, sede ASC, placa ASC";
 
     const [unidades] = await pool.query(sql, params);
+    const sedesFormulario = await obtenerTodasSedes(pool);
 
     let resumenSql = `
       SELECT
@@ -160,6 +180,8 @@ router.get("/", async (req, res) => {
       unidades,
       user,
       sedeSeleccionada: req.session.sedeSeleccionada || "TODAS",
+      sedesFormulario,
+      etiquetaSede,
       puedeEditar: puedeEditarUnidades(user),
       filtros: {
         estado: estadoFiltro,

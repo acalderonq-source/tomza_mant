@@ -5,6 +5,11 @@ const {
   ensureRepuestosSolicitudesTable,
   etiquetaEstadoRepuesto
 } = require("../utils/repuestosSolicitudes");
+const {
+  SEDES_TRANSPORTE,
+  esSedeTransporte,
+  obtenerSedesTransporte
+} = require("../utils/sedes");
 
 function requireAuth(req, res, next) {
   if (!req.session.user) return res.redirect("/login");
@@ -16,8 +21,9 @@ router.use(requireAuth);
 const ROLES_VER_TALLER = ["ADMIN", "TALLER", "MECANICO", "SUPERVISOR", "SUPERVISOR_PESADO"];
 const ROLES_GESTION_TALLER = ["ADMIN", "TALLER", "MECANICO"];
 const ROLES_PRIORIDADES_TALLER = ["ADMIN", "TALLER"];
-const SEDES_TRANSPORTE = ["Transportadora", "Granel"];
-const SEDES_TRANSPORTE_NORMALIZADAS = SEDES_TRANSPORTE.map(sede => sede.toUpperCase());
+const SEDES_TRANSPORTE_AGRUPADAS = ["Transportadora", "Granel"];
+const SQL_SEDE_TRANSPORTE_EXPR = "UPPER(TRIM(COALESCE(NULLIF(tp.sede, ''), un.sede, '')))";
+const SQL_ES_SEDE_TRANSPORTE = `(${SQL_SEDE_TRANSPORTE_EXPR} IN ('TRANSPORTADORA', 'GRANEL') OR ${SQL_SEDE_TRANSPORTE_EXPR} LIKE 'GRANEL_%')`;
 
 function fechaCostaRica(offsetDays = 0) {
   const date = new Date();
@@ -63,7 +69,7 @@ function esUsuarioMecanico(user) {
 function esPrioridadPesados(prioridad) {
   return (
     prioridad.grupo_prioridad === "PESADOS" ||
-    SEDES_TRANSPORTE_NORMALIZADAS.includes(String(prioridad.sede || "").trim().toUpperCase()) ||
+    esSedeTransporte(prioridad.sede) ||
     String(prioridad.creado_por_nombre || "").trim().toLowerCase().includes("pesado")
   );
 }
@@ -131,7 +137,7 @@ async function obtenerSedesPermitidas(req) {
   }
 
   if (esUsuarioPesados(user)) {
-    return [...SEDES_TRANSPORTE];
+    return obtenerSedesTransporte(pool);
   }
 
   const [extras] = await pool.query(
@@ -154,7 +160,7 @@ async function obtenerSedesPermitidas(req) {
 function expandirSedesTransporte(sedes) {
   if (!Array.isArray(sedes) || sedes.length === 0) return sedes;
   const set = new Set(sedes.filter(Boolean));
-  if (sedes.some(sede => SEDES_TRANSPORTE.includes(sede))) {
+  if (sedes.some(sede => SEDES_TRANSPORTE_AGRUPADAS.includes(sede))) {
     SEDES_TRANSPORTE.forEach(sede => set.add(sede));
   }
   return [...set];
@@ -412,7 +418,7 @@ router.get("/dashboard", async (req, res) => {
         tp.placa,
         COALESCE(NULLIF(tp.sede, ''), un.sede) AS sede,
         CASE
-          WHEN UPPER(TRIM(COALESCE(NULLIF(tp.sede, ''), un.sede, ''))) IN ('TRANSPORTADORA', 'GRANEL')
+          WHEN ${SQL_ES_SEDE_TRANSPORTE}
             OR LOWER(TRIM(COALESCE(usr.usuario, ''))) LIKE '%pesado%'
           THEN 'PESADOS'
           ELSE 'MECANICO'
@@ -437,7 +443,7 @@ router.get("/dashboard", async (req, res) => {
       prioridadesSql += `
         ORDER BY
           CASE
-            WHEN UPPER(TRIM(COALESCE(NULLIF(tp.sede, ''), un.sede, ''))) IN ('TRANSPORTADORA', 'GRANEL')
+            WHEN ${SQL_ES_SEDE_TRANSPORTE}
               OR LOWER(TRIM(COALESCE(usr.usuario, ''))) LIKE '%pesado%'
             THEN 0
             ELSE 1
@@ -579,17 +585,17 @@ router.post("/prioridades", async (req, res) => {
     }
 
     if (!unidadPrioridad?.sede && esUsuarioPesados(req.session.user)) {
-      sedeAsignada = SEDES_TRANSPORTE_NORMALIZADAS.includes(String(req.session.sedeSeleccionada || "").trim().toUpperCase())
+      sedeAsignada = esSedeTransporte(req.session.sedeSeleccionada)
         ? req.session.sedeSeleccionada
         : "Transportadora";
     }
 
-    if (esUsuarioPesados(req.session.user) && !SEDES_TRANSPORTE_NORMALIZADAS.includes(String(sedeAsignada || "").trim().toUpperCase())) {
+    if (esUsuarioPesados(req.session.user) && !esSedeTransporte(sedeAsignada)) {
       req.session.error = "El usuario de Pesados solo puede agregar prioridades de Granel o Transportadora.";
       return res.redirect("/taller/dashboard");
     }
 
-    if (esUsuarioMecanico(req.session.user) && SEDES_TRANSPORTE_NORMALIZADAS.includes(String(sedeAsignada || "").trim().toUpperCase())) {
+    if (esUsuarioMecanico(req.session.user) && esSedeTransporte(sedeAsignada)) {
       req.session.error = "El usuario mecánico solo puede agregar prioridades de taller/Cartago.";
       return res.redirect("/taller/dashboard");
     }

@@ -2,23 +2,10 @@ const express = require("express");
 const router = express.Router();
 const pool = require("../db");
 const ExcelJS = require("exceljs");
+const { TODAS_SEDES } = require("../utils/sedes");
 
 const ROLES_VER_GIRAS = ["ADMIN", "TALLER", "MECANICO", "SUPERVISOR", "SUPERVISOR_PESADO"];
 const ROLES_GESTION_GIRAS = ["ADMIN", "TALLER"];
-const TODAS_SEDES = [
-  "Cartago",
-  "Guapiles",
-  "La Cruz",
-  "Transportadora",
-  "Granel",
-  "Alajuela",
-  "Tecnicos",
-  "Taller",
-  "San Carlos",
-  "Rio Claro",
-  "Perez Zeledon",
-  "Nicoya"
-];
 
 function requireAuth(req, res, next) {
   if (!req.session.user) return res.redirect("/login");

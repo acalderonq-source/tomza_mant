@@ -43,7 +43,8 @@
 </head>
 <body>
 <%
-  const sedes = ['Cartago', 'Alajuela', 'Guapiles', 'La Cruz', 'Perez Zeledon', 'Rio Claro', 'San Carlos', 'Nicoya'];
+  const sedes = sedesFormulario || [];
+  const mostrarSede = typeof etiquetaSede === 'function' ? etiquetaSede : (sede) => sede;
 %>
 
 <nav class="navbar navbar-dark px-3 py-2">
@@ -135,7 +136,7 @@
             <select name="sede" class="form-select" required>
               <option value="">Seleccione sede</option>
               <% sedes.forEach(sede => { %>
-                <option value="<%= sede %>" <%= sedeSeleccionada === sede ? 'selected' : '' %>><%= sede %></option>
+                <option value="<%= sede %>" <%= sedeSeleccionada === sede ? 'selected' : '' %>><%= mostrarSede(sede) %></option>
               <% }) %>
             </select>
           </div>
@@ -182,7 +183,7 @@
           <% unidades.forEach(u => { %>
             <tr>
               <td><strong><%= u.placa %></strong></td>
-              <td><%= u.sede || '-' %></td>
+              <td><%= mostrarSede(u.sede) %></td>
               <td>
                 <% if (Number(u.activa) === 1) { %>
                   <span class="status-pill status-active">Activa</span>

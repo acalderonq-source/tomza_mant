@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const pool = require("../db");
+const { obtenerSedesTransporte } = require("../utils/sedes");
 
 /* =========================================================
    CAMBIAR SEDE
@@ -48,10 +49,13 @@ router.post("/cambiar-sede", async (req, res) => {
     // =========================
     // ARMAR LISTA COMPLETA
     // =========================
-    const sedesPermitidas = [
-      user.sede,
-      ...extras.map(e => e.sede)
-    ];
+    const esPesados = String(user.usuario || "").trim().toLowerCase() === "pesados" || user.rol === "SUPERVISOR_PESADO";
+    const sedesPermitidas = esPesados
+      ? await obtenerSedesTransporte(pool)
+      : [
+          user.sede,
+          ...extras.map(e => e.sede)
+        ];
 
     console.log("👤 Usuario:", user.usuario);
 

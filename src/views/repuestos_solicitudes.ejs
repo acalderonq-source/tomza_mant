@@ -342,6 +342,7 @@
   const proveedoresLista = Array.isArray(proveedores) ? proveedores : [];
   const estadoClass = estado => String(estado || '').toLowerCase();
   const prioridadClass = prioridad => String(prioridad || '').toLowerCase();
+  const mostrarSede = typeof etiquetaSede === 'function' ? etiquetaSede : (sede) => sede;
 %>
 
 <nav class="navbar navbar-dark topbar px-3 py-2">
@@ -397,7 +398,7 @@
         <select name="sede" class="form-select form-select-sm">
           <option value="">Todas permitidas</option>
           <% sedes.forEach(sede => { %>
-            <option value="<%= sede %>" <%= filtros.sede === sede ? 'selected' : '' %>><%= sede %></option>
+            <option value="<%= sede %>" <%= filtros.sede === sede ? 'selected' : '' %>><%= mostrarSede(sede) %></option>
           <% }) %>
         </select>
       </div>
@@ -454,7 +455,7 @@
             <% lista.forEach(item => { %>
               <tr>
                 <td data-label="Fecha"><%= item.fecha_formato %></td>
-                <td data-label="Sede"><%= item.sede %></td>
+                <td data-label="Sede"><%= mostrarSede(item.sede) %></td>
                 <td data-label="Placa" class="cell-placa"><%= item.placa %></td>
                 <td data-label="Solicitado por"><%= item.solicitado_por %></td>
                 <td data-label="Repuesto"><%= item.repuesto_solicitado %></td>
@@ -578,7 +579,7 @@
 <% } %>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-<script type="application/json" id="unidadesRepuestosData"><%- JSON.stringify(unidadesLista.map(unidad => ({ placa: unidad.placa, sede: unidad.sede || '' }))) %></script>
+<script type="application/json" id="unidadesRepuestosData"><%- JSON.stringify(unidadesLista.map(unidad => ({ placa: unidad.placa, sede: unidad.sede || '', sedeTexto: mostrarSede(unidad.sede) || '' }))) %></script>
 <script>
   const placaUnidadSearch = document.getElementById('placaUnidadSearch');
   const placaUnidadValue = document.getElementById('placaUnidadValue');
@@ -639,7 +640,7 @@
       const button = document.createElement('button');
       button.type = 'button';
       button.className = 'plate-option';
-      button.innerHTML = `<strong>${unidad.placa}</strong><span>${unidad.sede || 'Sin sede'}</span>`;
+      button.innerHTML = `<strong>${unidad.placa}</strong><span>${unidad.sedeTexto || unidad.sede || 'Sin sede'}</span>`;
       button.addEventListener('click', () => seleccionarUnidadRepuesto(unidad));
       placaUnidadResults.appendChild(button);
     });
