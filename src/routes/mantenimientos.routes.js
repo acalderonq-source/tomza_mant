@@ -7,6 +7,7 @@ const {
   ensureReportesSupervisoresTables,
   registrarSugerenciasParaCorrectivo
 } = require("../utils/reportesSupervisoresDb");
+const { esUsuarioTodasSedes } = require("../utils/sedes");
 
 // =====================================================
 // MIDDLEWARE DE AUTENTICACIÓN
@@ -21,7 +22,7 @@ function requireAuth(req, res, next) {
 // =====================================================
 function obtenerSedeFiltro(req) {
   if (!req.session.user) return null;
-  if (req.session.user.rol === "ADMIN") {
+  if (esUsuarioTodasSedes(req.session.user)) {
     if (req.session.sedeSeleccionada && req.session.sedeSeleccionada !== "TODAS")
       return req.session.sedeSeleccionada;
     return null;

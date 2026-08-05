@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const pool = require("../db");
+const { esUsuarioTodasSedes } = require("../utils/sedes");
 
 function requireAuth(req, res, next) {
   if (!req.session.user) return res.redirect("/login");
@@ -16,7 +17,7 @@ function obtenerSedeFiltro(req) {
   // =========================
   // ADMIN
   // =========================
-  if (req.session.user.rol === "ADMIN") {
+  if (esUsuarioTodasSedes(req.session.user)) {
 
     if (
       req.session.sedeSeleccionada &&

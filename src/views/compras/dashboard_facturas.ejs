@@ -47,6 +47,41 @@
     }
     .stat-foot { color: #64748b; font-size: .82rem; margin-top: .2rem; }
     .chart-card { overflow: hidden; }
+    .debt-card {
+      background: #fff;
+      border: 1px solid #dbe3ef;
+      border-radius: 14px;
+      box-shadow: 0 10px 24px rgba(15, 23, 42, .05);
+      overflow: hidden;
+    }
+    .debt-head {
+      align-items: center;
+      background: linear-gradient(135deg, #111827, #1d4ed8);
+      color: #fff;
+      display: flex;
+      gap: 1rem;
+      justify-content: space-between;
+      padding: 1rem 1.15rem;
+    }
+    .debt-title {
+      font-size: 1.08rem;
+      font-weight: 900;
+      margin: 0;
+    }
+    .debt-subtitle {
+      color: rgba(255,255,255,.76);
+      font-size: .86rem;
+      margin: .2rem 0 0;
+    }
+    .debt-table-wrap {
+      max-height: 430px;
+      overflow: auto;
+    }
+    .debt-table-wrap thead th {
+      position: sticky;
+      top: 0;
+      z-index: 1;
+    }
     .chart-head {
       border-bottom: 1px solid #e2e8f0;
       font-weight: 900;
@@ -72,6 +107,7 @@
     }
     @media (max-width: 620px) {
       .stat-grid { grid-template-columns: 1fr; }
+      .debt-head { align-items: stretch; flex-direction: column; }
       .navbar .text-white {
         align-items: flex-start !important;
         flex-direction: column;
@@ -90,8 +126,12 @@
   const safePorMes = Array.isArray(porMes) ? porMes : [];
   const safePorEstado = Array.isArray(porEstado) ? porEstado : [];
   const safeRecientes = Array.isArray(facturasRecientes) ? facturasRecientes : [];
+  const safeDeudaPorProveedor = Array.isArray(deudaPorProveedor) ? deudaPorProveedor : [];
+  const safeResumenDeuda = resumenDeuda || {};
   const filtrosActuales = filtros || {};
   const money = (value) => Number(value || 0).toLocaleString('es-CR', { maximumFractionDigits: 0 });
+  const pdfDeudaUrl = '/compras/facturas/reporte/pdf?orden=asc';
+  const listaDeudaUrl = '/compras/facturas?pagada=0&orden=asc';
 %>
 
 <nav class="navbar navbar-dark bg-dark px-3 py-2">
@@ -174,6 +214,52 @@
       <div class="stat-label">Abonos</div>
       <div class="stat-value">₡<%= money(safeResumen.abonos) %></div>
       <div class="stat-foot"><%= safeResumen.conAbono || 0 %> facturas abonadas</div>
+    </div>
+  </section>
+
+  <section class="debt-card mb-3">
+    <div class="debt-head">
+      <div>
+        <h2 class="debt-title"><i class="bi bi-cash-coin me-1"></i> Cuentas por pagar de todos los proveedores</h2>
+        <p class="debt-subtitle">Muestra toda la deuda pendiente, sin filtros de fecha, agrupada por proveedor y ordenada alfabéticamente.</p>
+      </div>
+      <div class="d-flex gap-2 flex-wrap">
+        <a href="<%= pdfDeudaUrl %>" class="btn btn-light btn-sm rounded-pill px-3">
+          <i class="bi bi-file-earmark-pdf"></i> Descargar PDF
+        </a>
+        <a href="<%= listaDeudaUrl %>" class="btn btn-outline-light btn-sm rounded-pill px-3">
+          Ver facturas pendientes
+        </a>
+      </div>
+    </div>
+    <div class="debt-table-wrap">
+      <table class="table table-sm align-middle mb-0">
+        <thead>
+          <tr>
+            <th>Proveedor</th>
+            <th class="text-end">Saldo</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% if (!safeDeudaPorProveedor.length) { %>
+            <tr><td colspan="2" class="text-center text-muted py-4">No hay cuentas pendientes por pagar.</td></tr>
+          <% } %>
+          <% safeDeudaPorProveedor.forEach(item => { %>
+            <tr>
+              <td><strong><%= item.proveedor %></strong></td>
+              <td class="text-end fw-bold">₡<%= money(item.saldo) %></td>
+            </tr>
+          <% }) %>
+        </tbody>
+        <% if (safeDeudaPorProveedor.length) { %>
+          <tfoot>
+            <tr>
+              <th>Total general</th>
+              <th class="text-end">₡<%= money(safeResumenDeuda.saldo) %></th>
+            </tr>
+          </tfoot>
+        <% } %>
+      </table>
     </div>
   </section>
 

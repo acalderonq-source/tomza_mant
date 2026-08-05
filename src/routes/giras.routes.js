@@ -2,7 +2,7 @@ const express = require("express");
 const router = express.Router();
 const pool = require("../db");
 const ExcelJS = require("exceljs");
-const { TODAS_SEDES } = require("../utils/sedes");
+const { esUsuarioTodasSedes, TODAS_SEDES } = require("../utils/sedes");
 
 const ROLES_VER_GIRAS = ["ADMIN", "TALLER", "MECANICO", "SUPERVISOR", "SUPERVISOR_PESADO"];
 const ROLES_GESTION_GIRAS = ["ADMIN", "TALLER"];
@@ -27,8 +27,8 @@ function puedeGestionar(user) {
 function sedesPermitidasGiras(req) {
   const user = req.session.user;
 
-  if (["ADMIN", "TALLER"].includes(user.rol)) {
-    if (user.rol === "ADMIN" && req.session.sedeSeleccionada && req.session.sedeSeleccionada !== "TODAS") {
+  if (esUsuarioTodasSedes(user)) {
+    if (req.session.sedeSeleccionada && req.session.sedeSeleccionada !== "TODAS") {
       return [req.session.sedeSeleccionada];
     }
     return TODAS_SEDES;

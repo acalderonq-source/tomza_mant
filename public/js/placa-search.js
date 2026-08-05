@@ -126,7 +126,9 @@
   function createSelectedBox(wrapper) {
     const selected = document.createElement("div");
     selected.className = "tomza-plate-selected";
-    wrapper.insertAdjacentElement("afterend", selected);
+    if (wrapper && wrapper.appendChild) {
+      wrapper.appendChild(selected);
+    }
     return selected;
   }
 

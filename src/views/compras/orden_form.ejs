@@ -15,6 +15,104 @@
       border-radius: 12px;
       padding: .9rem;
     }
+    .order-lines-wrap {
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      overflow-x: auto;
+    }
+    .order-lines-table {
+      margin-bottom: 0;
+      min-width: 980px;
+      table-layout: fixed;
+    }
+    .order-lines-table th,
+    .order-lines-table td {
+      vertical-align: top;
+    }
+    .order-lines-table .col-placa { width: 18%; }
+    .order-lines-table .col-descripcion { width: 38%; }
+    .order-lines-table .col-cantidad { width: 11%; }
+    .order-lines-table .col-precio { width: 15%; }
+    .order-lines-table .col-subtotal { width: 15%; }
+    .order-lines-table .col-accion { width: 48px; }
+    .order-lines-table textarea {
+      min-height: 76px;
+      resize: vertical;
+    }
+    .order-lines-table .removeRow {
+      height: 36px;
+      width: 36px;
+      padding: 0;
+    }
+    .order-totals {
+      display: grid;
+      gap: .65rem;
+      margin-left: auto;
+      max-width: 420px;
+      padding-top: 1rem;
+    }
+    .order-total-row {
+      align-items: center;
+      display: grid;
+      grid-template-columns: 1fr 180px;
+      gap: .75rem;
+    }
+    .order-total-row label {
+      color: #111827;
+      font-weight: 800;
+      margin: 0;
+      text-align: right;
+    }
+    .order-total-row.total {
+      border-top: 1px solid #e2e8f0;
+      margin-top: .25rem;
+      padding-top: .65rem;
+    }
+    .order-actions {
+      align-items: center;
+      display: flex;
+      flex-wrap: wrap;
+      gap: .5rem;
+    }
+    @media (max-width: 768px) {
+      .order-lines-table {
+        min-width: 0;
+      }
+      .order-lines-table thead {
+        display: none;
+      }
+      .order-lines-table,
+      .order-lines-table tbody,
+      .order-lines-table tr,
+      .order-lines-table td {
+        display: block;
+        width: 100%;
+      }
+      .order-lines-table tr {
+        border-bottom: 1px solid #e2e8f0;
+        padding: .75rem;
+      }
+      .order-lines-table td {
+        border-bottom: 0 !important;
+        padding: .35rem 0 !important;
+      }
+      .order-lines-table td::before {
+        content: attr(data-label);
+        display: block;
+        color: #475569;
+        font-size: .72rem;
+        font-weight: 800;
+        margin-bottom: .25rem;
+        text-transform: uppercase;
+      }
+      .order-total-row {
+        grid-template-columns: 1fr;
+        gap: .25rem;
+      }
+      .order-total-row label {
+        text-align: left;
+      }
+    }
   </style>
   <link rel="stylesheet" href="/css/compras.css">
 </head>
@@ -85,22 +183,46 @@
 
       <hr>
       <h4 class="page-title fs-5 mb-3">Detalle de productos/servicios</h4>
-      <div class="table-responsive">
-        <table class="table table-bordered" id="itemsTable">
+      <div class="order-lines-wrap">
+        <table class="table table-bordered order-lines-table" id="itemsTable">
+          <colgroup>
+            <col class="col-placa">
+            <col class="col-descripcion">
+            <col class="col-cantidad">
+            <col class="col-precio">
+            <col class="col-subtotal">
+            <col class="col-accion">
+          </colgroup>
           <thead>
             <tr><th>Placa</th><th>Descripción</th><th>Cantidad</th><th>Precio unitario</th><th>Subtotal</th><th></th></tr>
           </thead>
           <tbody>
             <!-- Las filas se agregarán dinámicamente -->
           </tbody>
-          <tfoot>
-            <tr><td colspan="4" class="text-end"><strong>Subtotal</strong></td><td><input type="text" id="subtotal" name="subtotal" readonly class="form-control-plaintext money" value="<%= safeOrden.subtotal || '' %>"></td><td></td></tr>
-            <tr><td colspan="4" class="text-end"><strong>Descuento monto</strong></td><td><input type="number" id="descuento" name="descuento" step="0.01" min="0" value="<%= safeOrden.descuento ?? 0 %>" class="form-control"></td><td></td></tr>
-            <tr><td colspan="4" class="text-end"><strong>Transporte</strong></td><td><input type="number" id="transporte" name="transporte" step="0.01" value="<%= safeOrden.transporte ?? 0 %>" class="form-control"></td><td></td></tr>
-            <tr><td colspan="4" class="text-end"><strong>IVA (%)</strong></td><td><input type="number" id="iva" name="iva" step="0.01" value="<%= safeOrden.iva ?? 13 %>" class="form-control"></td><td></td></tr>
-            <tr><td colspan="4" class="text-end"><strong>Total</strong></td><td><input type="text" id="total" name="total" readonly class="form-control-plaintext fw-bold money" value="<%= safeOrden.total || '' %>"></td><td></td></tr>
-          </tfoot>
         </table>
+      </div>
+
+      <div class="order-totals">
+        <div class="order-total-row">
+          <label for="subtotal">Subtotal</label>
+          <input type="text" id="subtotal" name="subtotal" readonly class="form-control-plaintext money" value="<%= safeOrden.subtotal || '' %>">
+        </div>
+        <div class="order-total-row">
+          <label for="descuento">Descuento monto</label>
+          <input type="number" id="descuento" name="descuento" step="0.01" min="0" value="<%= safeOrden.descuento ?? 0 %>" class="form-control">
+        </div>
+        <div class="order-total-row">
+          <label for="transporte">Transporte</label>
+          <input type="number" id="transporte" name="transporte" step="0.01" value="<%= safeOrden.transporte ?? 0 %>" class="form-control">
+        </div>
+        <div class="order-total-row">
+          <label for="iva">IVA (%)</label>
+          <input type="number" id="iva" name="iva" step="0.01" value="<%= safeOrden.iva ?? 13 %>" class="form-control">
+        </div>
+        <div class="order-total-row total">
+          <label for="total">Total</label>
+          <input type="text" id="total" name="total" readonly class="form-control-plaintext fw-bold money" value="<%= safeOrden.total || '' %>">
+        </div>
       </div>
 
       <div class="mb-3">
@@ -132,9 +254,11 @@
         </div>
       </div>
 
-      <button type="button" class="btn btn-secondary" id="addRowBtn">➕ Agregar línea</button>
-      <button type="submit" class="btn btn-primary"><%= textoBotonGuardar %></button>
-      <a href="<%= urlCancelar %>" class="btn btn-danger">Cancelar</a>
+      <div class="order-actions">
+        <button type="button" class="btn btn-secondary" id="addRowBtn"><i class="bi bi-plus-circle"></i> Agregar línea</button>
+        <button type="submit" class="btn btn-primary"><%= textoBotonGuardar %></button>
+        <a href="<%= urlCancelar %>" class="btn btn-danger">Cancelar</a>
+      </div>
     </form>
   </div>
 </div>
@@ -147,12 +271,12 @@
     const tbody = document.querySelector("#itemsTable tbody");
     const newRow = document.createElement("tr");
     newRow.innerHTML = `
-      <td><input type="text" name="lineas[${rowIndex}][codigo]" class="form-control text-uppercase" placeholder="Ej: CL279463" data-placa-autocomplete data-placa-mode="placa" data-placa-allow-free="true"></td>
-      <td><textarea name="lineas[${rowIndex}][descripcion]" class="form-control" rows="2" required></textarea></td>
-      <td><input type="number" name="lineas[${rowIndex}][cantidad]" class="form-control cantidad" value="1" step="0.01"></td>
-      <td><input type="number" name="lineas[${rowIndex}][precio_unitario]" class="form-control precio" step="0.01"></td>
-      <td><input type="text" name="lineas[${rowIndex}][subtotal]" class="form-control subtotal" readonly></td>
-      <td><button type="button" class="btn btn-danger btn-sm removeRow">X</button></td>
+      <td data-label="Placa"><input type="text" name="lineas[${rowIndex}][codigo]" class="form-control text-uppercase" placeholder="Ej: CL279463" data-placa-autocomplete data-placa-mode="placa" data-placa-allow-free="true"></td>
+      <td data-label="Descripción"><textarea name="lineas[${rowIndex}][descripcion]" class="form-control" rows="3" required></textarea></td>
+      <td data-label="Cantidad"><input type="number" name="lineas[${rowIndex}][cantidad]" class="form-control cantidad" value="1" step="0.01"></td>
+      <td data-label="Precio unitario"><input type="number" name="lineas[${rowIndex}][precio_unitario]" class="form-control precio" step="0.01"></td>
+      <td data-label="Subtotal"><input type="text" name="lineas[${rowIndex}][subtotal]" class="form-control subtotal money" readonly></td>
+      <td data-label="Quitar"><button type="button" class="btn btn-danger btn-sm removeRow" title="Quitar línea"><i class="bi bi-x-lg"></i></button></td>
     `;
     tbody.appendChild(newRow);
     newRow.querySelector(`[name="lineas[${rowIndex}][codigo]"]`).value = linea.codigo || '';

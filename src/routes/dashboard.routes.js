@@ -5,6 +5,7 @@ const {
   agregarTallerParaMecanico,
   SEDES_TRANSPORTE,
   etiquetaSede: etiquetaSedeTomza,
+  esUsuarioTodasSedes,
   obtenerTodasSedes,
   obtenerSedesTransporte
 } = require("../utils/sedes");
@@ -86,7 +87,10 @@ router.get("/", async (req, res) => {
     // =========================
     const esUsuarioPesados = req.session.user.rol === "SUPERVISOR_PESADO" ||
       String(req.session.user.usuario || "").trim().toLowerCase() === "pesados";
-    const sedesPermitidas = esUsuarioPesados
+    const usuarioTodasSedes = esUsuarioTodasSedes(req.session.user);
+    const sedesPermitidas = usuarioTodasSedes
+      ? await obtenerTodasSedes(pool)
+      : esUsuarioPesados
       ? await obtenerSedesTransporte(pool)
       : agregarTallerParaMecanico(req.session.user, [
           req.session.user.sede,
@@ -98,8 +102,7 @@ router.get("/", async (req, res) => {
     // =========================
     let sedeFiltro = null;
 
-    // ADMIN
-    if (req.session.user.rol === "ADMIN") {
+    if (usuarioTodasSedes) {
       if (req.session.sedeSeleccionada && req.session.sedeSeleccionada !== "TODAS") {
         sedeFiltro = req.session.sedeSeleccionada;
       }

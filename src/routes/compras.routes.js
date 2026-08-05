@@ -3,6 +3,7 @@ const router = express.Router();
 const pool = require("../db");
 const fs = require("fs");
 const path = require("path");
+const PdfPrinter = require("pdfmake");
 const { generarPDFOrden } = require('../utils/pdfOrdenCompra');
 
 // ===================== MIDDLEWARES =====================
@@ -26,6 +27,14 @@ const ROLES_RECEPCION_FACTURAS = [
 ];
 const ROLES_VER_ORDENES = [...ROLES_GESTION_FACTURAS, "CONTABILIDAD", ...ROLES_MENSAJERO_FACTURAS];
 const ROLES_REGISTRAR_FACTURA_ORDEN = [...ROLES_GESTION_FACTURAS, ...ROLES_MENSAJERO_FACTURAS];
+const PDF_FONTS = {
+  Helvetica: {
+    normal: "Helvetica",
+    bold: "Helvetica-Bold",
+    italics: "Helvetica-Oblique",
+    bolditalics: "Helvetica-BoldOblique"
+  }
+};
 
 function esMensajeroFacturas(user) {
   return ROLES_MENSAJERO_FACTURAS.includes(user.rol);
@@ -533,6 +542,170 @@ async function obtenerFacturasCompras(filtros = {}) {
   }
 
   return facturasConEstado;
+}
+
+function agruparFacturasPendientesPorProveedor(facturas = []) {
+  return Array.from(facturas.reduce((map, factura) => {
+    const proveedorNombre = factura.proveedor_nombre || "Sin proveedor";
+    if (!map.has(proveedorNombre)) {
+      map.set(proveedorNombre, {
+        proveedor: proveedorNombre,
+        facturas: [],
+        totales: {
+          montoOriginal: 0,
+          notasCredito: 0,
+          abonos: 0,
+          saldo: 0
+        }
+      });
+    }
+
+    const grupo = map.get(proveedorNombre);
+    grupo.facturas.push(factura);
+    grupo.totales.montoOriginal += parseMonto(factura.monto_original ?? factura.monto);
+    grupo.totales.notasCredito += parseMonto(factura.nota_credito_monto);
+    grupo.totales.abonos += parseMonto(factura.abono_monto);
+    grupo.totales.saldo += parseMonto(factura.saldo);
+
+    return map;
+  }, new Map()).values()).sort((a, b) =>
+    b.totales.saldo - a.totales.saldo ||
+    a.proveedor.localeCompare(b.proveedor, "es")
+  );
+}
+
+function calcularTotalesFacturas(facturas = []) {
+  return facturas.reduce((acc, f) => {
+    acc.montoOriginal += parseMonto(f.monto_original ?? f.monto);
+    acc.notasCredito += parseMonto(f.nota_credito_monto);
+    acc.abonos += parseMonto(f.abono_monto);
+    acc.saldo += parseMonto(f.saldo);
+    acc.vencidas += f.vencida ? 1 : 0;
+    return acc;
+  }, {
+    montoOriginal: 0,
+    notasCredito: 0,
+    abonos: 0,
+    saldo: 0,
+    vencidas: 0
+  });
+}
+
+function formatDateCR(value) {
+  if (!value) return "-";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? "-" : date.toLocaleDateString("es-CR");
+}
+
+function formatMoneyCR(value) {
+  return Number(value || 0).toLocaleString("es-CR", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  });
+}
+
+function pdfStreamToBuffer(pdfDoc) {
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    pdfDoc.on("data", chunk => chunks.push(chunk));
+    pdfDoc.on("end", () => resolve(Buffer.concat(chunks)));
+    pdfDoc.on("error", reject);
+    pdfDoc.end();
+  });
+}
+
+async function generarPDFFacturasPendientes({ gruposProveedor, facturas, filtros, totales, fechaGeneracion }) {
+  const printer = new PdfPrinter(PDF_FONTS);
+  const body = [
+    [
+      { text: "Proveedor", style: "tableHeader" },
+      { text: "Saldo", style: "tableHeader", alignment: "right" }
+    ]
+  ];
+
+  gruposProveedor.forEach(grupo => {
+    body.push([
+      { text: grupo.proveedor, bold: true },
+      { text: `CRC ${formatMoneyCR(grupo.totales.saldo)}`, alignment: "right", bold: true }
+    ]);
+  });
+
+  if (!gruposProveedor.length) {
+    body.push([{ text: "No hay cuentas pendientes por pagar.", colSpan: 2, alignment: "center", color: "#64748b", margin: [0, 12, 0, 12] }, {}]);
+  } else {
+    body.push([
+      { text: "Total general", bold: true, fillColor: "#dcfce7", color: "#14532d" },
+      { text: `CRC ${formatMoneyCR(totales.saldo)}`, alignment: "right", bold: true, fillColor: "#dcfce7", color: "#14532d" }
+    ]);
+  }
+
+  const docDefinition = {
+    pageSize: "LETTER",
+    pageOrientation: "landscape",
+    pageMargins: [24, 24, 24, 28],
+    defaultStyle: { font: "Helvetica", fontSize: 7.2, color: "#111827" },
+    footer: (currentPage, pageCount) => ({
+      text: `Pagina ${currentPage} de ${pageCount}`,
+      alignment: "right",
+      margin: [0, 0, 24, 0],
+      fontSize: 7,
+      color: "#64748b"
+    }),
+    content: [
+      {
+        columns: [
+          [
+            { text: "Facturas pendientes por pagar", fontSize: 16, bold: true },
+            { text: "Gas Tomza - Sistema de compras", color: "#64748b", margin: [0, 2, 0, 0] }
+          ],
+          [
+            { text: `Generado: ${fechaGeneracion}`, alignment: "right", bold: true },
+            { text: `${facturas.length} factura${facturas.length === 1 ? "" : "s"} pendiente${facturas.length === 1 ? "" : "s"}`, alignment: "right", color: "#64748b" }
+          ]
+        ],
+        margin: [0, 0, 0, 10]
+      },
+      {
+        table: {
+          widths: ["*", "*", "*", "*"],
+          body: [[
+            { text: `Proveedor: ${filtros.proveedor_nombre || "Todos"}`, style: "filterBox" },
+            { text: `Desde: ${filtros.fecha_desde || "-"}`, style: "filterBox" },
+            { text: `Hasta: ${filtros.fecha_hasta || "-"}`, style: "filterBox" },
+            { text: `Solo vencidas: ${filtros.vencida === "1" ? "Si" : "No"}`, style: "filterBox" }
+          ]]
+        },
+        layout: "noBorders",
+        margin: [0, 0, 0, 8]
+      },
+      {
+        table: {
+          headerRows: 1,
+          widths: ["*", 120],
+          body
+        },
+        layout: {
+          hLineColor: () => "#cbd5e1",
+          vLineColor: () => "#e2e8f0",
+          hLineWidth: () => 0.5,
+          vLineWidth: () => 0.5,
+          paddingLeft: () => 3,
+          paddingRight: () => 3,
+          paddingTop: () => 3,
+          paddingBottom: () => 3
+        }
+      },
+      { text: `Total general pendiente: CRC ${formatMoneyCR(totales.saldo)}`, alignment: "right", fontSize: 11, bold: true, color: "#14532d", margin: [0, 10, 0, 0] }
+    ],
+    styles: {
+      tableHeader: { fillColor: "#111827", color: "#ffffff", bold: true, fontSize: 7 },
+      filterBox: { fillColor: "#f8fafc", margin: [4, 4, 4, 4], bold: true },
+      totalBox: { fillColor: "#f8fafc", margin: [4, 5, 4, 5], bold: true },
+      totalBoxMain: { fillColor: "#dcfce7", color: "#14532d", margin: [4, 5, 4, 5], bold: true }
+    }
+  };
+
+  return pdfStreamToBuffer(printer.createPdfKitDocument(docDefinition));
 }
 
 // ===================== FUNCIÓN PARA GENERAR NÚMERO DE PO =====================
@@ -1414,6 +1587,9 @@ router.get("/facturas/dashboard", requireAuth, allowRoles("ADMIN", "TALLER", "PR
     const orden = req.query.orden === "asc" ? "asc" : "desc";
     const filtros = { proveedor_id, fecha_desde, fecha_hasta, pagada, vencida, orden };
     const facturas = await obtenerFacturasCompras(filtros);
+    const filtrosDeuda = { pagada: "0", orden: "asc" };
+    const facturasPendientesTodas = (await obtenerFacturasCompras(filtrosDeuda))
+      .filter(factura => parseMonto(factura.saldo) > 0 && !factura.cubierta_por_nc);
     const [proveedores] = await queryWithRetry("SELECT id, nombre FROM proveedores ORDER BY nombre");
 
     const resumen = facturas.reduce((acc, factura) => {
@@ -1523,6 +1699,21 @@ router.get("/facturas/dashboard", requireAuth, allowRoles("ADMIN", "TALLER", "PR
     const porMes = Array.from(porMesMap.values()).sort((a, b) => a.mes.localeCompare(b.mes, "es"));
     const porEstado = Array.from(porEstadoMap.values()).filter(item => item.cantidad > 0);
     const facturasRecientes = facturas.slice(0, 12);
+    const gruposDeudaProveedor = agruparFacturasPendientesPorProveedor(facturasPendientesTodas);
+    const deudaPorProveedor = gruposDeudaProveedor.map(grupo => ({
+      proveedor: grupo.proveedor,
+      facturas: grupo.facturas.length,
+      vencidas: grupo.facturas.filter(f => f.vencida).length,
+      montoOriginal: grupo.totales.montoOriginal,
+      notasCredito: grupo.totales.notasCredito,
+      abonos: grupo.totales.abonos,
+      saldo: grupo.totales.saldo
+    }));
+    const resumenDeuda = {
+      ...calcularTotalesFacturas(facturasPendientesTodas),
+      facturas: facturasPendientesTodas.length,
+      proveedores: deudaPorProveedor.length
+    };
 
     res.render("compras/dashboard_facturas", {
       user: req.session.user,
@@ -1532,7 +1723,9 @@ router.get("/facturas/dashboard", requireAuth, allowRoles("ADMIN", "TALLER", "PR
       porProveedor,
       porMes,
       porEstado,
-      facturasRecientes
+      facturasRecientes,
+      deudaPorProveedor,
+      resumenDeuda
     });
   } catch (error) {
     console.error("Error en dashboard de facturas:", error);
@@ -1549,36 +1742,14 @@ router.get("/facturas/reporte/pdf", requireAuth, allowRoles("ADMIN", "TALLER", "
     const { proveedor_id, fecha_desde, fecha_hasta, vencida } = req.query;
     const orden = req.query.orden === "asc" ? "asc" : "desc";
     const filtros = { proveedor_id, fecha_desde, fecha_hasta, pagada: "0", vencida, orden };
-    const facturas = await obtenerFacturasCompras(filtros);
+    const facturas = (await obtenerFacturasCompras(filtros))
+      .filter(factura => parseMonto(factura.saldo) > 0 && !factura.cubierta_por_nc);
 
     const [[proveedorFiltro]] = proveedor_id
       ? await queryWithRetry("SELECT nombre FROM proveedores WHERE id = ?", [proveedor_id])
       : [[null]];
 
-    const gruposProveedor = Array.from(facturas.reduce((map, factura) => {
-      const proveedorNombre = factura.proveedor_nombre || "Sin proveedor";
-      if (!map.has(proveedorNombre)) {
-        map.set(proveedorNombre, {
-          proveedor: proveedorNombre,
-          facturas: [],
-          totales: {
-            montoOriginal: 0,
-            notasCredito: 0,
-            abonos: 0,
-            saldo: 0
-          }
-        });
-      }
-
-      const grupo = map.get(proveedorNombre);
-      grupo.facturas.push(factura);
-      grupo.totales.montoOriginal += parseMonto(factura.monto_original ?? factura.monto);
-      grupo.totales.notasCredito += parseMonto(factura.nota_credito_monto);
-      grupo.totales.abonos += parseMonto(factura.abono_monto);
-      grupo.totales.saldo += parseMonto(factura.saldo);
-
-      return map;
-    }, new Map()).values()).sort((a, b) => a.proveedor.localeCompare(b.proveedor, "es"));
+    const gruposProveedor = agruparFacturasPendientesPorProveedor(facturas);
 
     gruposProveedor.forEach(grupo => {
       grupo.facturas.sort((a, b) => {
@@ -1588,27 +1759,8 @@ router.get("/facturas/reporte/pdf", requireAuth, allowRoles("ADMIN", "TALLER", "
       });
     });
 
-    const totales = facturas.reduce((acc, f) => {
-      acc.montoOriginal += parseMonto(f.monto_original ?? f.monto);
-      acc.notasCredito += parseMonto(f.nota_credito_monto);
-      acc.abonos += parseMonto(f.abono_monto);
-      acc.saldo += parseMonto(f.saldo);
-      return acc;
-    }, {
-      montoOriginal: 0,
-      notasCredito: 0,
-      abonos: 0,
-      saldo: 0
-    });
-
-    const ejs = require("ejs");
-    const path = require("path");
-    const fs = require("fs");
-    const pdf = require("html-pdf");
-    const tmpDir = path.join(process.cwd(), "tmp");
-    fs.mkdirSync(tmpDir, { recursive: true });
-
-    const html = await ejs.renderFile(path.join(__dirname, "../views/compras/facturas_reporte_pdf.ejs"), {
+    const totales = calcularTotalesFacturas(facturas);
+    const pdfBuffer = await generarPDFFacturasPendientes({
       facturas,
       gruposProveedor,
       filtros: {
@@ -1619,15 +1771,9 @@ router.get("/facturas/reporte/pdf", requireAuth, allowRoles("ADMIN", "TALLER", "
       fechaGeneracion: new Date().toLocaleString("es-CR")
     });
 
-    pdf.create(html, { format: "Letter", orientation: "landscape", border: "8mm", directory: tmpDir }).toBuffer((err, buffer) => {
-      if (err) {
-        console.error("Error generando reporte de facturas pendientes:", err);
-        return res.status(500).send("Error al generar reporte");
-      }
-      res.setHeader("Content-Type", "application/pdf");
-      res.setHeader("Content-Disposition", `attachment; filename=reporte_facturas_pendientes_${new Date().toISOString().slice(0, 19).replace(/:/g, "-")}.pdf`);
-      res.send(buffer);
-    });
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename=reporte_facturas_pendientes_${new Date().toISOString().slice(0, 19).replace(/:/g, "-")}.pdf`);
+    res.send(pdfBuffer);
   } catch (error) {
     console.error("Error descargando reporte de facturas pendientes:", error);
     res.status(500).send("Error descargando reporte");

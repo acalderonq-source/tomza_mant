@@ -4,7 +4,7 @@ const path = require("path");
 const ejs = require("ejs");
 const pdf = require("html-pdf");
 const pool = require("../db");
-const { agregarTallerParaMecanico, TODAS_SEDES } = require("../utils/sedes");
+const { agregarTallerParaMecanico, esUsuarioTodasSedes, TODAS_SEDES } = require("../utils/sedes");
 
 const router = express.Router();
 
@@ -90,7 +90,7 @@ async function ensureTables() {
 async function obtenerSedesPermitidas(req) {
   const user = req.session.user;
 
-  if (user.rol === "ADMIN") {
+  if (esUsuarioTodasSedes(user)) {
     if (req.session.sedeSeleccionada && req.session.sedeSeleccionada !== "TODAS") {
       return [req.session.sedeSeleccionada];
     }

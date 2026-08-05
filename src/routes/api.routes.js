@@ -4,7 +4,7 @@ const pool = require("../db");
 const {
   agregarTallerParaMecanico,
   esSedeTransporte,
-  esUsuarioProveeduria,
+  esUsuarioTodasSedes,
   obtenerSedesTransporte
 } = require("../utils/sedes");
 
@@ -19,7 +19,7 @@ function requireAuth(req, res, next) {
 async function sedesPermitidasUsuario(req) {
   const user = req.session.user;
 
-  if (user.rol === "ADMIN" || esUsuarioProveeduria(user)) {
+  if (esUsuarioTodasSedes(user)) {
     if (req.session.sedeSeleccionada && req.session.sedeSeleccionada !== "TODAS") {
       return [req.session.sedeSeleccionada];
     }

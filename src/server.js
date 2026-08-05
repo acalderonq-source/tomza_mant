@@ -66,17 +66,17 @@ function injectPwaAssets(html) {
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" href="/img/app-icon.svg" type="image/svg+xml">`;
   const pwaScript = `\n<script src="/js/pwa.js" defer></script>`;
-  const placaSearchScript = `\n<script src="/js/placa-search.js?v=20260803-2" defer></script>`;
+  const placaSearchScript = `\n<script src="/js/placa-search.js?v=20260803-3" defer></script>`;
 
   if (!output.includes('href="/manifest.webmanifest"') && output.includes("</head>")) {
     output = output.replace("</head>", `${pwaHead}\n</head>`);
   }
 
-  if (!output.includes('src="/js/pwa.js"') && output.includes("</body>")) {
+  if (!output.includes("/js/pwa.js") && output.includes("</body>")) {
     output = output.replace("</body>", `${pwaScript}\n</body>`);
   }
 
-  if (!output.includes('src="/js/placa-search.js"') && output.includes("</body>")) {
+  if (!output.includes("/js/placa-search.js") && output.includes("</body>")) {
     output = output.replace("</body>", `${placaSearchScript}\n</body>`);
   }
 

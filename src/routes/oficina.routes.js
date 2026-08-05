@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const pool = require("../db");
-const { SEDES_TRANSPORTE, etiquetaSede: etiquetaSedeTomza } = require("../utils/sedes");
+const { SEDES_TRANSPORTE, etiquetaSede: etiquetaSedeTomza, esUsuarioTodasSedes } = require("../utils/sedes");
 
 const ROLES_OFICINA_DIA_DIA = ["ADMIN", "TALLER", "PROVEEDURIA_TALLER"];
 const SEDES_TRANSPORTE_AGRUPADAS = ["Transportadora", "Granel"];
@@ -63,10 +63,8 @@ async function ensureOficinaDiaDiaTable() {
 
 async function obtenerSedesUsuario(req) {
   const user = req.session.user;
-  const [extras] = await pool.query("SELECT sede FROM usuarios_sedes WHERE usuario_id = ?", [user.id]);
-  const sedesPermitidas = [...new Set([user.sede, ...extras.map(e => e.sede)].filter(Boolean))];
 
-  if (user.rol === "ADMIN") {
+  if (esUsuarioTodasSedes(user)) {
     const seleccionada = req.session.sedeSeleccionada && req.session.sedeSeleccionada !== "TODAS"
       ? req.session.sedeSeleccionada
       : null;
@@ -76,6 +74,9 @@ async function obtenerSedesUsuario(req) {
       sedeVista: etiquetaSede(seleccionada)
     };
   }
+
+  const [extras] = await pool.query("SELECT sede FROM usuarios_sedes WHERE usuario_id = ?", [user.id]);
+  const sedesPermitidas = [...new Set([user.sede, ...extras.map(e => e.sede)].filter(Boolean))];
 
   const sedeFiltro = req.session.sedeSeleccionada && sedesPermitidas.includes(req.session.sedeSeleccionada)
     ? req.session.sedeSeleccionada

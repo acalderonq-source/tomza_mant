@@ -280,7 +280,9 @@
     : ['ADMIN', 'TALLER', 'PROVEEDURIA_TALLER'].includes(user.rol);
   const sedeActual = sedeSeleccionada || user.sede || 'TODAS';
   const mostrarSede = typeof etiquetaSede === 'function' ? etiquetaSede : (sede) => sede;
-  const sedes = user.rol === 'ADMIN'
+  const rolesTodasSedes = ['ADMIN', 'TALLER', 'TRAMITES', 'PROVEEDURIA', 'PROVEEDURIA_TALLER'];
+  const usuarioTodasSedes = rolesTodasSedes.includes(user.rol);
+  const sedes = usuarioTodasSedes
     ? (Array.isArray(sedesDashboard) ? sedesDashboard : [])
     : (Array.isArray(sedesMultiples) ? sedesMultiples : []);
   const money = (value) => Number(value || 0).toLocaleString('es-CR', { maximumFractionDigits: 0 });
@@ -330,7 +332,7 @@
     </div>
   </section>
 
-  <% if ((user.rol === 'ADMIN' || sedes.length > 1) && sedes.length) { %>
+  <% if ((usuarioTodasSedes || sedes.length > 1) && sedes.length) { %>
     <section class="plain-card p-2 mb-2">
       <h2 class="section-title">Cambiar sede</h2>
       <div class="sede-selector">
@@ -339,7 +341,7 @@
             <button class="btn btn-sm <%= sedeActual === sede ? 'btn-dark' : 'btn-outline-primary' %>" name="sede" value="<%= sede %>"><%= mostrarSede(sede) %></button>
           </form>
         <% }) %>
-        <% if (user.rol === 'ADMIN') { %>
+        <% if (usuarioTodasSedes) { %>
           <form method="POST" action="/cambiar-sede">
             <button class="btn btn-sm <%= sedeActual === 'TODAS' ? 'btn-dark' : 'btn-outline-dark' %>" name="sede" value="TODAS">TODAS</button>
           </form>

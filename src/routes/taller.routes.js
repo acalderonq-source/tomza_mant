@@ -9,6 +9,7 @@ const {
   agregarTallerParaMecanico,
   SEDES_TRANSPORTE,
   esSedeTransporte,
+  esUsuarioTodasSedes,
   obtenerSedesTransporte
 } = require("../utils/sedes");
 
@@ -130,7 +131,7 @@ async function ensurePrioridadesTallerTable() {
 async function obtenerSedesPermitidas(req) {
   const user = req.session.user;
 
-  if (user.rol === "ADMIN") {
+  if (esUsuarioTodasSedes(user)) {
     if (req.session.sedeSeleccionada && req.session.sedeSeleccionada !== "TODAS") {
       return [req.session.sedeSeleccionada];
     }

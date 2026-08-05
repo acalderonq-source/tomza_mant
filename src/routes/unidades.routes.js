@@ -5,6 +5,7 @@ const {
   agregarTallerParaMecanico,
   etiquetaSede,
   esSedeTransporte,
+  esUsuarioTodasSedes,
   obtenerTodasSedes,
   obtenerSedesTransporte
 } = require("../utils/sedes");
@@ -49,7 +50,7 @@ async function ensureUnidadEstadoColumns() {
 async function obtenerSedesPermitidas(req) {
   const user = req.session.user;
 
-  if (user.rol === "ADMIN") {
+  if (esUsuarioTodasSedes(user)) {
     if (req.session.sedeSeleccionada && req.session.sedeSeleccionada !== "TODAS") {
       return [req.session.sedeSeleccionada];
     }
@@ -224,7 +225,7 @@ async function agregarUnidad(req, res) {
     }
 
     const sedeAsignada =
-      req.session.user.rol === "ADMIN" && sede
+      esUsuarioTodasSedes(req.session.user) && sede
         ? sede
         : req.session.sedeSeleccionada && req.session.sedeSeleccionada !== "TODAS"
           ? req.session.sedeSeleccionada

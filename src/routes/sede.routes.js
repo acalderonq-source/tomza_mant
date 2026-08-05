@@ -3,6 +3,7 @@ const router = express.Router();
 const pool = require("../db");
 const {
   agregarTallerParaMecanico,
+  esUsuarioTodasSedes,
   obtenerSedesTransporte
 } = require("../utils/sedes");
 
@@ -26,14 +27,14 @@ router.post("/cambiar-sede", async (req, res) => {
     const user = req.session.user;
 
     // =========================
-    // ADMIN
+    // USUARIOS CON TODAS LAS SEDES
     // =========================
-    if (user.rol === "ADMIN") {
+    if (esUsuarioTodasSedes(user)) {
 
       req.session.sedeSeleccionada = sede;
 
       console.log(
-        `🟢 ADMIN cambió a sede: ${sede}`
+        `🟢 ${user.usuario} cambió a sede: ${sede}`
       );
 
       return res.redirect("/dashboard");

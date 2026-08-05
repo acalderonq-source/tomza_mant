@@ -138,7 +138,7 @@
           <label class="filter-label">Placa</label>
           <input type="text" name="placa" class="form-control" placeholder="Ej: C173136" required>
         </div>
-        <% if (user.rol === 'ADMIN') { %>
+        <% if (['ADMIN', 'TALLER', 'TRAMITES', 'PROVEEDURIA', 'PROVEEDURIA_TALLER'].includes(user.rol)) { %>
           <div class="col-md-4">
             <label class="filter-label">Sede</label>
             <select name="sede" class="form-select" required>

@@ -64,7 +64,7 @@
   <div class="mb-3">
     <label class="fw-bold text-warning">📍 Filtrar por sede:</label>
     <div class="d-flex flex-wrap gap-2 mt-1">
-      <% if (user.rol === 'ADMIN') { %>
+      <% if (['ADMIN', 'TALLER', 'TRAMITES', 'PROVEEDURIA', 'PROVEEDURIA_TALLER'].includes(user.rol)) { %>
         <form method="POST" action="/cambiar-sede" class="d-inline">
           <button class="btn btn-sm <%= sedeSeleccionada === 'TODAS' ? 'btn-warning' : 'btn-outline-light' %>" name="sede" value="TODAS">TODAS</button>
         </form>

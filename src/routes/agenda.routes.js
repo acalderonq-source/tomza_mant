@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const pool = require("../db");
-const { agregarTallerParaMecanico } = require("../utils/sedes");
+const { agregarTallerParaMecanico, esUsuarioTodasSedes, obtenerTodasSedes } = require("../utils/sedes");
 
 // ================= FUNCIONES AUXILIARES =================
 
@@ -22,6 +22,10 @@ function siguienteDiaHabil(fechaBase) {
 // ================= SEDES =================
 
 async function obtenerSedesPermitidas(req) {
+  if (esUsuarioTodasSedes(req.session.user)) {
+    return obtenerTodasSedes(pool);
+  }
+
   const [extras] = await pool.query(
     `SELECT sede FROM usuarios_sedes WHERE usuario_id = ?`,
     [req.session.user.id]
@@ -34,12 +38,11 @@ async function obtenerSedesPermitidas(req) {
 }
 
 function obtenerSedeFiltro(req, sedesPermitidas) {
-  // ADMIN puede elegir "TODAS" o una sede específica
-  if (req.session.user.rol === "ADMIN") {
+  if (esUsuarioTodasSedes(req.session.user)) {
     if (req.session.sedeSeleccionada && req.session.sedeSeleccionada !== "TODAS") {
       return req.session.sedeSeleccionada;
     }
-    return null; // null = TODAS
+    return null;
   }
   // Usuarios normales: si tiene sede seleccionada y está permitida, la usa; si no, la primera permitida
   if (req.session.sedeSeleccionada && sedesPermitidas.includes(req.session.sedeSeleccionada)) {
@@ -79,7 +82,7 @@ router.get("/", async (req, res) => {
     if (sedeFiltro) {
       sql += ` AND u.sede = ?`;
       params.push(sedeFiltro);
-    } else if (sedesPermitidas.length && req.session.user.rol !== "ADMIN") {
+    } else if (sedesPermitidas.length && !esUsuarioTodasSedes(req.session.user)) {
       sql += ` AND u.sede IN (?)`;
       params.push(sedesPermitidas);
     }
@@ -104,7 +107,7 @@ router.get("/", async (req, res) => {
     if (sedeFiltro) {
       sql += ` AND u.sede = ?`;
       params.push(sedeFiltro);
-    } else if (sedesPermitidas.length && req.session.user.rol !== "ADMIN") {
+    } else if (sedesPermitidas.length && !esUsuarioTodasSedes(req.session.user)) {
       sql += ` AND u.sede IN (?)`;
       params.push(sedesPermitidas);
     }
@@ -158,7 +161,7 @@ router.get("/manana", async (req, res) => {
     if (sedeFiltro) {
       sql += ` AND u.sede = ?`;
       params.push(sedeFiltro);
-    } else if (sedesPermitidas.length && req.session.user.rol !== "ADMIN") {
+    } else if (sedesPermitidas.length && !esUsuarioTodasSedes(req.session.user)) {
       sql += ` AND u.sede IN (?)`;
       params.push(sedesPermitidas);
     }
@@ -183,7 +186,7 @@ router.get("/manana", async (req, res) => {
     if (sedeFiltro) {
       sql += ` AND u.sede = ?`;
       params.push(sedeFiltro);
-    } else if (sedesPermitidas.length && req.session.user.rol !== "ADMIN") {
+    } else if (sedesPermitidas.length && !esUsuarioTodasSedes(req.session.user)) {
       sql += ` AND u.sede IN (?)`;
       params.push(sedesPermitidas);
     }

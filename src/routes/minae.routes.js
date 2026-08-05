@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const pool = require("../db");
 const { enviarConfirmacionCita } = require("../utils/emailService");
+const { esUsuarioTodasSedes } = require("../utils/sedes");
 
 // =====================================================
 // MIDDLEWARES DE AUTENTICACIÓN Y ROLES
@@ -29,7 +30,7 @@ router.use(allowRoles("ADMIN", "TRAMITES"));
 // OBTENER SEDE FILTRO (nunca retorna undefined)
 // =====================================================
 function obtenerSedeFiltro(req) {
-  if (req.session.user.rol === "ADMIN") {
+  if (esUsuarioTodasSedes(req.session.user)) {
     if (
       req.session.sedeSeleccionada &&
       req.session.sedeSeleccionada !== "TODAS"
@@ -105,7 +106,7 @@ router.get("/", async (req, res) => {
       params.push(sedeFiltro);
     }
 
-    if (sede && req.session.user.rol === "ADMIN" && sedeFiltro === null) {
+    if (sede && esUsuarioTodasSedes(req.session.user) && sedeFiltro === null) {
       sql += ` AND mt.sede = ?`;
       params.push(sede);
     }

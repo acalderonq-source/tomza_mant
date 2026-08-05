@@ -113,7 +113,7 @@
           <% }) %>
         </select>
       </div>
-      <% if (user.rol === 'ADMIN' && sedeSeleccionada === 'TODAS') { %>
+      <% if (['ADMIN', 'TRAMITES'].includes(user.rol) && sedeSeleccionada === 'TODAS') { %>
         <div class="col-md-2">
           <label class="filter-label">Sede</label>
           <select name="sede" class="form-select form-select-sm">

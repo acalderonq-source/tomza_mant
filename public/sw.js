@@ -1,4 +1,4 @@
-const CACHE_NAME = "tomza-taller-v3";
+const CACHE_NAME = "tomza-taller-v4";
 const STATIC_ASSETS = [
   "/offline.html",
   "/manifest.webmanifest",
@@ -7,7 +7,7 @@ const STATIC_ASSETS = [
   "/css/compras.css",
   "/css/mantenimientos.css",
   "/js/pwa.js",
-  "/js/placa-search.js?v=20260803-2"
+  "/js/placa-search.js?v=20260803-3"
 ];
 
 self.addEventListener("install", event => {

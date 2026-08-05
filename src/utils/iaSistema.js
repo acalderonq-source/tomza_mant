@@ -1,4 +1,5 @@
 const pool = require("../db");
+const { esUsuarioTodasSedes } = require("./sedes");
 
 function puedeVerCompras(user) {
   return ["ADMIN", "TALLER", "PROVEEDURIA_TALLER", "CONTABILIDAD"].includes(user.rol);
@@ -16,7 +17,7 @@ function obtenerSedeFiltro(req) {
   const user = req.session.user;
   if (!user) return null;
 
-  if (user.rol === "ADMIN") {
+  if (esUsuarioTodasSedes(user)) {
     if (req.session.sedeSeleccionada && req.session.sedeSeleccionada !== "TODAS") {
       return req.session.sedeSeleccionada;
     }
