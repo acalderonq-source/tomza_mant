@@ -10,9 +10,10 @@ const MENSAJEROS_REPUESTOS = [
   "Andres Bieckan Acuña",
   "Dennis Umaña"
 ];
+const { normalizarPlaca: normalizarPlacaSistema } = require("./placas");
 
 function normalizarPlaca(value) {
-  return String(value || "").trim().toUpperCase();
+  return normalizarPlacaSistema(value) || "";
 }
 
 function normalizarEstado(value) {

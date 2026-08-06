@@ -57,8 +57,49 @@
     document.head.appendChild(style);
   }
 
+  function cleanPlate(value) {
+    return String(value || "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toUpperCase()
+      .replace(/[^A-Z0-9]/g, "");
+  }
+
+  function normalizePlate(value) {
+    const raw = cleanPlate(value);
+    if (!raw) return "";
+
+    if (/^CLC\d{5,6}$/.test(raw)) return raw.replace(/^CLC/, "CL");
+    if (/^CL\d{5,6}$/.test(raw)) return raw;
+    if (/^SS\d{5,6}$/.test(raw)) return raw.replace(/^SS/, "S");
+    if (/^S\d{5,6}$/.test(raw)) return raw;
+    if (/^C\d{5,6}$/.test(raw)) return raw;
+    if (/^\d{5,6}$/.test(raw)) return /^[23]/.test(raw) ? `CL${raw}` : `C${raw}`;
+    const embedded = raw.match(/(?:CL|C|S)?\d{5,6}/);
+    if (embedded) return normalizePlate(embedded[0]);
+    return raw;
+  }
+
+  function plateVariants(value) {
+    const raw = cleanPlate(value);
+    const normalized = normalizePlate(value);
+    const values = new Set([raw, normalized].filter(Boolean));
+    const number = (normalized || raw).match(/\d{5,6}/)?.[0];
+
+    if (number) {
+      values.add(number);
+      values.add(`C${number}`);
+      values.add(`CL${number}`);
+      values.add(`S${number}`);
+      values.add(`CLC${number}`);
+      values.add(`SS${number}`);
+    }
+
+    return [...values].filter(Boolean);
+  }
+
   function normalize(value) {
-    return String(value || "").trim().toUpperCase();
+    return normalizePlate(value);
   }
 
   function readLocalUnits(selector) {
@@ -75,8 +116,12 @@
   }
 
   function filterLocalUnits(units, query) {
+    const variants = plateVariants(query);
     return units
-      .filter(unit => normalize(unit.placa).includes(query))
+      .filter(unit => {
+        const placa = cleanPlate(unit.placa);
+        return variants.some(variant => placa.includes(variant));
+      })
       .slice(0, 20);
   }
 
@@ -181,7 +226,7 @@
     }
 
     async function renderNow() {
-      const query = normalize(input.value);
+      const query = cleanPlate(input.value);
       if (!allowFree) clearSelection();
       if (!query || query.length < 2) {
         close();
@@ -216,7 +261,7 @@
     }
 
     function scheduleRender(force = false) {
-      const query = normalize(input.value);
+      const query = cleanPlate(input.value);
       if (!force && query === lastQuery && results.innerHTML) {
         results.classList.add("is-open");
         return;
@@ -227,7 +272,13 @@
 
     input.addEventListener("input", () => scheduleRender(true));
     input.addEventListener("focus", () => scheduleRender(false));
+    input.addEventListener("blur", () => {
+      if (!target && allowFree) input.value = normalizePlate(input.value);
+    });
     input.form?.addEventListener("submit", event => {
+      if (allowFree && (!target || !target.value)) {
+        input.value = normalizePlate(input.value);
+      }
       if (!allowFree && target && !target.value) {
         event.preventDefault();
         if (selected) selected.textContent = "Seleccione una placa de la lista.";
@@ -254,6 +305,7 @@
     });
   }
 
+  window.TomzaPlateNormalizer = { cleanPlate, normalizePlate, plateVariants };
   window.TomzaPlacaSearch = { initAll, initInput };
   document.addEventListener("DOMContentLoaded", () => initAll());
 })();

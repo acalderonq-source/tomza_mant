@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const pool = require("../db");
 const { getSedesPermitidas } = require("../utils/sedes");
+const { agregarFiltroPlacaSql } = require("../utils/placas");
 
 const ROLES_REVISION_RUTA = ["ADMIN", "TALLER", "MECANICO", "SUPERVISOR", "SUPERVISOR_PESADO"];
 const ROLES_CREAR_REVISION_RUTA = ["ADMIN", "MECANICO"];
@@ -189,8 +190,11 @@ router.get("/", async (req, res) => {
     }
 
     if (placaFiltro) {
-      sql += " AND u.placa LIKE ?";
-      params.push(`%${placaFiltro.toUpperCase()}%`);
+      const condicionesPlaca = [];
+      agregarFiltroPlacaSql(condicionesPlaca, params, "u.placa", placaFiltro);
+      if (condicionesPlaca.length) {
+        sql += ` AND ${condicionesPlaca[0]}`;
+      }
     }
 
     if (estadoFiltro === "apto") {

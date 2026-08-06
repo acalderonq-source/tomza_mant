@@ -8,6 +8,7 @@ const {
   registrarSugerenciasParaCorrectivo
 } = require("../utils/reportesSupervisoresDb");
 const { esUsuarioTodasSedes } = require("../utils/sedes");
+const { agregarFiltroPlacaSql } = require("../utils/placas");
 
 // =====================================================
 // MIDDLEWARE DE AUTENTICACIÓN
@@ -469,8 +470,7 @@ router.get("/", requireAuth, async (req, res) => {
     else if (filtro === "realizados") condiciones.push("m.estado = 'CERRADO'");
 
     if (placa && placa.trim() !== "") {
-      condiciones.push("u.placa LIKE ?");
-      params.push(`%${placa.trim()}%`);
+      agregarFiltroPlacaSql(condiciones, params, "u.placa", placa);
     }
     if (tipo && tipo !== "") {
       condiciones.push("m.tipo = ?");

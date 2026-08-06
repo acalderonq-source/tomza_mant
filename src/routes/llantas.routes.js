@@ -5,6 +5,7 @@ const ejs = require("ejs");
 const pdf = require("html-pdf");
 const pool = require("../db");
 const { agregarTallerParaMecanico, esUsuarioTodasSedes, TODAS_SEDES } = require("../utils/sedes");
+const { agregarFiltroPlacaSql } = require("../utils/placas");
 
 const router = express.Router();
 
@@ -178,8 +179,7 @@ function construirFiltrosSolicitudes(sedesPermitidas, filtros = {}) {
     params.push(filtros.estado);
   }
   if (filtros.placa && filtros.placa.trim()) {
-    condiciones.push("s.placa LIKE ?");
-    params.push(`%${filtros.placa.trim().toUpperCase()}%`);
+    agregarFiltroPlacaSql(condiciones, params, "s.placa", filtros.placa);
   }
   if (filtros.semana && /^\d{4}-\d{2}-\d{2}$/.test(filtros.semana)) {
     condiciones.push("s.fecha_solicitud >= ? AND s.fecha_solicitud < DATE_ADD(?, INTERVAL 7 DAY)");

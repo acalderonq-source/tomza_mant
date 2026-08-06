@@ -7,6 +7,7 @@ const {
   esUsuarioTodasSedes,
   obtenerSedesTransporte
 } = require("../utils/sedes");
+const { agregarFiltroPlacaSql, normalizarPlaca } = require("../utils/placas");
 
 const DB_CONNECTION_ERRORS = new Set(["ETIMEDOUT", "ECONNRESET", "ENOTFOUND", "ECONNREFUSED"]);
 const lastDbErrorLog = new Map();
@@ -72,7 +73,7 @@ function logDbSearchError(error) {
 
 router.get("/unidades/buscar", requireAuth, async (req, res) => {
   try {
-    const q = String(req.query.q || "").trim().toUpperCase();
+    const q = String(req.query.q || "").trim();
     if (q.length < 2) return res.json({ unidades: [] });
 
     const sedes = await sedesPermitidasUsuario(req);
@@ -84,10 +85,7 @@ router.get("/unidades/buscar", requireAuth, async (req, res) => {
       params.push(sedes);
     }
 
-    if (q) {
-      condiciones.push("UPPER(placa) LIKE ?");
-      params.push(`%${q}%`);
-    }
+    agregarFiltroPlacaSql(condiciones, params, "placa", q);
 
     const [unidades] = await pool.query(
       `SELECT id, placa, sede
@@ -98,7 +96,16 @@ router.get("/unidades/buscar", requireAuth, async (req, res) => {
       params
     );
 
-    res.json({ unidades });
+    const placaNormalizada = normalizarPlaca(q);
+    const ordenadas = placaNormalizada
+      ? [...unidades].sort((a, b) => {
+          const aExacta = String(a.placa || "").toUpperCase() === placaNormalizada ? 0 : 1;
+          const bExacta = String(b.placa || "").toUpperCase() === placaNormalizada ? 0 : 1;
+          return aExacta - bExacta;
+        })
+      : unidades;
+
+    res.json({ unidades: ordenadas });
   } catch (error) {
     logDbSearchError(error);
     const status = DB_CONNECTION_ERRORS.has(error.code) ? 503 : 500;

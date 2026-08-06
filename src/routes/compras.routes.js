@@ -5,6 +5,7 @@ const fs = require("fs");
 const path = require("path");
 const PdfPrinter = require("pdfmake");
 const { generarPDFOrden } = require('../utils/pdfOrdenCompra');
+const { agregarFiltroPlacaSql, normalizarPlaca: normalizarPlacaSistema } = require("../utils/placas");
 
 // ===================== MIDDLEWARES =====================
 function requireAuth(req, res, next) {
@@ -97,8 +98,7 @@ function calcularTotalesOrden(lineasOrden, valores = {}) {
 }
 
 function normalizarPlaca(value) {
-  const placa = String(value || "").trim().toUpperCase();
-  return placa || null;
+  return normalizarPlacaSistema(value);
 }
 
 function obtenerPlacaOrden(lineasOrden, placaUnidad = null) {
@@ -819,8 +819,11 @@ function construirConsultaOrdenes(filtros = {}) {
   }
   const placaFiltro = normalizarPlaca(placa_unidad);
   if (placaFiltro) {
-    sql += ` AND o.placa_unidad LIKE ?`;
-    params.push(`%${placaFiltro}%`);
+    const condicionesPlaca = [];
+    agregarFiltroPlacaSql(condicionesPlaca, params, "o.placa_unidad", placaFiltro);
+    if (condicionesPlaca.length) {
+      sql += ` AND ${condicionesPlaca[0]}`;
+    }
   }
   if (estado && estado !== '') {
     sql += ` AND o.estado = ?`;
@@ -2879,15 +2882,15 @@ router.get("/dashboard", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA
         SELECT
           o.id,
           UPPER(TRIM(COALESCE(
-            REGEXP_SUBSTR(UPPER(COALESCE(d.codigo, '')), 'C[L]?[0-9]{5,6}|S[0-9]{5,6}'),
+            REGEXP_REPLACE(REGEXP_SUBSTR(UPPER(COALESCE(d.codigo, '')), 'C[[:space:]]*L?[[:space:]]*[0-9]{5,6}|S[[:space:]]*[0-9]{5,6}'), '[[:space:]]+', ''),
             CASE
               WHEN UPPER(TRIM(COALESCE(d.codigo, ''))) IN ('GENERAL', 'GENERALES', 'GENERAL TALLER', 'GENERALES TALLER') THEN 'GENERALES TALLER'
             END,
             CASE
               WHEN UPPER(TRIM(COALESCE(o.placa_unidad, ''))) IN ('GENERAL', 'GENERALES', 'GENERAL TALLER', 'GENERALES TALLER') THEN 'GENERALES TALLER'
             END,
-            CASE WHEN COALESCE(placas_detalle.tiene_placas, 0) = 0 THEN NULLIF(UPPER(TRIM(o.placa_unidad)), '') END,
-            CASE WHEN COALESCE(placas_detalle.tiene_placas, 0) = 0 THEN REGEXP_SUBSTR(UPPER(COALESCE(o.observaciones, '')), 'C[L]?[0-9]{5,6}|S[0-9]{5,6}') END,
+            CASE WHEN COALESCE(placas_detalle.tiene_placas, 0) = 0 THEN NULLIF(REPLACE(UPPER(TRIM(o.placa_unidad)), ' ', ''), '') END,
+            CASE WHEN COALESCE(placas_detalle.tiene_placas, 0) = 0 THEN REGEXP_REPLACE(REGEXP_SUBSTR(UPPER(COALESCE(o.observaciones, '')), 'C[[:space:]]*L?[[:space:]]*[0-9]{5,6}|S[[:space:]]*[0-9]{5,6}'), '[[:space:]]+', '') END,
             'SIN PLACA'
           ))) AS placa,
           CASE
@@ -2900,12 +2903,12 @@ router.get("/dashboard", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA
         LEFT JOIN (
           SELECT orden_compra_id, COUNT(*) AS tiene_placas
           FROM ordenes_compra_detalle
-          WHERE REGEXP_SUBSTR(UPPER(COALESCE(codigo, '')), 'C[L]?[0-9]{5,6}|S[0-9]{5,6}') IS NOT NULL
+          WHERE REGEXP_SUBSTR(UPPER(COALESCE(codigo, '')), 'C[[:space:]]*L?[[:space:]]*[0-9]{5,6}|S[[:space:]]*[0-9]{5,6}') IS NOT NULL
           GROUP BY orden_compra_id
         ) placas_detalle ON placas_detalle.orden_compra_id = o.id
         ${whereClause}
       ) compras
-      LEFT JOIN unidades u ON UPPER(TRIM(u.placa)) = compras.placa
+      LEFT JOIN unidades u ON REPLACE(UPPER(TRIM(u.placa)), ' ', '') = compras.placa
       WHERE compras.placa <> 'SIN PLACA'
       GROUP BY compras.placa
       ORDER BY total_gastado DESC
@@ -2937,15 +2940,15 @@ router.get("/dashboard", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA
             o.id,
             d.id AS detalle_id,
             UPPER(TRIM(COALESCE(
-              REGEXP_SUBSTR(UPPER(COALESCE(d.codigo, '')), 'C[L]?[0-9]{5,6}|S[0-9]{5,6}'),
+              REGEXP_REPLACE(REGEXP_SUBSTR(UPPER(COALESCE(d.codigo, '')), 'C[[:space:]]*L?[[:space:]]*[0-9]{5,6}|S[[:space:]]*[0-9]{5,6}'), '[[:space:]]+', ''),
               CASE
                 WHEN UPPER(TRIM(COALESCE(d.codigo, ''))) IN ('GENERAL', 'GENERALES', 'GENERAL TALLER', 'GENERALES TALLER') THEN 'GENERALES TALLER'
               END,
               CASE
                 WHEN UPPER(TRIM(COALESCE(o.placa_unidad, ''))) IN ('GENERAL', 'GENERALES', 'GENERAL TALLER', 'GENERALES TALLER') THEN 'GENERALES TALLER'
               END,
-              CASE WHEN COALESCE(placas_detalle.tiene_placas, 0) = 0 THEN NULLIF(UPPER(TRIM(o.placa_unidad)), '') END,
-              CASE WHEN COALESCE(placas_detalle.tiene_placas, 0) = 0 THEN REGEXP_SUBSTR(UPPER(COALESCE(o.observaciones, '')), 'C[L]?[0-9]{5,6}|S[0-9]{5,6}') END,
+              CASE WHEN COALESCE(placas_detalle.tiene_placas, 0) = 0 THEN NULLIF(REPLACE(UPPER(TRIM(o.placa_unidad)), ' ', ''), '') END,
+              CASE WHEN COALESCE(placas_detalle.tiene_placas, 0) = 0 THEN REGEXP_REPLACE(REGEXP_SUBSTR(UPPER(COALESCE(o.observaciones, '')), 'C[[:space:]]*L?[[:space:]]*[0-9]{5,6}|S[[:space:]]*[0-9]{5,6}'), '[[:space:]]+', '') END,
               'SIN PLACA'
             ))) AS placa,
             CASE
@@ -2957,7 +2960,7 @@ router.get("/dashboard", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA
           LEFT JOIN (
             SELECT orden_compra_id, COUNT(*) AS tiene_placas
             FROM ordenes_compra_detalle
-            WHERE REGEXP_SUBSTR(UPPER(COALESCE(codigo, '')), 'C[L]?[0-9]{5,6}|S[0-9]{5,6}') IS NOT NULL
+            WHERE REGEXP_SUBSTR(UPPER(COALESCE(codigo, '')), 'C[[:space:]]*L?[[:space:]]*[0-9]{5,6}|S[[:space:]]*[0-9]{5,6}') IS NOT NULL
             GROUP BY orden_compra_id
           ) placas_detalle ON placas_detalle.orden_compra_id = o.id
           ${whereClause}

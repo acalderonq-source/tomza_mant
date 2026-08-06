@@ -678,8 +678,27 @@
       unidades = [];
     }
 
-    function normalizar(value) {
-      return String(value || "").trim().toUpperCase();
+    function limpiarPlaca(value) {
+      return String(value || "")
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toUpperCase()
+        .replace(/[^A-Z0-9]/g, "");
+    }
+
+    function variantesPlaca(value) {
+      const raw = limpiarPlaca(value);
+      const valores = new Set([raw].filter(Boolean));
+      const numero = raw.match(/\d{5,6}/)?.[0];
+      if (numero) {
+        valores.add(numero);
+        valores.add(`C${numero}`);
+        valores.add(`CL${numero}`);
+        valores.add(`S${numero}`);
+        valores.add(`CLC${numero}`);
+        valores.add(`SS${numero}`);
+      }
+      return [...valores].filter(Boolean);
     }
 
     function cerrar() {
@@ -700,7 +719,7 @@
     }
 
     function render() {
-      const texto = normalizar(input.value);
+      const texto = limpiarPlaca(input.value);
       unidadId.value = "";
       selected.textContent = "";
 
@@ -710,8 +729,12 @@
         return;
       }
 
+      const variantes = variantesPlaca(texto);
       const encontradas = unidades
-        .filter(unidad => normalizar(unidad.placa).includes(texto))
+        .filter(unidad => {
+          const placa = limpiarPlaca(unidad.placa);
+          return variantes.some(variant => placa.includes(variant));
+        })
         .slice(0, 20);
 
       results.innerHTML = "";

@@ -1,5 +1,6 @@
 const pool = require("../db");
 const { esUsuarioTodasSedes } = require("./sedes");
+const { expresionPlacaSql, extraerPlacasTexto, variantesPlaca } = require("./placas");
 
 function puedeVerCompras(user) {
   return ["ADMIN", "TALLER", "PROVEEDURIA_TALLER", "CONTABILIDAD"].includes(user.rol);
@@ -67,8 +68,7 @@ function normalizarTexto(value) {
 function detectarIntencion(pregunta = "") {
   const texto = normalizarTexto(pregunta);
   const incluye = (...palabras) => palabras.some(palabra => texto.includes(palabra));
-  const placas = [...new Set((String(pregunta).toUpperCase().match(/\b[A-Z]{1,4}\d{3,6}\b/g) || [])
-    .filter(valor => !/^F\d+$/i.test(valor)))];
+  const placas = extraerPlacasTexto(pregunta);
   const poNumeros = [...new Set((String(pregunta).match(/\b20\d{2}-\d{1,5}\b/g) || []))];
   const posiblesFacturas = [...new Set((String(pregunta).match(/\b(?:factura|fac|f)[\s#:.-]*([A-Z0-9-]{3,})/gi) || [])
     .map(match => match.replace(/^(factura|fac|f)[\s#:.-]*/i, "").trim().toUpperCase())
@@ -259,7 +259,8 @@ async function obtenerContextoSistema(req, pregunta = "") {
 
     let busquedaPlacas = [];
     if (intencion.placas.length) {
-      const paramsPlacas = [intencion.placas];
+      const placasBusqueda = [...new Set(intencion.placas.flatMap(placa => variantesPlaca(placa)))];
+      const paramsPlacas = [placasBusqueda];
       const sedePlacas = aplicarSede("u", sedeFiltro, paramsPlacas);
       busquedaPlacas = await safeQuery(
         `SELECT
@@ -275,7 +276,7 @@ async function obtenerContextoSistema(req, pregunta = "") {
            DATE_FORMAT(m.fecha_programada, '%Y-%m-%d') AS fecha_programada
          FROM unidades u
          LEFT JOIN mantenimientos m ON m.unidad_id = u.id AND m.estado != 'CERRADO'
-         WHERE u.placa IN (?)
+         WHERE ${expresionPlacaSql("u.placa")} IN (?)
            ${sedePlacas}
          ORDER BY u.placa, m.fecha_programada ASC
          LIMIT 30`,

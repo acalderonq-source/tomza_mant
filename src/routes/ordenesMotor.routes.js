@@ -4,6 +4,7 @@ const pool = require("../db");
 const fs = require("fs");
 const path = require("path");
 const { generarPDFOrden } = require("../utils/pdfOrdenCompra");
+const { agregarFiltroPlacaSql, normalizarPlaca } = require("../utils/placas");
 
 const ROLES_MOTOR = ["ADMIN", "TALLER", "PROVEEDURIA_TALLER"];
 
@@ -119,7 +120,7 @@ function normalizarLineas(lineas = []) {
       const precio = Number(linea.precio_unitario || 0);
       const subtotal = Number(linea.subtotal || (cantidad * precio) || 0);
       return {
-        codigo: String(linea.codigo || "").trim().toUpperCase() || null,
+        codigo: normalizarPlaca(linea.codigo) || null,
         descripcion: String(linea.descripcion || "").trim(),
         cantidad: Number.isFinite(cantidad) && cantidad > 0 ? cantidad : 1,
         precio_unitario: Number.isFinite(precio) ? precio : 0,
@@ -149,7 +150,7 @@ function calcularTotalesOrden(lineasOrden, valores = {}) {
 }
 
 function obtenerPlacaOrden(lineasOrden, placaUnidad = null) {
-  const placa = String(placaUnidad || "").trim().toUpperCase();
+  const placa = normalizarPlaca(placaUnidad);
   if (placa) return placa;
   return (lineasOrden.find(linea => linea.codigo) || {}).codigo || null;
 }
@@ -210,8 +211,7 @@ router.get("/", requireAuth, requireMotor, async (req, res) => {
       params.push(fecha_hasta);
     }
     if (placa_unidad) {
-      condiciones.push("UPPER(om.placa_unidad) LIKE ?");
-      params.push(`%${String(placa_unidad).trim().toUpperCase()}%`);
+      agregarFiltroPlacaSql(condiciones, params, "om.placa_unidad", placa_unidad);
     }
     if (estado) {
       condiciones.push("om.estado = ?");

@@ -12,6 +12,7 @@ const {
   esUsuarioTodasSedes,
   obtenerSedesTransporte
 } = require("../utils/sedes");
+const { agregarFiltroPlacaSql, expresionPlacaSql, normalizarPlaca, variantesPlaca } = require("../utils/placas");
 
 function requireAuth(req, res, next) {
   if (!req.session.user) return res.redirect("/login");
@@ -403,8 +404,11 @@ router.get("/dashboard", async (req, res) => {
     }
 
     if (placaFiltro) {
-      sql += " AND u.placa LIKE ?";
-      params.push(`%${placaFiltro}%`);
+      const condicionesPlaca = [];
+      agregarFiltroPlacaSql(condicionesPlaca, params, "u.placa", placaFiltro);
+      if (condicionesPlaca.length) {
+        sql += ` AND ${condicionesPlaca[0]}`;
+      }
     }
 
     sql += " ORDER BY COALESCE(u.varada, 0) DESC, u.sede, u.placa";
@@ -559,7 +563,7 @@ router.post("/prioridades", async (req, res) => {
     }
 
     await ensurePrioridadesTallerTable();
-    const placa = String(req.body.placa || "").trim().toUpperCase();
+    const placa = normalizarPlaca(req.body.placa);
     const observacion = String(req.body.observacion || "").trim();
     const fechaPrioridad = /^\d{4}-\d{2}-\d{2}$/.test(String(req.body.fecha_prioridad || ""))
       ? req.body.fecha_prioridad
@@ -572,8 +576,8 @@ router.post("/prioridades", async (req, res) => {
     }
 
     const [[unidadPrioridad]] = await pool.query(
-      "SELECT sede FROM unidades WHERE UPPER(TRIM(placa)) = ? LIMIT 1",
-      [placa]
+      `SELECT sede FROM unidades WHERE ${expresionPlacaSql("placa")} IN (?) LIMIT 1`,
+      [variantesPlaca(placa)]
     );
 
     let sedeAsignada = unidadPrioridad?.sede || (

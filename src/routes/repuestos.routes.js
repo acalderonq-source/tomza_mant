@@ -18,6 +18,7 @@ const {
   normalizarPlaca,
   normalizarPrioridad
 } = require("../utils/repuestosSolicitudes");
+const { agregarFiltroPlacaSql } = require("../utils/placas");
 
 const ROLES_PROVEEDURIA = ["PROVEEDURIA_TALLER", "PROVEEDURIA"];
 const ROLES_MENSAJERO_REPUESTOS = ["MENSAJERO", "MENSAJERIA", "MENSAJERO_FACTURAS"];
@@ -124,8 +125,7 @@ router.get("/", async (req, res) => {
     }
 
     if (placaFiltro) {
-      condiciones.push("sr.placa LIKE ?");
-      params.push(`%${placaFiltro}%`);
+      agregarFiltroPlacaSql(condiciones, params, "sr.placa", placaFiltro);
     }
 
     const [solicitudes] = await pool.query(

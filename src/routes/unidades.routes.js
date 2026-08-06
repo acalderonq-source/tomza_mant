@@ -9,6 +9,7 @@ const {
   obtenerTodasSedes,
   obtenerSedesTransporte
 } = require("../utils/sedes");
+const { agregarFiltroPlacaSql, normalizarPlaca } = require("../utils/placas");
 
 function requireAuth(req, res, next) {
   if (!req.session.user) return res.redirect("/login");
@@ -95,7 +96,7 @@ function puedeVerUnidad(unidad, sedesPermitidas) {
 }
 
 function normalizarPlacaUnidad(value) {
-  return String(value || "").trim().toUpperCase().replace(/\s+/g, "");
+  return normalizarPlaca(value) || "";
 }
 
 async function obtenerUnidadAutorizada(req, id) {
@@ -155,8 +156,11 @@ router.get("/", async (req, res) => {
     }
 
     if (placaFiltro) {
-      sql += " AND placa LIKE ?";
-      params.push(`%${placaFiltro.toUpperCase()}%`);
+      const condicionesPlaca = [];
+      agregarFiltroPlacaSql(condicionesPlaca, params, "placa", placaFiltro);
+      if (condicionesPlaca.length) {
+        sql += ` AND ${condicionesPlaca[0]}`;
+      }
     }
 
     sql += " ORDER BY activa DESC, varada DESC, sede ASC, placa ASC";

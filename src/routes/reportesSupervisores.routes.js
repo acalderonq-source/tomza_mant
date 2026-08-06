@@ -7,6 +7,7 @@ const {
   limpiarTextoReporte
 } = require("../utils/reportesSupervisoresDb");
 const { agregarTallerParaMecanico } = require("../utils/sedes");
+const { agregarFiltroPlacaSql } = require("../utils/placas");
 
 const ROLES_VER = ["ADMIN", "TALLER", "MECANICO", "SUPERVISOR", "SUPERVISOR_PESADO"];
 const ROLES_CREAR = ["ADMIN", "TALLER", "SUPERVISOR", "SUPERVISOR_PESADO"];
@@ -228,8 +229,11 @@ async function consultarReportesPendientes(req, filtros = {}) {
     params.push(sede);
   }
   if (placa) {
-    sql += " AND u.placa LIKE ?";
-    params.push(`%${String(placa).trim().toUpperCase()}%`);
+    const condicionesPlaca = [];
+    agregarFiltroPlacaSql(condicionesPlaca, params, "u.placa", placa);
+    if (condicionesPlaca.length) {
+      sql += ` AND ${condicionesPlaca[0]}`;
+    }
   }
   if (importante === "1") {
     sql += " AND rs.importante = 1";
@@ -463,8 +467,11 @@ router.get("/historial", allowRoles(...ROLES_VER), async (req, res) => {
       params.push(sede);
     }
     if (placa) {
-      sql += " AND u.placa LIKE ?";
-      params.push(`%${String(placa).trim().toUpperCase()}%`);
+      const condicionesPlaca = [];
+      agregarFiltroPlacaSql(condicionesPlaca, params, "u.placa", placa);
+      if (condicionesPlaca.length) {
+        sql += ` AND ${condicionesPlaca[0]}`;
+      }
     }
     if (fecha_desde) {
       sql += " AND DATE(rs.fecha_cierre) >= ?";
