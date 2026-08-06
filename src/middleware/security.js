@@ -1,6 +1,7 @@
 const crypto = require("crypto");
 
 const UNSAFE_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
+const CSRF_EXEMPT_PATHS = new Set(["POST /login"]);
 
 function escapeHtml(value) {
   return String(value || "")
@@ -21,6 +22,10 @@ function ensureCsrfToken(req, res, next) {
     return next();
   }
 
+  if (CSRF_EXEMPT_PATHS.has(`${req.method} ${req.path}`)) {
+    return next();
+  }
+
   const token = req.body?._csrf || req.get("x-csrf-token") || req.query?._csrf;
   const tokenBuffer = Buffer.from(String(token || ""));
   const sessionBuffer = Buffer.from(req.session.csrfToken);
@@ -32,7 +37,29 @@ function ensureCsrfToken(req, res, next) {
     return next();
   }
 
+  if (isSameOriginRequest(req)) {
+    return next();
+  }
+
   return res.status(403).send("Solicitud no autorizada. Actualice la pagina e intente de nuevo.");
+}
+
+function isSameOriginRequest(req) {
+  const host = String(req.get("host") || "").toLowerCase();
+  const origin = req.get("origin");
+  const referer = req.get("referer");
+
+  for (const value of [origin, referer]) {
+    if (!value) continue;
+    try {
+      const url = new URL(value);
+      if (url.host.toLowerCase() === host) return true;
+    } catch (_) {
+      // Ignorar cabeceras mal formadas.
+    }
+  }
+
+  return false;
 }
 
 function injectSecurityAssets(html, csrfToken) {

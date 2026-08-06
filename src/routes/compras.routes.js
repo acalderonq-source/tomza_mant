@@ -128,13 +128,13 @@ function clasificarPlacaCompra(placa, sede) {
   const sedeUpper = sedeLimpia.toUpperCase();
 
   if (esSedeGranelDashboard(sedeLimpia)) return "Graneles";
-  if (sedeUpper === "TRANSPORTADORA" && /^C[L]?\d{5,6}$/.test(placaLimpia)) return "Cabezales";
+  if (sedeUpper === "TRANSPORTADORA" || /^S\d{5,6}$/.test(placaLimpia)) return "Transportadora";
   if (/^C[L]?\d{5,6}$/.test(placaLimpia) && !["TALLER", "TECNICOS", "GENERAL"].includes(sedeUpper)) return "Hinos";
   return "Los demás";
 }
 
 function agruparGastosPorPlaca(gastos = []) {
-  const ordenCategorias = ["Hinos", "Graneles", "Cabezales", "Los demás"];
+  const ordenCategorias = ["Hinos", "Graneles", "Transportadora", "Los demás"];
   const grupos = ordenCategorias.map(nombre => ({
     nombre,
     total: 0,
