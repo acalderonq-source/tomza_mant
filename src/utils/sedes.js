@@ -20,6 +20,7 @@ const TODAS_SEDES = [
   "granel_la_cruz",
   "granel_guapiles",
   "granel_perez_zeledon",
+  "Orotina",
   "Alajuela",
   "Tecnicos",
   "Taller",

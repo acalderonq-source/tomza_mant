@@ -33,9 +33,6 @@ router.post("/login", async (req, res) => {
       [usuario]
     );
 
-    console.log("Usuario recibido:", usuario);
-    console.log("Rows encontradas:", rows);
-
     // Usuario no existe
     if (rows.length === 0) {
       return res.render("login", {
@@ -46,13 +43,8 @@ router.post("/login", async (req, res) => {
 
     const user = rows[0];
 
-    console.log("Usuario BD:", user);
-    console.log("Hash guardado:", user.password);
-
     // Comparar contraseña
     const match = await bcrypt.compare(password, user.password);
-
-    console.log("Resultado bcrypt:", match);
 
     if (!match) {
       return res.render("login", {
@@ -62,7 +54,7 @@ router.post("/login", async (req, res) => {
     }
 
     // Login correcto -> guardar sesión
-    req.session.user = {
+    const sessionUser = {
       id: user.id,
       nombre: user.nombre || user.usuario,
       usuario: user.usuario,
@@ -70,11 +62,19 @@ router.post("/login", async (req, res) => {
       sede: user.sede
     };
 
-    res.redirect(nextUrl || "/dashboard");
+    req.session.regenerate(error => {
+      if (error) {
+        console.error("Error regenerando sesión:", error);
+        return res.status(500).send("No se pudo iniciar sesión.");
+      }
+
+      req.session.user = sessionUser;
+      res.redirect(nextUrl || "/dashboard");
+    });
 
   } catch (error) {
-    console.error("❌ ERROR LOGIN COMPLETO:", error);
-    return res.status(500).send(error.message);
+    console.error("Error procesando login:", error.code || error.message);
+    return res.status(500).send("No se pudo iniciar sesión.");
   }
 });
 

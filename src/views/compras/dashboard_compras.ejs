@@ -170,6 +170,136 @@
       transform: translateY(-1px);
     }
 
+    .placa-drilldown {
+      display: grid;
+      gap: .75rem;
+      max-height: 440px;
+      overflow: auto;
+      padding-right: .35rem;
+    }
+
+    .drill-card {
+      border: 1px solid #dbe4f0;
+      border-radius: 16px;
+      overflow: hidden;
+      background: #fff;
+    }
+
+    .drill-row {
+      width: 100%;
+      border: 0;
+      background: #fff;
+      color: #0f172a;
+      padding: .72rem .85rem;
+      display: grid;
+      grid-template-columns: 1fr auto auto;
+      gap: .75rem;
+      align-items: center;
+      text-align: left;
+      font-weight: 900;
+    }
+
+    .drill-row:hover {
+      background: #f8fafc;
+    }
+
+    .drill-row-main {
+      min-width: 0;
+    }
+
+    .drill-row-title {
+      display: block;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .drill-row-sub {
+      display: block;
+      margin-top: .12rem;
+      color: #64748b;
+      font-size: .75rem;
+      font-weight: 700;
+    }
+
+    .drill-amount {
+      white-space: nowrap;
+      color: #0b3b82;
+      font-weight: 950;
+    }
+
+    .drill-caret {
+      width: 28px;
+      height: 28px;
+      border-radius: 999px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: #eef2ff;
+      color: #0b3b82;
+      font-size: .9rem;
+      transition: transform .15s ease;
+    }
+
+    .drill-row[aria-expanded="true"] .drill-caret {
+      transform: rotate(90deg);
+    }
+
+    .drill-row-category {
+      background: #0f2f70;
+      color: #fff;
+    }
+
+    .drill-row-category:hover {
+      background: #143a86;
+    }
+
+    .drill-row-category .drill-row-sub,
+    .drill-row-category .drill-amount {
+      color: rgba(255,255,255,.82);
+    }
+
+    .drill-row-category .drill-caret {
+      background: rgba(255,255,255,.18);
+      color: #fff;
+    }
+
+    .drill-panel {
+      display: none;
+      border-top: 1px solid #e5edf7;
+    }
+
+    .drill-panel.is-open {
+      display: block;
+    }
+
+    .drill-sede-block {
+      border-top: 1px solid #e5edf7;
+    }
+
+    .drill-sede-block:first-child {
+      border-top: 0;
+    }
+
+    .drill-placas {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: .86rem;
+      background: #fbfdff;
+    }
+
+    .drill-placas td {
+      padding: .55rem .85rem .55rem 1.25rem;
+      border-top: 1px solid #edf2f7;
+      vertical-align: middle;
+    }
+
+    .drill-placas td:last-child {
+      text-align: right;
+      white-space: nowrap;
+      font-weight: 900;
+    }
+
     .placa-detail-backdrop {
       position: fixed;
       inset: 0;
@@ -297,6 +427,7 @@
   const safeOrdenesPorEstado = Array.isArray(ordenesPorEstado) ? ordenesPorEstado : [];
   const safeTodosProveedores = Array.isArray(todosProveedoresGasto) ? todosProveedoresGasto : [];
   const safeGastosPorPlaca = Array.isArray(gastosPorPlaca) ? gastosPorPlaca : [];
+  const safeGastosPorPlacaAgrupados = Array.isArray(gastosPorPlacaAgrupados) ? gastosPorPlacaAgrupados : [];
   const safeComprasPorPlaca = comprasPorPlaca && typeof comprasPorPlaca === 'object' ? comprasPorPlaca : {};
 
   const proveedorTop = safeTopProveedores[0] || {};
@@ -431,31 +562,54 @@
             <canvas id="chartGastosPlaca" style="max-height: 380px;"></canvas>
           </div>
           <div class="col-lg-5">
-            <div class="table-responsive h-100">
-              <table class="table table-sm table-hover align-middle mb-0 placa-table">
-                <thead>
-                  <tr>
-                    <th>Placa</th>
-                    <th>Sede</th>
-                    <th class="text-center">Órdenes</th>
-                    <th class="text-end">Total</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <% safeGastosPorPlaca.forEach(item => { %>
-                    <tr>
-                      <td>
-                        <button type="button" class="placa-link js-placa-detail" data-placa="<%= item.placa %>">
-                          <%= item.placa %>
+            <div class="placa-drilldown">
+              <% safeGastosPorPlacaAgrupados.filter(grupo => Number(grupo.total || 0) > 0).forEach(grupo => { %>
+                <% const grupoId = `grupo-${String(grupo.nombre || '').replace(/[^a-z0-9]/gi, '-').toLowerCase()}`; %>
+                <section class="drill-card">
+                  <button type="button" class="drill-row drill-row-category js-drill-toggle" data-target="<%= grupoId %>" aria-expanded="false">
+                    <span class="drill-row-main">
+                      <span class="drill-row-title"><%= grupo.nombre %></span>
+                      <span class="drill-row-sub"><%= Number(grupo.sedes?.length || 0).toLocaleString('es-CR') %> sede(s) · <%= Number(grupo.ordenes || 0).toLocaleString('es-CR') %> orden(es)</span>
+                    </span>
+                    <span class="drill-amount">₡<%= Number(grupo.total || 0).toLocaleString('es-CR') %></span>
+                    <span class="drill-caret"><i class="bi bi-chevron-right"></i></span>
+                  </button>
+
+                  <div class="drill-panel" id="<%= grupoId %>">
+                    <% grupo.sedes.forEach((sedeGrupo, sedeIndex) => { %>
+                      <% const sedeId = `${grupoId}-sede-${sedeIndex}`; %>
+                      <div class="drill-sede-block">
+                        <button type="button" class="drill-row js-drill-toggle" data-target="<%= sedeId %>" aria-expanded="false">
+                          <span class="drill-row-main">
+                            <span class="drill-row-title"><%= sedeGrupo.nombre || 'Sin sede' %></span>
+                            <span class="drill-row-sub"><%= Number(sedeGrupo.placas?.length || 0).toLocaleString('es-CR') %> placa(s) · <%= Number(sedeGrupo.ordenes || 0).toLocaleString('es-CR') %> orden(es)</span>
+                          </span>
+                          <span class="drill-amount">₡<%= Number(sedeGrupo.total || 0).toLocaleString('es-CR') %></span>
+                          <span class="drill-caret"><i class="bi bi-chevron-right"></i></span>
                         </button>
-                      </td>
-                      <td><%= item.sede || 'Sin sede' %></td>
-                      <td class="text-center"><%= Number(item.ordenes || 0).toLocaleString('es-CR') %></td>
-                      <td class="text-end">₡<%= Number(item.total_gastado || 0).toLocaleString('es-CR') %></td>
-                    </tr>
-                  <% }) %>
-                </tbody>
-              </table>
+
+                        <div class="drill-panel" id="<%= sedeId %>">
+                          <table class="drill-placas">
+                            <tbody>
+                              <% sedeGrupo.placas.forEach(item => { %>
+                                <tr>
+                                  <td>
+                                    <button type="button" class="placa-link js-placa-detail" data-placa="<%= item.placa %>">
+                                      <%= item.placa %>
+                                    </button>
+                                    <div class="small text-muted mt-1"><%= Number(item.ordenes || 0).toLocaleString('es-CR') %> orden(es)</div>
+                                  </td>
+                                  <td>₡<%= Number(item.total_gastado || 0).toLocaleString('es-CR') %></td>
+                                </tr>
+                              <% }) %>
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    <% }) %>
+                  </div>
+                </section>
+              <% }) %>
             </div>
           </div>
         </div>
@@ -714,6 +868,16 @@
 
   document.querySelectorAll('.js-placa-detail').forEach(btn => {
     btn.addEventListener('click', () => abrirDetallePlaca(btn.dataset.placa));
+  });
+
+  document.querySelectorAll('.js-drill-toggle').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const panel = document.getElementById(btn.dataset.target);
+      if (!panel) return;
+
+      const isOpen = panel.classList.toggle('is-open');
+      btn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+    });
   });
 
   document.getElementById('placaDetailClose')?.addEventListener('click', cerrarDetallePlaca);

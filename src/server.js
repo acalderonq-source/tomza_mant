@@ -6,9 +6,20 @@ const session = require("express-session");
 const cron = require("node-cron");
 const enviarAlertasDekra = require("./utils/dekraMail");
 const { enviarRecordatoriosMantenimientos, ensurePushTables } = require("./utils/notificacionesPush");
+const { ensureCsrfToken, injectSecurityAssets } = require("./middleware/security");
 
 // Inicializar app
 const app = express();
+const isProduction = process.env.NODE_ENV === "production";
+const sessionSecret = process.env.SESSION_SECRET || "tomza_dev_secret_change_me";
+
+if (isProduction && !process.env.SESSION_SECRET) {
+  console.warn("SESSION_SECRET no esta configurado. Configure esta variable en produccion.");
+}
+
+if (isProduction) {
+  app.set("trust proxy", 1);
+}
 
 // ===================== MIDDLEWARES =====================
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
@@ -40,21 +51,25 @@ app.get("/.well-known/assetlinks.json", (req, res) => {
 
 // ===================== SESSION =====================
 app.use(session({
-  secret: "tomza_secret_key",
+  secret: sessionSecret,
   resave: false,
   saveUninitialized: false,
   cookie: {
-    secure: false,
-    httpOnly: true
+    secure: isProduction,
+    httpOnly: true,
+    sameSite: "lax",
+    maxAge: 1000 * 60 * 60 * 12
   }
 }));
+
+app.use(ensureCsrfToken);
 
 // ===================== VISTAS =====================
 app.set("view engine", "ejs");
 app.set("views", path.join(__dirname, "views"));
 
 // ===================== PWA / APP INSTALABLE =====================
-function injectPwaAssets(html) {
+function injectPageAssets(html, csrfToken) {
   if (typeof html !== "string") return html;
 
   let output = html;
@@ -80,6 +95,8 @@ function injectPwaAssets(html) {
     output = output.replace("</body>", `${placaSearchScript}\n</body>`);
   }
 
+  output = injectSecurityAssets(output, csrfToken);
+
   return output;
 }
 
@@ -93,9 +110,9 @@ app.use((req, res, next) => {
     }
 
     originalRender(view, options, (err, html) => {
-      if (callback) return callback(err, err ? html : injectPwaAssets(html));
+      if (callback) return callback(err, err ? html : injectPageAssets(html, res.locals.csrfToken));
       if (err) return next(err);
-      res.send(injectPwaAssets(html));
+      res.send(injectPageAssets(html, res.locals.csrfToken));
     });
   };
 

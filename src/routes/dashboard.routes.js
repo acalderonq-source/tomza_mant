@@ -63,10 +63,6 @@ router.get("/", async (req, res) => {
       return res.redirect("/login");
     }
 
-    if (["MENSAJERO", "MENSAJERIA", "MENSAJERO_FACTURAS"].includes(req.session.user.rol)) {
-      return res.redirect("/compras/ordenes");
-    }
-
     // =========================
     // FECHA HOY
     // =========================

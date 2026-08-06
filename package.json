@@ -5,7 +5,8 @@
   "type": "commonjs",
   "scripts": {
     "dev": "nodemon src/server.js",
-    "start": "node src/server.js"
+    "start": "node src/server.js",
+    "migrate": "node src/scripts/runMigrations.js"
   },
   "dependencies": {
     "@sendgrid/mail": "^8.1.6",

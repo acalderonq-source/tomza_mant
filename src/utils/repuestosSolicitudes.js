@@ -6,6 +6,10 @@ const ESTADOS_REPUESTOS = [
 ];
 
 const PRIORIDADES_REPUESTOS = ["BAJA", "MEDIA", "ALTA"];
+const MENSAJEROS_REPUESTOS = [
+  "Andres Bieckan Acuña",
+  "Dennis Umaña"
+];
 
 function normalizarPlaca(value) {
   return String(value || "").trim().toUpperCase();
@@ -54,6 +58,10 @@ async function ensureRepuestosSolicitudesTable(pool) {
       estado ENUM('PENDIENTE_COMPRAR','PEDIDO','EN_TRANSITO','ENTREGADO') NOT NULL DEFAULT 'PENDIENTE_COMPRAR',
       proveedor_id INT NULL,
       proveedor VARCHAR(180) NULL,
+      entregado_por VARCHAR(150) NULL,
+      recibido_por VARCHAR(150) NULL,
+      salida_en DATETIME NULL,
+      entregado_en DATETIME NULL,
       creado_por INT NULL,
       creado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
       actualizado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -75,10 +83,33 @@ async function ensureRepuestosSolicitudesTable(pool) {
   if (!Number(proveedorIdColumn.count || 0)) {
     await pool.query("ALTER TABLE solicitudes_repuestos ADD COLUMN proveedor_id INT NULL AFTER estado");
   }
+
+  const columnasEntrega = [
+    ["entregado_por", "VARCHAR(150) NULL"],
+    ["recibido_por", "VARCHAR(150) NULL"],
+    ["salida_en", "DATETIME NULL"],
+    ["entregado_en", "DATETIME NULL"]
+  ];
+
+  for (const [column, definition] of columnasEntrega) {
+    const [[row]] = await pool.query(
+      `SELECT COUNT(*) AS count
+       FROM INFORMATION_SCHEMA.COLUMNS
+       WHERE TABLE_SCHEMA = DATABASE()
+         AND TABLE_NAME = 'solicitudes_repuestos'
+         AND COLUMN_NAME = ?`,
+      [column]
+    );
+
+    if (!Number(row.count || 0)) {
+      await pool.query(`ALTER TABLE solicitudes_repuestos ADD COLUMN ${column} ${definition}`);
+    }
+  }
 }
 
 module.exports = {
   ESTADOS_REPUESTOS,
+  MENSAJEROS_REPUESTOS,
   PRIORIDADES_REPUESTOS,
   ensureRepuestosSolicitudesTable,
   etiquetaEstadoRepuesto,

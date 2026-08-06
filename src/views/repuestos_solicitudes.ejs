@@ -278,8 +278,11 @@
 <%
   const lista = Array.isArray(solicitudes) ? solicitudes : [];
   const puedeEditar = Boolean(puedeGestionar);
+  const puedeMarcarEntrega = Boolean(puedeEntregar);
+  const usuarioMensajero = Boolean(esMensajero);
   const unidadesLista = Array.isArray(unidades) ? unidades : [];
   const proveedoresLista = Array.isArray(proveedores) ? proveedores : [];
+  const mensajerosLista = Array.isArray(mensajerosRepuestos) ? mensajerosRepuestos : [];
   const estadoClass = estado => String(estado || '').toLowerCase();
   const prioridadClass = prioridad => String(prioridad || '').toLowerCase();
   const mostrarSede = typeof etiquetaSede === 'function' ? etiquetaSede : (sede) => sede;
@@ -327,7 +330,9 @@
     <div class="summary-card"><div class="summary-label">Entregado</div><div class="summary-value"><%= resumen.ENTREGADO || 0 %></div></div>
   </section>
 
-  <% if (!puedeEditar) { %>
+  <% if (usuarioMensajero) { %>
+    <div class="alert alert-info">Su usuario puede ver repuestos, marcar quién sale con el repuesto y luego confirmar cuando ya llegó.</div>
+  <% } else if (!puedeEditar) { %>
     <div class="alert alert-info">Su usuario puede ver las solicitudes de repuestos, pero solo ADMIN y PROVEEDURIA pueden agregar o actualizar.</div>
   <% } %>
 
@@ -388,7 +393,8 @@
               <th>Prioridad</th>
               <th>Estado</th>
               <th>Proveedor</th>
-              <% if (puedeEditar) { %><th>Acción</th><% } %>
+              <th>Entrega</th>
+              <% if (puedeEditar || puedeMarcarEntrega) { %><th>Acción</th><% } %>
             </tr>
           </thead>
           <tbody>
@@ -403,31 +409,82 @@
                 <td data-label="Prioridad" class="priority-<%= prioridadClass(item.prioridad) %>"><%= etiquetaPrioridadRepuesto(item.prioridad) %></td>
                 <td data-label="Estado" class="estado-<%= estadoClass(item.estado) %>"><%= etiquetaEstadoRepuesto(item.estado) %></td>
                 <td data-label="Proveedor"><%= item.proveedor_nombre || item.proveedor || '-' %></td>
-                <% if (puedeEditar) { %>
+                <td data-label="Entrega">
+                  <% if (item.entregado_por || item.recibido_por) { %>
+                    <strong><%= item.entregado_por || '-' %></strong>
+                    <% if (item.salida_formato) { %>
+                      <div class="small text-muted">Salida: <%= item.salida_formato %></div>
+                    <% } %>
+                  <% } else { %>
+                    <span class="text-muted">Sin salida</span>
+                  <% } %>
+                </td>
+                <% if (puedeEditar || puedeMarcarEntrega) { %>
                   <td data-label="Acción">
-                    <form method="POST" action="/repuestos/<%= item.id %>/estado" class="inline-status">
-                      <input type="hidden" name="sede" value="<%= filtros.sede || '' %>">
-                      <input type="hidden" name="estado_filtro" value="<%= filtros.estado || '' %>">
-                      <input type="hidden" name="placa" value="<%= filtros.placa || '' %>">
-                      <select name="estado" class="form-select form-select-sm">
-                        <% estados.forEach(estado => { %>
-                          <option value="<%= estado %>" <%= item.estado === estado ? 'selected' : '' %>><%= etiquetaEstadoRepuesto(estado) %></option>
-                        <% }) %>
-                      </select>
-                      <select name="proveedor_id" class="form-select form-select-sm">
-                        <option value="">Sin proveedor</option>
-                        <% proveedoresLista.forEach(proveedor => { %>
-                          <option value="<%= proveedor.id %>" <%= Number(item.proveedor_id || 0) === Number(proveedor.id) ? 'selected' : '' %>><%= proveedor.nombre %></option>
-                        <% }) %>
-                      </select>
-                      <button class="btn btn-sm btn-dark"><i class="bi bi-save"></i></button>
-                    </form>
-                    <form method="POST" action="/repuestos/<%= item.id %>/eliminar" class="mt-1" onsubmit="return confirm('¿Eliminar esta solicitud de repuesto?')">
-                      <input type="hidden" name="sede" value="<%= filtros.sede || '' %>">
-                      <input type="hidden" name="estado" value="<%= filtros.estado || '' %>">
-                      <input type="hidden" name="placa" value="<%= filtros.placa || '' %>">
-                      <button class="btn btn-sm btn-outline-danger w-100"><i class="bi bi-trash"></i> Eliminar</button>
-                    </form>
+                    <% if (puedeEditar) { %>
+                      <form method="POST" action="/repuestos/<%= item.id %>/estado" class="inline-status">
+                        <input type="hidden" name="sede" value="<%= filtros.sede || '' %>">
+                        <input type="hidden" name="estado_filtro" value="<%= filtros.estado || '' %>">
+                        <input type="hidden" name="placa" value="<%= filtros.placa || '' %>">
+                        <select name="estado" class="form-select form-select-sm">
+                          <% estados.forEach(estado => { %>
+                            <option value="<%= estado %>" <%= item.estado === estado ? 'selected' : '' %>><%= etiquetaEstadoRepuesto(estado) %></option>
+                          <% }) %>
+                        </select>
+                        <select name="proveedor_id" class="form-select form-select-sm">
+                          <option value="">Sin proveedor</option>
+                          <% proveedoresLista.forEach(proveedor => { %>
+                            <option value="<%= proveedor.id %>" <%= Number(item.proveedor_id || 0) === Number(proveedor.id) ? 'selected' : '' %>><%= proveedor.nombre %></option>
+                          <% }) %>
+                        </select>
+                        <button class="btn btn-sm btn-dark"><i class="bi bi-save"></i></button>
+                      </form>
+                    <% } %>
+                    <% if (puedeMarcarEntrega && item.estado !== 'ENTREGADO') { %>
+                      <% if (!item.entregado_por) { %>
+                        <form method="POST" action="/repuestos/<%= item.id %>/salida" class="<%= puedeEditar ? 'mt-1' : '' %>">
+                          <input type="hidden" name="sede" value="<%= filtros.sede || '' %>">
+                          <input type="hidden" name="estado_filtro" value="<%= filtros.estado || '' %>">
+                          <input type="hidden" name="placa" value="<%= filtros.placa || '' %>">
+                          <div class="d-grid gap-1">
+                            <select name="entregado_por" class="form-select form-select-sm" required>
+                              <option value="">Mensajero que sale</option>
+                              <% mensajerosLista.forEach(nombre => { %>
+                                <option value="<%= nombre %>"><%= nombre %></option>
+                              <% }) %>
+                            </select>
+                            <button class="btn btn-sm btn-primary w-100"><i class="bi bi-box-arrow-up-right"></i> Marcar salida</button>
+                          </div>
+                        </form>
+                      <% } else { %>
+                        <button
+                          type="button"
+                          class="btn btn-sm btn-success w-100 <%= puedeEditar ? 'mt-1' : '' %> js-entregar-repuesto"
+                          data-bs-toggle="modal"
+                          data-bs-target="#entregarRepuestoModal"
+                          data-id="<%= item.id %>"
+                          data-placa="<%= item.placa %>"
+                          data-repuesto="<%= String(item.repuesto_solicitado || '').replace(/"/g, '&quot;') %>">
+                          <i class="bi bi-check2-circle"></i> Ya llegó
+                        </button>
+                      <% } %>
+                    <% } else if (item.estado === 'ENTREGADO') { %>
+                      <div class="alert alert-success py-2 px-2 mb-0 small">
+                        <div class="fw-bold">
+                          <i class="bi bi-check2-circle"></i>
+                          Recibió: <%= item.recibido_por || '-' %>
+                        </div>
+                        <div>Entrega: <%= item.entregado_formato || '-' %></div>
+                      </div>
+                    <% } %>
+                    <% if (puedeEditar) { %>
+                      <form method="POST" action="/repuestos/<%= item.id %>/eliminar" class="mt-1" onsubmit="return confirm('¿Eliminar esta solicitud de repuesto?')">
+                        <input type="hidden" name="sede" value="<%= filtros.sede || '' %>">
+                        <input type="hidden" name="estado" value="<%= filtros.estado || '' %>">
+                        <input type="hidden" name="placa" value="<%= filtros.placa || '' %>">
+                        <button class="btn btn-sm btn-outline-danger w-100"><i class="bi bi-trash"></i> Eliminar</button>
+                      </form>
+                    <% } %>
                   </td>
                 <% } %>
               </tr>
@@ -519,7 +576,52 @@
   </div>
 <% } %>
 
+<% if (puedeMarcarEntrega) { %>
+  <div class="modal fade" id="entregarRepuestoModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <form method="POST" id="entregarRepuestoForm">
+          <input type="hidden" name="sede" value="<%= filtros.sede || '' %>">
+          <input type="hidden" name="estado_filtro" value="<%= filtros.estado || '' %>">
+          <input type="hidden" name="placa" value="<%= filtros.placa || '' %>">
+          <div class="modal-header">
+            <div>
+              <h5 class="modal-title fw-bold mb-0"><i class="bi bi-check2-circle me-1"></i> Marcar repuesto recibido</h5>
+              <div class="small opacity-75" id="entregarRepuestoResumen">Confirme quién recibió el repuesto.</div>
+            </div>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+          </div>
+          <div class="modal-body">
+            <div>
+              <label class="form-label fw-bold">Quién recibió el repuesto</label>
+              <input type="text" name="recibido_por" class="form-control" placeholder="Nombre de quien recibió" required>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+            <button class="btn btn-success"><i class="bi bi-check2-circle"></i> Confirmar llegada</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+<% } %>
+
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script type="application/json" id="unidadesRepuestosData"><%- JSON.stringify(unidadesLista.map(unidad => ({ id: unidad.id, placa: unidad.placa, sede: unidad.sede || '', sedeTexto: mostrarSede(unidad.sede) || '' }))) %></script>
+<script>
+  document.querySelectorAll('.js-entregar-repuesto').forEach(button => {
+    button.addEventListener('click', () => {
+      const form = document.getElementById('entregarRepuestoForm');
+      const resumen = document.getElementById('entregarRepuestoResumen');
+      if (!form) return;
+
+      form.action = `/repuestos/${button.dataset.id}/entregar`;
+      if (resumen) {
+        resumen.textContent = `${button.dataset.placa || ''} · ${button.dataset.repuesto || 'Repuesto'}`;
+      }
+    });
+  });
+</script>
 </body>
 </html>

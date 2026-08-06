@@ -286,8 +286,9 @@
     ? (Array.isArray(sedesDashboard) ? sedesDashboard : [])
     : (Array.isArray(sedesMultiples) ? sedesMultiples : []);
   const money = (value) => Number(value || 0).toLocaleString('es-CR', { maximumFractionDigits: 0 });
+  const esMensajeroDashboard = ['MENSAJERO', 'MENSAJERIA', 'MENSAJERO_FACTURAS'].includes(user.rol);
   const puedeVerCompras = ['ADMIN', 'TALLER', 'PROVEEDURIA_TALLER', 'CONTABILIDAD'].includes(user.rol);
-  const puedeVerOperaciones = user.rol !== 'CONTABILIDAD';
+  const puedeVerOperaciones = user.rol !== 'CONTABILIDAD' && !esMensajeroDashboard;
   const puedeVerReportesSupervisores = ['ADMIN', 'TALLER', 'MECANICO', 'SUPERVISOR', 'SUPERVISOR_PESADO'].includes(user.rol);
   const puedeVerAceite = ['ADMIN', 'MECANICO'].includes(user.rol)
     || String(user.usuario || '').trim().toLowerCase() === 'supervisor_rio_claro';
@@ -296,7 +297,7 @@
   const puedeVerGiras = ['ADMIN', 'TALLER', 'MECANICO', 'SUPERVISOR', 'SUPERVISOR_PESADO'].includes(user.rol);
   const puedeVerDashboardTaller = ['ADMIN', 'TALLER', 'MECANICO', 'SUPERVISOR', 'SUPERVISOR_PESADO'].includes(user.rol);
   const puedeVerOrdenesMotor = ['ADMIN', 'TALLER', 'PROVEEDURIA_TALLER'].includes(user.rol);
-  const puedeVerRepuestos = ['ADMIN', 'TALLER', 'PROVEEDURIA_TALLER', 'PROVEEDURIA', 'SUPERVISOR_PESADO'].includes(user.rol)
+  const puedeVerRepuestos = ['ADMIN', 'TALLER', 'PROVEEDURIA_TALLER', 'PROVEEDURIA', 'SUPERVISOR_PESADO', 'MENSAJERO', 'MENSAJERIA', 'MENSAJERO_FACTURAS'].includes(user.rol)
     || String(user.usuario || '').trim().toLowerCase() === 'pesados';
   const prioridadesLista = Array.isArray(prioridadesTaller) ? prioridadesTaller : [];
   const llantasEnProceso = Number(exec.llantasSolicitadas || 0) + Number(exec.llantasCotizadas || 0) + Number(exec.llantasCompradas || 0);
@@ -479,6 +480,12 @@
             <div><div class="module-title">Aires acondicionados</div><p class="module-copy">Reparación, carga y mantenimiento.</p></div>
           </a>
         <% } %>
+      <% } %>
+      <% if (puedeVerRepuestos && !puedeVerOperaciones) { %>
+        <a href="/repuestos" class="module-card">
+          <span class="module-icon icon-amber"><i class="bi bi-box-seam"></i></span>
+          <div><div class="module-title">Solicitud de repuestos</div><p class="module-copy">Ver repuestos y marcar entregas.</p></div>
+        </a>
       <% } %>
       <% if (puedeVerCompras) { %>
         <a href="/compras/ordenes" class="module-card">

@@ -9,6 +9,7 @@ const {
 } = require("../utils/sedes");
 const {
   ESTADOS_REPUESTOS,
+  MENSAJEROS_REPUESTOS,
   PRIORIDADES_REPUESTOS,
   ensureRepuestosSolicitudesTable,
   etiquetaEstadoRepuesto,
@@ -19,7 +20,8 @@ const {
 } = require("../utils/repuestosSolicitudes");
 
 const ROLES_PROVEEDURIA = ["PROVEEDURIA_TALLER", "PROVEEDURIA"];
-const ROLES_VER_REPUESTOS = ["ADMIN", "TALLER", "SUPERVISOR_PESADO", ...ROLES_PROVEEDURIA];
+const ROLES_MENSAJERO_REPUESTOS = ["MENSAJERO", "MENSAJERIA", "MENSAJERO_FACTURAS"];
+const ROLES_VER_REPUESTOS = ["ADMIN", "TALLER", "SUPERVISOR_PESADO", ...ROLES_PROVEEDURIA, ...ROLES_MENSAJERO_REPUESTOS];
 const ROLES_GESTION_REPUESTOS = ["ADMIN", ...ROLES_PROVEEDURIA];
 
 function requireAuth(req, res, next) {
@@ -32,6 +34,10 @@ function esUsuarioPesado(user) {
     user.rol === "SUPERVISOR_PESADO" ||
     String(user.usuario || "").trim().toLowerCase() === "pesados"
   );
+}
+
+function esMensajeroRepuestos(user) {
+  return user && ROLES_MENSAJERO_REPUESTOS.includes(user.rol);
 }
 
 function requireVerRepuestos(req, res, next) {
@@ -69,7 +75,7 @@ function redirectConFiltros(req, res) {
 }
 
 async function sedesDisponibles(req) {
-  if (req.session.user.rol === "ADMIN" || ROLES_PROVEEDURIA.includes(req.session.user.rol)) {
+  if (req.session.user.rol === "ADMIN" || ROLES_PROVEEDURIA.includes(req.session.user.rol) || esMensajeroRepuestos(req.session.user)) {
     return obtenerTodasSedes(pool);
   }
 
@@ -113,6 +119,8 @@ router.get("/", async (req, res) => {
     if (ESTADOS_REPUESTOS.includes(estadoFiltro)) {
       condiciones.push("sr.estado = ?");
       params.push(estadoFiltro);
+    } else if (esMensajeroRepuestos(req.session.user)) {
+      condiciones.push("sr.estado <> 'ENTREGADO'");
     }
 
     if (placaFiltro) {
@@ -124,6 +132,8 @@ router.get("/", async (req, res) => {
       `SELECT
          sr.*,
          DATE_FORMAT(sr.fecha_solicitud, '%d/%m/%Y') AS fecha_formato,
+         DATE_FORMAT(sr.salida_en, '%d/%m/%Y %H:%i') AS salida_formato,
+         DATE_FORMAT(sr.entregado_en, '%d/%m/%Y %H:%i') AS entregado_formato,
          u.usuario AS creado_por_usuario,
          COALESCE(p.nombre, sr.proveedor) AS proveedor_nombre
        FROM solicitudes_repuestos sr
@@ -176,7 +186,10 @@ router.get("/", async (req, res) => {
       filtros: { sede: sedeFiltro, estado: estadoFiltro, placa: placaFiltro },
       estados: ESTADOS_REPUESTOS,
       prioridades: PRIORIDADES_REPUESTOS,
+      mensajerosRepuestos: MENSAJEROS_REPUESTOS,
       puedeGestionar: ROLES_GESTION_REPUESTOS.includes(req.session.user.rol),
+      puedeEntregar: esMensajeroRepuestos(req.session.user) || ROLES_GESTION_REPUESTOS.includes(req.session.user.rol),
+      esMensajero: esMensajeroRepuestos(req.session.user),
       fechaHoy: fechaCostaRica(),
       resumen,
       success,
@@ -188,6 +201,93 @@ router.get("/", async (req, res) => {
   } catch (error) {
     console.error("Error cargando solicitud de repuestos:", error);
     res.status(500).send("Error cargando solicitud de repuestos");
+  }
+});
+
+router.post("/:id/entregar", async (req, res) => {
+  try {
+    await ensureRepuestosSolicitudesTable(pool);
+
+    if (!esMensajeroRepuestos(req.session.user) && !ROLES_GESTION_REPUESTOS.includes(req.session.user.rol)) {
+      return res.status(403).send("No autorizado");
+    }
+
+    const recibidoPor = String(req.body.recibido_por || "").trim();
+    const sedes = await sedesDisponibles(req);
+
+    const [[solicitud]] = await pool.query(
+      "SELECT id, entregado_por FROM solicitudes_repuestos WHERE id = ? AND sede IN (?) LIMIT 1",
+      [req.params.id, sedes]
+    );
+
+    if (!solicitud) {
+      req.session.error = "Solicitud no encontrada o sin permiso para esa sede.";
+      return redirectConFiltros(req, res);
+    }
+
+    if (!MENSAJEROS_REPUESTOS.includes(String(solicitud.entregado_por || "").trim())) {
+      req.session.error = "Primero marque qué mensajero sale con el repuesto.";
+      return redirectConFiltros(req, res);
+    }
+
+    if (!recibidoPor) {
+      req.session.error = "Escriba quién recibió el repuesto.";
+      return redirectConFiltros(req, res);
+    }
+
+    const [result] = await pool.query(
+      `UPDATE solicitudes_repuestos
+       SET estado = 'ENTREGADO',
+           recibido_por = ?,
+           entregado_en = NOW()
+       WHERE id = ? AND sede IN (?)`,
+      [recibidoPor, req.params.id, sedes]
+    );
+
+    req.session[result.affectedRows ? "success" : "error"] = result.affectedRows
+      ? "Repuesto marcado como entregado."
+      : "Solicitud no encontrada o sin permiso para esa sede.";
+    redirectConFiltros(req, res);
+  } catch (error) {
+    console.error("Error entregando solicitud de repuesto:", error);
+    req.session.error = "Error marcando el repuesto como entregado.";
+    redirectConFiltros(req, res);
+  }
+});
+
+router.post("/:id/salida", async (req, res) => {
+  try {
+    await ensureRepuestosSolicitudesTable(pool);
+
+    if (!esMensajeroRepuestos(req.session.user) && !ROLES_GESTION_REPUESTOS.includes(req.session.user.rol)) {
+      return res.status(403).send("No autorizado");
+    }
+
+    const entregadoPor = String(req.body.entregado_por || "").trim();
+    const sedes = await sedesDisponibles(req);
+
+    if (!MENSAJEROS_REPUESTOS.includes(entregadoPor)) {
+      req.session.error = "Seleccione el mensajero que sale con el repuesto.";
+      return redirectConFiltros(req, res);
+    }
+
+    const [result] = await pool.query(
+      `UPDATE solicitudes_repuestos
+       SET estado = CASE WHEN estado = 'PENDIENTE_COMPRAR' THEN 'EN_TRANSITO' ELSE estado END,
+           entregado_por = ?,
+           salida_en = NOW()
+       WHERE id = ? AND sede IN (?) AND estado <> 'ENTREGADO'`,
+      [entregadoPor, req.params.id, sedes]
+    );
+
+    req.session[result.affectedRows ? "success" : "error"] = result.affectedRows
+      ? "Salida de mensajero registrada."
+      : "Solicitud no encontrada, sin permiso o ya entregada.";
+    redirectConFiltros(req, res);
+  } catch (error) {
+    console.error("Error registrando salida de repuesto:", error);
+    req.session.error = "Error registrando salida de mensajero.";
+    redirectConFiltros(req, res);
   }
 });
 
