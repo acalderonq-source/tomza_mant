@@ -129,6 +129,78 @@
     }
     .nc-note strong { font-size: .8rem; }
     .nc-note small { color: #1d4ed8; }
+    .provider-pay-node {
+      background: #ffffff;
+      border: 1px solid #dbe3ef;
+      border-radius: 18px;
+      box-shadow: 0 8px 20px rgba(15,23,42,0.05);
+      margin-bottom: 1.25rem;
+      overflow: hidden;
+    }
+    .provider-pay-head {
+      align-items: center;
+      background: linear-gradient(135deg, #0f172a, #1e40af);
+      color: #fff;
+      display: flex;
+      gap: 1rem;
+      justify-content: space-between;
+      padding: 1rem 1.15rem;
+    }
+    .provider-pay-title {
+      font-size: 1.05rem;
+      font-weight: 900;
+      margin: 0;
+    }
+    .provider-pay-body { padding: 1rem 1.15rem 1.15rem; }
+    .pay-company-grid {
+      display: grid;
+      gap: .75rem;
+      grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+      margin-bottom: 1rem;
+    }
+    .pay-company-card {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 14px;
+      padding: .85rem;
+    }
+    .pay-company-card strong {
+      color: #0f172a;
+      display: block;
+      font-size: .78rem;
+      text-transform: uppercase;
+    }
+    .pay-company-card span {
+      color: #111827;
+      display: block;
+      font-size: 1.25rem;
+      font-weight: 900;
+    }
+    .pay-table-wrap {
+      border: 1px solid #e2e8f0;
+      border-radius: 14px;
+      max-height: 300px;
+      overflow: auto;
+    }
+    .pay-table {
+      font-size: .84rem;
+      margin: 0;
+    }
+    .pay-table th {
+      background: #f8fafc;
+      color: #334155;
+      font-size: .72rem;
+      position: sticky;
+      text-transform: uppercase;
+      top: 0;
+      z-index: 1;
+    }
+    .pay-upload-box {
+      background: #f8fafc;
+      border: 1px dashed #cbd5e1;
+      border-radius: 14px;
+      padding: .9rem;
+    }
     @media (max-width: 576px) {
       body { background: #eef2f7; }
       .navbar {
@@ -433,6 +505,12 @@
       <div class="d-flex gap-2 flex-wrap justify-content-end">
         <a href="<%= dashboardFacturasUrl %>" class="btn btn-dark btn-sm">
           <i class="bi bi-bar-chart-line"></i> Dashboard facturas
+        </a>
+        <a href="/compras/facturas/pagos-proveedor" class="btn btn-outline-primary btn-sm">
+          <i class="bi bi-bank"></i> Pago proveedor
+        </a>
+        <a href="/compras/facturas/caja-chica" class="btn btn-outline-warning btn-sm">
+          <i class="bi bi-wallet2"></i> Caja chica
         </a>
         <a href="<%= reportePendientesUrl %>" class="btn btn-outline-danger btn-sm">
           <i class="bi bi-file-earmark-pdf"></i> PDF pendientes

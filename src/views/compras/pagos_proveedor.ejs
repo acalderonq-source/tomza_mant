@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pago de proveedor</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <style>
+    body { background: #eef2f7; color: #0f172a; font-family: 'Segoe UI', Roboto, sans-serif; }
+    .page-wrap { max-width: 1450px; }
+    .topbar {
+      background: linear-gradient(135deg, #0f172a, #123b80);
+      border-bottom: 4px solid #e11d2e;
+      color: #fff;
+    }
+    .hero {
+      background: linear-gradient(135deg, #0f172a, #1d4ed8);
+      border-radius: 18px;
+      color: #fff;
+      padding: 1.2rem;
+    }
+    .hero h1 { font-size: 1.6rem; font-weight: 900; margin: 0; }
+    .hero p { color: rgba(255,255,255,.78); margin: .35rem 0 0; }
+    .stat-grid {
+      display: grid;
+      gap: .85rem;
+      grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+      margin: 1rem 0;
+    }
+    .stat-card {
+      background: #fff;
+      border: 1px solid #dbe3ef;
+      border-radius: 14px;
+      padding: .95rem;
+      box-shadow: 0 8px 18px rgba(15,23,42,.05);
+    }
+    .stat-label {
+      color: #64748b;
+      font-size: .76rem;
+      font-weight: 900;
+      text-transform: uppercase;
+    }
+    .stat-value {
+      font-size: 1.55rem;
+      font-weight: 900;
+      line-height: 1.1;
+    }
+    .panel {
+      background: #fff;
+      border: 1px solid #dbe3ef;
+      border-radius: 18px;
+      box-shadow: 0 8px 20px rgba(15,23,42,.05);
+      overflow: hidden;
+    }
+    .panel-head {
+      align-items: center;
+      border-bottom: 1px solid #e2e8f0;
+      display: flex;
+      gap: 1rem;
+      justify-content: space-between;
+      padding: 1rem;
+    }
+    .panel-title { font-size: 1rem; font-weight: 900; margin: 0; }
+    .upload-box {
+      background: #f8fafc;
+      border: 1px dashed #94a3b8;
+      border-radius: 16px;
+      padding: 1rem;
+    }
+    .table-wrap {
+      max-height: calc(100vh - 390px);
+      min-height: 320px;
+      overflow: auto;
+    }
+    .payments-table { font-size: .88rem; margin: 0; }
+    .payments-table th {
+      background: #f8fafc;
+      color: #334155;
+      font-size: .72rem;
+      position: sticky;
+      text-transform: uppercase;
+      top: 0;
+      z-index: 1;
+    }
+    .company-pill {
+      border-radius: 999px;
+      display: inline-block;
+      font-size: .72rem;
+      font-weight: 900;
+      padding: .25rem .55rem;
+      white-space: nowrap;
+    }
+    .company-pill.tomza { background: #dbeafe; color: #1e3a8a; }
+    .company-pill.super { background: #fee2e2; color: #991b1b; }
+    .provider-list {
+      display: grid;
+      gap: .45rem;
+    }
+    .provider-row {
+      align-items: center;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      display: flex;
+      justify-content: space-between;
+      padding: .55rem .7rem;
+    }
+    .provider-chart {
+      background: linear-gradient(180deg, #ffffff, #f8fafc);
+      border-top: 1px solid #e2e8f0;
+      border-radius: 16px;
+      margin-top: .9rem;
+      padding: 1rem;
+    }
+    .tower-chart {
+      align-items: end;
+      display: grid;
+      gap: .85rem;
+      grid-template-columns: repeat(auto-fit, minmax(76px, 1fr));
+      min-height: 290px;
+      overflow-x: auto;
+      padding: .75rem .25rem .15rem;
+    }
+    .tower-item {
+      align-items: center;
+      display: grid;
+      gap: .35rem;
+      grid-template-rows: auto 210px auto;
+      min-width: 0;
+    }
+    .tower-value {
+      color: #0f172a;
+      font-size: .76rem;
+      font-weight: 900;
+      text-align: center;
+      white-space: nowrap;
+    }
+    .tower-track {
+      align-items: end;
+      background: linear-gradient(180deg, #e2e8f0, #f8fafc);
+      border: 1px solid #dbe3ef;
+      border-radius: 18px;
+      box-shadow: inset 0 1px 4px rgba(15,23,42,.08);
+      display: flex;
+      height: 210px;
+      justify-content: center;
+      overflow: hidden;
+      width: 54px;
+    }
+    .tower-bar {
+      border-radius: 16px 16px 10px 10px;
+      box-shadow: 0 -8px 18px rgba(15,23,42,.16);
+      min-height: 18px;
+      width: 100%;
+    }
+    .tower-name {
+      color: #334155;
+      font-size: .72rem;
+      font-weight: 800;
+      line-height: 1.05;
+      max-width: 98px;
+      min-height: 2.2rem;
+      overflow: hidden;
+      text-align: center;
+    }
+    .chart-subtitle {
+      color: #64748b;
+      font-size: .78rem;
+      margin-top: .1rem;
+    }
+    @media (max-width: 768px) {
+      .hero h1 { font-size: 1.3rem; }
+      .panel-head { align-items: stretch; flex-direction: column; }
+      .table-wrap { max-height: none; min-height: 0; }
+      .payments-table thead { display: none; }
+      .payments-table,
+      .payments-table tbody,
+      .payments-table tr,
+      .payments-table td { display: block; width: 100%; }
+      .payments-table tr {
+        border: 1px solid #e2e8f0;
+        border-radius: 14px;
+        margin: .75rem;
+        padding: .75rem;
+      }
+      .payments-table td {
+        border: 0;
+        display: flex;
+        gap: 1rem;
+        justify-content: space-between;
+        padding: .35rem 0;
+      }
+      .payments-table td::before {
+        color: #64748b;
+        content: attr(data-label);
+        font-weight: 800;
+      }
+    }
+  </style>
+</head>
+<body>
+<nav class="topbar px-3 py-2">
+  <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+    <div class="fw-black"><i class="bi bi-bank me-2"></i>Pago de proveedor</div>
+    <div class="d-flex align-items-center gap-2 flex-wrap">
+      <span class="small"><%= user.usuario %> (<%= user.rol %>)</span>
+      <a href="/compras/facturas" class="btn btn-sm btn-outline-light">Facturas</a>
+      <a href="/compras/facturas/dashboard" class="btn btn-sm btn-outline-light">Dashboard facturas</a>
+      <a href="/dashboard" class="btn btn-sm btn-outline-light">Dashboard</a>
+      <a href="/logout" class="btn btn-sm btn-warning">Salir</a>
+    </div>
+  </div>
+</nav>
+
+<main class="container-fluid page-wrap py-4">
+  <%
+    const pagos = pagosProveedor || { totalesEmpresa: [], topProveedores: [], recientes: [], totalGeneral: 0, totalPagos: 0 };
+    const puedeImportar = ['ADMIN', 'TALLER', 'PROVEEDURIA_TALLER'].includes(user.rol);
+    const fecha = value => {
+      if (!value) return '—';
+      const date = new Date(value);
+      return Number.isNaN(date.getTime()) ? '—' : date.toLocaleDateString('es-CR');
+    };
+    const moneda = value => `₡${Number(value || 0).toLocaleString('es-CR', { maximumFractionDigits: 0 })}`;
+    const maxProveedor = Math.max(...pagos.topProveedores.map(item => Number(item.total || 0)), 1);
+    const chartColors = [
+      'linear-gradient(180deg, #ef233c, #174ea6)',
+      'linear-gradient(180deg, #f59e0b, #dc2626)',
+      'linear-gradient(180deg, #22c55e, #0f766e)',
+      'linear-gradient(180deg, #38bdf8, #1d4ed8)',
+      'linear-gradient(180deg, #a855f7, #7c3aed)',
+      'linear-gradient(180deg, #fb7185, #be123c)',
+      'linear-gradient(180deg, #14b8a6, #0f766e)',
+      'linear-gradient(180deg, #64748b, #0f172a)',
+      'linear-gradient(180deg, #facc15, #ca8a04)',
+      'linear-gradient(180deg, #60a5fa, #2563eb)'
+    ];
+  %>
+
+  <section class="hero">
+    <div class="d-flex justify-content-between gap-3 flex-wrap">
+      <div>
+        <h1>Pago de proveedor</h1>
+        <p>Importa la plantilla de pagos y consulta lo acumulado por Gas Tomza y Super Gas.</p>
+      </div>
+      <div class="text-end">
+        <div class="small text-white-50">Total general</div>
+        <div class="fs-3 fw-black"><%= moneda(pagos.totalGeneral) %></div>
+      </div>
+    </div>
+  </section>
+
+  <% if (success) { %>
+    <div class="alert alert-success alert-dismissible fade show mt-3">
+      <%= success %>
+      <button class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+  <% } %>
+  <% if (error) { %>
+    <div class="alert alert-danger alert-dismissible fade show mt-3">
+      <%= error %>
+      <button class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+  <% } %>
+
+  <div class="stat-grid">
+    <div class="stat-card">
+      <div class="stat-label">Pagos importados</div>
+      <div class="stat-value"><%= Number(pagos.totalPagos || 0).toLocaleString('es-CR') %></div>
+    </div>
+    <% if (pagos.totalesEmpresa.length) { %>
+      <% pagos.totalesEmpresa.forEach(item => { %>
+        <div class="stat-card">
+          <div class="stat-label"><%= item.empresa %> · <%= item.pagos %> pago(s)</div>
+          <div class="stat-value"><%= moneda(item.total) %></div>
+        </div>
+      <% }) %>
+    <% } else { %>
+      <div class="stat-card">
+        <div class="stat-label">Sin datos</div>
+        <div class="stat-value">₡0</div>
+      </div>
+    <% } %>
+  </div>
+
+  <div class="row g-3">
+    <div class="col-lg-4">
+      <section class="panel">
+        <div class="panel-head">
+          <h2 class="panel-title">Importar plantilla</h2>
+        </div>
+        <div class="p-3">
+          <% if (puedeImportar) { %>
+            <form method="POST" action="/compras/facturas/pagos-proveedor/importar" class="upload-box" id="formPagoProveedor">
+              <label class="form-label fw-bold">Archivo Excel</label>
+              <input type="file" class="form-control mb-2" id="archivoPagoProveedor" accept=".xlsx,.xls" required>
+              <input type="hidden" name="archivo_pago_data" id="archivoPagoProveedorData">
+              <input type="hidden" name="archivo_pago_nombre" id="archivoPagoProveedorNombre">
+              <div class="small text-muted mb-3">Detecta Gas Tomza arriba y Super Gas abajo. Si el pago ya existe, lo omite.</div>
+              <button class="btn btn-success w-100">
+                <i class="bi bi-file-earmark-excel"></i> Importar pagos
+              </button>
+            </form>
+          <% } else { %>
+            <div class="alert alert-info mb-0">Contabilidad puede ver los pagos, pero no importarlos.</div>
+          <% } %>
+        </div>
+      </section>
+
+      <section class="panel mt-3">
+        <div class="panel-head">
+          <h2 class="panel-title">Mayores proveedores</h2>
+        </div>
+        <div class="p-3 provider-list">
+          <% if (pagos.topProveedores.length) { %>
+            <% pagos.topProveedores.forEach(item => { %>
+              <div class="provider-row">
+                <div>
+                  <strong><%= item.proveedor_nombre %></strong>
+                  <div class="small text-muted"><%= item.pagos %> pago(s)</div>
+                </div>
+                <strong><%= moneda(item.total) %></strong>
+              </div>
+            <% }) %>
+          <% } else { %>
+            <div class="text-muted">Sin proveedores importados.</div>
+          <% } %>
+
+          <% if (pagos.topProveedores.length) { %>
+            <div class="provider-chart">
+              <div class="fw-bold small text-muted text-uppercase">Gráfico por monto pagado</div>
+              <div class="chart-subtitle">Columnas verticales según el monto acumulado por proveedor.</div>
+              <div class="tower-chart">
+                <% pagos.topProveedores.forEach((item, index) => { %>
+                  <div class="tower-item" title="<%= item.proveedor_nombre %> · <%= moneda(item.total) %>">
+                    <div class="tower-value"><%= moneda(item.total) %></div>
+                    <div class="tower-track">
+                      <div class="tower-bar" style="height: <%= Math.max(8, Math.round((Number(item.total || 0) / maxProveedor) * 100)) %>%; background: <%= chartColors[index % chartColors.length] %>"></div>
+                    </div>
+                    <div class="tower-name"><%= item.proveedor_nombre %></div>
+                  </div>
+                <% }) %>
+              </div>
+            </div>
+          <% } %>
+        </div>
+      </section>
+    </div>
+
+    <div class="col-lg-8">
+      <section class="panel">
+        <div class="panel-head">
+          <div>
+            <h2 class="panel-title">Historial de pagos de proveedor</h2>
+            <div class="small text-muted">Todo pago importado queda guardado como historial. Mostrando últimos 300 registros.</div>
+          </div>
+          <a href="/compras/facturas" class="btn btn-sm btn-outline-secondary">Volver a facturas</a>
+        </div>
+        <div class="table-wrap">
+          <table class="table table-hover align-middle payments-table">
+            <thead>
+              <tr>
+                <th>Empresa</th>
+                <th>Fecha</th>
+                <th>Proveedor</th>
+                <th>Concepto</th>
+                <th>Factura</th>
+                <th>Placa</th>
+                <th class="text-end">Monto</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% if (pagos.recientes.length) { %>
+                <% pagos.recientes.forEach(pago => { %>
+                  <tr>
+                    <td data-label="Empresa">
+                      <span class="company-pill <%= pago.empresa === 'SUPER GAS' ? 'super' : 'tomza' %>"><%= pago.empresa %></span>
+                    </td>
+                    <td data-label="Fecha"><%= fecha(pago.fecha_solicitud) %></td>
+                    <td data-label="Proveedor"><strong><%= pago.proveedor_nombre %></strong></td>
+                    <td data-label="Concepto"><%= pago.concepto || '—' %></td>
+                    <td data-label="Factura"><%= pago.numero_factura || '—' %></td>
+                    <td data-label="Placa"><%= pago.placa || '—' %></td>
+                    <td data-label="Monto" class="text-end fw-bold"><%= moneda(pago.monto) %></td>
+                  </tr>
+                <% }) %>
+              <% } else { %>
+                <tr>
+                  <td colspan="7" class="text-center text-muted py-4">Todavía no hay pagos importados.</td>
+                </tr>
+              <% } %>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  </div>
+</main>
+
+<script>
+  const formPagoProveedor = document.getElementById('formPagoProveedor');
+  const archivoPagoProveedor = document.getElementById('archivoPagoProveedor');
+  const archivoPagoProveedorData = document.getElementById('archivoPagoProveedorData');
+  const archivoPagoProveedorNombre = document.getElementById('archivoPagoProveedorNombre');
+
+  if (formPagoProveedor && archivoPagoProveedor && archivoPagoProveedorData) {
+    archivoPagoProveedor.addEventListener('change', () => {
+      archivoPagoProveedorData.value = '';
+      if (archivoPagoProveedorNombre) archivoPagoProveedorNombre.value = '';
+      const file = archivoPagoProveedor.files && archivoPagoProveedor.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onerror = () => {
+        alert('No se pudo leer el archivo Excel.');
+        archivoPagoProveedor.value = '';
+      };
+      reader.onload = () => {
+        archivoPagoProveedorData.value = reader.result;
+        if (archivoPagoProveedorNombre) archivoPagoProveedorNombre.value = file.name || 'plantilla_pagos.xlsx';
+      };
+      reader.readAsDataURL(file);
+    });
+
+    formPagoProveedor.addEventListener('submit', event => {
+      if (!archivoPagoProveedorData.value) {
+        event.preventDefault();
+        alert('Seleccione el archivo Excel y espere un momento antes de importar.');
+      }
+    });
+  }
+</script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

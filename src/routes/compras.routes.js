@@ -4,6 +4,7 @@ const pool = require("../db");
 const fs = require("fs");
 const path = require("path");
 const PdfPrinter = require("pdfmake");
+const ExcelJS = require("exceljs");
 const { generarPDFOrden } = require('../utils/pdfOrdenCompra');
 const { agregarFiltroPlacaSql, normalizarPlaca: normalizarPlacaSistema } = require("../utils/placas");
 
@@ -356,6 +357,45 @@ async function ensureFacturaRecepcionColumns() {
   }
 }
 
+async function ensurePagosProveedorTable() {
+  await queryWithRetry(`
+    CREATE TABLE IF NOT EXISTS pagos_proveedor (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      empresa VARCHAR(80) NOT NULL,
+      fecha_solicitud DATE NULL,
+      proveedor_nombre VARCHAR(180) NOT NULL,
+      cuenta_iban VARCHAR(60) NULL,
+      concepto TEXT NULL,
+      numero_factura VARCHAR(100) NULL,
+      placa VARCHAR(50) NULL,
+      monto DECIMAL(14,2) NOT NULL DEFAULT 0,
+      partida_presupuestaria VARCHAR(150) NULL,
+      fecha_pago DATE NULL,
+      archivo_nombre VARCHAR(255) NULL,
+      creado_por INT NULL,
+      creado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      INDEX idx_pagos_proveedor_empresa (empresa),
+      INDEX idx_pagos_proveedor_fecha (fecha_solicitud),
+      INDEX idx_pagos_proveedor_proveedor (proveedor_nombre),
+      INDEX idx_pagos_proveedor_placa (placa)
+    )
+  `);
+}
+
+async function ensureCajaChicaTable() {
+  await queryWithRetry(`
+    CREATE TABLE IF NOT EXISTS caja_chica_reintegros (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      fecha DATE NOT NULL,
+      monto DECIMAL(14,2) NOT NULL DEFAULT 0,
+      observacion TEXT NULL,
+      creado_por INT NULL,
+      creado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      INDEX idx_caja_chica_fecha (fecha)
+    )
+  `);
+}
+
 async function ensureOrdenPlacaColumn() {
   if (!(await columnExists("ordenes_compra", "placa_unidad"))) {
     await queryWithRetry("ALTER TABLE ordenes_compra ADD COLUMN placa_unidad VARCHAR(50) NULL");
@@ -443,6 +483,165 @@ function parseMonto(value) {
   return Number.isFinite(monto) ? monto : 0;
 }
 
+function valorCeldaExcel(cell) {
+  if (!cell) return null;
+  let value = cell.value;
+
+  if (value && typeof value === "object") {
+    if (value.result !== undefined) value = value.result;
+    else if (value.text !== undefined) value = value.text;
+    else if (value.richText) value = value.richText.map(item => item.text || "").join("");
+    else if (value.hyperlink && value.text) value = value.text;
+  }
+
+  return value;
+}
+
+function textoCeldaExcel(cell) {
+  const value = valorCeldaExcel(cell);
+  if (value === null || value === undefined) return "";
+  if (value instanceof Date) return value.toISOString().slice(0, 10);
+  return String(value).trim();
+}
+
+function fechaExcelToSql(value) {
+  if (!value) return null;
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return value.toISOString().slice(0, 10);
+  }
+
+  const text = String(value).trim();
+  if (!text) return null;
+
+  const iso = text.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`;
+
+  const local = text.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);
+  if (local) {
+    const year = local[3].length === 2 ? `20${local[3]}` : local[3];
+    return `${year}-${local[2].padStart(2, "0")}-${local[1].padStart(2, "0")}`;
+  }
+
+  const parsed = new Date(text);
+  return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString().slice(0, 10);
+}
+
+function parseMontoExcel(value) {
+  if (typeof value === "number") return Number.isFinite(value) ? value : 0;
+  let text = String(value || "").trim();
+  if (!text) return 0;
+
+  text = text
+    .replace(/[₡$]/g, "")
+    .replace(/\s+/g, "")
+    .replace(/[^\d,.-]/g, "");
+
+  if (text.includes(",") && !text.includes(".")) {
+    text = text.replace(",", ".");
+  } else if (text.includes(",") && text.includes(".")) {
+    text = text.replace(/,/g, "");
+  }
+
+  const monto = Number(text);
+  return Number.isFinite(monto) ? monto : 0;
+}
+
+function normalizarEmpresaPago(value) {
+  const texto = String(value || "").toUpperCase();
+  if (texto.includes("SUPER")) return "SUPER GAS";
+  if (texto.includes("TOMZA")) return "GAS TOMZA";
+  return "";
+}
+
+function parsePagoProveedorDataUrl(dataUrl) {
+  const match = String(dataUrl || "").match(/^data:([^;]+);base64,(.+)$/);
+  if (!match) throw new Error("Debe adjuntar un archivo Excel válido.");
+
+  const mime = match[1];
+  if (![
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "application/vnd.ms-excel",
+    "application/octet-stream"
+  ].includes(mime)) {
+    throw new Error("El archivo debe ser Excel (.xlsx o .xls).");
+  }
+
+  const buffer = Buffer.from(match[2], "base64");
+  if (buffer.length > 8 * 1024 * 1024) {
+    throw new Error("El archivo supera 8 MB.");
+  }
+
+  return buffer;
+}
+
+async function leerPagosProveedorExcel(buffer) {
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.load(buffer);
+  const pagos = [];
+
+  workbook.worksheets.forEach(worksheet => {
+    let empresaActual = "";
+
+    worksheet.eachRow({ includeEmpty: false }, row => {
+      const textoFila = row.values
+        .slice(1)
+        .map(value => String(value?.text || value?.result || value || "").trim())
+        .filter(Boolean)
+        .join(" ");
+
+      const empresaDetectada = normalizarEmpresaPago(textoFila);
+      if (empresaDetectada) {
+        empresaActual = empresaDetectada;
+        return;
+      }
+
+      const primeraCelda = textoCeldaExcel(row.getCell(1)).toLowerCase();
+      if (!primeraCelda.includes("fecha")) return;
+
+      const startRow = row.number + 1;
+      for (let r = startRow; r <= worksheet.rowCount; r++) {
+        const dataRow = worksheet.getRow(r);
+        const filaTexto = dataRow.values
+          .slice(1, 10)
+          .map(value => String(value?.text || value?.result || value || "").trim())
+          .filter(Boolean)
+          .join(" ");
+
+        const nuevaEmpresa = normalizarEmpresaPago(filaTexto);
+        if (nuevaEmpresa) break;
+
+        const fechaSolicitudRaw = valorCeldaExcel(dataRow.getCell(1));
+        const proveedor = textoCeldaExcel(dataRow.getCell(2));
+        const cuentaIban = textoCeldaExcel(dataRow.getCell(3));
+        const concepto = textoCeldaExcel(dataRow.getCell(4));
+        const numeroFactura = textoCeldaExcel(dataRow.getCell(5));
+        const placa = normalizarPlaca(textoCeldaExcel(dataRow.getCell(6)));
+        const monto = parseMontoExcel(valorCeldaExcel(dataRow.getCell(7)));
+        const partida = textoCeldaExcel(dataRow.getCell(8));
+        const fechaPagoRaw = valorCeldaExcel(dataRow.getCell(9));
+
+        if (!proveedor && !concepto && !monto) continue;
+        if (!proveedor || monto <= 0) continue;
+
+        pagos.push({
+          empresa: empresaActual || "GAS TOMZA",
+          fecha_solicitud: fechaExcelToSql(fechaSolicitudRaw),
+          proveedor_nombre: proveedor,
+          cuenta_iban: cuentaIban || null,
+          concepto: concepto || null,
+          numero_factura: numeroFactura || null,
+          placa,
+          monto,
+          partida_presupuestaria: partida || null,
+          fecha_pago: fechaExcelToSql(fechaPagoRaw)
+        });
+      }
+    });
+  });
+
+  return pagos;
+}
+
 function calcularSaldoFactura(monto, notaCredito = 0, abono = 0, pagada = 0) {
   const montoOriginal = parseMonto(monto);
   const notaCreditoMonto = Math.min(parseMonto(notaCredito), montoOriginal);
@@ -483,6 +682,222 @@ async function obtenerOrdenesDisponiblesFactura() {
     LIMIT 300
   `);
   return ordenesDisponibles;
+}
+
+async function obtenerResumenPagosProveedor() {
+  await ensurePagosProveedorTable();
+
+  const [totalesEmpresa] = await queryWithRetry(`
+    SELECT empresa, COUNT(*) AS pagos, COALESCE(SUM(monto), 0) AS total
+    FROM pagos_proveedor
+    GROUP BY empresa
+    ORDER BY FIELD(empresa, 'GAS TOMZA', 'SUPER GAS'), empresa
+  `);
+
+  const [topProveedores] = await queryWithRetry(`
+    SELECT proveedor_nombre, COUNT(*) AS pagos, COALESCE(SUM(monto), 0) AS total
+    FROM pagos_proveedor
+    GROUP BY proveedor_nombre
+    ORDER BY total DESC
+    LIMIT 10
+  `);
+
+  const [recientes] = await queryWithRetry(`
+    SELECT *
+    FROM pagos_proveedor
+    ORDER BY COALESCE(fecha_solicitud, DATE(creado_en)) DESC, id DESC
+    LIMIT 300
+  `);
+
+  return {
+    totalesEmpresa,
+    topProveedores,
+    recientes,
+    totalGeneral: totalesEmpresa.reduce((sum, item) => sum + Number(item.total || 0), 0),
+    totalPagos: totalesEmpresa.reduce((sum, item) => sum + Number(item.pagos || 0), 0)
+  };
+}
+
+async function existePagoProveedor(connection, pago) {
+  const [rows] = await connection.query(
+    `SELECT id
+     FROM pagos_proveedor
+     WHERE empresa = ?
+       AND COALESCE(fecha_solicitud, '1000-01-01') = COALESCE(?, '1000-01-01')
+       AND proveedor_nombre = ?
+       AND COALESCE(concepto, '') = COALESCE(?, '')
+       AND COALESCE(numero_factura, '') = COALESCE(?, '')
+       AND COALESCE(placa, '') = COALESCE(?, '')
+       AND monto = ?
+     LIMIT 1`,
+    [
+      pago.empresa,
+      pago.fecha_solicitud,
+      pago.proveedor_nombre,
+      pago.concepto,
+      pago.numero_factura,
+      pago.placa,
+      pago.monto
+    ]
+  );
+
+  return rows.length > 0;
+}
+
+async function obtenerResumenCajaChica() {
+  await ensureCajaChicaTable();
+
+  const [resumenRows] = await queryWithRetry(`
+    SELECT
+      COUNT(*) AS registros,
+      COALESCE(SUM(monto), 0) AS total,
+      COALESCE(SUM(CASE WHEN YEAR(fecha) = YEAR(CURDATE()) AND MONTH(fecha) = MONTH(CURDATE()) THEN monto ELSE 0 END), 0) AS total_mes
+    FROM caja_chica_reintegros
+  `);
+
+  const [porMes] = await queryWithRetry(`
+    SELECT DATE_FORMAT(fecha, '%Y-%m') AS mes, COUNT(*) AS registros, COALESCE(SUM(monto), 0) AS total
+    FROM caja_chica_reintegros
+    GROUP BY DATE_FORMAT(fecha, '%Y-%m')
+    ORDER BY mes DESC
+    LIMIT 12
+  `);
+
+  const [historial] = await queryWithRetry(`
+    SELECT c.*, u.usuario AS creado_por_usuario
+    FROM caja_chica_reintegros c
+    LEFT JOIN usuarios u ON u.id = c.creado_por
+    ORDER BY c.fecha DESC, c.id DESC
+    LIMIT 300
+  `);
+
+  return {
+    resumen: resumenRows[0] || { registros: 0, total: 0, total_mes: 0 },
+    porMes,
+    historial
+  };
+}
+
+function agregarFiltroFecha(sqlParts, params, campoFecha, fechaDesde, fechaHasta) {
+  if (fechaDesde) {
+    sqlParts.push(`${campoFecha} >= ?`);
+    params.push(fechaDesde);
+  }
+  if (fechaHasta) {
+    sqlParts.push(`${campoFecha} <= ?`);
+    params.push(fechaHasta);
+  }
+}
+
+async function obtenerDashboardFinancieroFacturas(filtros = {}) {
+  await ensurePagosProveedorTable();
+  await ensureCajaChicaTable();
+
+  const { proveedor_id, fecha_desde, fecha_hasta } = filtros;
+  const whereOrdenes = [];
+  const paramsOrdenes = [];
+  agregarFiltroFecha(whereOrdenes, paramsOrdenes, "o.fecha", fecha_desde, fecha_hasta);
+  if (proveedor_id) {
+    whereOrdenes.push("o.proveedor_id = ?");
+    paramsOrdenes.push(proveedor_id);
+  }
+  const whereOrdenesSql = whereOrdenes.length ? `WHERE ${whereOrdenes.join(" AND ")}` : "";
+
+  const fechaPagoProveedor = "COALESCE(pp.fecha_pago, pp.fecha_solicitud, DATE(pp.creado_en))";
+  const wherePagos = [];
+  const paramsPagos = [];
+  agregarFiltroFecha(wherePagos, paramsPagos, fechaPagoProveedor, fecha_desde, fecha_hasta);
+  const wherePagosSql = wherePagos.length ? `WHERE ${wherePagos.join(" AND ")}` : "";
+
+  const whereCaja = [];
+  const paramsCaja = [];
+  agregarFiltroFecha(whereCaja, paramsCaja, "cc.fecha", fecha_desde, fecha_hasta);
+  const whereCajaSql = whereCaja.length ? `WHERE ${whereCaja.join(" AND ")}` : "";
+
+  const [[ordenesResumen]] = await queryWithRetry(`
+    SELECT COUNT(*) AS registros, COALESCE(SUM(total), 0) AS total
+    FROM ordenes_compra o
+    ${whereOrdenesSql}
+  `, paramsOrdenes);
+
+  const [[pagosResumen]] = await queryWithRetry(`
+    SELECT COUNT(*) AS registros, COALESCE(SUM(monto), 0) AS total
+    FROM pagos_proveedor pp
+    ${wherePagosSql}
+  `, paramsPagos);
+
+  const [[cajaResumen]] = await queryWithRetry(`
+    SELECT COUNT(*) AS registros, COALESCE(SUM(monto), 0) AS total
+    FROM caja_chica_reintegros cc
+    ${whereCajaSql}
+  `, paramsCaja);
+
+  const [ordenesMes] = await queryWithRetry(`
+    SELECT DATE_FORMAT(o.fecha, '%Y-%m') AS mes, COUNT(*) AS registros, COALESCE(SUM(o.total), 0) AS total
+    FROM ordenes_compra o
+    ${whereOrdenesSql}
+    GROUP BY DATE_FORMAT(o.fecha, '%Y-%m')
+  `, paramsOrdenes);
+
+  const [pagosMes] = await queryWithRetry(`
+    SELECT DATE_FORMAT(${fechaPagoProveedor}, '%Y-%m') AS mes, COUNT(*) AS registros, COALESCE(SUM(pp.monto), 0) AS total
+    FROM pagos_proveedor pp
+    ${wherePagosSql}
+    GROUP BY DATE_FORMAT(${fechaPagoProveedor}, '%Y-%m')
+  `, paramsPagos);
+
+  const [cajaMes] = await queryWithRetry(`
+    SELECT DATE_FORMAT(cc.fecha, '%Y-%m') AS mes, COUNT(*) AS registros, COALESCE(SUM(cc.monto), 0) AS total
+    FROM caja_chica_reintegros cc
+    ${whereCajaSql}
+    GROUP BY DATE_FORMAT(cc.fecha, '%Y-%m')
+  `, paramsCaja);
+
+  const porMesMap = new Map();
+  const asegurarMes = (mes) => {
+    const key = mes || "Sin fecha";
+    if (!porMesMap.has(key)) {
+      porMesMap.set(key, { mes: key, ordenes: 0, pagosProveedor: 0, cajaChica: 0, total: 0 });
+    }
+    return porMesMap.get(key);
+  };
+
+  ordenesMes.forEach(row => {
+    const item = asegurarMes(row.mes);
+    item.ordenes += Number(row.total || 0);
+    item.total += Number(row.total || 0);
+  });
+  pagosMes.forEach(row => {
+    const item = asegurarMes(row.mes);
+    item.pagosProveedor += Number(row.total || 0);
+    item.total += Number(row.total || 0);
+  });
+  cajaMes.forEach(row => {
+    const item = asegurarMes(row.mes);
+    item.cajaChica += Number(row.total || 0);
+    item.total += Number(row.total || 0);
+  });
+
+  const totalOrdenes = Number(ordenesResumen?.total || 0);
+  const totalPagosProveedor = Number(pagosResumen?.total || 0);
+  const totalCajaChica = Number(cajaResumen?.total || 0);
+  const porTipo = [
+    { tipo: "Ordenes de compra", total: totalOrdenes, registros: Number(ordenesResumen?.registros || 0), color: "#0f3b82" },
+    { tipo: "Pago de proveedor", total: totalPagosProveedor, registros: Number(pagosResumen?.registros || 0), color: "#0ea5e9" },
+    { tipo: "Caja chica", total: totalCajaChica, registros: Number(cajaResumen?.registros || 0), color: "#f59e0b" }
+  ];
+
+  return {
+    resumen: {
+      totalOrdenes,
+      totalPagosProveedor,
+      totalCajaChica,
+      totalGeneral: totalOrdenes + totalPagosProveedor + totalCajaChica,
+      registros: porTipo.reduce((sum, item) => sum + item.registros, 0)
+    },
+    porTipo,
+    porMes: Array.from(porMesMap.values()).sort((a, b) => a.mes.localeCompare(b.mes, "es"))
+  };
 }
 
 async function obtenerFacturasCompras(filtros = {}) {
@@ -1611,6 +2026,143 @@ router.post("/facturas/agregar", requireAuth, allowRoles(...ROLES_RECEPCION_FACT
   }
 });
 
+router.post("/facturas/pagos-proveedor/importar", requireAuth, allowRoles(...ROLES_GESTION_FACTURAS), async (req, res) => {
+  const connection = await pool.getConnection();
+  try {
+    await ensurePagosProveedorTable();
+
+    const buffer = parsePagoProveedorDataUrl(req.body.archivo_pago_data);
+    const archivoNombre = String(req.body.archivo_pago_nombre || "plantilla_pagos.xlsx").trim().slice(0, 255);
+    const pagos = await leerPagosProveedorExcel(buffer);
+
+    if (!pagos.length) {
+      req.session.error = "No se encontraron pagos válidos en el archivo.";
+      return res.redirect("/compras/facturas/pagos-proveedor");
+    }
+
+    await connection.beginTransaction();
+
+    let insertados = 0;
+    let duplicados = 0;
+
+    for (const pago of pagos) {
+      if (await existePagoProveedor(connection, pago)) {
+        duplicados += 1;
+        continue;
+      }
+
+      await connection.query(
+        `INSERT INTO pagos_proveedor
+         (empresa, fecha_solicitud, proveedor_nombre, cuenta_iban, concepto, numero_factura, placa, monto,
+          partida_presupuestaria, fecha_pago, archivo_nombre, creado_por)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          pago.empresa,
+          pago.fecha_solicitud,
+          pago.proveedor_nombre,
+          pago.cuenta_iban,
+          pago.concepto,
+          pago.numero_factura,
+          pago.placa,
+          pago.monto,
+          pago.partida_presupuestaria,
+          pago.fecha_pago,
+          archivoNombre,
+          req.session.user.id || null
+        ]
+      );
+      insertados += 1;
+    }
+
+    await connection.commit();
+    req.session.success = `Pagos de proveedor importados: ${insertados}. Duplicados omitidos: ${duplicados}.`;
+    res.redirect("/compras/facturas/pagos-proveedor");
+  } catch (error) {
+    try {
+      await connection.rollback();
+    } catch (_) {}
+    console.error("Error importando pagos de proveedor:", error);
+    req.session.error = error.message || "Error al importar pagos de proveedor.";
+    res.redirect("/compras/facturas/pagos-proveedor");
+  } finally {
+    connection.release();
+  }
+});
+
+router.get("/facturas/pagos-proveedor", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER", "CONTABILIDAD"), async (req, res) => {
+  try {
+    await ensurePagosProveedorTable();
+    const pagosProveedor = await obtenerResumenPagosProveedor();
+    const success = req.session.success;
+    const error = req.session.error;
+    delete req.session.success;
+    delete req.session.error;
+
+    res.render("compras/pagos_proveedor", {
+      user: req.session.user,
+      pagosProveedor,
+      success,
+      error
+    });
+  } catch (error) {
+    console.error("Error cargando pagos de proveedor:", error);
+    res.status(500).send("Error cargando pagos de proveedor");
+  }
+});
+
+router.get("/facturas/caja-chica", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER", "CONTABILIDAD"), async (req, res) => {
+  try {
+    const cajaChica = await obtenerResumenCajaChica();
+    const success = req.session.success;
+    const error = req.session.error;
+    delete req.session.success;
+    delete req.session.error;
+
+    res.render("compras/caja_chica", {
+      user: req.session.user,
+      cajaChica,
+      success,
+      error,
+      hoy: new Date().toISOString().slice(0, 10)
+    });
+  } catch (error) {
+    console.error("Error cargando caja chica:", error);
+    res.status(500).send("Error cargando caja chica");
+  }
+});
+
+router.post("/facturas/caja-chica", requireAuth, allowRoles(...ROLES_GESTION_FACTURAS), async (req, res) => {
+  try {
+    await ensureCajaChicaTable();
+    const fecha = String(req.body.fecha || "").trim();
+    const monto = parseMontoCotizacion(req.body.monto);
+    const observacion = String(req.body.observacion || "").trim();
+
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha)) {
+      req.session.error = "Debe indicar una fecha válida.";
+      return res.redirect("/compras/facturas/caja-chica");
+    }
+
+    if (!monto || monto <= 0) {
+      req.session.error = "Debe indicar un monto mayor a cero.";
+      return res.redirect("/compras/facturas/caja-chica");
+    }
+
+    await queryWithRetry(
+      `INSERT INTO caja_chica_reintegros (fecha, monto, observacion, creado_por)
+       VALUES (?, ?, ?, ?)`,
+      [fecha, monto, observacion || null, req.session.user.id || null]
+    );
+
+    req.session.success = `Reintegro de caja chica registrado por ₡${monto.toLocaleString("es-CR", { maximumFractionDigits: 0 })}.`;
+    res.redirect("/compras/facturas/caja-chica");
+  } catch (error) {
+    console.error("Error guardando caja chica:", error);
+    req.session.error = "No se pudo guardar el reintegro de caja chica.";
+    res.redirect("/compras/facturas/caja-chica");
+  }
+});
+
 // ===================== LISTADO DE FACTURAS (unificado) =====================
 router.get("/facturas", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER", "CONTABILIDAD"), async (req, res) => {
   try {
@@ -1657,6 +2209,7 @@ router.get("/facturas/dashboard", requireAuth, allowRoles("ADMIN", "TALLER", "PR
     const orden = req.query.orden === "asc" ? "asc" : "desc";
     const filtros = { proveedor_id, fecha_desde, fecha_hasta, pagada, vencida, orden };
     const facturas = await obtenerFacturasCompras(filtros);
+    const financiero = await obtenerDashboardFinancieroFacturas(filtros);
     const filtrosDeuda = { pagada: "0", orden: "asc" };
     const facturasPendientesTodas = (await obtenerFacturasCompras(filtrosDeuda))
       .filter(factura => parseMonto(factura.saldo) > 0 && !factura.cubierta_por_nc);
@@ -1795,7 +2348,8 @@ router.get("/facturas/dashboard", requireAuth, allowRoles("ADMIN", "TALLER", "PR
       porEstado,
       facturasRecientes,
       deudaPorProveedor,
-      resumenDeuda
+      resumenDeuda,
+      financiero
     });
   } catch (error) {
     console.error("Error en dashboard de facturas:", error);

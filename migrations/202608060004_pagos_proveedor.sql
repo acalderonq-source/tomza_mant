@@ -1,0 +1,20 @@
+CREATE TABLE IF NOT EXISTS pagos_proveedor (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  empresa VARCHAR(80) NOT NULL,
+  fecha_solicitud DATE NULL,
+  proveedor_nombre VARCHAR(180) NOT NULL,
+  cuenta_iban VARCHAR(60) NULL,
+  concepto TEXT NULL,
+  numero_factura VARCHAR(100) NULL,
+  placa VARCHAR(50) NULL,
+  monto DECIMAL(14,2) NOT NULL DEFAULT 0,
+  partida_presupuestaria VARCHAR(150) NULL,
+  fecha_pago DATE NULL,
+  archivo_nombre VARCHAR(255) NULL,
+  creado_por INT NULL,
+  creado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_pagos_proveedor_empresa (empresa),
+  INDEX idx_pagos_proveedor_fecha (fecha_solicitud),
+  INDEX idx_pagos_proveedor_proveedor (proveedor_nombre),
+  INDEX idx_pagos_proveedor_placa (placa)
+);
