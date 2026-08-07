@@ -36,6 +36,7 @@
     .status-stopped { background: #fee2e2; color: #991b1b; }
     .status-ok { background: #dbeafe; color: #1d4ed8; }
     .reason-box { min-width: 260px; }
+    .sede-form { min-width: 230px; }
     .empty-state { color: #64748b; font-weight: 700; padding: 1.5rem; text-align: center; }
     @media (max-width: 1180px) { .kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
     @media (max-width: 680px) { .kpi-grid { grid-template-columns: 1fr; } }
@@ -44,6 +45,7 @@
 <body>
 <%
   const sedes = sedesFormulario || [];
+  const sedesCambio = Array.isArray(sedesEditables) ? sedesEditables : sedes;
   const mostrarSede = typeof etiquetaSede === 'function' ? etiquetaSede : (sede) => sede;
 %>
 
@@ -191,7 +193,26 @@
           <% unidades.forEach(u => { %>
             <tr>
               <td><strong><%= u.placa %></strong></td>
-              <td><%= mostrarSede(u.sede) %></td>
+              <td>
+                <% if (puedeEditar) { %>
+                  <form method="POST" action="/unidades/<%= u.id %>/sede" class="d-flex gap-2 sede-form">
+                    <input type="hidden" name="estado" value="<%= filtros.estado || '' %>">
+                    <input type="hidden" name="varado" value="<%= filtros.varado || '' %>">
+                    <input type="hidden" name="placa" value="<%= filtros.placa || '' %>">
+                    <select name="sede" class="form-select form-select-sm" aria-label="Sede de <%= u.placa %>">
+                      <% if (u.sede && !sedesCambio.includes(u.sede)) { %>
+                        <option value="<%= u.sede %>" selected><%= mostrarSede(u.sede) %></option>
+                      <% } %>
+                      <% sedesCambio.forEach(sede => { %>
+                        <option value="<%= sede %>" <%= u.sede === sede ? 'selected' : '' %>><%= mostrarSede(sede) %></option>
+                      <% }) %>
+                    </select>
+                    <button class="btn btn-sm btn-outline-primary">Guardar</button>
+                  </form>
+                <% } else { %>
+                  <%= mostrarSede(u.sede) %>
+                <% } %>
+              </td>
               <td>
                 <% if (Number(u.activa) === 1) { %>
                   <span class="status-pill status-active">Activa</span>

@@ -46,6 +46,25 @@ async function ensureUnidadEstadoColumns() {
       await pool.query(`ALTER TABLE unidades ADD COLUMN ${column} ${definition}`);
     }
   }
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS unidades_sede_historial (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      unidad_id INT NOT NULL,
+      placa VARCHAR(80) NOT NULL,
+      sede_anterior VARCHAR(100) NULL,
+      sede_nueva VARCHAR(100) NOT NULL,
+      usuario_id INT NULL,
+      usuario_nombre VARCHAR(120) NULL,
+      creado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      INDEX idx_unidad_fecha (unidad_id, creado_en),
+      INDEX idx_placa_fecha (placa, creado_en),
+      INDEX idx_sede_nueva (sede_nueva),
+      CONSTRAINT fk_unidades_sede_historial_unidad
+        FOREIGN KEY (unidad_id) REFERENCES unidades(id)
+        ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  `);
 }
 
 async function obtenerSedesPermitidas(req) {
@@ -89,6 +108,23 @@ async function obtenerSedesPermitidas(req) {
   }
 
   return todasLasSedes;
+}
+
+async function obtenerSedesEditables(req) {
+  if (esUsuarioTodasSedes(req.session.user)) {
+    return obtenerTodasSedes(pool);
+  }
+
+  return obtenerSedesPermitidas(req);
+}
+
+function redirectUnidades(req, res) {
+  const params = new URLSearchParams();
+  ["estado", "varado", "placa"].forEach(key => {
+    const value = String(req.body[key] || req.query[key] || "").trim();
+    if (value) params.set(key, value);
+  });
+  res.redirect(`/unidades${params.toString() ? `?${params.toString()}` : ""}`);
 }
 
 function puedeVerUnidad(unidad, sedesPermitidas) {
@@ -167,6 +203,7 @@ router.get("/", async (req, res) => {
 
     const [unidades] = await pool.query(sql, params);
     const sedesFormulario = await obtenerTodasSedes(pool);
+    const sedesEditables = await obtenerSedesEditables(req);
 
     let resumenSql = `
       SELECT
@@ -191,6 +228,7 @@ router.get("/", async (req, res) => {
       user,
       sedeSeleccionada: req.session.sedeSeleccionada || "TODAS",
       sedesFormulario,
+      sedesEditables,
       etiquetaSede,
       puedeEditar: puedeEditarUnidades(user),
       success: req.query.success || "",
@@ -324,6 +362,70 @@ router.post("/:id/estado", async (req, res) => {
     res.redirect("/unidades");
   } catch (error) {
     console.error("ERROR actualizando estado unidad:", error);
+    res.status(500).send("Error interno");
+  }
+});
+
+// ===================== CAMBIAR SEDE =====================
+router.post("/:id/sede", async (req, res) => {
+  try {
+    await ensureUnidadEstadoColumns();
+
+    if (!puedeEditarUnidades(req.session.user)) {
+      return res.status(403).send("No autorizado");
+    }
+
+    const id = parseInt(req.params.id, 10);
+    if (Number.isNaN(id)) {
+      return res.status(400).send("ID de unidad invalido");
+    }
+
+    const resultado = await obtenerUnidadAutorizada(req, id);
+    if (resultado.error) {
+      return res.status(resultado.error).send(resultado.mensaje);
+    }
+
+    const sedeNueva = String(req.body.sede || "").trim();
+    const sedesEditables = await obtenerSedesEditables(req);
+
+    if (!sedeNueva || !sedesEditables.includes(sedeNueva)) {
+      return res.redirect(
+        `/unidades?error=${encodeURIComponent("Seleccione una sede permitida.")}`
+      );
+    }
+
+    const unidad = resultado.unidad;
+
+    if (String(unidad.sede || "") === sedeNueva) {
+      return redirectUnidades(req, res);
+    }
+
+    await pool.query(
+      `UPDATE unidades
+       SET sede = ?
+       WHERE id = ?`,
+      [sedeNueva, id]
+    );
+
+    await pool.query(
+      `INSERT INTO unidades_sede_historial
+       (unidad_id, placa, sede_anterior, sede_nueva, usuario_id, usuario_nombre)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [
+        id,
+        unidad.placa,
+        unidad.sede || null,
+        sedeNueva,
+        req.session.user.id || null,
+        req.session.user.usuario || req.session.user.nombre || req.session.user.rol || null
+      ]
+    );
+
+    return res.redirect(
+      `/unidades?success=${encodeURIComponent(`Sede actualizada para ${unidad.placa}.`)}&placa=${encodeURIComponent(unidad.placa)}&estado=todas`
+    );
+  } catch (error) {
+    console.error("ERROR actualizando sede unidad:", error);
     res.status(500).send("Error interno");
   }
 });
