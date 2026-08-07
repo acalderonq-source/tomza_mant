@@ -275,6 +275,11 @@
   const estadoClase = estado => String(estado || '').toLowerCase();
   const fechaSemanaNueva = (typeof fechaProximaSemana !== 'undefined' && fechaProximaSemana) || filtros.fecha || fechaHoy;
   const textoSeguroData = value => String(value || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const pedidoPdfParams = new URLSearchParams();
+  ['fecha', 'sede', 'placa', 'estado'].forEach(key => {
+    if (filtros[key]) pedidoPdfParams.set(key, filtros[key]);
+  });
+  const pedidoPdfUrl = `/repuestos-semanales/pedido-cedis.pdf${pedidoPdfParams.toString() ? `?${pedidoPdfParams.toString()}` : ''}`;
 %>
 
 <nav class="navbar navbar-dark topbar px-3 py-2">
@@ -294,11 +299,16 @@
         <h1 class="page-title">Repuestos semanales</h1>
         <div class="opacity-75">Formato semanal por sede. Lo marcado en rojo representa lo que va llegando.</div>
       </div>
-      <% if (puedeGestionar) { %>
-        <button type="button" class="btn btn-warning btn-sm rounded-pill fw-bold px-3" data-bs-toggle="modal" data-bs-target="#nuevoSemanalModal">
-          <i class="bi bi-plus-circle"></i> Agregar próxima semana
-        </button>
-      <% } %>
+      <div class="d-flex gap-2 flex-wrap">
+        <a href="<%= pedidoPdfUrl %>" class="btn btn-light btn-sm rounded-pill fw-bold px-3">
+          <i class="bi bi-file-earmark-pdf"></i> Descargar pedido
+        </a>
+        <% if (puedeGestionar) { %>
+          <button type="button" class="btn btn-warning btn-sm rounded-pill fw-bold px-3" data-bs-toggle="modal" data-bs-target="#nuevoSemanalModal">
+            <i class="bi bi-plus-circle"></i> Agregar próxima semana
+          </button>
+        <% } %>
+      </div>
     </div>
   </section>
 

@@ -14,6 +14,7 @@ const {
   normalizarEstadoSemanal
 } = require("../utils/repuestosSemanales");
 const { normalizarPlaca: normalizarPlacaSistema, agregarFiltroPlacaSql } = require("../utils/placas");
+const { generarPdfPedidoCedis } = require("../utils/pdfPedidoCedis");
 
 const ROLES_PROVEEDURIA = ["PROVEEDURIA_TALLER", "PROVEEDURIA"];
 const ROLES_VER = ["ADMIN", "TALLER", "MECANICO", "SUPERVISOR_PESADO", ...ROLES_PROVEEDURIA];
@@ -138,6 +139,85 @@ async function resolverSedePorPlaca(req, placa, sedeFallback = "") {
   return { placa: placaLimpia, sede, sedes };
 }
 
+async function obtenerSolicitudesFiltradas(req) {
+  const sedes = await sedesDisponibles(req);
+  const fechaFiltro = String(req.query.fecha || proximaSemanaCostaRica()).trim();
+  const sedeFiltro = String(req.query.sede || "").trim();
+  const placaFiltro = limpiarPlacaLibre(req.query.placa);
+  const estadoFiltro = normalizarEstadoSemanal(req.query.estado);
+  const estadoRaw = String(req.query.estado || "").trim().toUpperCase();
+
+  const condiciones = ["1=1"];
+  const params = [];
+
+  if (fechaFiltro) {
+    condiciones.push("rs.fecha = ?");
+    params.push(fechaFiltro);
+  }
+
+  if (sedeFiltro && sedes.includes(sedeFiltro)) {
+    condiciones.push("rs.sede = ?");
+    params.push(sedeFiltro);
+  } else if (sedes.length) {
+    condiciones.push("rs.sede IN (?)");
+    params.push(sedes);
+  }
+
+  if (estadoRaw && ESTADOS_REPUESTOS_SEMANALES.includes(estadoFiltro)) {
+    condiciones.push("rs.estado = ?");
+    params.push(estadoFiltro);
+  }
+
+  if (placaFiltro) {
+    const placaConditions = [];
+    agregarFiltroPlacaSql(placaConditions, params, "rs.placa", placaFiltro);
+    if (placaConditions.length) {
+      condiciones.push(`(${placaConditions[0]} OR UPPER(rs.placa) LIKE ?)`);
+      params.push(`%${placaFiltro}%`);
+    } else {
+      condiciones.push("UPPER(rs.placa) LIKE ?");
+      params.push(`%${placaFiltro}%`);
+    }
+  }
+
+  const [solicitudes] = await pool.query(
+    `SELECT
+       rs.*,
+       DATE_FORMAT(rs.fecha, '%d/%m/%Y') AS fecha_formato,
+       DATE_FORMAT(rs.fecha, '%Y-%m-%d') AS fecha_iso,
+       u.usuario AS creado_por_usuario
+     FROM repuestos_semanales rs
+     LEFT JOIN usuarios u ON u.id = rs.creado_por
+     WHERE ${condiciones.join(" AND ")}
+     ORDER BY rs.fecha DESC, rs.sede ASC, rs.placa ASC, rs.id ASC`,
+    params
+  );
+
+  return {
+    sedes,
+    solicitudes,
+    filtros: { fecha: fechaFiltro, sede: sedeFiltro, placa: placaFiltro, estado: estadoRaw }
+  };
+}
+
+function agruparParaPedido(solicitudes) {
+  const grupos = new Map();
+
+  solicitudes.forEach(item => {
+    const key = `${item.fecha_iso || item.fecha}|${item.sede}`;
+    if (!grupos.has(key)) {
+      grupos.set(key, {
+        fecha: item.fecha_iso || item.fecha,
+        sede: item.sede,
+        items: []
+      });
+    }
+    grupos.get(key).items.push(item);
+  });
+
+  return [...grupos.values()];
+}
+
 router.use(requireAuth);
 router.use(requireVer);
 
@@ -145,57 +225,7 @@ router.get("/", async (req, res) => {
   try {
     await ensureRepuestosSemanalesTable(pool);
 
-    const sedes = await sedesDisponibles(req);
-    const fechaFiltro = String(req.query.fecha || proximaSemanaCostaRica()).trim();
-    const sedeFiltro = String(req.query.sede || "").trim();
-    const placaFiltro = limpiarPlacaLibre(req.query.placa);
-    const estadoFiltro = normalizarEstadoSemanal(req.query.estado);
-    const estadoRaw = String(req.query.estado || "").trim().toUpperCase();
-
-    const condiciones = ["1=1"];
-    const params = [];
-
-    if (fechaFiltro) {
-      condiciones.push("rs.fecha = ?");
-      params.push(fechaFiltro);
-    }
-
-    if (sedeFiltro && sedes.includes(sedeFiltro)) {
-      condiciones.push("rs.sede = ?");
-      params.push(sedeFiltro);
-    } else if (sedes.length) {
-      condiciones.push("rs.sede IN (?)");
-      params.push(sedes);
-    }
-
-    if (estadoRaw && ESTADOS_REPUESTOS_SEMANALES.includes(estadoFiltro)) {
-      condiciones.push("rs.estado = ?");
-      params.push(estadoFiltro);
-    }
-
-    if (placaFiltro) {
-      const placaConditions = [];
-      agregarFiltroPlacaSql(placaConditions, params, "rs.placa", placaFiltro);
-      if (placaConditions.length) {
-        condiciones.push(`(${placaConditions[0]} OR UPPER(rs.placa) LIKE ?)`);
-        params.push(`%${placaFiltro}%`);
-      } else {
-        condiciones.push("UPPER(rs.placa) LIKE ?");
-        params.push(`%${placaFiltro}%`);
-      }
-    }
-
-    const [solicitudes] = await pool.query(
-      `SELECT
-         rs.*,
-         DATE_FORMAT(rs.fecha, '%d/%m/%Y') AS fecha_formato,
-         u.usuario AS creado_por_usuario
-       FROM repuestos_semanales rs
-       LEFT JOIN usuarios u ON u.id = rs.creado_por
-       WHERE ${condiciones.join(" AND ")}
-       ORDER BY rs.fecha DESC, rs.sede ASC, rs.placa ASC, rs.id ASC`,
-      params
-    );
+    const { sedes, solicitudes, filtros } = await obtenerSolicitudesFiltradas(req);
 
     const [unidades] = await pool.query(
       `SELECT id, placa, sede
@@ -224,7 +254,7 @@ router.get("/", async (req, res) => {
       solicitudes,
       sedes,
       unidades,
-      filtros: { fecha: fechaFiltro, sede: sedeFiltro, placa: placaFiltro, estado: estadoRaw },
+      filtros,
       estados: ESTADOS_REPUESTOS_SEMANALES,
       resumen,
       fechaHoy: fechaCostaRica(),
@@ -238,6 +268,33 @@ router.get("/", async (req, res) => {
   } catch (error) {
     console.error("Error cargando repuestos semanales:", error);
     res.status(500).send("Error cargando repuestos semanales");
+  }
+});
+
+router.get("/pedido-cedis.pdf", async (req, res) => {
+  try {
+    await ensureRepuestosSemanalesTable(pool);
+
+    const { solicitudes, filtros } = await obtenerSolicitudesFiltradas(req);
+    const grupos = agruparParaPedido(solicitudes);
+
+    if (!grupos.length) {
+      return res.status(404).send("No hay datos para generar el pedido.");
+    }
+
+    const pdfBuffer = await generarPdfPedidoCedis(grupos);
+    const sedeNombre = filtros.sede ? filtros.sede.replace(/\s+/g, "_") : "todas";
+    const fechaNombre = filtros.fecha || fechaCostaRica();
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename=\"pedido_cedis_${sedeNombre}_${fechaNombre}.pdf\"`
+    );
+    res.send(pdfBuffer);
+  } catch (error) {
+    console.error("Error generando pedido CEDIS:", error);
+    res.status(500).send("Error generando pedido CEDIS");
   }
 });
 
