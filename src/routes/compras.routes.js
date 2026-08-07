@@ -3178,6 +3178,61 @@ router.post("/facturas/:id/pagar", requireAuth, allowRoles("ADMIN", "TALLER", "P
   }
 });
 
+router.get("/facturas/recibo-preview", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER", "CONTABILIDAD"), async (req, res) => {
+  try {
+    const fechaPago = new Date().toISOString().slice(0, 10);
+    const facturas = [
+      {
+        po_numero: "2026-1200",
+        proveedor_nombre: "MAXI REPUESTOS SRL",
+        factura: "F-001258",
+        fecha_vencimiento_factura: "2026-08-30",
+        nota_credito_monto: 0,
+        abono_monto: 0,
+        total: 125000,
+        observacion: "Pago completo de repuestos para unidad C164415."
+      },
+      {
+        po_numero: "2026-1201",
+        proveedor_nombre: "Q.C. CASA DEL CAMION S.A.",
+        factura: "FAC-8841",
+        fecha_vencimiento_factura: "2026-09-05",
+        nota_credito_monto: 7500,
+        abono_monto: 15000,
+        total: 98500,
+        observacion: "Aplica nota de credito y abono previo registrado."
+      },
+      {
+        po_numero: "-",
+        proveedor_nombre: "SERVIREPUESTOS NAVARRO",
+        factura: "A-00452",
+        fecha_vencimiento_factura: "2026-08-22",
+        nota_credito_monto: 0,
+        abono_monto: 0,
+        total: 46250,
+        observacion: "Factura independiente recibida en proveeduria."
+      }
+    ];
+    const totalPagado = facturas.reduce((sum, f) => sum + Number(f.total || 0), 0);
+    const logoPath = path.join(__dirname, "../../public/img/logo_tomza.jpg");
+    const logoDataUri = fs.existsSync(logoPath)
+      ? `data:image/jpeg;base64,${fs.readFileSync(logoPath).toString("base64")}`
+      : "";
+
+    res.render("compras/recibo_pago", {
+      facturas,
+      fechaPago,
+      totalPagado,
+      logoDataUri,
+      reciboNumero: `RP-VISTA-${fechaPago.replace(/-/g, "")}`,
+      generadoPor: req.session.user?.usuario || "Sistema"
+    });
+  } catch (error) {
+    console.error("Error generando vista previa del recibo:", error);
+    res.status(500).send("Error generando vista previa del recibo");
+  }
+});
+
 router.post("/facturas/pagar-multiple", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER"), async (req, res) => {
   try {
     await ensureNotaCreditoColumns();
@@ -3295,12 +3350,31 @@ router.post("/facturas/pagar-multiple", requireAuth, allowRoles("ADMIN", "TALLER
     }
 
     const totalPagado = facturas.reduce((sum, f) => sum + parseFloat(f.total), 0);
+    const logoPath = path.join(__dirname, "../../public/img/logo_tomza.jpg");
+    const logoDataUri = fs.existsSync(logoPath)
+      ? `data:image/jpeg;base64,${fs.readFileSync(logoPath).toString("base64")}`
+      : "";
+    const reciboNumero = `RP-${fechaPago.replace(/-/g, "")}-${String(Date.now()).slice(-6)}`;
     const ejs = require('ejs');
-    const path = require('path');
     const pdf = require('html-pdf');
     const templatePath = path.join(__dirname, '../views/compras/recibo_pago.ejs');
-    const html = await ejs.renderFile(templatePath, { facturas, fechaPago, totalPagado });
-    pdf.create(html, { format: 'Letter' }).toBuffer((err, buffer) => {
+    const html = await ejs.renderFile(templatePath, {
+      facturas,
+      fechaPago,
+      totalPagado,
+      logoDataUri,
+      reciboNumero,
+      generadoPor: req.session.user?.usuario || "Sistema"
+    });
+    pdf.create(html, {
+      format: 'Letter',
+      border: {
+        top: "10mm",
+        right: "10mm",
+        bottom: "10mm",
+        left: "10mm"
+      }
+    }).toBuffer((err, buffer) => {
       if (err) {
         console.error("Error generando PDF:", err);
         return res.status(500).send("Error al generar el recibo");

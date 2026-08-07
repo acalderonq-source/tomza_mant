@@ -3,7 +3,9 @@ require("./cronJobs");
 const express = require("express");
 const path = require("path");
 const session = require("express-session");
+const MySQLStore = require("express-mysql-session")(session);
 const cron = require("node-cron");
+const pool = require("./db");
 const enviarAlertasDekra = require("./utils/dekraMail");
 const { enviarRecordatoriosMantenimientos, ensurePushTables } = require("./utils/notificacionesPush");
 const { ensureCsrfToken, injectSecurityAssets } = require("./middleware/security");
@@ -12,6 +14,7 @@ const { ensureCsrfToken, injectSecurityAssets } = require("./middleware/security
 const app = express();
 const isProduction = process.env.NODE_ENV === "production";
 const sessionSecret = process.env.SESSION_SECRET || "tomza_dev_secret_change_me";
+const sessionMaxAge = Number(process.env.SESSION_MAX_AGE_MS || 1000 * 60 * 60 * 24 * 7);
 
 if (isProduction && !process.env.SESSION_SECRET) {
   console.warn("SESSION_SECRET no esta configurado. Configure esta variable en produccion.");
@@ -50,7 +53,39 @@ app.get("/.well-known/assetlinks.json", (req, res) => {
 });
 
 // ===================== SESSION =====================
+const sessionStore = new MySQLStore({
+  clearExpired: false,
+  checkExpirationInterval: 1000 * 60 * 15,
+  expiration: sessionMaxAge,
+  createDatabaseTable: true,
+  endConnectionOnClose: false,
+  schema: {
+    tableName: "sessions",
+    columnNames: {
+      session_id: "session_id",
+      expires: "expires",
+      data: "data"
+    }
+  }
+}, pool);
+
+sessionStore.onReady().catch(error => {
+  console.warn("No se pudo preparar el store de sesiones:", error.code || error.message);
+});
+
+const limpiarSesionesInterval = setInterval(() => {
+  sessionStore.clearExpiredSessions().catch(error => {
+    console.warn("No se pudieron limpiar sesiones vencidas:", error.code || error.message);
+  });
+}, 1000 * 60 * 30);
+
+if (typeof limpiarSesionesInterval.unref === "function") {
+  limpiarSesionesInterval.unref();
+}
+
 app.use(session({
+  store: sessionStore,
+  name: "tomza.sid",
   secret: sessionSecret,
   resave: false,
   saveUninitialized: false,
@@ -58,7 +93,7 @@ app.use(session({
     secure: isProduction,
     httpOnly: true,
     sameSite: "lax",
-    maxAge: 1000 * 60 * 60 * 12
+    maxAge: sessionMaxAge
   }
 }));
 
@@ -143,6 +178,7 @@ const tallerRoutes = require("./routes/taller.routes");
 const oficinaRoutes = require("./routes/oficina.routes");
 const ordenesMotorRoutes = require("./routes/ordenesMotor.routes");
 const repuestosRoutes = require("./routes/repuestos.routes");
+const repuestosSemanalesRoutes = require("./routes/repuestosSemanales.routes");
 const apiRoutes = require("./routes/api.routes");
 
 // ===================== USAR RUTAS =====================
@@ -169,6 +205,7 @@ app.use("/taller", tallerRoutes);
 app.use("/oficina-dia-dia", oficinaRoutes);
 app.use("/ordenes-motor", ordenesMotorRoutes);
 app.use("/repuestos", repuestosRoutes);
+app.use("/repuestos-semanales", repuestosSemanalesRoutes);
 app.use("/api", apiRoutes);
 
 // ===================== CRON JOBS =====================

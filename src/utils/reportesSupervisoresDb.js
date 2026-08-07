@@ -38,6 +38,7 @@ async function ensureReportesSupervisoresTables(pool) {
         importante TINYINT(1) NOT NULL DEFAULT 0,
         estado ENUM('PENDIENTE','EN_REVISION','HISTORIAL','DESCARTADO') NOT NULL DEFAULT 'PENDIENTE',
         fecha_reporte DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        semana_reporte DATE NULL,
         actualizado_en DATETIME NULL,
         cerrado_por INT NULL,
         fecha_cierre DATETIME NULL,
@@ -79,7 +80,8 @@ async function ensureReportesSupervisoresTables(pool) {
     ["correctivo_id", "INT NULL"],
     ["cierre_motivo", "TEXT NULL"],
     ["cierre_confianza", "DECIMAL(5,2) NULL"],
-    ["actualizado_en", "DATETIME NULL"]
+    ["actualizado_en", "DATETIME NULL"],
+    ["semana_reporte", "DATE NULL"]
   ];
 
   for (const [column, definition] of columns) {
@@ -108,7 +110,7 @@ async function registrarSugerenciasParaCorrectivo(pool, correctivoId) {
      JOIN unidades u ON u.id = rs.unidad_id
      WHERE rs.unidad_id = ?
        AND rs.estado IN ('PENDIENTE','EN_REVISION')
-       AND rs.fecha_reporte <= ?
+       AND COALESCE(rs.semana_reporte, DATE(rs.fecha_reporte)) <= DATE(?)
      ORDER BY rs.fecha_reporte ASC`,
     [correctivo.unidad_id, correctivo.fecha]
   );

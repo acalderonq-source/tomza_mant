@@ -71,6 +71,62 @@ function nombreHojaSeguro(value, fallback = "Reportes") {
   return (nombre || fallback).slice(0, 31);
 }
 
+function fechaISO(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function inicioSemanaLunes(date = new Date()) {
+  const d = new Date(date);
+  d.setHours(12, 0, 0, 0);
+  const dia = d.getDay() || 7;
+  d.setDate(d.getDate() - dia + 1);
+  return d;
+}
+
+function semanaInputValue(date = new Date()) {
+  const d = inicioSemanaLunes(date);
+  const jueves = new Date(d);
+  jueves.setDate(d.getDate() + 3);
+  const primerJueves = new Date(jueves.getFullYear(), 0, 4, 12, 0, 0, 0);
+  const primerLunes = inicioSemanaLunes(primerJueves);
+  const semana = Math.floor((jueves - primerLunes) / 604800000) + 1;
+  return `${jueves.getFullYear()}-W${String(semana).padStart(2, "0")}`;
+}
+
+function lunesDesdeSemanaInput(value) {
+  const raw = String(value || "").trim();
+  const match = raw.match(/^(\d{4})-W(\d{2})$/);
+  if (!match) return "";
+
+  const year = Number(match[1]);
+  const week = Number(match[2]);
+  if (!year || week < 1 || week > 53) return "";
+
+  const enero4 = new Date(year, 0, 4, 12, 0, 0, 0);
+  const lunesSemana1 = inicioSemanaLunes(enero4);
+  lunesSemana1.setDate(lunesSemana1.getDate() + ((week - 1) * 7));
+  return fechaISO(lunesSemana1);
+}
+
+function semanaInputDesdeFecha(value) {
+  if (!value) return "";
+  const fecha = new Date(`${String(value).slice(0, 10)}T12:00:00`);
+  if (Number.isNaN(fecha.getTime())) return "";
+  return semanaInputValue(fecha);
+}
+
+function semanaDefaultReporte() {
+  const hoy = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Costa_Rica" }));
+  const base = new Date(hoy);
+  if (hoy.getDay() === 5) {
+    base.setDate(base.getDate() + 7);
+  }
+  return semanaInputValue(base);
+}
+
 function agruparPorSede(reportes) {
   return Array.from(reportes.reduce((map, reporte) => {
     const sedeReporte = reporte.sede || "Sin sede";
@@ -210,7 +266,7 @@ function tieneRojoReporte(value) {
 
 async function consultarReportesPendientes(req, filtros = {}) {
   const sedesPermitidas = await obtenerSedesPermitidas(req);
-  const { sede, placa, importante } = filtros;
+  const { sede, placa, importante, semana_reporte } = filtros;
   const params = [];
   let sql = `
     SELECT
@@ -238,8 +294,12 @@ async function consultarReportesPendientes(req, filtros = {}) {
   if (importante === "1") {
     sql += " AND rs.importante = 1";
   }
+  if (semana_reporte) {
+    sql += " AND COALESCE(rs.semana_reporte, DATE(rs.fecha_reporte)) = ?";
+    params.push(semana_reporte);
+  }
 
-  sql += " ORDER BY rs.importante DESC, rs.sede ASC, u.placa ASC, rs.fecha_reporte DESC";
+  sql += " ORDER BY COALESCE(rs.semana_reporte, DATE(rs.fecha_reporte)) DESC, rs.importante DESC, rs.sede ASC, u.placa ASC, rs.fecha_reporte DESC";
   const [reportes] = await pool.query(sql, params);
   return { reportes, sedesPermitidas };
 }
@@ -386,7 +446,9 @@ router.get("/", allowRoles(...ROLES_VER), async (req, res) => {
     await ensureReportesSupervisoresTables(pool);
     const sedesPermitidas = await obtenerSedesPermitidas(req);
     const { sede, placa, importante, correctivo_id } = req.query;
-    const { reportes } = await consultarReportesPendientes(req, { sede, placa, importante });
+    const semana = String(req.query.semana || "").trim();
+    const semanaReporteFecha = lunesDesdeSemanaInput(semana);
+    const { reportes } = await consultarReportesPendientes(req, { sede, placa, importante, semana_reporte: semanaReporteFecha });
     const unidades = await cargarUnidades(req);
     const sugerencias = await obtenerSugerenciasPendientes(sedesPermitidas, correctivo_id || null);
     const success = req.session.success;
@@ -399,7 +461,8 @@ router.get("/", allowRoles(...ROLES_VER), async (req, res) => {
       unidades,
       sugerencias,
       user: req.session.user,
-      filtros: { sede, placa, importante, correctivo_id },
+      filtros: { sede, placa, importante, correctivo_id, semana },
+      semanaDefault: semanaDefaultReporte(),
       puedeCrear: ROLES_CREAR.includes(req.session.user.rol),
       puedeEditar: ROLES_EDITAR.includes(req.session.user.rol),
       renderReporteHtml,
@@ -416,7 +479,9 @@ router.get("/reporte/excel", allowRoles(...ROLES_VER), async (req, res) => {
   try {
     await ensureReportesSupervisoresTables(pool);
     const { sede, placa, importante } = req.query;
-    const { reportes } = await consultarReportesPendientes(req, { sede, placa, importante });
+    const semana = String(req.query.semana || "").trim();
+    const semanaReporteFecha = lunesDesdeSemanaInput(semana);
+    const { reportes } = await consultarReportesPendientes(req, { sede, placa, importante, semana_reporte: semanaReporteFecha });
     const gruposSede = agruparPorSede(reportes);
     const workbook = new ExcelJS.Workbook();
     workbook.creator = "Gas Tomza";
@@ -501,6 +566,8 @@ router.post("/limpiar-tabla", allowRoles(...ROLES_EDITAR), async (req, res) => {
   try {
     await ensureReportesSupervisoresTables(pool);
     const sede = String(req.body.sede || "").trim();
+    const semana = String(req.body.semana || "").trim();
+    const semanaReporteFecha = lunesDesdeSemanaInput(semana);
     const sedesPermitidas = await obtenerSedesPermitidas(req);
 
     if (!sede) {
@@ -512,13 +579,16 @@ router.post("/limpiar-tabla", allowRoles(...ROLES_EDITAR), async (req, res) => {
       return res.redirect("/reportes-supervisores");
     }
 
-    const [reportes] = await pool.query(
-      `SELECT id, descripcion_original
+    const paramsReportes = [sede];
+    let sqlReportes = `SELECT id, descripcion_original
        FROM reportes_supervisores
        WHERE sede = ?
-         AND estado IN ('PENDIENTE','EN_REVISION')`,
-      [sede]
-    );
+         AND estado IN ('PENDIENTE','EN_REVISION')`;
+    if (semanaReporteFecha) {
+      sqlReportes += " AND COALESCE(semana_reporte, DATE(fecha_reporte)) = ?";
+      paramsReportes.push(semanaReporteFecha);
+    }
+    const [reportes] = await pool.query(sqlReportes, paramsReportes);
 
     for (const reporte of reportes) {
       await pool.query(
@@ -528,7 +598,7 @@ router.post("/limpiar-tabla", allowRoles(...ROLES_EDITAR), async (req, res) => {
     }
 
     req.session.success = `Tabla de ${sede} reescrita correctamente.`;
-    res.redirect(`/reportes-supervisores?sede=${encodeURIComponent(sede)}`);
+    res.redirect(`/reportes-supervisores?sede=${encodeURIComponent(sede)}${semana ? `&semana=${encodeURIComponent(semana)}` : ""}`);
   } catch (error) {
     console.error("Error limpiando tabla de reportes:", error);
     req.session.error = "No se pudo reescribir la tabla.";
@@ -540,6 +610,7 @@ router.post("/", allowRoles(...ROLES_CREAR), async (req, res) => {
   try {
     await ensureReportesSupervisoresTables(pool);
     const { unidad_id, descripcion_original } = req.body;
+    const semanaReporte = lunesDesdeSemanaInput(req.body.semana_reporte) || lunesDesdeSemanaInput(semanaDefaultReporte());
     if (!unidad_id || !String(descripcion_original || "").trim()) {
       req.session.error = "Debe seleccionar unidad y escribir el reporte.";
       return res.redirect("/reportes-supervisores");
@@ -554,19 +625,20 @@ router.post("/", allowRoles(...ROLES_CREAR), async (req, res) => {
 
     await pool.query(
       `INSERT INTO reportes_supervisores
-       (unidad_id, sede, supervisor_id, supervisor_nombre, descripcion_original, descripcion_limpia)
-       VALUES (?, ?, ?, ?, ?, ?)`,
+       (unidad_id, sede, supervisor_id, supervisor_nombre, descripcion_original, descripcion_limpia, semana_reporte)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
       [
         unidad.id,
         unidad.sede,
         req.session.user.id,
         req.session.user.nombre || req.session.user.usuario,
         descripcion_original.trim(),
-        limpiarTextoReporte(descripcion_original)
+        limpiarTextoReporte(descripcion_original),
+        semanaReporte
       ]
     );
 
-    req.session.success = `Reporte registrado para ${unidad.placa}.`;
+    req.session.success = `Reporte registrado para ${unidad.placa}. Semana: ${semanaInputDesdeFecha(semanaReporte) || "actual"}.`;
     res.redirect("/reportes-supervisores");
   } catch (error) {
     console.error("Error guardando reporte de supervisor:", error);

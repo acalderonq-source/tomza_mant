@@ -74,7 +74,9 @@
     if (filtros.sede) excelGeneralParams.push(`sede=${encodeURIComponent(filtros.sede)}`);
     if (filtros.placa) excelGeneralParams.push(`placa=${encodeURIComponent(filtros.placa)}`);
     if (filtros.importante) excelGeneralParams.push(`importante=${encodeURIComponent(filtros.importante)}`);
+    if (filtros.semana) excelGeneralParams.push(`semana=${encodeURIComponent(filtros.semana)}`);
     const excelGeneralUrl = `/reportes-supervisores/reporte/excel${excelGeneralParams.length ? `?${excelGeneralParams.join('&')}` : ''}`;
+    const semanaNueva = semanaDefault || filtros.semana || '';
   %>
   <div class="page-heading">
     <div>
@@ -94,7 +96,7 @@
     <section class="surface-card p-3 mb-3">
       <h2 class="page-title fs-5 mb-3">Nuevo reporte</h2>
       <form method="POST" action="/reportes-supervisores" class="row g-3">
-        <div class="col-lg-4">
+        <div class="col-lg-3">
           <label class="form-label">Unidad</label>
           <div data-placa-search data-placa-mode="unidad" data-placa-target="#unidadReporteSupervisorId">
             <input type="text" class="form-control" data-placa-input data-placa-autocomplete placeholder="Escriba la placa" required>
@@ -103,7 +105,12 @@
             <div data-placa-selected></div>
           </div>
         </div>
-        <div class="col-lg-6">
+        <div class="col-lg-3">
+          <label class="form-label">Semana del reporte</label>
+          <input type="week" name="semana_reporte" class="form-control" value="<%= semanaNueva %>" required>
+          <div class="form-text">Si se sube viernes, por defecto queda para la semana siguiente.</div>
+        </div>
+        <div class="col-lg-4">
           <label class="form-label">Reporte del supervisor</label>
           <textarea name="descripcion_original" class="form-control" placeholder="Ej: revisar frenos, fuga de aceite..." required></textarea>
         </div>
@@ -151,15 +158,19 @@
 
   <section class="filters-card">
     <form method="GET" action="/reportes-supervisores" class="row g-3">
-      <div class="col-md-3">
+      <div class="col-md-2">
         <label class="form-label small">Sede</label>
         <input type="text" name="sede" class="form-control form-control-sm" value="<%= filtros.sede || '' %>" placeholder="Ej: Cartago">
       </div>
-      <div class="col-md-3">
+      <div class="col-md-2">
         <label class="form-label small">Placa</label>
         <input type="text" name="placa" class="form-control form-control-sm text-uppercase" value="<%= filtros.placa || '' %>">
       </div>
       <div class="col-md-3">
+        <label class="form-label small">Semana del reporte</label>
+        <input type="week" name="semana" class="form-control form-control-sm" value="<%= filtros.semana || '' %>">
+      </div>
+      <div class="col-md-2">
         <label class="form-label small">Importante</label>
         <select name="importante" class="form-select form-select-sm">
           <option value="">Todos</option>
@@ -196,6 +207,7 @@
                 const excelSedeParams = [`sede=${encodeURIComponent(sedeNombre)}`];
                 if (filtros.placa) excelSedeParams.push(`placa=${encodeURIComponent(filtros.placa)}`);
                 if (filtros.importante) excelSedeParams.push(`importante=${encodeURIComponent(filtros.importante)}`);
+                if (filtros.semana) excelSedeParams.push(`semana=${encodeURIComponent(filtros.semana)}`);
                 const excelSedeUrl = `/reportes-supervisores/reporte/excel?${excelSedeParams.join('&')}`;
               %>
               <tr class="sede-row">
@@ -207,6 +219,9 @@
                       <% if (puedeEditar) { %>
                         <form method="POST" action="/reportes-supervisores/limpiar-tabla" class="d-inline" onsubmit="return confirm('¿Reescribir con IA toda esta tabla?');">
                           <input type="hidden" name="sede" value="<%= sedeNombre %>">
+                          <% if (filtros.semana) { %>
+                            <input type="hidden" name="semana" value="<%= filtros.semana %>">
+                          <% } %>
                           <button class="btn btn-primary btn-sm py-0 px-2">Reescribir IA</button>
                         </form>
                       <% } %>
@@ -244,6 +259,7 @@
                               <div class="meta mt-2">
                                 <%= r.supervisor_nombre || 'Supervisor' %> ·
                                 <%= r.fecha_reporte ? new Date(r.fecha_reporte).toLocaleString('es-CR') : '' %> ·
+                                Semana: <%= r.semana_reporte ? new Date(`${String(r.semana_reporte).slice(0, 10)}T12:00:00`).toLocaleDateString('es-CR') : 'Sin definir' %> ·
                                 <%= r.estado.replace('_', ' ') %>
                               </div>
                             </div>

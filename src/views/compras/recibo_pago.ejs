@@ -4,87 +4,348 @@
 <meta charset="UTF-8">
 <title>Recibo de Pago</title>
 <style>
-  *{box-sizing:border-box}
-  @page{ size:A4; margin:8mm; }
-  body{ margin:0; background:#e5e5e5; font-family:Arial, Helvetica, sans-serif; font-size:9px; color:#000; }
-  .recibo{ width:740px; background:#fff; margin:10px auto; padding:8px; overflow:hidden; }
-  .header{ display:grid; grid-template-columns:180px 1fr 180px; gap:8px; align-items:start; margin-bottom:6px; }
-  .logo{ width:170px; height:65px; object-fit:contain; }
-  .title{ text-align:center; font-size:18px; font-weight:800; padding-top:22px; white-space:nowrap; }
-  table{ width:100%; border-collapse:collapse; table-layout:fixed; }
-  .po-box{ font-size:8px; margin-top:24px; }
-  .po-box th{ background:#2F5597; color:white; padding:2px; border:1px solid #ccc; }
-  .po-box td{ height:17px; padding:2px; text-align:center; border:1px solid #ccc; font-weight:bold; }
-  .section-title{ background:#2F5597; color:white; text-align:center; font-weight:bold; padding:3px; font-size:10px; }
-  .info td{ width:50%; vertical-align:top; }
-  .label{ background:#E2EFDA; font-weight:bold; padding:2px 4px; }
-  .value{ padding:2px 4px; height:16px; border-bottom:1px solid #eee; word-break:break-word; }
-  .items{ margin-top:5px; }
-  .items th{ background:#2F5597; color:white; border:1px solid #ccc; padding:3px; font-size:9px; }
-  .items td{ border:1px solid #ddd; padding:3px; height:20px; }
-  .items .obs{ color:#374151; font-size:8px; line-height:1.25; word-break:break-word; }
-  .totals{ margin-top:20px; text-align:right; }
-  .totals table{ width:300px; margin-left:auto; }
-  .totals td{ padding:4px; }
-  .total-final{ font-weight:bold; background-color:#f0f0f0; }
-  .text-right{ text-align:right; }
-  .text-center{ text-align:center; }
-  @media print{ body{ background:white; } .recibo{ width:100%; margin:0; padding:0; } }
+  * { box-sizing: border-box; }
+  @page { size: Letter; margin: 0; }
+  body {
+    margin: 0;
+    background: #f3f4f6;
+    color: #111827;
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 10px;
+  }
+  .page {
+    background: #fff;
+    margin: 0 auto;
+    min-height: 930px;
+    padding: 22px 24px;
+    width: 760px;
+  }
+  .top-band {
+    background: #0f2f66;
+    border-bottom: 4px solid #f2c200;
+    color: #fff;
+    padding: 14px 16px;
+  }
+  .header-table { width: 100%; border-collapse: collapse; }
+  .header-table td { vertical-align: middle; }
+  .logo-box {
+    background: #fff;
+    border-radius: 6px;
+    padding: 5px;
+    width: 178px;
+  }
+  .logo { display: block; height: 58px; object-fit: contain; width: 168px; }
+  .title {
+    font-size: 22px;
+    font-weight: 800;
+    letter-spacing: .4px;
+    text-align: right;
+    text-transform: uppercase;
+  }
+  .subtitle {
+    color: #dbeafe;
+    font-size: 10px;
+    margin-top: 3px;
+    text-align: right;
+  }
+  .meta-table {
+    border-collapse: collapse;
+    margin-top: 14px;
+    width: 100%;
+  }
+  .meta-table td {
+    border: 1px solid #d1d5db;
+    padding: 7px 8px;
+    vertical-align: top;
+  }
+  .label {
+    color: #475569;
+    display: block;
+    font-size: 8px;
+    font-weight: 800;
+    letter-spacing: .3px;
+    margin-bottom: 3px;
+    text-transform: uppercase;
+  }
+  .value {
+    color: #111827;
+    font-size: 11px;
+    font-weight: 700;
+  }
+  .value-big {
+    color: #0f2f66;
+    font-size: 18px;
+    font-weight: 900;
+  }
+  .section-title {
+    background: #0f2f66;
+    color: #fff;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: .2px;
+    margin-top: 15px;
+    padding: 7px 9px;
+    text-transform: uppercase;
+  }
+  .summary-table,
+  .items-table,
+  .totals-table {
+    border-collapse: collapse;
+    width: 100%;
+  }
+  .summary-table th,
+  .items-table th {
+    background: #eaf1fb;
+    border: 1px solid #cbd5e1;
+    color: #1f2937;
+    font-size: 8px;
+    font-weight: 800;
+    padding: 6px;
+    text-align: left;
+    text-transform: uppercase;
+  }
+  .summary-table td,
+  .items-table td {
+    border: 1px solid #dbe3ef;
+    padding: 6px;
+    vertical-align: top;
+  }
+  .items-table tbody tr:nth-child(even) td { background: #f8fafc; }
+  .text-right { text-align: right; }
+  .text-center { text-align: center; }
+  .muted { color: #64748b; }
+  .badge {
+    background: #dcfce7;
+    border: 1px solid #86efac;
+    border-radius: 999px;
+    color: #166534;
+    display: inline-block;
+    font-size: 8px;
+    font-weight: 800;
+    padding: 3px 7px;
+    text-transform: uppercase;
+  }
+  .note {
+    color: #334155;
+    font-size: 9px;
+    line-height: 1.35;
+    word-break: break-word;
+  }
+  .totals-wrap {
+    margin-left: auto;
+    margin-top: 12px;
+    width: 330px;
+  }
+  .totals-table td {
+    border: 1px solid #d1d5db;
+    padding: 8px;
+  }
+  .total-row td {
+    background: #0f2f66;
+    color: #fff;
+    font-size: 13px;
+    font-weight: 900;
+  }
+  .signatures {
+    border-collapse: collapse;
+    margin-top: 34px;
+    width: 100%;
+  }
+  .signatures td {
+    padding: 0 16px;
+    text-align: center;
+    width: 50%;
+  }
+  .line {
+    border-top: 1px solid #111827;
+    margin: 28px auto 7px;
+    width: 230px;
+  }
+  .footer {
+    border-top: 1px solid #e5e7eb;
+    color: #64748b;
+    font-size: 8px;
+    line-height: 1.35;
+    margin-top: 22px;
+    padding-top: 8px;
+    text-align: center;
+  }
 </style>
 </head>
 <body>
-<div class="recibo">
-  <div class="header">
-    <img src="https://www.tomzasureste.com/img/grp_tomza.png" class="logo">
-    <div class="title">RECIBO DE PAGO DE FACTURAS</div>
-    <table class="po-box">
-      <tr><th>FECHA</th></tr>
-      <tr><td class="text-center"><%= new Date().toLocaleDateString('es-CR') %></td></tr>
+<%
+  const safeFacturas = Array.isArray(facturas) ? facturas : [];
+  const money = value => Number(value || 0).toLocaleString('es-CR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const dateFmt = value => {
+    if (!value) return '-';
+    const raw = String(value);
+    const fecha = /^\d{4}-\d{2}-\d{2}$/.test(raw) ? new Date(`${raw}T12:00:00`) : new Date(value);
+    return Number.isNaN(fecha.getTime()) ? '-' : fecha.toLocaleDateString('es-CR');
+  };
+  const proveedoresMap = new Map();
+  let totalNotasCredito = 0;
+  let totalAbonosPrevios = 0;
+  safeFacturas.forEach(f => {
+    const proveedor = f.proveedor_nombre || 'Sin proveedor';
+    const monto = Number(f.total || 0);
+    totalNotasCredito += Number(f.nota_credito_monto || 0);
+    totalAbonosPrevios += Number(f.abono_monto || 0);
+    if (!proveedoresMap.has(proveedor)) {
+      proveedoresMap.set(proveedor, { proveedor, facturas: 0, total: 0 });
+    }
+    const item = proveedoresMap.get(proveedor);
+    item.facturas += 1;
+    item.total += monto;
+  });
+  const resumenProveedores = Array.from(proveedoresMap.values()).sort((a, b) => b.total - a.total);
+%>
+<div class="page">
+  <div class="top-band">
+    <table class="header-table">
+      <tr>
+        <td style="width:190px;">
+          <div class="logo-box">
+            <% if (logoDataUri) { %>
+              <img src="<%= logoDataUri %>" class="logo">
+            <% } else { %>
+              <div class="value" style="height:58px; padding-top:20px; text-align:center;">GAS TOMZA</div>
+            <% } %>
+          </div>
+        </td>
+        <td>
+          <div class="title">Recibo de pago</div>
+          <div class="subtitle">Control de facturas pagadas - Departamento de compras</div>
+        </td>
+      </tr>
     </table>
   </div>
 
-  <table class="info">
-    <tr><td colspan="2" class="section-title">INFORMACIÓN DEL PAGO</td></tr>
-    <tr><td class="label">EMPRESA</td><td class="value">GAS TOMZA DE COSTA RICA S.A.</td></tr>
-    <tr><td class="label">FECHA DE PAGO</td><td class="value"><%= new Date(fechaPago).toLocaleDateString('es-CR') %></td></tr>
-    <tr><td class="label">FACTURAS PAGADAS</td><td class="value"><%= facturas.length %></td></tr>
-    <tr><td class="label">MONTO TOTAL PAGADO</td><td class="value">₡<%= totalPagado.toLocaleString('es-CR') %></td></tr>
+  <table class="meta-table">
+    <tr>
+      <td style="width:25%;">
+        <span class="label">Recibo No.</span>
+        <span class="value"><%= reciboNumero || '-' %></span>
+      </td>
+      <td style="width:25%;">
+        <span class="label">Fecha de pago</span>
+        <span class="value"><%= dateFmt(fechaPago) %></span>
+      </td>
+      <td style="width:25%;">
+        <span class="label">Generado por</span>
+        <span class="value"><%= generadoPor || 'Sistema' %></span>
+      </td>
+      <td style="width:25%;">
+        <span class="label">Estado</span>
+        <span class="badge">Pagado</span>
+      </td>
+    </tr>
+    <tr>
+      <td colspan="2">
+        <span class="label">Empresa</span>
+        <span class="value">Gas Tomza de Costa Rica S.A.</span>
+      </td>
+      <td>
+        <span class="label">Facturas incluidas</span>
+        <span class="value"><%= safeFacturas.length %></span>
+      </td>
+      <td>
+        <span class="label">Total pagado</span>
+        <span class="value-big">₡<%= money(totalPagado) %></span>
+      </td>
+    </tr>
   </table>
 
-  <table class="items">
+  <div class="section-title">Resumen por proveedor</div>
+  <table class="summary-table">
     <thead>
       <tr>
-        <th>PO Número</th>
         <th>Proveedor</th>
-        <th>N° Factura</th>
-        <th>Monto</th>
-        <th>Fecha Vencimiento</th>
-        <th>Observación</th>
+        <th class="text-center" style="width:90px;">Facturas</th>
+        <th class="text-right" style="width:150px;">Monto pagado</th>
       </tr>
     </thead>
     <tbody>
-      <% facturas.forEach(f => { %>
-      <tr>
-        <td><%= f.po_numero || '—' %></td>
-        <td><%= f.proveedor_nombre %></td>
-        <td><%= f.factura %></td>
-        <td class="text-right">₡<%= parseFloat(f.total).toLocaleString('es-CR') %></td>
-        <td><%= f.fecha_vencimiento_factura ? new Date(f.fecha_vencimiento_factura).toLocaleDateString('es-CR') : '—' %></td>
-        <td class="obs"><%= f.observacion || f.factura_observacion || f.abono_observacion || f.nota_credito_motivo || '—' %></td>
-      </tr>
+      <% if (!resumenProveedores.length) { %>
+        <tr><td colspan="3" class="text-center muted">No hay facturas en este recibo.</td></tr>
+      <% } %>
+      <% resumenProveedores.forEach(item => { %>
+        <tr>
+          <td><strong><%= item.proveedor %></strong></td>
+          <td class="text-center"><%= item.facturas %></td>
+          <td class="text-right"><strong>₡<%= money(item.total) %></strong></td>
+        </tr>
       <% }) %>
     </tbody>
   </table>
 
-  <div class="totals">
-    <table>
-      <tr><td><strong>SUBTOTAL</strong></td><td class="text-right">₡<%= totalPagado.toLocaleString('es-CR') %></td></tr>
-      <tr class="total-final"><td><strong>TOTAL PAGADO</strong></td><td class="text-right">₡<%= totalPagado.toLocaleString('es-CR') %></td></tr>
+  <div class="section-title">Detalle de facturas pagadas</div>
+  <table class="items-table">
+    <thead>
+      <tr>
+        <th style="width:72px;">PO</th>
+        <th>Proveedor</th>
+        <th style="width:90px;">Factura</th>
+        <th style="width:90px;">Vencimiento</th>
+        <th style="width:88px;" class="text-right">NC</th>
+        <th style="width:88px;" class="text-right">Abono</th>
+        <th style="width:98px;" class="text-right">Pagado</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% safeFacturas.forEach(f => { %>
+        <tr>
+          <td><strong><%= f.po_numero || '-' %></strong></td>
+          <td>
+            <strong><%= f.proveedor_nombre || '-' %></strong>
+            <% const observacion = f.observacion || f.factura_observacion || f.abono_observacion || f.nota_credito_motivo || ''; %>
+            <% if (observacion) { %>
+              <div class="note"><span class="muted">Obs.:</span> <%= observacion %></div>
+            <% } %>
+          </td>
+          <td><%= f.factura || '-' %></td>
+          <td><%= dateFmt(f.fecha_vencimiento_factura) %></td>
+          <td class="text-right">₡<%= money(f.nota_credito_monto) %></td>
+          <td class="text-right">₡<%= money(f.abono_monto) %></td>
+          <td class="text-right"><strong>₡<%= money(f.total) %></strong></td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+
+  <div class="totals-wrap">
+    <table class="totals-table">
+      <tr>
+        <td>Notas de crédito aplicadas</td>
+        <td class="text-right">₡<%= money(totalNotasCredito) %></td>
+      </tr>
+      <tr>
+        <td>Abonos previos aplicados</td>
+        <td class="text-right">₡<%= money(totalAbonosPrevios) %></td>
+      </tr>
+      <tr class="total-row">
+        <td>Total pagado</td>
+        <td class="text-right">₡<%= money(totalPagado) %></td>
+      </tr>
     </table>
   </div>
 
-  <div style="margin-top:30px; text-align:center; font-size:8px;">
-    Documento generado automáticamente por el sistema de compras de Gas Tomza.
+  <table class="signatures">
+    <tr>
+      <td>
+        <div class="line"></div>
+        <strong>Preparado por</strong><br>
+        <span class="muted">Compras / Proveeduría</span>
+      </td>
+      <td>
+        <div class="line"></div>
+        <strong>Revisado por</strong><br>
+        <span class="muted">Administración / Contabilidad</span>
+      </td>
+    </tr>
+  </table>
+
+  <div class="footer">
+    Documento generado automáticamente por el sistema interno de Gas Tomza. Este recibo respalda el pago de las facturas indicadas y debe conservarse junto con los comprobantes bancarios correspondientes.
   </div>
 </div>
 </body>
