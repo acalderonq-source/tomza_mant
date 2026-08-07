@@ -55,6 +55,100 @@ function cantidadItem(item) {
   return String(item.cantidad || "").trim();
 }
 
+function limpiarDescripcionRepuesto(value) {
+  return String(value || "")
+    .replace(/\s+/g, " ")
+    .replace(/^[\s.,;:-]+|[\s.,;:-]+$/g, "")
+    .trim();
+}
+
+function dividirPorConjuncionInteligente(texto) {
+  const keywords = [
+    "aceite",
+    "bateria",
+    "batería",
+    "bomba",
+    "broca",
+    "cable",
+    "cables",
+    "aire",
+    "diesel",
+    "empaque",
+    "empaques",
+    "escobilla",
+    "escobillas",
+    "faro",
+    "faros",
+    "fibra",
+    "fibras",
+    "filtro",
+    "filtros",
+    "luz",
+    "luces",
+    "manguera",
+    "mangueras",
+    "pastilla",
+    "pastillas",
+    "reten",
+    "retenedor",
+    "retenedores",
+    "sensor",
+    "sensores",
+    "silenciador",
+    "tambor",
+    "tambores",
+    "zapata",
+    "zapatas"
+  ];
+  const regex = new RegExp(`\\s+y\\s+(?=(?:${keywords.join("|")})\\b)`, "gi");
+  return texto.split(regex);
+}
+
+function dividirDescripcionRepuestos(value) {
+  const texto = descripcionItem({ solicitud: value });
+  if (!texto) return [""];
+
+  const normalizado = texto
+    .replace(/\r\n/g, "\n")
+    .replace(/[•*]+/g, "\n")
+    .replace(/\s+-\s+/g, "\n")
+    .replace(/\s*(?:^|\s)(\d{1,2})[.)]\s+/g, "\n")
+    .replace(/[;|/]+/g, "\n")
+    .replace(/,+/g, "\n");
+
+  const partes = normalizado
+    .split(/\n+/)
+    .flatMap(parte => dividirPorConjuncionInteligente(parte))
+    .map(limpiarDescripcionRepuesto)
+    .filter(Boolean);
+
+  if (!partes.length) return [texto];
+
+  const sinDuplicados = [];
+  const vistos = new Set();
+  partes.forEach(parte => {
+    const clave = parte.toLowerCase();
+    if (!vistos.has(clave)) {
+      vistos.add(clave);
+      sinDuplicados.push(parte);
+    }
+  });
+
+  return sinDuplicados;
+}
+
+function expandirItemsPorRepuesto(items) {
+  return (Array.isArray(items) ? items : []).flatMap(item => {
+    const partes = dividirDescripcionRepuestos(descripcionItem(item));
+    return partes.map((descripcion, index) => ({
+      ...item,
+      descripcion_dividida: descripcion,
+      cantidad_dividida: index === 0 ? cantidadItem(item) : "",
+      placa_dividida: item.placa || ""
+    }));
+  });
+}
+
 function logoTomza() {
   const logoPath = path.join(process.cwd(), "public", "img", "logo_tomza.jpg");
   if (fs.existsSync(logoPath)) {
@@ -64,7 +158,7 @@ function logoTomza() {
 }
 
 function crearTablaPedido(grupo) {
-  const items = Array.isArray(grupo.items) ? grupo.items : [];
+  const items = expandirItemsPorRepuesto(grupo.items);
   const bodyRowsCount = Math.max(items.length, 14);
   const body = [
     [
@@ -102,9 +196,9 @@ function crearTablaPedido(grupo) {
       row.push({ text: "", fillColor: YELLOW });
     }
 
-    row.push({ text: item.placa || "", fontSize: 12, margin: [2, 2, 2, 2] });
-    row.push({ text: cantidadItem(item), alignment: "center", fontSize: 11, margin: [2, 2, 2, 2] });
-    row.push({ text: descripcionItem(item), fontSize: 12, margin: [2, 2, 2, 2] });
+    row.push({ text: item.placa_dividida || item.placa || "", fontSize: 12, margin: [2, 2, 2, 2] });
+    row.push({ text: item.cantidad_dividida || "", alignment: "center", fontSize: 11, margin: [2, 2, 2, 2] });
+    row.push({ text: item.descripcion_dividida || descripcionItem(item), fontSize: 12, margin: [2, 2, 2, 2] });
     body.push(row);
   }
 
