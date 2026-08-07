@@ -4,7 +4,8 @@ const pool = require("../db");
 const {
   agregarTallerParaMecanico,
   esUsuarioTodasSedes,
-  obtenerSedesTransporte
+  obtenerSedesTransporte,
+  sedeGranelDesdeUsuario
 } = require("../utils/sedes");
 
 /* =========================================================
@@ -53,8 +54,11 @@ router.post("/cambiar-sede", async (req, res) => {
     // =========================
     // ARMAR LISTA COMPLETA
     // =========================
+    const sedeGranelUsuario = sedeGranelDesdeUsuario(user);
     const esPesados = String(user.usuario || "").trim().toLowerCase() === "pesados" || user.rol === "SUPERVISOR_PESADO";
-    const sedesPermitidas = esPesados
+    const sedesPermitidas = sedeGranelUsuario
+      ? [sedeGranelUsuario]
+      : esPesados
       ? await obtenerSedesTransporte(pool)
       : agregarTallerParaMecanico(user, [user.sede, ...extras.map(e => e.sede)]);
 

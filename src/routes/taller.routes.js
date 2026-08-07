@@ -10,7 +10,8 @@ const {
   SEDES_TRANSPORTE,
   esSedeTransporte,
   esUsuarioTodasSedes,
-  obtenerSedesTransporte
+  obtenerSedesTransporte,
+  sedeGranelDesdeUsuario
 } = require("../utils/sedes");
 const { agregarFiltroPlacaSql, expresionPlacaSql, normalizarPlaca, variantesPlaca } = require("../utils/placas");
 
@@ -131,12 +132,24 @@ async function ensurePrioridadesTallerTable() {
 
 async function obtenerSedesPermitidas(req) {
   const user = req.session.user;
+  const sedeGranelUsuario = sedeGranelDesdeUsuario(user);
 
   if (esUsuarioTodasSedes(user)) {
     if (req.session.sedeSeleccionada && req.session.sedeSeleccionada !== "TODAS") {
       return [req.session.sedeSeleccionada];
     }
     return [];
+  }
+
+  if (sedeGranelUsuario) {
+    if (
+      req.session.sedeSeleccionada &&
+      req.session.sedeSeleccionada !== "TODAS" &&
+      req.session.sedeSeleccionada === sedeGranelUsuario
+    ) {
+      return [req.session.sedeSeleccionada];
+    }
+    return [sedeGranelUsuario];
   }
 
   if (esUsuarioPesados(user)) {

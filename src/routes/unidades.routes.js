@@ -7,7 +7,8 @@ const {
   esSedeTransporte,
   esUsuarioTodasSedes,
   obtenerTodasSedes,
-  obtenerSedesTransporte
+  obtenerSedesTransporte,
+  sedeGranelDesdeUsuario
 } = require("../utils/sedes");
 const { agregarFiltroPlacaSql, normalizarPlaca } = require("../utils/placas");
 
@@ -79,6 +80,19 @@ async function obtenerSedesPermitidas(req) {
 
   const esUsuarioPesados = user.rol === "SUPERVISOR_PESADO" ||
     String(user.usuario || "").trim().toLowerCase() === "pesados";
+  const sedeGranelUsuario = sedeGranelDesdeUsuario(user);
+
+  if (sedeGranelUsuario) {
+    if (
+      req.session.sedeSeleccionada &&
+      req.session.sedeSeleccionada !== "TODAS" &&
+      req.session.sedeSeleccionada === sedeGranelUsuario
+    ) {
+      return [req.session.sedeSeleccionada];
+    }
+    return [sedeGranelUsuario];
+  }
+
   if (esUsuarioPesados) {
     if (
       req.session.sedeSeleccionada &&

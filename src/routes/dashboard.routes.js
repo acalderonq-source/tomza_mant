@@ -7,7 +7,8 @@ const {
   etiquetaSede: etiquetaSedeTomza,
   esUsuarioTodasSedes,
   obtenerTodasSedes,
-  obtenerSedesTransporte
+  obtenerSedesTransporte,
+  sedeGranelDesdeUsuario
 } = require("../utils/sedes");
 
 async function safeQuery(sql, params = [], fallback = []) {
@@ -84,8 +85,11 @@ router.get("/", async (req, res) => {
     const esUsuarioPesados = req.session.user.rol === "SUPERVISOR_PESADO" ||
       String(req.session.user.usuario || "").trim().toLowerCase() === "pesados";
     const usuarioTodasSedes = esUsuarioTodasSedes(req.session.user);
+    const sedeGranelUsuario = sedeGranelDesdeUsuario(req.session.user);
     const sedesPermitidas = usuarioTodasSedes
       ? await obtenerTodasSedes(pool)
+      : sedeGranelUsuario
+      ? [sedeGranelUsuario]
       : esUsuarioPesados
       ? await obtenerSedesTransporte(pool)
       : agregarTallerParaMecanico(req.session.user, [
@@ -107,7 +111,7 @@ router.get("/", async (req, res) => {
       if (req.session.sedeSeleccionada && sedesPermitidas.includes(req.session.sedeSeleccionada)) {
         sedeFiltro = req.session.sedeSeleccionada;
       } else {
-        sedeFiltro = req.session.user.sede;
+        sedeFiltro = sedeGranelUsuario || req.session.user.sede;
       }
     }
 

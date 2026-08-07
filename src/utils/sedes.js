@@ -87,6 +87,11 @@ function esUsuarioProveeduria(user) {
     ["proveeduria", "proveeduria_taller"].includes(limpiarSede(user?.usuario).toLowerCase());
 }
 
+function sedeGranelDesdeUsuario(user) {
+  const usuario = limpiarSede(user?.usuario).toLowerCase();
+  return SEDES_GRANEL.find(sede => sede.toLowerCase() === usuario) || "";
+}
+
 function esUsuarioTodasSedes(user) {
   return ["ADMIN", "TALLER", "TRAMITES"].includes(user?.rol) || esUsuarioProveeduria(user);
 }
@@ -121,6 +126,7 @@ async function obtenerSedesTransporte(pool) {
 
 function getSedesPermitidas(req) {
   const user = req.session.user;
+  const sedeGranelUsuario = sedeGranelDesdeUsuario(user);
   let sedes = [];
 
   if (esUsuarioTodasSedes(user)) {
@@ -135,6 +141,22 @@ function getSedesPermitidas(req) {
     } else {
 
       sedes = TODAS_SEDES;
+
+    }
+
+  } else if (sedeGranelUsuario) {
+
+    if (
+      req.session.sedeSeleccionada &&
+      req.session.sedeSeleccionada !== "TODAS" &&
+      req.session.sedeSeleccionada === sedeGranelUsuario
+    ) {
+
+      sedes = [req.session.sedeSeleccionada];
+
+    } else {
+
+      sedes = [sedeGranelUsuario];
 
     }
 
@@ -173,6 +195,7 @@ module.exports = {
   esUsuarioMecanico,
   esUsuarioProveeduria,
   esUsuarioTodasSedes,
+  sedeGranelDesdeUsuario,
   agregarTallerParaMecanico,
   obtenerTodasSedes,
   obtenerSedesTransporte,

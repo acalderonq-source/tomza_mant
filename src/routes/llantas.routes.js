@@ -4,7 +4,7 @@ const path = require("path");
 const ejs = require("ejs");
 const pdf = require("html-pdf");
 const pool = require("../db");
-const { agregarTallerParaMecanico, esUsuarioTodasSedes, TODAS_SEDES } = require("../utils/sedes");
+const { agregarTallerParaMecanico, esUsuarioTodasSedes, TODAS_SEDES, sedeGranelDesdeUsuario } = require("../utils/sedes");
 const { agregarFiltroPlacaSql } = require("../utils/placas");
 
 const router = express.Router();
@@ -90,12 +90,24 @@ async function ensureTables() {
 
 async function obtenerSedesPermitidas(req) {
   const user = req.session.user;
+  const sedeGranelUsuario = sedeGranelDesdeUsuario(user);
 
   if (esUsuarioTodasSedes(user)) {
     if (req.session.sedeSeleccionada && req.session.sedeSeleccionada !== "TODAS") {
       return [req.session.sedeSeleccionada];
     }
     return TODAS_SEDES;
+  }
+
+  if (sedeGranelUsuario) {
+    if (
+      req.session.sedeSeleccionada &&
+      req.session.sedeSeleccionada !== "TODAS" &&
+      req.session.sedeSeleccionada === sedeGranelUsuario
+    ) {
+      return [req.session.sedeSeleccionada];
+    }
+    return [sedeGranelUsuario];
   }
 
   const [extras] = await pool.query(
