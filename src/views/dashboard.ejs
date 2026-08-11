@@ -297,6 +297,7 @@
   const puedeVerGiras = ['ADMIN', 'TALLER', 'MECANICO', 'SUPERVISOR', 'SUPERVISOR_PESADO'].includes(user.rol);
   const puedeVerDashboardTaller = ['ADMIN', 'TALLER', 'MECANICO', 'SUPERVISOR', 'SUPERVISOR_PESADO'].includes(user.rol);
   const puedeVerOrdenesMotor = ['ADMIN', 'TALLER', 'PROVEEDURIA_TALLER'].includes(user.rol);
+  const puedeVerResumenEjecutivo = ['ADMIN', 'TALLER', 'PROVEEDURIA', 'PROVEEDURIA_TALLER', 'TRAMITES'].includes(user.rol);
   const puedeVerRepuestos = ['ADMIN', 'TALLER', 'PROVEEDURIA_TALLER', 'PROVEEDURIA', 'SUPERVISOR_PESADO', 'MENSAJERO', 'MENSAJERIA', 'MENSAJERO_FACTURAS'].includes(user.rol)
     || String(user.usuario || '').trim().toLowerCase() === 'pesados';
   const prioridadesLista = Array.isArray(prioridadesTaller) ? prioridadesTaller : [];
@@ -405,6 +406,12 @@
   <section class="mb-2">
     <h2 class="section-title">Módulos</h2>
     <div class="module-grid">
+      <% if (puedeVerResumenEjecutivo) { %>
+        <a href="/dashboard/resumen-ejecutivo" class="module-card">
+          <span class="module-icon icon-blue"><i class="bi bi-graph-up-arrow"></i></span>
+          <div><div class="module-title">Resumen ejecutivo</div><p class="module-copy">Gastos, proveedores, placas y mantenimientos.</p></div>
+        </a>
+      <% } %>
       <% if (puedeVerOperaciones) { %>
         <a href="/mantenimientos" class="module-card">
           <span class="module-icon icon-amber"><i class="bi bi-tools"></i></span>

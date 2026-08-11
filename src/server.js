@@ -15,6 +15,30 @@ const app = express();
 const isProduction = process.env.NODE_ENV === "production";
 const sessionSecret = process.env.SESSION_SECRET || "tomza_dev_secret_change_me";
 const sessionMaxAge = Number(process.env.SESSION_MAX_AGE_MS || 1000 * 60 * 60 * 24 * 7);
+const transientDbErrors = new Set(["ECONNRESET", "PROTOCOL_CONNECTION_LOST", "ETIMEDOUT", "ENOTFOUND", "ECONNREFUSED"]);
+
+function isTransientDbError(error) {
+  return error && transientDbErrors.has(error.code);
+}
+
+process.on("unhandledRejection", error => {
+  if (isTransientDbError(error)) {
+    console.warn("Conexion MySQL interrumpida temporalmente:", error.code);
+    return;
+  }
+
+  console.error("Promesa rechazada sin manejar:", error);
+});
+
+process.on("uncaughtException", error => {
+  if (isTransientDbError(error)) {
+    console.warn("Error temporal de MySQL capturado:", error.code);
+    return;
+  }
+
+  console.error("Error no capturado:", error);
+  process.exit(1);
+});
 
 if (isProduction && !process.env.SESSION_SECRET) {
   console.warn("SESSION_SECRET no esta configurado. Configure esta variable en produccion.");
@@ -68,6 +92,18 @@ const sessionStore = new MySQLStore({
     }
   }
 }, pool);
+
+const originalSessionQuery = sessionStore.query.bind(sessionStore);
+sessionStore.query = async (sql, params) => {
+  try {
+    return await originalSessionQuery(sql, params);
+  } catch (error) {
+    if (!isTransientDbError(error)) throw error;
+    console.warn("Reintentando consulta de sesion por error MySQL:", error.code);
+    await new Promise(resolve => setTimeout(resolve, 350));
+    return originalSessionQuery(sql, params);
+  }
+};
 
 sessionStore.onReady().catch(error => {
   console.warn("No se pudo preparar el store de sesiones:", error.code || error.message);

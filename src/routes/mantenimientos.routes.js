@@ -7,7 +7,7 @@ const {
   ensureReportesSupervisoresTables,
   registrarSugerenciasParaCorrectivo
 } = require("../utils/reportesSupervisoresDb");
-const { esUsuarioTodasSedes } = require("../utils/sedes");
+const { SEDES_GRANEL, esUsuarioTodasSedes, etiquetaSede, getSedesPermitidas } = require("../utils/sedes");
 const { agregarFiltroPlacaSql } = require("../utils/placas");
 
 // =====================================================
@@ -33,6 +33,392 @@ function obtenerSedeFiltro(req) {
 
 function puedeReprogramarMantenimientos(user) {
   return ["ADMIN", "TALLER"].includes(user.rol);
+}
+
+const FAMILIAS_MANTENIMIENTO = [
+  {
+    clave: "frenos_seguridad",
+    nombre: "Frenos y seguridad",
+    color: "#dc2626",
+    palabras: [
+      "freno", "frenos", "fibra", "fibras", "clutch", "embrague", "direccion",
+      "dirección", "pito", "alarma", "seguridad", "bomba hidraulica", "bomba hidráulica"
+    ]
+  },
+  {
+    clave: "motor_transmision",
+    nombre: "Motor y transmisión",
+    color: "#ea580c",
+    palabras: [
+      "motor", "caja", "transmision", "transmisión", "inyector", "turbo", "arrancador",
+      "alternador", "compresor", "bomba", "fuga de aire", "manguera", "sensor", "tacometro", "tacómetro"
+    ]
+  },
+  {
+    clave: "aceites_fluidos",
+    nombre: "Aceites y fluidos",
+    color: "#0f766e",
+    palabras: [
+      "aceite", "aceites", "engrase", "engrasar", "hidraulico", "hidráulico", "agua",
+      "radiador", "coolant", "liquido", "líquido", "filtro", "filtros", "nivel"
+    ]
+  },
+  {
+    clave: "electrico_luces",
+    nombre: "Eléctrico y luces",
+    color: "#2563eb",
+    palabras: [
+      "luz", "luces", "electrico", "eléctrico", "bateria", "batería", "baterias", "baterías",
+      "corto", "cable", "cables", "marcha", "direccional", "tablero", "velocimetro", "velocímetro"
+    ]
+  },
+  {
+    clave: "llantas_carroceria",
+    nombre: "Llantas, carrocería y otros",
+    color: "#6d28d9",
+    palabras: [
+      "llanta", "llantas", "aro", "aros", "rotulacion", "rotulación", "calcomania",
+      "calcomanía", "cabina", "puerta", "bumper", "golpe", "cajon", "cajón", "asiento",
+      "escobilla", "parabrisas", "lamina", "lámina", "pintar", "pintura"
+    ]
+  }
+];
+
+const SEDES_CILINDREROS = [
+  "ALAJUELA",
+  "CARTAGO",
+  "GUAPILES",
+  "LA CRUZ",
+  "NICOYA",
+  "OROTINA",
+  "PEREZ ZELEDON",
+  "RIO CLARO",
+  "SAN CARLOS"
+];
+
+const ORDEN_NEGOCIOS_MANTENIMIENTO = ["TRANSPORTADORA", "CILINDREROS", "GRANELES", "OTROS"];
+const SUBGRUPOS_BASE_MANTENIMIENTO = {
+  TRANSPORTADORA: ["Cabezales", "Cisternas y carretas"],
+  CILINDREROS: ["Alajuela", "Cartago", "Guapiles", "La Cruz", "Nicoya", "Orotina", "Perez Zeledon", "Rio Claro", "San Carlos"],
+  GRANELES: SEDES_GRANEL.map(sede => etiquetaSede(sede)),
+  OTROS: ["Taller", "Tecnicos", "Otros"]
+};
+
+function normalizarTextoIA(texto) {
+  return String(texto || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+}
+
+function normalizarClaveNegocio(texto) {
+  return normalizarTextoIA(texto).toUpperCase().replace(/\s+/g, " ").trim();
+}
+
+function recortarTexto(texto, limite = 220) {
+  const limpio = String(texto || "")
+    .replace(/\s*\|\s*/g, ", ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!limpio) return "-";
+  return limpio.length > limite ? `${limpio.slice(0, limite - 3)}...` : limpio;
+}
+
+function dividirTrabajosMantenimiento(texto) {
+  const limpio = String(texto || "")
+    .replace(/\s*\|\s*/g, " | ")
+    .replace(/\r?\n+/g, " | ")
+    .replace(/\b\d+\s*[\).:-]\s*/g, " | ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (!limpio) return [];
+
+  const partes = limpio
+    .split(/\s+\|\s+|;|,(?=\s*[a-zA-ZÁÉÍÓÚáéíóúÑñ])/)
+    .map(parte => parte.replace(/^[-.:,\s]+|[-.:,\s]+$/g, "").trim())
+    .filter(parte => parte.length >= 3);
+
+  return partes.length ? partes : [limpio];
+}
+
+function obtenerFamiliaConPuntaje(texto) {
+  const normalizado = normalizarTextoIA(texto);
+  let mejorFamilia = FAMILIAS_MANTENIMIENTO[FAMILIAS_MANTENIMIENTO.length - 1];
+  let mejorPuntaje = 0;
+
+  for (const familia of FAMILIAS_MANTENIMIENTO) {
+    const puntaje = familia.palabras.reduce((total, palabra) => {
+      const palabraNormalizada = normalizarTextoIA(palabra);
+      if (!normalizado.includes(palabraNormalizada)) return total;
+      return total + (palabraNormalizada.includes(" ") ? 3 : 1);
+    }, 0);
+
+    if (puntaje > mejorPuntaje) {
+      mejorPuntaje = puntaje;
+      mejorFamilia = familia;
+    }
+  }
+
+  return { familia: mejorFamilia, puntaje: mejorPuntaje };
+}
+
+function clasificarFamiliaMantenimiento(texto) {
+  return obtenerFamiliaConPuntaje(texto).familia;
+}
+
+function analizarFamiliasMantenimiento(texto) {
+  const trabajos = dividirTrabajosMantenimiento(texto);
+  const resumen = new Map();
+
+  for (const trabajo of trabajos) {
+    const { familia, puntaje } = obtenerFamiliaConPuntaje(trabajo);
+    const clasificado = {
+      texto: recortarTexto(trabajo, 180),
+      familiaClave: familia.clave,
+      familiaNombre: familia.nombre,
+      familiaColor: familia.color,
+      puntaje
+    };
+
+    if (!resumen.has(familia.clave)) {
+      resumen.set(familia.clave, {
+        clave: familia.clave,
+        nombre: familia.nombre,
+        color: familia.color,
+        cantidad: 0,
+        trabajos: []
+      });
+    }
+
+    const grupo = resumen.get(familia.clave);
+    grupo.cantidad += 1;
+    grupo.trabajos.push(clasificado);
+  }
+
+  const familias = [...resumen.values()].sort((a, b) => b.cantidad - a.cantidad);
+  const principal = familias[0]
+    ? FAMILIAS_MANTENIMIENTO.find(f => f.clave === familias[0].clave)
+    : FAMILIAS_MANTENIMIENTO[FAMILIAS_MANTENIMIENTO.length - 1];
+
+  return {
+    principal,
+    familias,
+    trabajosClasificados: familias.flatMap(familia => familia.trabajos)
+  };
+}
+
+function crearResumenFamilias() {
+  return FAMILIAS_MANTENIMIENTO.map(familia => ({
+    ...familia,
+    total: 0,
+    preventivos: [],
+    correctivos: []
+  }));
+}
+
+function prepararItemMantenimiento(row, tipoRegistro) {
+  const textoBase = tipoRegistro === "PREVENTIVO"
+    ? [row.ejecucion, row.plan, row.pendiente, row.tipo].filter(Boolean).join(" ")
+    : [row.trabajo_realizado, row.trabajos_detalle, row.repuestos, row.pendiente].filter(Boolean).join(" ");
+  const analisisFamilias = analizarFamiliasMantenimiento(textoBase);
+  const familia = analisisFamilias.principal;
+  const sedeEtiqueta = etiquetaSede(row.sede);
+
+  return {
+    id: row.id,
+    tipoRegistro,
+    familiaClave: familia.clave,
+    familiaNombre: familia.nombre,
+    familiaColor: familia.color,
+    placa: row.placa,
+    sede: row.sede,
+    sedeEtiqueta,
+    fecha: row.fecha_formato || "-",
+    estado: row.estado || (tipoRegistro === "CORRECTIVO" ? "CERRADO" : "-"),
+    mecanicos: row.mecanicos || "-",
+    detalle: recortarTexto(textoBase),
+    familiasDetectadas: analisisFamilias.familias,
+    trabajosClasificados: analisisFamilias.trabajosClasificados
+  };
+}
+
+function obtenerNegocioMantenimiento(item) {
+  const sede = normalizarClaveNegocio(item.sede);
+  const placa = String(item.placa || "").toUpperCase().replace(/\s+/g, "");
+
+  if (sede.includes("GRANEL")) {
+    return {
+      grupo: "GRANELES",
+      subgrupo: item.sedeEtiqueta || "Granel"
+    };
+  }
+
+  if (sede === "TRANSPORTADORA") {
+    return {
+      grupo: "TRANSPORTADORA",
+      subgrupo: placa.startsWith("S") ? "Cisternas y carretas" : "Cabezales"
+    };
+  }
+
+  if (SEDES_CILINDREROS.includes(sede)) {
+    return {
+      grupo: "CILINDREROS",
+      subgrupo: item.sedeEtiqueta || item.sede || "Sin sede"
+    };
+  }
+
+  return {
+    grupo: "OTROS",
+    subgrupo: item.sedeEtiqueta || item.sede || "Sin sede"
+  };
+}
+
+function agruparPorNegocio(items) {
+  const grupos = new Map();
+
+  for (const nombre of ORDEN_NEGOCIOS_MANTENIMIENTO) {
+    const subgrupos = new Map();
+    for (const subgrupo of SUBGRUPOS_BASE_MANTENIMIENTO[nombre] || []) {
+      subgrupos.set(subgrupo, {
+        nombre: subgrupo,
+        total: 0,
+        preventivos: 0,
+        correctivos: 0,
+        placas: new Map()
+      });
+    }
+
+    grupos.set(nombre, {
+      nombre,
+      total: 0,
+      preventivos: 0,
+      correctivos: 0,
+      subgrupos
+    });
+  }
+
+  for (const item of items) {
+    const negocio = obtenerNegocioMantenimiento(item);
+    if (!grupos.has(negocio.grupo)) {
+      grupos.set(negocio.grupo, {
+        nombre: negocio.grupo,
+        total: 0,
+        preventivos: 0,
+        correctivos: 0,
+        subgrupos: new Map()
+      });
+    }
+
+    const grupo = grupos.get(negocio.grupo);
+    grupo.total += 1;
+    if (item.tipoRegistro === "PREVENTIVO") grupo.preventivos += 1;
+    if (item.tipoRegistro === "CORRECTIVO") grupo.correctivos += 1;
+
+    if (!grupo.subgrupos.has(negocio.subgrupo)) {
+      grupo.subgrupos.set(negocio.subgrupo, {
+        nombre: negocio.subgrupo,
+        total: 0,
+        preventivos: 0,
+        correctivos: 0,
+        placas: new Map()
+      });
+    }
+
+    const subgrupo = grupo.subgrupos.get(negocio.subgrupo);
+    subgrupo.total += 1;
+    if (item.tipoRegistro === "PREVENTIVO") subgrupo.preventivos += 1;
+    if (item.tipoRegistro === "CORRECTIVO") subgrupo.correctivos += 1;
+
+    if (!subgrupo.placas.has(item.placa)) {
+      subgrupo.placas.set(item.placa, {
+        placa: item.placa,
+        sedeEtiqueta: item.sedeEtiqueta,
+        total: 0,
+        preventivos: 0,
+        correctivos: 0,
+        items: []
+      });
+    }
+
+    const placa = subgrupo.placas.get(item.placa);
+    placa.total += 1;
+    if (item.tipoRegistro === "PREVENTIVO") placa.preventivos += 1;
+    if (item.tipoRegistro === "CORRECTIVO") placa.correctivos += 1;
+    placa.items.push(item);
+  }
+
+  return [...grupos.values()]
+    .map(grupo => ({
+      ...grupo,
+      subgrupos: [...grupo.subgrupos.values()]
+        .map(subgrupo => ({
+          ...subgrupo,
+          placas: [...subgrupo.placas.values()]
+            .sort((a, b) => String(a.placa).localeCompare(String(b.placa), "es"))
+        }))
+        .sort((a, b) => a.nombre.localeCompare(b.nombre, "es"))
+    }));
+}
+
+function agruparDashboardMantenimientos(preventivosRows, correctivosRows) {
+  const familias = crearResumenFamilias();
+  const familiasPorClave = new Map(familias.map(f => [f.clave, f]));
+  const preventivos = preventivosRows.map(row => prepararItemMantenimiento(row, "PREVENTIVO"));
+  const correctivos = correctivosRows.map(row => prepararItemMantenimiento(row, "CORRECTIVO"));
+  const items = [...preventivos, ...correctivos];
+
+  for (const item of preventivos) {
+    const familiasItem = item.familiasDetectadas?.length ? item.familiasDetectadas : [{ clave: item.familiaClave }];
+    for (const familiaItem of familiasItem) {
+      const familia = familiasPorClave.get(familiaItem.clave);
+      if (!familia) continue;
+      familia.total += 1;
+      familia.preventivos.push(item);
+    }
+  }
+
+  for (const item of correctivos) {
+    const familiasItem = item.familiasDetectadas?.length ? item.familiasDetectadas : [{ clave: item.familiaClave }];
+    for (const familiaItem of familiasItem) {
+      const familia = familiasPorClave.get(familiaItem.clave);
+      if (!familia) continue;
+      familia.total += 1;
+      familia.correctivos.push(item);
+    }
+  }
+
+  const total = items.length;
+  const familiaPrincipal = [...familias].sort((a, b) => b.total - a.total)[0] || null;
+
+  return {
+    total,
+    preventivos,
+    correctivos,
+    familias,
+    familiaPrincipal,
+    negocios: agruparPorNegocio(items)
+  };
+}
+
+function aplicarFiltroSedesDashboard(req, condiciones, params, aliasUnidad = "u") {
+  const user = req.session.user;
+  const sedeQuery = String(req.query.sede || "").trim();
+  const sedesPermitidas = getSedesPermitidas(req).filter(Boolean);
+  const usuarioTodas = esUsuarioTodasSedes(user);
+
+  if (sedeQuery && sedeQuery !== "TODAS" && (usuarioTodas || sedesPermitidas.includes(sedeQuery))) {
+    condiciones.push(`${aliasUnidad}.sede = ?`);
+    params.push(sedeQuery);
+    return sedeQuery;
+  }
+
+  if (!usuarioTodas && sedesPermitidas.length) {
+    condiciones.push(`${aliasUnidad}.sede IN (?)`);
+    params.push(sedesPermitidas);
+  }
+
+  return "TODAS";
 }
 
 async function unidadColumnExists(columnName) {
@@ -244,6 +630,123 @@ router.get("/exportar", requireAuth, async (req, res) => {
   } catch (err) {
     console.error("Error exportando:", err);
     res.status(500).send("Error exportando datos");
+  }
+});
+
+// =====================================================
+// DASHBOARD IA DE MANTENIMIENTOS
+// =====================================================
+router.get("/dashboard", requireAuth, async (req, res) => {
+  try {
+    const fechaDesde = String(req.query.fecha_desde || "").trim();
+    const fechaHasta = String(req.query.fecha_hasta || "").trim();
+
+    const condicionesPreventivos = [];
+    const condicionesCorrectivos = [];
+    const paramsPreventivos = [];
+    const paramsCorrectivos = [];
+
+    const sedeSeleccionada = aplicarFiltroSedesDashboard(req, condicionesPreventivos, paramsPreventivos, "u");
+    aplicarFiltroSedesDashboard(req, condicionesCorrectivos, paramsCorrectivos, "u");
+
+    if (fechaDesde) {
+      condicionesPreventivos.push("DATE(m.fecha_programada) >= ?");
+      condicionesCorrectivos.push("DATE(c.fecha) >= ?");
+      paramsPreventivos.push(fechaDesde);
+      paramsCorrectivos.push(fechaDesde);
+    }
+
+    if (fechaHasta) {
+      condicionesPreventivos.push("DATE(m.fecha_programada) <= ?");
+      condicionesCorrectivos.push("DATE(c.fecha) <= ?");
+      paramsPreventivos.push(fechaHasta);
+      paramsCorrectivos.push(fechaHasta);
+    }
+
+    const wherePreventivos = condicionesPreventivos.length ? `WHERE ${condicionesPreventivos.join(" AND ")}` : "";
+    const whereCorrectivos = condicionesCorrectivos.length ? `WHERE ${condicionesCorrectivos.join(" AND ")}` : "";
+
+    const [preventivosRows] = await pool.query(
+      `
+      SELECT
+        m.id,
+        u.placa,
+        u.sede,
+        m.tipo,
+        m.estado,
+        m.prioridad,
+        m.plan,
+        m.ejecucion,
+        m.pendiente,
+        DATE_FORMAT(m.fecha_programada, '%d/%m/%Y') AS fecha_formato,
+        COALESCE(GROUP_CONCAT(DISTINCT mec.nombre ORDER BY mec.nombre SEPARATOR ', '), '-') AS mecanicos
+      FROM mantenimientos m
+      JOIN unidades u ON u.id = m.unidad_id
+      LEFT JOIN mantenimiento_mecanicos mm ON mm.mantenimiento_id = m.id
+      LEFT JOIN mecanicos mec ON mec.id = mm.mecanico_id
+      ${wherePreventivos}
+      GROUP BY m.id, u.placa, u.sede, m.tipo, m.estado, m.prioridad, m.plan, m.ejecucion, m.pendiente, m.fecha_programada
+      ORDER BY m.fecha_programada DESC, m.id DESC
+      LIMIT 1200
+      `,
+      paramsPreventivos
+    );
+
+    const [correctivosRows] = await pool.query(
+      `
+      SELECT
+        c.id,
+        u.placa,
+        COALESCE(u.sede, c.sede) AS sede,
+        'CERRADO' AS estado,
+        c.trabajo_realizado,
+        c.pendiente,
+        DATE_FORMAT(c.fecha, '%d/%m/%Y') AS fecha_formato,
+        COALESCE(GROUP_CONCAT(DISTINCT ct.trabajo SEPARATOR ' | '), '') AS trabajos_detalle,
+        COALESCE(GROUP_CONCAT(DISTINCT ct.repuestos SEPARATOR ' | '), '') AS repuestos,
+        COALESCE(GROUP_CONCAT(DISTINCT mec.nombre ORDER BY mec.nombre SEPARATOR ', '), '-') AS mecanicos
+      FROM correctivos c
+      JOIN unidades u ON u.id = c.unidad_id
+      LEFT JOIN correctivo_trabajos ct ON ct.correctivo_id = c.id
+      LEFT JOIN mecanicos mec ON mec.id = ct.mecanico_id
+      ${whereCorrectivos}
+      GROUP BY c.id, u.placa, c.sede, u.sede, c.trabajo_realizado, c.pendiente, c.fecha
+      ORDER BY c.fecha DESC, c.id DESC
+      LIMIT 1200
+      `,
+      paramsCorrectivos
+    );
+
+    const [sedesRows] = await pool.query(`
+      SELECT DISTINCT sede
+      FROM unidades
+      WHERE sede IS NOT NULL AND TRIM(sede) <> ''
+      ORDER BY sede
+    `);
+
+    const sedesPermitidas = getSedesPermitidas(req).filter(Boolean);
+    const puedeTodas = esUsuarioTodasSedes(req.session.user);
+    const sedesFiltro = sedesRows
+      .map(row => row.sede)
+      .filter(sede => puedeTodas || sedesPermitidas.includes(sede))
+      .map(sede => ({ valor: sede, etiqueta: etiquetaSede(sede) }));
+
+    const dashboard = agruparDashboardMantenimientos(preventivosRows, correctivosRows);
+
+    res.render("mantenimientos_dashboard", {
+      user: req.session.user,
+      filtros: {
+        sede: sedeSeleccionada,
+        fecha_desde: fechaDesde,
+        fecha_hasta: fechaHasta
+      },
+      sedesFiltro,
+      dashboard,
+      familias: FAMILIAS_MANTENIMIENTO
+    });
+  } catch (error) {
+    console.error("ERROR dashboard IA mantenimientos:", error);
+    res.status(500).send("Error cargando dashboard de mantenimientos");
   }
 });
 

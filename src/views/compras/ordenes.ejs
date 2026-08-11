@@ -187,6 +187,7 @@
     if (filtros.estado) reporteParams.set('estado', filtros.estado);
     if (filtros.facturada !== undefined && filtros.facturada !== '') reporteParams.set('facturada', filtros.facturada);
     const reporteOrdenesUrl = '/compras/ordenes/reporte/pdf' + (reporteParams.toString() ? `?${reporteParams.toString()}` : '');
+    const reporteOrdenesExcelUrl = '/compras/ordenes/reporte/excel' + (reporteParams.toString() ? `?${reporteParams.toString()}` : '');
   %>
   <div class="page-heading">
     <div>
@@ -295,7 +296,10 @@
       <div>
         <% if (puedeDescargarReporte) { %>
           <a href="<%= reporteOrdenesUrl %>" class="btn btn-outline-success btn-sm me-2">
-            <i class="bi bi-download"></i> Descargar reporte
+            <i class="bi bi-file-earmark-pdf"></i> PDF
+          </a>
+          <a href="<%= reporteOrdenesExcelUrl %>" class="btn btn-success btn-sm me-2">
+            <i class="bi bi-file-earmark-excel"></i> Excel completo
           </a>
         <% } %>
         <% if (puedeModificarCompras) { %>

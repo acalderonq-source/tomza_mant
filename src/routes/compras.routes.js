@@ -1253,6 +1253,152 @@ function construirConsultaOrdenes(filtros = {}) {
   return { sql, params };
 }
 
+async function obtenerOrdenesReporteCompleto(filtros = {}) {
+  const { sql, params } = construirConsultaOrdenes(filtros);
+  let [ordenes] = await pool.query(sql, params);
+
+  if (!ordenes.length) return [];
+
+  const ordenIds = ordenes.map(orden => orden.id);
+  const placeholders = ordenIds.map(() => "?").join(",");
+  const [lineas] = await pool.query(
+    `SELECT orden_compra_id, codigo, descripcion, cantidad, precio_unitario, subtotal
+     FROM ordenes_compra_detalle
+     WHERE orden_compra_id IN (${placeholders})
+     ORDER BY orden_compra_id, id`,
+    ordenIds
+  );
+
+  const lineasPorOrden = lineas.reduce((map, linea) => {
+    if (!map.has(linea.orden_compra_id)) map.set(linea.orden_compra_id, []);
+    map.get(linea.orden_compra_id).push(linea);
+    return map;
+  }, new Map());
+
+  ordenes = ordenes.map(orden => ({
+    ...orden,
+    lineas: lineasPorOrden.get(orden.id) || []
+  }));
+
+  return ordenes;
+}
+
+function excelDate(value) {
+  if (!value) return null;
+  const date = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function pintarFilaHeader(row, color = "FF111827") {
+  row.font = { bold: true, color: { argb: "FFFFFFFF" } };
+  row.fill = { type: "pattern", pattern: "solid", fgColor: { argb: color } };
+  row.alignment = { vertical: "middle", horizontal: "center", wrapText: true };
+  row.height = 22;
+}
+
+function aplicarBordesWorksheet(worksheet) {
+  worksheet.eachRow(row => {
+    row.eachCell(cell => {
+      cell.border = {
+        top: { style: "thin", color: { argb: "FFE2E8F0" } },
+        left: { style: "thin", color: { argb: "FFE2E8F0" } },
+        bottom: { style: "thin", color: { argb: "FFE2E8F0" } },
+        right: { style: "thin", color: { argb: "FFE2E8F0" } }
+      };
+      cell.alignment = cell.alignment || { vertical: "middle" };
+    });
+  });
+}
+
+function estadoFacturaOrden(orden) {
+  if (orden.facturada || orden.factura) return "Facturada";
+  return "Sin factura";
+}
+
+function resumenPreciosUnitariosOrden(orden) {
+  const lineas = Array.isArray(orden.lineas) ? orden.lineas : [];
+  if (!lineas.length) return "-";
+
+  return lineas.map(linea => {
+    const codigo = linea.codigo ? `${linea.codigo} · ` : "";
+    const descripcion = String(linea.descripcion || "Sin descripcion").trim();
+    const cantidad = parseMonto(linea.cantidad);
+    const precio = parseMonto(linea.precio_unitario);
+    return `${codigo}${descripcion}: ${cantidad.toLocaleString("es-CR")} x ₡${precio.toLocaleString("es-CR", { maximumFractionDigits: 2 })}`;
+  }).join("\n");
+}
+
+function textoExcelLimpio(value, fallback = "-") {
+  const texto = String(value || "").replace(/\s+/g, " ").trim();
+  return texto || fallback;
+}
+
+function agruparOrdenesPorDescripcion(ordenes = []) {
+  const grupos = new Map();
+
+  ordenes.forEach(orden => {
+    const lineas = Array.isArray(orden.lineas) ? orden.lineas : [];
+
+    lineas.forEach(linea => {
+      const descripcion = textoExcelLimpio(linea.descripcion, "Sin descripcion");
+      const clave = descripcion.toUpperCase();
+      const cantidad = parseMonto(linea.cantidad);
+      const precio = parseMonto(linea.precio_unitario);
+      const subtotal = parseMonto(linea.subtotal) || cantidad * precio;
+      const fecha = excelDate(orden.fecha);
+
+      if (!grupos.has(clave)) {
+        grupos.set(clave, {
+          descripcion,
+          codigos: new Set(),
+          proveedores: new Set(),
+          ordenes: new Set(),
+          cantidadTotal: 0,
+          vecesComprado: 0,
+          montoTotal: 0,
+          precioMin: null,
+          precioMax: null,
+          ultimoPrecio: 0,
+          ultimaFecha: null,
+          ultimoProveedor: "-"
+        });
+      }
+
+      const grupo = grupos.get(clave);
+      grupo.codigos.add(textoExcelLimpio(linea.codigo));
+      grupo.proveedores.add(textoExcelLimpio(orden.proveedor_nombre));
+      grupo.ordenes.add(textoExcelLimpio(orden.po_numero));
+      grupo.cantidadTotal += cantidad;
+      grupo.vecesComprado += 1;
+      grupo.montoTotal += subtotal;
+
+      if (precio > 0) {
+        grupo.precioMin = grupo.precioMin === null ? precio : Math.min(grupo.precioMin, precio);
+        grupo.precioMax = grupo.precioMax === null ? precio : Math.max(grupo.precioMax, precio);
+      }
+
+      if (fecha && (!grupo.ultimaFecha || fecha > grupo.ultimaFecha)) {
+        grupo.ultimaFecha = fecha;
+        grupo.ultimoPrecio = precio;
+        grupo.ultimoProveedor = textoExcelLimpio(orden.proveedor_nombre);
+      }
+    });
+  });
+
+  return Array.from(grupos.values())
+    .map(grupo => ({
+      ...grupo,
+      codigosTexto: Array.from(grupo.codigos).filter(Boolean).join(", ") || "-",
+      proveedoresTexto: Array.from(grupo.proveedores).filter(Boolean).join(", ") || "-",
+      ordenesTexto: Array.from(grupo.ordenes).filter(Boolean).join(", ") || "-",
+      ordenesCantidad: grupo.ordenes.size,
+      precioPromedio: grupo.cantidadTotal > 0 ? grupo.montoTotal / grupo.cantidadTotal : 0,
+      precioMin: grupo.precioMin || 0,
+      precioMax: grupo.precioMax || 0
+    }))
+    .sort((a, b) => a.descripcion.localeCompare(b.descripcion, "es", { sensitivity: "base" }));
+}
+
 // ===================== PROVEEDORES =====================
 router.get("/proveedores", requireAuth, allowRoles("ADMIN", "PROVEEDURIA_TALLER"), async (req, res) => {
   try {
@@ -1613,6 +1759,368 @@ router.get("/ordenes/reporte/pdf", requireAuth, allowRoles("ADMIN", "TALLER", "P
   } catch (error) {
     console.error("Error descargando reporte de órdenes:", error);
     res.status(500).send("Error descargando reporte");
+  }
+});
+
+router.get("/ordenes/reporte/excel", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER", "CONTABILIDAD"), async (req, res) => {
+  try {
+    await ensureOrdenPlacaColumn();
+    await ensureOrdenCotizacionColumns();
+
+    const { proveedor_id, fecha_desde, fecha_hasta, po_numero, placa_unidad, estado, facturada } = req.query;
+    const filtros = { proveedor_id, fecha_desde, fecha_hasta, po_numero, placa_unidad, estado, facturada };
+    const ordenes = await obtenerOrdenesReporteCompleto(filtros);
+
+    const [[proveedorFiltro]] = proveedor_id
+      ? await pool.query("SELECT nombre FROM proveedores WHERE id = ?", [proveedor_id])
+      : [[null]];
+
+    const workbook = new ExcelJS.Workbook();
+    workbook.creator = "Gas Tomza";
+    workbook.created = new Date();
+    workbook.modified = new Date();
+    workbook.views = [{ activeTab: 0 }];
+
+    const totalFiltrado = ordenes.reduce((sum, orden) => sum + (parseMonto(orden.total) || 0), 0);
+    const totalSubtotal = ordenes.reduce((sum, orden) => sum + (parseMonto(orden.subtotal) || 0), 0);
+    const totalDescuento = ordenes.reduce((sum, orden) => sum + (parseMonto(orden.descuento) || 0), 0);
+    const totalTransporte = ordenes.reduce((sum, orden) => sum + (parseMonto(orden.transporte) || 0), 0);
+    const totalRecibidas = ordenes.filter(orden => orden.estado === "RECIBIDA_TOTAL" || orden.estado === "RECIBIDA_PARCIAL").length;
+    const totalFacturadas = ordenes.filter(orden => orden.facturada || orden.factura).length;
+    const productosPorDescripcion = agruparOrdenesPorDescripcion(ordenes);
+
+    const wsProductos = workbook.addWorksheet("Productos", {
+      views: [{ state: "frozen", ySplit: 1 }]
+    });
+    wsProductos.columns = [
+      { header: "Descripcion", key: "descripcion", width: 48 },
+      { header: "Codigos / placas", key: "codigos", width: 32 },
+      { header: "Cantidad total", key: "cantidad_total", width: 16 },
+      { header: "Veces comprado", key: "veces_comprado", width: 16 },
+      { header: "Ordenes", key: "ordenes_cantidad", width: 12 },
+      { header: "Precio minimo", key: "precio_min", width: 16 },
+      { header: "Precio promedio", key: "precio_promedio", width: 18 },
+      { header: "Ultimo precio", key: "ultimo_precio", width: 16 },
+      { header: "Precio maximo", key: "precio_max", width: 16 },
+      { header: "Monto total", key: "monto_total", width: 16 },
+      { header: "Ultima compra", key: "ultima_fecha", width: 14 },
+      { header: "Ultimo proveedor", key: "ultimo_proveedor", width: 30 },
+      { header: "Proveedores", key: "proveedores", width: 42 },
+      { header: "PO relacionados", key: "ordenes", width: 42 }
+    ];
+    pintarFilaHeader(wsProductos.getRow(1), "FF0B3B82");
+
+    productosPorDescripcion.forEach(producto => {
+      const row = wsProductos.addRow({
+        descripcion: producto.descripcion,
+        codigos: producto.codigosTexto,
+        cantidad_total: producto.cantidadTotal,
+        veces_comprado: producto.vecesComprado,
+        ordenes_cantidad: producto.ordenesCantidad,
+        precio_min: producto.precioMin,
+        precio_promedio: producto.precioPromedio,
+        ultimo_precio: producto.ultimoPrecio,
+        precio_max: producto.precioMax,
+        monto_total: producto.montoTotal,
+        ultima_fecha: producto.ultimaFecha,
+        ultimo_proveedor: producto.ultimoProveedor,
+        proveedores: producto.proveedoresTexto,
+        ordenes: producto.ordenesTexto
+      });
+      [6, 7, 8, 9, 10].forEach(col => {
+        row.getCell(col).numFmt = '"CRC" #,##0.00';
+      });
+      row.getCell(11).numFmt = "yyyy-mm-dd";
+      [1, 2, 12, 13, 14].forEach(col => {
+        row.getCell(col).alignment = { wrapText: true, vertical: "top" };
+      });
+    });
+    wsProductos.autoFilter = { from: "A1", to: "N1" };
+
+    const wsOrdenes = workbook.addWorksheet("Ordenes", {
+      views: [{ state: "frozen", ySplit: 1 }]
+    });
+    wsOrdenes.columns = [
+      { header: "PO", key: "po", width: 15 },
+      { header: "Fecha", key: "fecha", width: 13 },
+      { header: "Proveedor", key: "proveedor", width: 30 },
+      { header: "Placa / general", key: "placa", width: 17 },
+      { header: "Estado", key: "estado", width: 18 },
+      { header: "Factura", key: "factura", width: 18 },
+      { header: "Forma pago", key: "forma_pago", width: 18 },
+      { header: "Moneda", key: "moneda", width: 14 },
+      { header: "Empresa destinataria", key: "empresa", width: 28 },
+      { header: "Lineas", key: "lineas", width: 10 },
+      { header: "Subtotal", key: "subtotal", width: 15 },
+      { header: "Descuento", key: "descuento", width: 15 },
+      { header: "Transporte", key: "transporte", width: 15 },
+      { header: "IVA (%)", key: "iva", width: 10 },
+      { header: "Total", key: "total", width: 16 },
+      { header: "Precio unitario / detalle", key: "precios_unitarios", width: 62 },
+      { header: "Observaciones", key: "observaciones", width: 52 }
+    ];
+    pintarFilaHeader(wsOrdenes.getRow(1));
+
+    ordenes.forEach(orden => {
+      const row = wsOrdenes.addRow({
+        po: orden.po_numero,
+        fecha: excelDate(orden.fecha),
+        proveedor: orden.proveedor_nombre,
+        placa: orden.placa_unidad || "-",
+        estado: String(orden.estado || "").replaceAll("_", " "),
+        factura: orden.factura || estadoFacturaOrden(orden),
+        forma_pago: orden.forma_pago || "-",
+        moneda: orden.moneda || "-",
+        empresa: orden.empresa_destino || "-",
+        lineas: Array.isArray(orden.lineas) ? orden.lineas.length : 0,
+        subtotal: parseMonto(orden.subtotal),
+        descuento: parseMonto(orden.descuento),
+        transporte: parseMonto(orden.transporte),
+        iva: parseMonto(orden.iva),
+        total: parseMonto(orden.total),
+        precios_unitarios: resumenPreciosUnitariosOrden(orden),
+        observaciones: orden.observaciones || "-"
+      });
+      row.getCell(2).numFmt = "yyyy-mm-dd";
+      [11, 12, 13, 15].forEach(col => {
+        row.getCell(col).numFmt = '"CRC" #,##0.00';
+      });
+      row.getCell(16).alignment = { wrapText: true, vertical: "top" };
+      row.getCell(17).alignment = { wrapText: true, vertical: "top" };
+    });
+    wsOrdenes.autoFilter = { from: "A1", to: "Q1" };
+
+    const wsCompleto = workbook.addWorksheet("Órdenes completas", {
+      views: [{ showGridLines: false }]
+    });
+    wsCompleto.columns = [
+      { width: 16 },
+      { width: 13 },
+      { width: 30 },
+      { width: 17 },
+      { width: 18 },
+      { width: 18 },
+      { width: 18 },
+      { width: 48 },
+      { width: 12 },
+      { width: 16 },
+      { width: 16 },
+      { width: 16 },
+      { width: 48 }
+    ];
+
+    wsCompleto.mergeCells("A1:M1");
+    wsCompleto.getCell("A1").value = "Órdenes de compra completas";
+    wsCompleto.getCell("A1").font = { bold: true, size: 18, color: { argb: "FFFFFFFF" } };
+    wsCompleto.getCell("A1").alignment = { vertical: "middle", horizontal: "center" };
+    wsCompleto.getCell("A1").fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF071A44" } };
+    wsCompleto.getRow(1).height = 30;
+
+    wsCompleto.addRow([]);
+
+    if (!ordenes.length) {
+      const emptyRow = wsCompleto.addRow(["No hay órdenes con los filtros seleccionados."]);
+      wsCompleto.mergeCells(emptyRow.number, 1, emptyRow.number, 13);
+      emptyRow.font = { bold: true, color: { argb: "FF64748B" } };
+      emptyRow.alignment = { horizontal: "center" };
+    }
+
+    ordenes.forEach((orden, index) => {
+      const tituloRow = wsCompleto.addRow([
+        `Orden ${index + 1}: PO ${orden.po_numero || "-"} · ${orden.proveedor_nombre || "-"} · Total ₡${parseMonto(orden.total).toLocaleString("es-CR", { maximumFractionDigits: 2 })}`
+      ]);
+      wsCompleto.mergeCells(tituloRow.number, 1, tituloRow.number, 13);
+      tituloRow.font = { bold: true, size: 12, color: { argb: "FFFFFFFF" } };
+      tituloRow.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF0B3B82" } };
+
+      const metaRow = wsCompleto.addRow([
+        "Fecha", excelDate(orden.fecha),
+        "Proveedor", orden.proveedor_nombre || "-",
+        "Placa / general", orden.placa_unidad || "-",
+        "Estado", String(orden.estado || "").replaceAll("_", " "),
+        "Factura", orden.factura || estadoFacturaOrden(orden),
+        "Forma pago", orden.forma_pago || "-"
+      ]);
+      metaRow.getCell(1).font = { bold: true, color: { argb: "FF475569" } };
+      metaRow.getCell(3).font = { bold: true, color: { argb: "FF475569" } };
+      metaRow.getCell(5).font = { bold: true, color: { argb: "FF475569" } };
+      metaRow.getCell(7).font = { bold: true, color: { argb: "FF475569" } };
+      metaRow.getCell(9).font = { bold: true, color: { argb: "FF475569" } };
+      metaRow.getCell(11).font = { bold: true, color: { argb: "FF475569" } };
+      metaRow.getCell(2).numFmt = "yyyy-mm-dd";
+
+      const lineHeader = wsCompleto.addRow([
+        "PO", "Fecha", "Proveedor", "Placa", "Estado", "Factura", "Placa / código línea",
+        "Descripción", "Cantidad", "Precio unitario", "Subtotal línea", "Total orden", "Observaciones"
+      ]);
+      pintarFilaHeader(lineHeader, "FF111827");
+
+      const lineas = orden.lineas.length
+        ? orden.lineas
+        : [{ codigo: orden.placa_unidad, descripcion: "Orden sin detalle de líneas", cantidad: 1, precio_unitario: orden.total, subtotal: orden.total }];
+
+      lineas.forEach(linea => {
+        const row = wsCompleto.addRow([
+          orden.po_numero || "-",
+          excelDate(orden.fecha),
+          orden.proveedor_nombre || "-",
+          orden.placa_unidad || "-",
+          String(orden.estado || "").replaceAll("_", " "),
+          orden.factura || estadoFacturaOrden(orden),
+          linea.codigo || "-",
+          linea.descripcion || "-",
+          parseMonto(linea.cantidad),
+          parseMonto(linea.precio_unitario),
+          parseMonto(linea.subtotal),
+          parseMonto(orden.total),
+          orden.observaciones || "-"
+        ]);
+        row.getCell(2).numFmt = "yyyy-mm-dd";
+        [10, 11, 12].forEach(col => {
+          row.getCell(col).numFmt = '"CRC" #,##0.00';
+        });
+        row.getCell(8).alignment = { wrapText: true, vertical: "top" };
+        row.getCell(13).alignment = { wrapText: true, vertical: "top" };
+      });
+
+      const totalRow = wsCompleto.addRow([
+        "", "", "", "", "", "", "", "Total de la orden",
+        "", "", "", parseMonto(orden.total), orden.observaciones || "-"
+      ]);
+      totalRow.font = { bold: true, color: { argb: "FF14532D" } };
+      totalRow.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFDCFCE7" } };
+      totalRow.getCell(12).numFmt = '"CRC" #,##0.00';
+      totalRow.getCell(13).alignment = { wrapText: true, vertical: "top" };
+      wsCompleto.addRow([]);
+    });
+
+    const resumen = workbook.addWorksheet("Resumen", {
+      views: [{ showGridLines: false }]
+    });
+    resumen.columns = [
+      { width: 26 },
+      { width: 28 },
+      { width: 24 },
+      { width: 24 },
+      { width: 24 },
+      { width: 24 }
+    ];
+
+    resumen.mergeCells("A1:F1");
+    resumen.getCell("A1").value = "Reporte de órdenes de compra";
+    resumen.getCell("A1").font = { bold: true, size: 18, color: { argb: "FFFFFFFF" } };
+    resumen.getCell("A1").alignment = { vertical: "middle", horizontal: "center" };
+    resumen.getCell("A1").fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF071A44" } };
+    resumen.getRow(1).height = 30;
+
+    resumen.addRow([]);
+    const metaRows = [
+      ["Generado", new Date(), "Proveedor", proveedorFiltro ? proveedorFiltro.nombre : "Todos", "Estado", estado || "Todos"],
+      ["Desde", fecha_desde || "-", "Hasta", fecha_hasta || "-", "Facturada", facturada === "1" ? "Si" : facturada === "0" ? "No" : "Todas"],
+      ["PO", po_numero || "-", "Placa", placa_unidad || "-", "Órdenes", ordenes.length]
+    ];
+    metaRows.forEach(values => resumen.addRow(values));
+    resumen.getCell("B3").numFmt = "yyyy-mm-dd hh:mm";
+    ["A3", "C3", "E3", "A4", "C4", "E4", "A5", "C5", "E5"].forEach(cell => {
+      resumen.getCell(cell).font = { bold: true, color: { argb: "FF475569" } };
+    });
+
+    resumen.addRow([]);
+    const kpiHeader = resumen.addRow(["Indicador", "Valor", "", "Indicador", "Valor", ""]);
+    pintarFilaHeader(kpiHeader, "FF0B3B82");
+    const kpiRows = [
+      ["Total órdenes", ordenes.length, "", "Monto total", totalFiltrado, ""],
+      ["Subtotal", totalSubtotal, "", "Descuento", totalDescuento, ""],
+      ["Transporte", totalTransporte, "", "Recibidas", totalRecibidas, ""],
+      ["Facturadas", totalFacturadas, "", "Pendientes de recibir", Math.max(ordenes.length - totalRecibidas, 0), ""]
+    ];
+    kpiRows.forEach(values => {
+      const row = resumen.addRow(values);
+      row.getCell(1).font = { bold: true };
+      row.getCell(4).font = { bold: true };
+      if (["Subtotal", "Transporte"].includes(values[0])) row.getCell(2).numFmt = '"CRC" #,##0.00';
+      if (["Monto total", "Descuento"].includes(values[3])) row.getCell(5).numFmt = '"CRC" #,##0.00';
+    });
+
+    resumen.addRow([]);
+    const ordenTitle = resumen.addRow(["Resumen por orden"]);
+    resumen.mergeCells(ordenTitle.number, 1, ordenTitle.number, 6);
+    ordenTitle.font = { bold: true, size: 13, color: { argb: "FF071A44" } };
+    const ordenHeader = resumen.addRow(["PO", "Fecha", "Proveedor", "Placa", "Estado", "Total"]);
+    pintarFilaHeader(ordenHeader, "FF111827");
+    ordenes.forEach(orden => {
+      const row = resumen.addRow([
+        orden.po_numero || "-",
+        excelDate(orden.fecha),
+        orden.proveedor_nombre || "-",
+        orden.placa_unidad || "-",
+        String(orden.estado || "").replaceAll("_", " "),
+        parseMonto(orden.total)
+      ]);
+      row.getCell(2).numFmt = "yyyy-mm-dd";
+      row.getCell(6).numFmt = '"CRC" #,##0.00';
+    });
+
+    const wsDetalle = workbook.addWorksheet("Detalle completo", {
+      views: [{ state: "frozen", ySplit: 1 }]
+    });
+    wsDetalle.columns = [
+      { header: "PO", key: "po", width: 15 },
+      { header: "Fecha", key: "fecha", width: 13 },
+      { header: "Proveedor", key: "proveedor", width: 30 },
+      { header: "Estado orden", key: "estado", width: 18 },
+      { header: "Factura", key: "factura", width: 18 },
+      { header: "Placa orden", key: "placa_orden", width: 17 },
+      { header: "Placa / código línea", key: "codigo", width: 18 },
+      { header: "Descripción", key: "descripcion", width: 45 },
+      { header: "Cantidad", key: "cantidad", width: 12 },
+      { header: "Precio unitario", key: "precio", width: 16 },
+      { header: "Subtotal línea", key: "subtotal", width: 16 },
+      { header: "Total orden", key: "total_orden", width: 16 },
+      { header: "Observaciones", key: "observaciones", width: 48 }
+    ];
+    pintarFilaHeader(wsDetalle.getRow(1));
+
+    ordenes.forEach(orden => {
+      const lineas = orden.lineas.length ? orden.lineas : [{ codigo: orden.placa_unidad, descripcion: "Orden sin detalle de líneas", cantidad: 1, precio_unitario: orden.total, subtotal: orden.total }];
+      lineas.forEach(linea => {
+        const row = wsDetalle.addRow({
+          po: orden.po_numero,
+          fecha: excelDate(orden.fecha),
+          proveedor: orden.proveedor_nombre,
+          estado: String(orden.estado || "").replaceAll("_", " "),
+          factura: orden.factura || estadoFacturaOrden(orden),
+          placa_orden: orden.placa_unidad || "-",
+          codigo: linea.codigo || "-",
+          descripcion: linea.descripcion || "-",
+          cantidad: parseMonto(linea.cantidad),
+          precio: parseMonto(linea.precio_unitario),
+          subtotal: parseMonto(linea.subtotal),
+          total_orden: parseMonto(orden.total),
+          observaciones: orden.observaciones || "-"
+        });
+        row.getCell(2).numFmt = "yyyy-mm-dd";
+        [10, 11, 12].forEach(col => {
+          row.getCell(col).numFmt = '"CRC" #,##0.00';
+        });
+        row.getCell(8).alignment = { wrapText: true, vertical: "top" };
+        row.getCell(13).alignment = { wrapText: true, vertical: "top" };
+      });
+    });
+    wsDetalle.autoFilter = { from: "A1", to: "M1" };
+
+    [wsProductos, wsOrdenes, wsCompleto, resumen, wsDetalle].forEach(worksheet => {
+      aplicarBordesWorksheet(worksheet);
+      worksheet.pageSetup = { orientation: "landscape", fitToPage: true, fitToWidth: 1, fitToHeight: 0 };
+    });
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    res.setHeader("Content-Disposition", `attachment; filename=reporte_ordenes_${new Date().toISOString().slice(0, 19).replace(/:/g, "-")}.xlsx`);
+    res.send(Buffer.from(buffer));
+  } catch (error) {
+    console.error("Error descargando Excel de órdenes:", error);
+    res.status(500).send("Error descargando Excel de órdenes");
   }
 });
 

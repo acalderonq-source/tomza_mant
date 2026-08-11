@@ -1,0 +1,1280 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dashboard de Mantenimientos</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <link rel="stylesheet" href="/css/mantenimientos.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+
+    :root {
+      --tomza-navy: #071a44;
+      --tomza-blue: #0b3b82;
+      --tomza-red: #ef233c;
+      --tomza-gold: #f8b400;
+      --ink: #0f172a;
+      --muted: #64748b;
+      --line: #dbe4f0;
+      --soft: #f6f8fc;
+      --surface: #ffffff;
+    }
+
+    body {
+      background:
+        radial-gradient(circle at top left, rgba(11, 59, 130, .13), transparent 34rem),
+        linear-gradient(135deg, #f7f9fd 0%, #edf2f8 52%, #f8fafc 100%);
+      color: var(--ink);
+      font-family: "Segoe UI", Roboto, Arial, sans-serif;
+      padding-bottom: 2rem;
+    }
+
+    .navbar {
+      background: linear-gradient(90deg, #06173d 0%, #0b2f6f 72%, #111827 100%) !important;
+      box-shadow: 0 8px 24px rgba(7, 26, 68, .2);
+      border-bottom: 3px solid var(--tomza-gold);
+    }
+
+    .dashboard-shell { max-width: 1580px; margin: 0 auto; }
+
+    .fw-black { font-weight: 950; }
+
+    .hero-panel {
+      position: relative;
+      isolation: isolate;
+      overflow: hidden;
+      background:
+        linear-gradient(120deg, rgba(255,255,255,.09), transparent 26%),
+        linear-gradient(135deg, #071a44 0%, #0b3b82 55%, #ef233c 100%);
+      border: 1px solid rgba(255,255,255,.15);
+      border-radius: 22px;
+      color: #fff;
+      padding: 1.45rem 1.6rem;
+      box-shadow: 0 18px 42px rgba(7, 26, 68, .22);
+    }
+
+    .hero-panel::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      z-index: -1;
+      background:
+        linear-gradient(112deg, transparent 0 68%, rgba(248, 180, 0, .88) 68% 76%, transparent 76%),
+        linear-gradient(112deg, transparent 0 74%, rgba(255,255,255,.18) 74% 74.6%, transparent 74.6%);
+      opacity: .95;
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: .45rem;
+      margin-bottom: .55rem;
+      color: rgba(255,255,255,.82);
+      font-size: .75rem;
+      font-weight: 900;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+    }
+
+    .hero-title {
+      font-size: clamp(1.5rem, 2.6vw, 2.25rem);
+      line-height: 1.05;
+      font-weight: 950;
+      margin: 0;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+    }
+
+    .hero-subtitle {
+      color: rgba(255,255,255,.78);
+      margin: .35rem 0 0;
+      font-size: .92rem;
+      font-weight: 600;
+    }
+
+    .hero-actions {
+      display: flex;
+      align-items: center;
+      gap: .6rem;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: .42rem;
+      min-height: 34px;
+      padding: .45rem .75rem;
+      border-radius: 999px;
+      background: rgba(255,255,255,.12);
+      border: 1px solid rgba(255,255,255,.22);
+      color: rgba(255,255,255,.9);
+      font-size: .78rem;
+      font-weight: 850;
+      white-space: nowrap;
+    }
+
+    .filter-panel,
+    .stat-card,
+    .family-card,
+    .chart-card,
+    .maintenance-node {
+      background: var(--surface);
+      border: 1px solid rgba(219, 228, 240, .92);
+      border-radius: 18px;
+      box-shadow: 0 12px 32px rgba(15, 23, 42, .07);
+    }
+
+    .filter-panel {
+      padding: 1rem 1.15rem;
+    }
+
+    .filter-title {
+      display: flex;
+      align-items: center;
+      gap: .5rem;
+      margin: 0;
+      color: #172554;
+      font-weight: 950;
+      font-size: 1rem;
+    }
+
+    .filter-panel .form-label {
+      color: #475569;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+      font-size: .68rem;
+    }
+
+    .filter-panel .form-select,
+    .filter-panel .form-control {
+      border-color: #cfd9e8;
+      border-radius: 11px;
+      min-height: 36px;
+    }
+
+    .stat-card {
+      position: relative;
+      overflow: hidden;
+      padding: 1rem 1.05rem;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+    }
+
+    .stat-card::after {
+      content: "";
+      position: absolute;
+      inset: 0 auto 0 0;
+      width: 5px;
+      background: linear-gradient(180deg, var(--tomza-blue), var(--tomza-red));
+    }
+
+    .stat-label {
+      font-size: .76rem;
+      text-transform: uppercase;
+      font-weight: 850;
+      color: var(--muted);
+      letter-spacing: .04em;
+    }
+
+    .stat-number {
+      font-size: 1.9rem;
+      font-weight: 950;
+      color: #10213f;
+      line-height: 1.1;
+      margin-top: .25rem;
+    }
+
+    .stat-note {
+      margin-top: .22rem;
+      color: #64748b;
+      font-size: .72rem;
+      font-weight: 700;
+    }
+
+    .stat-icon {
+      width: 52px;
+      height: 52px;
+      border-radius: 16px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(135deg, #f8fafc, #eef4ff);
+      font-size: 1.7rem;
+      flex: 0 0 auto;
+      box-shadow: inset 0 0 0 1px rgba(219, 228, 240, .95);
+    }
+
+    .insight-strip {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: .9rem;
+    }
+
+    .insight-card {
+      background: rgba(255,255,255,.92);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: .95rem 1rem;
+      box-shadow: 0 10px 24px rgba(15, 23, 42, .055);
+    }
+
+    .insight-label {
+      color: #64748b;
+      font-size: .68rem;
+      font-weight: 950;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      margin-bottom: .25rem;
+    }
+
+    .insight-value {
+      color: #0b2f6f;
+      font-size: 1rem;
+      font-weight: 950;
+      line-height: 1.15;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .insight-caption {
+      color: #64748b;
+      font-size: .74rem;
+      font-weight: 700;
+      margin-top: .2rem;
+    }
+
+    .family-card {
+      position: relative;
+      overflow: hidden;
+      padding: .95rem 1rem;
+      height: 100%;
+    }
+
+    .family-card::before {
+      content: "";
+      position: absolute;
+      inset: 0 0 auto;
+      height: 4px;
+      background: var(--family-color, #0b3b82);
+    }
+
+    .family-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: .75rem;
+      min-height: 42px;
+    }
+
+    .family-name {
+      font-size: .92rem;
+      font-weight: 950;
+      line-height: 1.12;
+    }
+
+    .family-total {
+      font-size: 1.45rem;
+      font-weight: 950;
+      line-height: 1;
+    }
+
+    .family-bar {
+      height: 8px;
+      overflow: hidden;
+      border-radius: 999px;
+      background: #e2e8f0;
+      margin: .8rem 0 .65rem;
+    }
+
+    .family-bar span {
+      display: block;
+      height: 100%;
+      border-radius: 999px;
+    }
+
+    .family-split {
+      display: flex;
+      justify-content: space-between;
+      gap: .5rem;
+      color: #475569;
+      font-size: .76rem;
+      font-weight: 800;
+    }
+
+    .maintenance-node {
+      overflow: hidden;
+    }
+
+    .node-header {
+      background:
+        linear-gradient(112deg, transparent 0 70%, rgba(248, 180, 0, .85) 70% 77%, transparent 77%),
+        linear-gradient(135deg, #071a44 0%, #0b3b82 62%, #ef233c 100%);
+      color: #fff;
+      padding: 1.1rem 1.35rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      border-bottom: 1px solid rgba(255,255,255,.18);
+    }
+
+    .node-title {
+      margin: 0;
+      font-size: 1.18rem;
+      font-weight: 950;
+    }
+
+    .node-subtitle {
+      color: rgba(255,255,255,.78);
+      font-size: .88rem;
+      font-weight: 650;
+      margin: .2rem 0 0;
+    }
+
+    .node-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: .38rem;
+      padding: .45rem .7rem;
+      border-radius: 999px;
+      background: rgba(255,255,255,.16);
+      color: #fff;
+      border: 1px solid rgba(255,255,255,.18);
+      font-size: .78rem;
+      font-weight: 900;
+      white-space: nowrap;
+    }
+
+    .node-body {
+      padding: 1rem;
+      background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+    }
+
+    .chart-card {
+      overflow: hidden;
+      height: 100%;
+    }
+
+    .chart-head {
+      padding: .85rem 1rem;
+      border-bottom: 1px solid #e6edf6;
+      background: #f8fafc;
+      font-weight: 950;
+      color: #1f2937;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: .75rem;
+    }
+
+    .chart-head small {
+      color: #64748b;
+      font-size: .72rem;
+      font-weight: 800;
+    }
+
+    .chart-body {
+      padding: 1rem;
+      min-height: 355px;
+    }
+
+    canvas {
+      width: 100% !important;
+      max-height: 355px;
+    }
+
+    .selector-card {
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      overflow: hidden;
+      background: #fff;
+      height: 100%;
+    }
+
+    .selector-head {
+      padding: .85rem 1rem;
+      background:
+        linear-gradient(90deg, rgba(11, 59, 130, .08), transparent 60%),
+        #f8fafc;
+      border-bottom: 1px solid #e5edf7;
+      display: flex;
+      justify-content: space-between;
+      gap: .75rem;
+      align-items: center;
+    }
+
+    .business-tabs {
+      display: flex;
+      gap: .45rem;
+      flex-wrap: wrap;
+    }
+
+    .business-tab {
+      border: 1px solid #d6e0ee;
+      border-radius: 999px;
+      background: #fff;
+      color: #172554;
+      font-size: .78rem;
+      font-weight: 900;
+      padding: .4rem .72rem;
+      transition: background .15s ease, color .15s ease, transform .15s ease;
+    }
+
+    .business-tab:hover {
+      transform: translateY(-1px);
+    }
+
+    .business-tab.is-active {
+      background: linear-gradient(135deg, #0b2f6f, #0b3b82);
+      color: #fff;
+      border-color: #0b2f6f;
+      box-shadow: 0 8px 18px rgba(11, 47, 111, .22);
+    }
+
+    .drilldown {
+      display: grid;
+      gap: .7rem;
+      max-height: 600px;
+      overflow: auto;
+      padding: .85rem;
+      scrollbar-width: thin;
+      scrollbar-color: #94a3b8 #e2e8f0;
+    }
+
+    .drill-card {
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      overflow: hidden;
+      background: #fff;
+      box-shadow: 0 7px 18px rgba(15, 23, 42, .045);
+    }
+
+    .drill-row {
+      width: 100%;
+      border: 0;
+      background: #fff;
+      color: #0f172a;
+      padding: .78rem .9rem;
+      display: grid;
+      grid-template-columns: 1fr auto auto;
+      gap: .75rem;
+      align-items: center;
+      text-align: left;
+      font-weight: 950;
+    }
+
+    .drill-row:hover { background: #f8fafc; }
+
+    .drill-row-category {
+      background: linear-gradient(135deg, #081f55, #0b3b82);
+      color: #fff;
+    }
+
+    .drill-row-category:hover { background: linear-gradient(135deg, #0b2f6f, #124797); }
+
+    .drill-row-title {
+      display: block;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .drill-row-sub {
+      display: block;
+      margin-top: .15rem;
+      color: #64748b;
+      font-size: .75rem;
+      font-weight: 750;
+    }
+
+    .drill-row-category .drill-row-sub,
+    .drill-row-category .drill-amount { color: rgba(255,255,255,.82); }
+
+    .drill-amount {
+      color: #0b3b82;
+      font-weight: 950;
+      white-space: nowrap;
+      font-size: .85rem;
+    }
+
+    .drill-caret {
+      width: 28px;
+      height: 28px;
+      border-radius: 999px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: #eef2ff;
+      color: #0b3b82;
+      font-size: .9rem;
+      transition: transform .15s ease;
+    }
+
+    .drill-row-category .drill-caret {
+      background: rgba(255,255,255,.18);
+      color: #fff;
+    }
+
+    .drill-row[aria-expanded="true"] .drill-caret {
+      transform: rotate(90deg);
+    }
+
+    .drill-panel {
+      display: none;
+      border-top: 1px solid #e5edf7;
+      background: #fbfdff;
+    }
+
+    .drill-panel.is-open { display: block; }
+
+    .plate-table {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0;
+      font-size: .86rem;
+      background: #fbfdff;
+    }
+
+    .plate-table th {
+      background: #eef4fb;
+      color: #243b64;
+      text-transform: uppercase;
+      font-size: .7rem;
+      letter-spacing: .04em;
+      padding: .58rem .75rem;
+      border-bottom: 1px solid #dbe4f0;
+    }
+
+    .plate-table td {
+      padding: .68rem .75rem;
+      border-top: 1px solid #edf2f7;
+      vertical-align: middle;
+    }
+
+    .plate-table tbody tr:hover td {
+      background: #f5f8fd;
+    }
+
+    .plate-link {
+      border: 0;
+      border-radius: 12px;
+      background: #eaf1ff;
+      color: #0b2f6f;
+      font-size: .78rem;
+      font-weight: 950;
+      padding: .38rem .65rem;
+      line-height: 1;
+      transition: transform .15s ease, background .15s ease;
+    }
+
+    .plate-link:hover {
+      background: #0b2f6f;
+      color: #fff;
+      transform: translateY(-1px);
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      border-radius: 999px;
+      font-size: .72rem;
+      font-weight: 950;
+      padding: .25rem .54rem;
+      white-space: nowrap;
+    }
+
+    .pill-preventivo { background: #dbeafe; color: #1e3a8a; }
+    .pill-correctivo { background: #fee2e2; color: #991b1b; }
+    .pill-neutral { background: #eef2f7; color: #334155; }
+
+    .family-pills {
+      display: flex;
+      flex-wrap: wrap;
+      gap: .3rem;
+    }
+
+    .detail-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 2000;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+      background: rgba(15, 23, 42, .62);
+      backdrop-filter: blur(4px);
+    }
+
+    .detail-backdrop.is-open { display: flex; }
+
+    .detail-modal {
+      width: min(1050px, 100%);
+      max-height: 88vh;
+      overflow: hidden;
+      background: #f8fafc;
+      color: var(--ink);
+      border-radius: 22px;
+      box-shadow: 0 24px 70px rgba(0,0,0,.28);
+      display: flex;
+      flex-direction: column;
+      border: 1px solid rgba(255,255,255,.5);
+    }
+
+    .detail-head {
+      background:
+        linear-gradient(112deg, transparent 0 68%, rgba(248, 180, 0, .85) 68% 76%, transparent 76%),
+        linear-gradient(135deg, #071a44 0%, #0b3b82 65%, #ef233c 100%);
+      color: #fff;
+      padding: 1.05rem 1.2rem;
+      display: flex;
+      justify-content: space-between;
+      gap: 1rem;
+      align-items: center;
+    }
+
+    .detail-body {
+      padding: 1rem 1.15rem 1.2rem;
+      overflow: auto;
+    }
+
+    .detail-close {
+      border: 1px solid rgba(255,255,255,.35);
+      background: rgba(255,255,255,.12);
+      color: #fff;
+      border-radius: 999px;
+      width: 38px;
+      height: 38px;
+      font-size: 1.2rem;
+      line-height: 1;
+    }
+
+    .record-card {
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      overflow: hidden;
+      margin-bottom: .9rem;
+      background: #fff;
+      box-shadow: 0 8px 20px rgba(15, 23, 42, .055);
+    }
+
+    .record-top {
+      background: linear-gradient(90deg, #f8fafc, #eef4ff);
+      padding: .78rem .9rem;
+      display: flex;
+      justify-content: space-between;
+      gap: .75rem;
+      border-bottom: 1px solid #e2e8f0;
+    }
+
+    .record-detail {
+      padding: .85rem .9rem;
+      color: #1f2a44;
+      line-height: 1.38;
+      word-break: break-word;
+    }
+
+    .classified-list {
+      padding: .2rem .9rem .9rem;
+      display: grid;
+      gap: .45rem;
+    }
+
+    .classified-item {
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      padding: .55rem .65rem;
+      background: #ffffff;
+    }
+
+    .classified-text {
+      color: #1f2a44;
+      font-size: .86rem;
+      margin-top: .35rem;
+      line-height: 1.34;
+    }
+
+    .empty-msg {
+      text-align: center;
+      color: var(--muted);
+      padding: 2rem;
+      font-weight: 700;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #0b2f6f, #0b3b82);
+      border: 0;
+      font-weight: 900;
+      border-radius: 999px;
+      box-shadow: 0 8px 18px rgba(11, 47, 111, .18);
+    }
+
+    .btn-secondary {
+      background: #64748b;
+      border: 0;
+      font-weight: 900;
+      border-radius: 999px;
+    }
+
+    .btn-dark {
+      background: #081f55;
+      border: 0;
+      font-weight: 900;
+    }
+
+    @media (max-width: 992px) {
+      .node-header { align-items: flex-start; flex-direction: column; }
+      .drilldown { max-height: none; }
+      .insight-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+
+    @media (max-width: 768px) {
+      .stat-number { font-size: 1.35rem; }
+      .hero-actions { justify-content: flex-start; }
+      .insight-strip { grid-template-columns: 1fr; }
+      .navbar .text-white {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: .5rem;
+      }
+      .selector-head {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+      .drill-row {
+        grid-template-columns: 1fr auto;
+      }
+      .drill-amount { grid-column: 1 / 2; }
+      .record-top { flex-direction: column; }
+      .chart-body { min-height: 300px; }
+      canvas { max-height: 300px; }
+    }
+  </style>
+</head>
+<body>
+<%
+  const data = dashboard || {};
+  const totalGeneral = Number(data.total || 0);
+  const totalPreventivos = (data.preventivos || []).length;
+  const totalCorrectivos = (data.correctivos || []).length;
+  const familiasData = Array.isArray(data.familias) ? data.familias : [];
+  const negociosData = Array.isArray(data.negocios) ? data.negocios : [];
+  const familiaTop = data.familiaPrincipal || {};
+  const negocioTop = [...negociosData].sort((a, b) => Number(b.total || 0) - Number(a.total || 0))[0] || {};
+  const placasTotal = negociosData.reduce((total, negocio) => {
+    return total + (negocio.subgrupos || []).reduce((subTotal, subgrupo) => subTotal + Number((subgrupo.placas || []).length), 0);
+  }, 0);
+  const promedioPorPlaca = placasTotal ? (totalGeneral / placasTotal).toFixed(1) : '0.0';
+  const sedeTexto = filtros.sede === 'TODAS' ? 'Todas permitidas' : filtros.sede;
+  const rangoFechas = filtros.fecha_desde || filtros.fecha_hasta
+    ? `${filtros.fecha_desde || 'Inicio'} - ${filtros.fecha_hasta || 'Hoy'}`
+    : 'Todo el historial';
+  const porcentaje = (valor) => totalGeneral ? Math.round((Number(valor || 0) / totalGeneral) * 100) : 0;
+  const negocioId = (nombre) => String(nombre || 'otros').toLowerCase().replace(/[^a-z0-9]+/g, '-');
+  const familiasDePlaca = (placa) => {
+    const mapa = new Map();
+    (placa.items || []).forEach(item => {
+      const familias = Array.isArray(item.familiasDetectadas) && item.familiasDetectadas.length
+        ? item.familiasDetectadas
+        : [{ nombre: item.familiaNombre, color: item.familiaColor }];
+      familias.forEach(familia => {
+        if (familia?.nombre) mapa.set(familia.nombre, familia.color || '#334155');
+      });
+    });
+    return [...mapa.entries()].map(([nombre, color]) => ({ nombre, color }));
+  };
+%>
+
+<nav class="navbar navbar-dark bg-dark px-4 py-3">
+  <span class="navbar-brand fw-semibold fs-5">
+    <i class="bi bi-tools"></i> Dashboard de Mantenimientos
+  </span>
+  <div class="text-white d-flex align-items-center gap-3">
+    <span><i class="bi bi-person-circle me-1"></i> <%= user.usuario %> (<%= user.rol %>)</span>
+    <a href="/mantenimientos" class="btn btn-sm btn-outline-light rounded-pill px-3">
+      <i class="bi bi-arrow-left me-1"></i> Listado
+    </a>
+    <a href="/dashboard" class="btn btn-sm btn-outline-light rounded-pill px-3">Inicio</a>
+  </div>
+</nav>
+
+<main class="container-fluid py-4 dashboard-shell">
+  <section class="hero-panel mb-4">
+    <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
+      <div>
+        <div class="eyebrow"><i class="bi bi-speedometer2"></i> Taller · Mantenimiento · Operación</div>
+        <h1 class="hero-title">Control ejecutivo de taller</h1>
+        <p class="hero-subtitle">Preventivos y correctivos clasificados por IA, negocio, sede y placa.</p>
+      </div>
+      <div class="hero-actions">
+        <span class="hero-badge"><i class="bi bi-building"></i> <%= sedeTexto %></span>
+        <span class="hero-badge"><i class="bi bi-calendar-range"></i> <%= rangoFechas %></span>
+        <% if (user.rol === 'ADMIN') { %>
+          <a href="/mantenimientos/exportar" class="btn btn-light btn-sm fw-bold rounded-pill px-3">
+            <i class="bi bi-file-earmark-excel"></i> Exportar historial
+          </a>
+        <% } %>
+      </div>
+    </div>
+  </section>
+
+  <section class="filter-panel mb-4">
+    <h5 class="filter-title mb-3"><i class="bi bi-funnel"></i>Filtrar dashboard</h5>
+    <form method="GET" action="/mantenimientos/dashboard" class="row g-3 align-items-end">
+      <div class="col-lg-3 col-md-4">
+        <label class="form-label small fw-bold">Sede</label>
+        <select name="sede" class="form-select form-select-sm">
+          <option value="TODAS" <%= filtros.sede === 'TODAS' ? 'selected' : '' %>>Todas permitidas</option>
+          <% (sedesFiltro || []).forEach(s => { %>
+            <option value="<%= s.valor %>" <%= filtros.sede === s.valor ? 'selected' : '' %>><%= s.etiqueta %></option>
+          <% }) %>
+        </select>
+      </div>
+      <div class="col-lg-2 col-md-4">
+        <label class="form-label small fw-bold">Desde</label>
+        <input type="date" name="fecha_desde" class="form-control form-control-sm" value="<%= filtros.fecha_desde || '' %>">
+      </div>
+      <div class="col-lg-2 col-md-4">
+        <label class="form-label small fw-bold">Hasta</label>
+        <input type="date" name="fecha_hasta" class="form-control form-control-sm" value="<%= filtros.fecha_hasta || '' %>">
+      </div>
+      <div class="col-lg-2 col-md-6">
+        <button class="btn btn-primary btn-sm w-100">Filtrar</button>
+      </div>
+      <div class="col-lg-2 col-md-6">
+        <a href="/mantenimientos/dashboard" class="btn btn-secondary btn-sm w-100">Limpiar</a>
+      </div>
+    </form>
+  </section>
+
+  <section class="row g-4 mb-4">
+    <div class="col-lg-3 col-sm-6">
+      <div class="stat-card">
+        <div>
+          <div class="stat-number"><%= totalGeneral.toLocaleString('es-CR') %></div>
+          <div class="stat-label">Reportes clasificados</div>
+          <div class="stat-note">Datos unidos por IA y placa</div>
+        </div>
+        <div class="stat-icon"><i class="bi bi-clipboard2-pulse text-primary"></i></div>
+      </div>
+    </div>
+    <div class="col-lg-3 col-sm-6">
+      <div class="stat-card">
+        <div>
+          <div class="stat-number"><%= totalPreventivos.toLocaleString('es-CR') %></div>
+          <div class="stat-label">Preventivos</div>
+          <div class="stat-note">Planificados y ejecutados</div>
+        </div>
+        <div class="stat-icon"><i class="bi bi-calendar2-check text-success"></i></div>
+      </div>
+    </div>
+    <div class="col-lg-3 col-sm-6">
+      <div class="stat-card">
+        <div>
+          <div class="stat-number"><%= totalCorrectivos.toLocaleString('es-CR') %></div>
+          <div class="stat-label">Correctivos</div>
+          <div class="stat-note">Trabajos y reportes de falla</div>
+        </div>
+        <div class="stat-icon"><i class="bi bi-wrench-adjustable text-danger"></i></div>
+      </div>
+    </div>
+    <div class="col-lg-3 col-sm-6">
+      <div class="stat-card">
+        <div>
+          <div class="stat-number"><%= placasTotal.toLocaleString('es-CR') %></div>
+          <div class="stat-label">Placas con historial</div>
+          <div class="stat-note"><%= promedioPorPlaca %> reportes por placa</div>
+        </div>
+        <div class="stat-icon"><i class="bi bi-truck-front text-warning"></i></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="insight-strip mb-4">
+    <div class="insight-card">
+      <div class="insight-label">Vista actual</div>
+      <div class="insight-value"><%= sedeTexto %></div>
+      <div class="insight-caption">Sede o grupo filtrado</div>
+    </div>
+    <div class="insight-card">
+      <div class="insight-label">Rango</div>
+      <div class="insight-value"><%= rangoFechas %></div>
+      <div class="insight-caption">Periodo analizado</div>
+    </div>
+    <div class="insight-card">
+      <div class="insight-label">Negocio principal</div>
+      <div class="insight-value"><%= negocioTop.nombre || '-' %></div>
+      <div class="insight-caption"><%= Number(negocioTop.total || 0).toLocaleString('es-CR') %> reportes</div>
+    </div>
+    <div class="insight-card">
+      <div class="insight-label">Familia principal</div>
+      <div class="insight-value"><%= familiaTop.nombre || '-' %></div>
+      <div class="insight-caption"><%= Number(familiaTop.total || 0).toLocaleString('es-CR') %> registros detectados</div>
+    </div>
+  </section>
+
+  <section class="row g-3 mb-4">
+    <% familiasData.forEach(f => { %>
+      <div class="col-xl col-lg-4 col-md-6">
+        <div class="family-card" style="--family-color:<%= f.color %>">
+          <div class="family-head">
+            <div class="family-name"><%= f.nombre %></div>
+            <div class="family-total" style="color:<%= f.color %>"><%= Number(f.total || 0).toLocaleString('es-CR') %></div>
+          </div>
+          <div class="family-bar"><span style="width:<%= porcentaje(f.total) %>%;background:<%= f.color %>"></span></div>
+          <div class="family-split">
+            <span>P: <%= Number(f.preventivos?.length || 0).toLocaleString('es-CR') %></span>
+            <span>C: <%= Number(f.correctivos?.length || 0).toLocaleString('es-CR') %></span>
+          </div>
+        </div>
+      </div>
+    <% }) %>
+  </section>
+
+  <section class="maintenance-node">
+    <div class="node-header">
+      <div>
+        <h2 class="node-title"><i class="bi bi-diagram-3 me-2"></i>Reportes por negocio, sede y placa</h2>
+        <p class="node-subtitle">Seleccione el negocio y abra la sede o placa para revisar la información completa.</p>
+      </div>
+      <div class="d-flex flex-wrap gap-2">
+        <span class="node-chip"><i class="bi bi-star-fill"></i> Principal: <%= negocioTop.nombre || '—' %></span>
+        <span class="node-chip"><i class="bi bi-activity"></i> Familia top: <%= familiaTop.nombre || '—' %></span>
+      </div>
+    </div>
+
+    <div class="node-body">
+      <% if (!totalGeneral) { %>
+        <div class="empty-msg">No hay reportes con los filtros seleccionados.</div>
+      <% } else { %>
+        <div class="row g-3 align-items-stretch">
+          <div class="col-lg-5">
+            <div class="chart-card">
+              <div class="chart-head">
+                <span><i class="bi bi-bar-chart-fill me-2"></i>Resumen por negocio</span>
+                <small><%= totalGeneral.toLocaleString('es-CR') %> reportes</small>
+              </div>
+              <div class="chart-body">
+                <canvas id="chartNegocios"></canvas>
+              </div>
+            </div>
+          </div>
+          <div class="col-lg-7">
+            <div class="selector-card">
+              <div class="selector-head">
+                <div>
+                  <div class="fw-black">Seleccionar vista</div>
+                  <div class="small text-muted fw-semibold">Use los botones para ver solo una división.</div>
+                </div>
+                <div class="business-tabs">
+                  <button type="button" class="business-tab is-active js-business-tab" data-business-filter="TODOS">Todos</button>
+                  <% negociosData.forEach(negocio => { %>
+                    <button type="button" class="business-tab js-business-tab" data-business-filter="<%= negocio.nombre %>"><%= negocio.nombre %></button>
+                  <% }) %>
+                </div>
+              </div>
+
+              <div class="drilldown">
+                <% negociosData.forEach(negocio => { %>
+                  <% const grupoId = `negocio-${negocioId(negocio.nombre)}`; %>
+                  <section class="drill-card js-business-section" data-business="<%= negocio.nombre %>">
+                    <button type="button" class="drill-row drill-row-category js-drill-toggle" data-target="<%= grupoId %>" aria-expanded="true">
+                      <span>
+                        <span class="drill-row-title"><%= negocio.nombre %></span>
+                        <span class="drill-row-sub">
+                          <%= Number(negocio.subgrupos?.length || 0).toLocaleString('es-CR') %> grupo(s) ·
+                          <%= Number(negocio.preventivos || 0).toLocaleString('es-CR') %> preventivos ·
+                          <%= Number(negocio.correctivos || 0).toLocaleString('es-CR') %> correctivos
+                        </span>
+                      </span>
+                      <span class="drill-amount"><%= Number(negocio.total || 0).toLocaleString('es-CR') %> reportes</span>
+                      <span class="drill-caret"><i class="bi bi-chevron-right"></i></span>
+                    </button>
+
+                    <div class="drill-panel is-open" id="<%= grupoId %>">
+                      <% negocio.subgrupos.forEach((subgrupo, subIndex) => { %>
+                        <% const subId = `${grupoId}-sub-${subIndex}`; %>
+                        <button type="button" class="drill-row js-drill-toggle" data-target="<%= subId %>" aria-expanded="false">
+                          <span>
+                            <span class="drill-row-title"><%= subgrupo.nombre %></span>
+                            <span class="drill-row-sub"><%= Number(subgrupo.placas?.length || 0).toLocaleString('es-CR') %> placa(s)</span>
+                          </span>
+                          <span class="drill-amount"><%= Number(subgrupo.preventivos || 0).toLocaleString('es-CR') %> preventivos · <%= Number(subgrupo.correctivos || 0).toLocaleString('es-CR') %> correctivos</span>
+                          <span class="drill-caret"><i class="bi bi-chevron-right"></i></span>
+                        </button>
+
+                        <div class="drill-panel" id="<%= subId %>">
+                          <div class="table-responsive">
+                            <table class="plate-table">
+                              <thead>
+                                <tr>
+                                  <th>Placa</th>
+                                  <th class="text-center">Preventivo</th>
+                                  <th class="text-center">Correctivo</th>
+                                  <th>Familias detectadas</th>
+                                  <th class="text-end">Acción</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                <% if (!subgrupo.placas.length) { %>
+                                  <tr>
+                                    <td colspan="5" class="text-center text-muted fw-semibold py-3">
+                                      Sin reportes para esta división con los filtros actuales.
+                                    </td>
+                                  </tr>
+                                <% } %>
+                                <% subgrupo.placas.forEach(placa => { %>
+                                  <% const familiasPlaca = familiasDePlaca(placa); %>
+                                  <tr>
+                                    <td>
+                                      <button type="button" class="plate-link js-plate-detail" data-placa="<%= placa.placa %>"><%= placa.placa %></button>
+                                      <div class="small text-muted mt-1"><%= placa.sedeEtiqueta || subgrupo.nombre %></div>
+                                    </td>
+                                    <td class="text-center"><span class="pill pill-preventivo"><%= Number(placa.preventivos || 0).toLocaleString('es-CR') %></span></td>
+                                    <td class="text-center"><span class="pill pill-correctivo"><%= Number(placa.correctivos || 0).toLocaleString('es-CR') %></span></td>
+                                    <td>
+                                      <div class="family-pills">
+                                        <% familiasPlaca.slice(0, 4).forEach(familia => { %>
+                                          <span class="pill pill-neutral" style="color:<%= familia.color %>"><%= familia.nombre %></span>
+                                        <% }) %>
+                                        <% if (familiasPlaca.length > 4) { %>
+                                          <span class="pill pill-neutral">+<%= familiasPlaca.length - 4 %></span>
+                                        <% } %>
+                                        <% if (!familiasPlaca.length) { %>
+                                          <span class="pill pill-neutral">-</span>
+                                        <% } %>
+                                      </div>
+                                    </td>
+                                    <td class="text-end">
+                                      <button type="button" class="btn btn-sm btn-dark rounded-pill js-plate-detail" data-placa="<%= placa.placa %>">
+                                        <i class="bi bi-search me-1"></i> Ver detalle
+                                      </button>
+                                    </td>
+                                  </tr>
+                                <% }) %>
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      <% }) %>
+                    </div>
+                  </section>
+                <% }) %>
+              </div>
+            </div>
+          </div>
+        </div>
+      <% } %>
+    </div>
+  </section>
+</main>
+
+<div class="detail-backdrop" id="detailBackdrop" aria-hidden="true">
+  <div class="detail-modal" role="dialog" aria-modal="true" aria-labelledby="detailTitle">
+    <div class="detail-head">
+      <div>
+        <div class="small text-white-50 fw-bold text-uppercase">Historial por placa</div>
+        <h3 class="h5 fw-black mb-0" id="detailTitle">Placa</h3>
+      </div>
+      <button type="button" class="detail-close" id="detailClose" aria-label="Cerrar">&times;</button>
+    </div>
+    <div class="detail-body" id="detailBody"></div>
+  </div>
+</div>
+
+<script type="application/json" id="data-negocios"><%- JSON.stringify(negociosData) %></script>
+<script>
+  const readJson = (id, fallback) => {
+    const el = document.getElementById(id);
+    if (!el) return fallback;
+    try { return JSON.parse(el.textContent || JSON.stringify(fallback)); }
+    catch (error) { console.error('Error leyendo datos:', id, error); return fallback; }
+  };
+
+  const negocios = readJson('data-negocios', []);
+  const escapeHtml = (value) => String(value || '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#039;');
+
+  const placasDetalle = {};
+  negocios.forEach(negocio => {
+    (negocio.subgrupos || []).forEach(subgrupo => {
+      (subgrupo.placas || []).forEach(placa => {
+        placasDetalle[placa.placa] = placa;
+      });
+    });
+  });
+
+  document.querySelectorAll('.js-drill-toggle').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const panel = document.getElementById(btn.dataset.target);
+      if (!panel) return;
+      const isOpen = panel.classList.toggle('is-open');
+      btn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+    });
+  });
+
+  document.querySelectorAll('.js-business-tab').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const filtro = btn.dataset.businessFilter;
+      document.querySelectorAll('.js-business-tab').forEach(tab => tab.classList.remove('is-active'));
+      btn.classList.add('is-active');
+      document.querySelectorAll('.js-business-section').forEach(section => {
+        section.style.display = filtro === 'TODOS' || section.dataset.business === filtro ? '' : 'none';
+      });
+    });
+  });
+
+  const abrirDetalle = (placaId) => {
+    const placa = placasDetalle[placaId];
+    const backdrop = document.getElementById('detailBackdrop');
+    const title = document.getElementById('detailTitle');
+    const body = document.getElementById('detailBody');
+    if (!placa || !backdrop || !title || !body) return;
+
+    const items = Array.isArray(placa.items) ? placa.items : [];
+    title.textContent = `${placa.placa} · ${items.length} reporte(s)`;
+
+    body.innerHTML = items.length ? items.map(item => {
+      const trabajos = Array.isArray(item.trabajosClasificados) && item.trabajosClasificados.length
+        ? item.trabajosClasificados
+        : [{ texto: item.detalle || '-', familiaNombre: item.familiaNombre || '-', familiaColor: item.familiaColor || '#334155' }];
+
+      const familias = Array.isArray(item.familiasDetectadas) && item.familiasDetectadas.length
+        ? item.familiasDetectadas
+        : [{ nombre: item.familiaNombre || '-', color: item.familiaColor || '#334155' }];
+
+      return `
+        <section class="record-card">
+          <div class="record-top">
+            <div>
+              <div class="d-flex gap-2 flex-wrap align-items-center mb-1">
+                <span class="pill ${item.tipoRegistro === 'PREVENTIVO' ? 'pill-preventivo' : 'pill-correctivo'}">${escapeHtml(item.tipoRegistro)}</span>
+                ${familias.map(familia => `<span class="pill pill-neutral" style="color:${escapeHtml(familia.color || '#334155')}">${escapeHtml(familia.nombre || '-')}</span>`).join('')}
+              </div>
+              <div class="small text-muted fw-bold">${escapeHtml(item.sedeEtiqueta)} · ${escapeHtml(item.fecha)}</div>
+            </div>
+            <div class="text-muted small fw-bold">${escapeHtml(item.mecanicos || '-')}</div>
+          </div>
+          <div class="record-detail"><strong>Resumen original:</strong> ${escapeHtml(item.detalle || '-')}</div>
+          <div class="classified-list">
+            ${trabajos.map(trabajo => `
+              <div class="classified-item">
+                <span class="pill pill-neutral" style="color:${escapeHtml(trabajo.familiaColor || '#334155')}">${escapeHtml(trabajo.familiaNombre || '-')}</span>
+                <div class="classified-text">${escapeHtml(trabajo.texto || '-')}</div>
+              </div>
+            `).join('')}
+          </div>
+        </section>
+      `;
+    }).join('') : '<div class="empty-msg">No hay detalle para esta placa.</div>';
+
+    backdrop.classList.add('is-open');
+    backdrop.setAttribute('aria-hidden', 'false');
+  };
+
+  const cerrarDetalle = () => {
+    const backdrop = document.getElementById('detailBackdrop');
+    if (!backdrop) return;
+    backdrop.classList.remove('is-open');
+    backdrop.setAttribute('aria-hidden', 'true');
+  };
+
+  document.querySelectorAll('.js-plate-detail').forEach(btn => {
+    btn.addEventListener('click', () => abrirDetalle(btn.dataset.placa));
+  });
+
+  document.getElementById('detailClose')?.addEventListener('click', cerrarDetalle);
+  document.getElementById('detailBackdrop')?.addEventListener('click', event => {
+    if (event.target.id === 'detailBackdrop') cerrarDetalle();
+  });
+  document.addEventListener('keydown', event => {
+    if (event.key === 'Escape') cerrarDetalle();
+  });
+
+  const canvasNegocios = document.getElementById('chartNegocios');
+  if (canvasNegocios && negocios.length) {
+    const chartGradientBlue = canvasNegocios.getContext('2d').createLinearGradient(0, 0, 0, 320);
+    chartGradientBlue.addColorStop(0, '#0b3b82');
+    chartGradientBlue.addColorStop(1, '#1d7ed0');
+    const chartGradientRed = canvasNegocios.getContext('2d').createLinearGradient(0, 0, 0, 320);
+    chartGradientRed.addColorStop(0, '#ef233c');
+    chartGradientRed.addColorStop(1, '#f97316');
+
+    new Chart(canvasNegocios, {
+      type: 'bar',
+      data: {
+        labels: negocios.map(item => item.nombre),
+        datasets: [
+          {
+            label: 'Preventivos',
+            data: negocios.map(item => Number(item.preventivos || 0)),
+            backgroundColor: chartGradientBlue,
+            borderRadius: 10,
+            borderSkipped: false,
+            barThickness: 34,
+            maxBarThickness: 46
+          },
+          {
+            label: 'Correctivos',
+            data: negocios.map(item => Number(item.correctivos || 0)),
+            backgroundColor: chartGradientRed,
+            borderRadius: 10,
+            borderSkipped: false,
+            barThickness: 34,
+            maxBarThickness: 46
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          x: {
+            stacked: true,
+            grid: { display: false },
+            ticks: { color: '#334155', font: { weight: 'bold' } }
+          },
+          y: {
+            stacked: true,
+            beginAtZero: true,
+            ticks: { precision: 0, color: '#64748b' },
+            grid: { color: '#e5edf7' }
+          }
+        },
+        plugins: {
+          legend: {
+            position: 'bottom',
+            labels: { usePointStyle: true, boxWidth: 8, color: '#334155', font: { weight: 'bold' } }
+          },
+          tooltip: {
+            backgroundColor: '#071a44',
+            padding: 12,
+            titleFont: { weight: 'bold' },
+            callbacks: {
+              footer: rows => {
+                const idx = rows[0]?.dataIndex || 0;
+                const item = negocios[idx] || {};
+                return `Total: ${Number(item.total || 0).toLocaleString('es-CR')} reportes`;
+              }
+            }
+          }
+        }
+      }
+    });
+  }
+</script>
+</body>
+</html>

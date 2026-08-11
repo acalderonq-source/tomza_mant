@@ -1,0 +1,635 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Resumen Ejecutivo - Gas Tomza</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --navy: #071a44;
+      --blue: #0b3b82;
+      --red: #ef233c;
+      --gold: #f8b400;
+      --ink: #0f172a;
+      --muted: #64748b;
+      --line: #dbe4f0;
+      --soft: #f6f8fc;
+      --card: #ffffff;
+    }
+
+    body {
+      background:
+        radial-gradient(circle at top left, rgba(11, 59, 130, .12), transparent 32rem),
+        linear-gradient(135deg, #f7f9fd 0%, #eef3f9 100%);
+      color: var(--ink);
+      font-family: "Segoe UI", Roboto, Arial, sans-serif;
+    }
+
+    .topbar {
+      background: linear-gradient(90deg, var(--navy), var(--blue) 72%, #111827);
+      border-bottom: 3px solid var(--gold);
+      box-shadow: 0 8px 24px rgba(7, 26, 68, .2);
+    }
+
+    .shell { max-width: 1580px; }
+
+    .hero {
+      position: relative;
+      overflow: hidden;
+      color: #fff;
+      background:
+        linear-gradient(112deg, transparent 0 68%, rgba(248,180,0,.86) 68% 76%, transparent 76%),
+        linear-gradient(135deg, var(--navy), var(--blue) 62%, var(--red));
+      border-radius: 22px;
+      padding: 1.35rem 1.5rem;
+      box-shadow: 0 18px 42px rgba(7, 26, 68, .2);
+    }
+
+    .eyebrow {
+      color: rgba(255,255,255,.82);
+      font-size: .72rem;
+      font-weight: 900;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+    }
+
+    .page-title {
+      font-size: clamp(1.45rem, 2.4vw, 2.25rem);
+      font-weight: 950;
+      line-height: 1.05;
+      margin: .35rem 0 .25rem;
+      text-transform: uppercase;
+    }
+
+    .hero-subtitle {
+      color: rgba(255,255,255,.78);
+      font-weight: 650;
+      margin: 0;
+    }
+
+    .panel,
+    .metric-card,
+    .chart-card,
+    .table-card,
+    .conclusion-card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      box-shadow: 0 12px 30px rgba(15, 23, 42, .065);
+    }
+
+    .panel { padding: 1rem; }
+
+    .panel label {
+      color: #475569;
+      font-size: .68rem;
+      font-weight: 900;
+      letter-spacing: .05em;
+      text-transform: uppercase;
+    }
+
+    .panel .form-control,
+    .panel .form-select {
+      border-color: #cfd9e8;
+      border-radius: 12px;
+      min-height: 38px;
+    }
+
+    .metric-card {
+      position: relative;
+      overflow: hidden;
+      min-height: 108px;
+      padding: 1rem;
+    }
+
+    .metric-card::before {
+      content: "";
+      position: absolute;
+      inset: 0 0 auto;
+      height: 4px;
+      background: var(--accent, var(--blue));
+    }
+
+    .metric-label {
+      color: var(--muted);
+      font-size: .72rem;
+      font-weight: 950;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+    }
+
+    .metric-value {
+      color: #10213f;
+      font-size: 1.65rem;
+      font-weight: 950;
+      line-height: 1.1;
+      margin-top: .3rem;
+    }
+
+    .metric-foot {
+      color: var(--muted);
+      font-size: .78rem;
+      font-weight: 750;
+      margin-top: .25rem;
+    }
+
+    .chart-card { overflow: hidden; height: 100%; }
+
+    .card-head {
+      align-items: center;
+      background: linear-gradient(90deg, rgba(11,59,130,.08), transparent 62%), #f8fafc;
+      border-bottom: 1px solid #e6edf6;
+      display: flex;
+      justify-content: space-between;
+      gap: .75rem;
+      padding: .9rem 1rem;
+    }
+
+    .card-title {
+      color: #172554;
+      font-size: 1rem;
+      font-weight: 950;
+      margin: 0;
+    }
+
+    .card-subtitle {
+      color: var(--muted);
+      font-size: .74rem;
+      font-weight: 750;
+    }
+
+    .chart-body {
+      min-height: 320px;
+      padding: 1rem;
+    }
+
+    canvas {
+      width: 100% !important;
+      max-height: 330px;
+    }
+
+    .conclusion-list {
+      display: grid;
+      gap: .65rem;
+    }
+
+    .formula-box {
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      border-radius: 14px;
+      color: #172554;
+      font-size: .86rem;
+      font-weight: 750;
+      line-height: 1.35;
+      margin-bottom: .8rem;
+      padding: .8rem .9rem;
+    }
+
+    .formula-box strong {
+      font-weight: 950;
+    }
+
+    .conclusion-item {
+      background: #fff7ed;
+      border: 1px solid #fed7aa;
+      border-left: 5px solid var(--red);
+      border-radius: 14px;
+      color: #1f2937;
+      font-weight: 800;
+      line-height: 1.3;
+      padding: .75rem .85rem;
+    }
+
+    .table-card { overflow: hidden; height: 100%; }
+
+    .table {
+      font-size: .86rem;
+      margin: 0;
+    }
+
+    .table thead th {
+      background: #eef4fb;
+      color: #243b64;
+      font-size: .68rem;
+      font-weight: 950;
+      letter-spacing: .05em;
+      text-transform: uppercase;
+    }
+
+    .table td { vertical-align: middle; }
+
+    .rank {
+      align-items: center;
+      background: #eaf1ff;
+      border-radius: 999px;
+      color: var(--blue);
+      display: inline-flex;
+      font-size: .75rem;
+      font-weight: 950;
+      height: 26px;
+      justify-content: center;
+      width: 26px;
+    }
+
+    .money {
+      color: #0f172a;
+      font-weight: 950;
+      white-space: nowrap;
+    }
+
+    .pill {
+      border-radius: 999px;
+      display: inline-flex;
+      font-size: .72rem;
+      font-weight: 950;
+      padding: .25rem .55rem;
+      white-space: nowrap;
+    }
+
+    .pill-soft { background: #eef2f7; color: #334155; }
+    .pill-blue { background: #dbeafe; color: #1e3a8a; }
+    .pill-red { background: #fee2e2; color: #991b1b; }
+
+    .empty-state {
+      color: var(--muted);
+      font-weight: 800;
+      padding: 1.4rem;
+      text-align: center;
+    }
+
+    @media (max-width: 768px) {
+      .hero { padding: 1rem; }
+      .metric-value { font-size: 1.35rem; }
+      .chart-body { min-height: 260px; }
+      canvas { max-height: 280px; }
+    }
+  </style>
+</head>
+<body>
+<%
+  const data = resumen || {};
+  const money = (value) => Number(value || 0).toLocaleString('es-CR', { maximumFractionDigits: 0 });
+  const pct = (value, total) => total ? Math.round((Number(value || 0) / Number(total || 1)) * 100) : 0;
+  const fecha = (value) => {
+    if (!value) return '-';
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? String(value).slice(0, 10) : date.toLocaleDateString('es-CR');
+  };
+  const safe = (arr) => Array.isArray(arr) ? arr : [];
+  const categorias = safe(data.categorias);
+  const fuentes = safe(data.fuentes);
+  const proveedores = safe(data.proveedores);
+  const sedesGasto = safe(data.sedes);
+  const placasGasto = safe(data.placas);
+  const meses = safe(data.meses);
+  const familiasMant = safe(data.familiasMant);
+  const sedesMant = safe(data.sedesMant);
+  const placasMant = safe(data.placasMant);
+  const tiposMant = safe(data.tiposMant);
+  const conclusiones = safe(data.conclusiones);
+  const costoUnidad = data.costoUnidad || {};
+%>
+
+<nav class="navbar navbar-dark topbar px-4 py-3">
+  <span class="navbar-brand fw-bold"><i class="bi bi-graph-up-arrow me-2"></i>Resumen ejecutivo</span>
+  <div class="d-flex align-items-center gap-2 flex-wrap">
+    <span class="text-white small"><%= user.usuario %> · <%= user.rol %></span>
+    <a href="/dashboard" class="btn btn-sm btn-outline-light rounded-pill px-3">Inicio</a>
+  </div>
+</nav>
+
+<main class="container-fluid shell py-4">
+  <section class="hero mb-4">
+    <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
+      <div>
+        <div class="eyebrow"><i class="bi bi-cash-coin me-1"></i> Dinero · Taller · Conclusiones</div>
+        <h1 class="page-title">Dónde se está gastando el dinero</h1>
+        <p class="hero-subtitle">Cruza órdenes, pagos de proveedor, caja chica, preventivos y correctivos; las tablas por unidad muestran solo placas reales registradas.</p>
+      </div>
+      <div class="text-white text-end">
+        <div class="small opacity-75 fw-bold">Sede actual</div>
+        <div class="h5 fw-black mb-0"><%= sedeSeleccionada || 'TODAS' %></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel mb-4">
+    <form method="GET" action="/dashboard/resumen-ejecutivo" class="row g-3 align-items-end">
+      <div class="col-lg-3 col-md-6">
+        <label class="form-label">Sede</label>
+        <select name="sede" class="form-select form-select-sm">
+          <% if (usuarioTodasSedes) { %>
+            <option value="TODAS" <%= filtros.sede === 'TODAS' ? 'selected' : '' %>>Todas</option>
+          <% } %>
+          <% safe(sedes).forEach(s => { %>
+            <option value="<%= s %>" <%= filtros.sede === s ? 'selected' : '' %>><%= typeof etiquetaSede === 'function' ? etiquetaSede(s) : s %></option>
+          <% }) %>
+        </select>
+      </div>
+      <div class="col-lg-2 col-md-6">
+        <label class="form-label">Desde</label>
+        <input type="date" name="fecha_desde" class="form-control form-control-sm" value="<%= filtros.fecha_desde || '' %>">
+      </div>
+      <div class="col-lg-2 col-md-6">
+        <label class="form-label">Hasta</label>
+        <input type="date" name="fecha_hasta" class="form-control form-control-sm" value="<%= filtros.fecha_hasta || '' %>">
+      </div>
+      <div class="col-lg-2 col-md-6">
+        <button class="btn btn-primary btn-sm rounded-pill w-100 fw-bold">Filtrar</button>
+      </div>
+      <div class="col-lg-2 col-md-6">
+        <a href="/dashboard/resumen-ejecutivo" class="btn btn-secondary btn-sm rounded-pill w-100 fw-bold">Limpiar</a>
+      </div>
+    </form>
+  </section>
+
+  <section class="row g-3 mb-4">
+    <div class="col-xl col-md-6">
+      <div class="metric-card" style="--accent:#0b3b82">
+        <div class="metric-label">Total gastado</div>
+        <div class="metric-value">₡<%= money(data.totalGastos) %></div>
+        <div class="metric-foot"><%= Number(data.totalRegistrosGasto || 0).toLocaleString('es-CR') %> movimientos de dinero</div>
+      </div>
+    </div>
+    <div class="col-xl col-md-6">
+      <div class="metric-card" style="--accent:#ef233c">
+        <div class="metric-label">Mayor categoría</div>
+        <div class="metric-value"><%= categorias[0]?.nombre || '-' %></div>
+        <div class="metric-foot">₡<%= money(categorias[0]?.total || 0) %> · <%= pct(categorias[0]?.total, data.totalGastos) %>% del gasto</div>
+      </div>
+    </div>
+    <div class="col-xl col-md-6">
+      <div class="metric-card" style="--accent:#7c3aed">
+        <div class="metric-label">Costo promedio por unidad</div>
+        <div class="metric-value">₡<%= money(costoUnidad.costoPromedioPorUnidad || 0) %></div>
+        <div class="metric-foot"><%= Number(costoUnidad.unidadesConGasto || 0).toLocaleString('es-CR') %> placa(s) con gasto real</div>
+      </div>
+    </div>
+    <div class="col-xl col-md-6">
+      <div class="metric-card" style="--accent:#f8b400">
+        <div class="metric-label">Mantenimientos</div>
+        <div class="metric-value"><%= Number(data.totalMantenimientos || 0).toLocaleString('es-CR') %></div>
+        <div class="metric-foot"><%= familiasMant[0]?.nombre || '-' %> es lo más repetido</div>
+      </div>
+    </div>
+    <div class="col-xl col-md-6">
+      <div class="metric-card" style="--accent:#0f766e">
+        <div class="metric-label">Placa con más gasto</div>
+        <div class="metric-value"><%= placasGasto[0]?.nombre || '-' %></div>
+        <div class="metric-foot">₡<%= money(placasGasto[0]?.total || 0) %> · <%= placasGasto[0]?.sede || '-' %></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="row g-3 mb-4">
+    <div class="col-lg-8">
+      <div class="chart-card">
+        <div class="card-head">
+          <div>
+            <h2 class="card-title"><i class="bi bi-bar-chart-fill me-1"></i>Gasto por mes</h2>
+            <div class="card-subtitle">Tendencia general del dinero registrado.</div>
+          </div>
+        </div>
+        <div class="chart-body"><canvas id="chartMeses"></canvas></div>
+      </div>
+    </div>
+    <div class="col-lg-4">
+      <div class="chart-card">
+        <div class="card-head">
+          <div>
+            <h2 class="card-title"><i class="bi bi-pie-chart-fill me-1"></i>Gasto por categoría</h2>
+            <div class="card-subtitle">Dónde se concentra la plata.</div>
+          </div>
+        </div>
+        <div class="chart-body"><canvas id="chartCategorias"></canvas></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="row g-3 mb-4">
+    <div class="col-lg-5">
+      <div class="conclusion-card p-3 h-100">
+        <div class="card-title mb-2"><i class="bi bi-lightbulb-fill text-warning me-1"></i>Conclusiones</div>
+        <div class="formula-box">
+          <strong>Cómo se saca el costo por unidad:</strong><br>
+          ₡<%= money(costoUnidad.totalGastoConUnidad || 0) %> en gastos con placa real ÷
+          <%= Number(costoUnidad.unidadesConGasto || 0).toLocaleString('es-CR') %> unidad(es) =
+          <strong>₡<%= money(costoUnidad.costoPromedioPorUnidad || 0) %></strong>.
+          <% if (Number(costoUnidad.totalGastoSinUnidad || 0) > 0) { %>
+            <div class="mt-1 text-muted">
+              ₡<%= money(costoUnidad.totalGastoSinUnidad || 0) %> queda fuera de este promedio porque no tiene placa real registrada.
+            </div>
+          <% } %>
+        </div>
+        <% if (!conclusiones.length) { %>
+          <div class="empty-state">No hay suficientes datos para generar conclusiones.</div>
+        <% } else { %>
+          <div class="conclusion-list">
+            <% conclusiones.forEach(item => { %>
+              <div class="conclusion-item"><%= item %></div>
+            <% }) %>
+          </div>
+        <% } %>
+      </div>
+    </div>
+    <div class="col-lg-7">
+      <div class="chart-card">
+        <div class="card-head">
+          <div>
+            <h2 class="card-title"><i class="bi bi-tools me-1"></i>Mantenimientos por familia</h2>
+            <div class="card-subtitle">Preventivos y correctivos clasificados por tipo de trabajo.</div>
+          </div>
+        </div>
+        <div class="chart-body"><canvas id="chartMantenimientos"></canvas></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="row g-3 mb-4">
+    <div class="col-lg-6">
+      <div class="table-card">
+        <div class="card-head"><h2 class="card-title">Top proveedores</h2><span class="card-subtitle">Mayor a menor monto</span></div>
+        <div class="table-responsive">
+          <table class="table table-hover align-middle">
+            <thead><tr><th>#</th><th>Proveedor</th><th>Mov.</th><th class="text-end">Monto</th></tr></thead>
+            <tbody>
+              <% if (!proveedores.length) { %><tr><td colspan="4" class="empty-state">No hay registros para este filtro.</td></tr><% } %>
+              <% proveedores.forEach((item, i) => { %>
+                <tr><td><span class="rank"><%= i + 1 %></span></td><td><strong><%= item.nombre %></strong></td><td><span class="pill pill-soft"><%= item.registros %></span></td><td class="text-end money">₡<%= money(item.total) %></td></tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-6">
+      <div class="table-card">
+        <div class="card-head"><h2 class="card-title">Costo por unidad</h2><span class="card-subtitle">Monto acumulado por placa real en el periodo</span></div>
+        <div class="table-responsive">
+          <table class="table table-hover align-middle">
+            <thead><tr><th>#</th><th>Placa</th><th>Sede</th><th>Mov.</th><th class="text-end">Monto</th></tr></thead>
+            <tbody>
+              <% if (!placasGasto.length) { %><tr><td colspan="5" class="empty-state">No hay placas reales con monto en este filtro.</td></tr><% } %>
+              <% placasGasto.forEach((item, i) => { %>
+                <tr><td><span class="rank"><%= i + 1 %></span></td><td><strong><%= item.nombre %></strong></td><td><%= item.sede || '-' %></td><td><span class="pill pill-blue"><%= item.registros %></span></td><td class="text-end money">₡<%= money(item.total) %></td></tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="row g-3 mb-4">
+    <div class="col-lg-6">
+      <div class="table-card">
+        <div class="card-head"><h2 class="card-title">Gasto por sede</h2><span class="card-subtitle">Calculado solo desde placas registradas</span></div>
+        <div class="table-responsive">
+          <table class="table table-hover align-middle">
+            <thead><tr><th>Sede</th><th>Mov.</th><th class="text-end">Monto</th></tr></thead>
+            <tbody>
+              <% if (!sedesGasto.length) { %><tr><td colspan="3" class="empty-state">No hay sedes con placas reales en este filtro.</td></tr><% } %>
+              <% sedesGasto.forEach(item => { %>
+                <tr><td><strong><%= item.nombre %></strong></td><td><span class="pill pill-soft"><%= item.registros %></span></td><td class="text-end money">₡<%= money(item.total) %></td></tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-6">
+      <div class="table-card">
+        <div class="card-head"><h2 class="card-title">Mantenimientos más repetidos</h2><span class="card-subtitle">Familia de trabajo</span></div>
+        <div class="table-responsive">
+          <table class="table table-hover align-middle">
+            <thead><tr><th>Familia</th><th class="text-end">Registros</th></tr></thead>
+            <tbody>
+              <% if (!familiasMant.length) { %><tr><td colspan="2" class="empty-state">No hay registros para este filtro.</td></tr><% } %>
+              <% familiasMant.forEach(item => { %>
+                <tr><td><span class="pill" style="background:<%= item.color || '#eef2f7' %>22;color:<%= item.color || '#334155' %>"><%= item.nombre %></span></td><td class="text-end money"><%= Number(item.registros || 0).toLocaleString('es-CR') %></td></tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="row g-3">
+    <div class="col-lg-6">
+      <div class="table-card">
+        <div class="card-head"><h2 class="card-title">Últimos movimientos de dinero</h2><span class="card-subtitle">Órdenes, pagos y caja chica</span></div>
+        <div class="table-responsive">
+          <table class="table table-hover align-middle">
+            <thead><tr><th>Fecha</th><th>Fuente</th><th>Detalle</th><th class="text-end">Monto</th></tr></thead>
+            <tbody>
+              <% safe(data.recientesGasto).forEach(item => { %>
+                <tr>
+                  <td><%= fecha(item.fecha) %></td>
+                  <td><span class="pill pill-soft"><%= item.fuente === 'ORDEN' ? 'Orden' : item.fuente === 'PAGO_PROVEEDOR' ? 'Pago proveedor' : 'Caja chica' %></span></td>
+                  <td><strong><%= item.proveedor || '-' %></strong><div class="small text-muted"><%= item.placa %> · <%= item.sede %> · <%= item.descripcion || '-' %></div></td>
+                  <td class="text-end money">₡<%= money(item.monto) %></td>
+                </tr>
+              <% }) %>
+              <% if (!safe(data.recientesGasto).length) { %><tr><td colspan="4" class="empty-state">No hay movimientos con placa registrada para este filtro.</td></tr><% } %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-6">
+      <div class="table-card">
+        <div class="card-head"><h2 class="card-title">Últimos mantenimientos</h2><span class="card-subtitle">Preventivos y correctivos</span></div>
+        <div class="table-responsive">
+          <table class="table table-hover align-middle">
+            <thead><tr><th>Fecha</th><th>Placa</th><th>Tipo</th><th>Detalle</th></tr></thead>
+            <tbody>
+              <% safe(data.recientesMantenimiento).forEach(item => { %>
+                <tr>
+                  <td><%= fecha(item.fecha) %></td>
+                  <td><strong><%= item.placa %></strong><div class="small text-muted"><%= item.sede || '-' %></div></td>
+                  <td><span class="pill <%= item.tipo_registro === 'CORRECTIVO' ? 'pill-red' : 'pill-blue' %>"><%= item.tipo_registro %></span></td>
+                  <td><%= item.detalle || '-' %></td>
+                </tr>
+              <% }) %>
+              <% if (!safe(data.recientesMantenimiento).length) { %><tr><td colspan="4" class="empty-state">No hay mantenimientos para este filtro.</td></tr><% } %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script type="application/json" id="json-categorias"><%- JSON.stringify(categorias) %></script>
+<script type="application/json" id="json-meses"><%- JSON.stringify(meses) %></script>
+<script type="application/json" id="json-mantenimientos"><%- JSON.stringify(familiasMant) %></script>
+<script>
+  const readJson = (id) => {
+    try { return JSON.parse(document.getElementById(id)?.textContent || '[]'); }
+    catch (_) { return []; }
+  };
+  const formatMoney = (value) => `₡${Number(value || 0).toLocaleString('es-CR', { maximumFractionDigits: 0 })}`;
+  const categoriasData = readJson('json-categorias');
+  const mesesData = readJson('json-meses');
+  const mantenimientosData = readJson('json-mantenimientos');
+
+  const chartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { position: 'bottom', labels: { usePointStyle: true, font: { weight: 'bold' } } },
+      tooltip: { callbacks: { label: ctx => `${ctx.dataset.label || ctx.label}: ${formatMoney(ctx.raw)}` } }
+    },
+    scales: {
+      x: { grid: { display: false }, ticks: { color: '#334155', font: { weight: 'bold' } } },
+      y: { beginAtZero: true, ticks: { callback: formatMoney, color: '#64748b' }, grid: { color: '#e5edf7' } }
+    }
+  };
+
+  if (document.getElementById('chartMeses') && mesesData.length) {
+    new Chart(document.getElementById('chartMeses'), {
+      type: 'bar',
+      data: {
+        labels: mesesData.map(item => item.nombre),
+        datasets: [{ label: 'Gasto', data: mesesData.map(item => Number(item.total || 0)), backgroundColor: '#0b3b82', borderRadius: 10 }]
+      },
+      options: chartOptions
+    });
+  }
+
+  if (document.getElementById('chartCategorias') && categoriasData.length) {
+    new Chart(document.getElementById('chartCategorias'), {
+      type: 'doughnut',
+      data: {
+        labels: categoriasData.map(item => item.nombre),
+        datasets: [{ data: categoriasData.map(item => Number(item.total || 0)), backgroundColor: categoriasData.map(item => item.color || '#64748b'), borderWidth: 0 }]
+      },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { usePointStyle: true, font: { weight: 'bold' } } }, tooltip: { callbacks: { label: ctx => `${ctx.label}: ${formatMoney(ctx.raw)}` } } } }
+    });
+  }
+
+  if (document.getElementById('chartMantenimientos') && mantenimientosData.length) {
+    new Chart(document.getElementById('chartMantenimientos'), {
+      type: 'bar',
+      data: {
+        labels: mantenimientosData.map(item => item.nombre),
+        datasets: [{ label: 'Registros', data: mantenimientosData.map(item => Number(item.registros || 0)), backgroundColor: mantenimientosData.map(item => item.color || '#0b3b82'), borderRadius: 10 }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { grid: { display: false }, ticks: { color: '#334155', font: { weight: 'bold' } } },
+          y: { beginAtZero: true, ticks: { precision: 0, color: '#64748b' }, grid: { color: '#e5edf7' } }
+        }
+      }
+    });
+  }
+</script>
+</body>
+</html>
