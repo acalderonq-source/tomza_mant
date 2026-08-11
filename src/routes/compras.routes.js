@@ -3355,10 +3355,8 @@ router.post("/facturas/pagar-multiple", requireAuth, allowRoles("ADMIN", "TALLER
       ? `data:image/jpeg;base64,${fs.readFileSync(logoPath).toString("base64")}`
       : "";
     const reciboNumero = `RP-${fechaPago.replace(/-/g, "")}-${String(Date.now()).slice(-6)}`;
-    const ejs = require('ejs');
-    const pdf = require('html-pdf');
-    const templatePath = path.join(__dirname, '../views/compras/recibo_pago.ejs');
-    const html = await ejs.renderFile(templatePath, {
+    const { generarPDFReciboPago } = require("../utils/pdfReciboPago");
+    const buffer = await generarPDFReciboPago({
       facturas,
       fechaPago,
       totalPagado,
@@ -3366,23 +3364,11 @@ router.post("/facturas/pagar-multiple", requireAuth, allowRoles("ADMIN", "TALLER
       reciboNumero,
       generadoPor: req.session.user?.usuario || "Sistema"
     });
-    pdf.create(html, {
-      format: 'Letter',
-      border: {
-        top: "10mm",
-        right: "10mm",
-        bottom: "10mm",
-        left: "10mm"
-      }
-    }).toBuffer((err, buffer) => {
-      if (err) {
-        console.error("Error generando PDF:", err);
-        return res.status(500).send("Error al generar el recibo");
-      }
-      res.setHeader('Content-Type', 'application/pdf');
-      res.setHeader('Content-Disposition', `attachment; filename=recibo_pago_${new Date().toISOString().slice(0,19).replace(/:/g, '-')}.pdf`);
-      res.send(buffer);
-    });
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename=recibo_pago_${new Date().toISOString().slice(0,19).replace(/:/g, '-')}.pdf`);
+    res.setHeader('Content-Length', buffer.length);
+    res.end(buffer);
   } catch (error) {
     console.error("Error al procesar pago múltiple:", error);
     res.status(500).send("Error al procesar el pago múltiple");

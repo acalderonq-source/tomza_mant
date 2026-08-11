@@ -8,35 +8,35 @@
   @page { size: Letter; margin: 0; }
   body {
     margin: 0;
-    background: #f3f4f6;
+    background: #fff;
     color: #111827;
     font-family: Arial, Helvetica, sans-serif;
-    font-size: 10px;
+    font-size: 9px;
   }
   .page {
     background: #fff;
-    margin: 0 auto;
-    min-height: 930px;
-    padding: 22px 24px;
-    width: 760px;
+    margin: 0;
+    min-height: 100%;
+    padding: 0;
+    width: 100%;
   }
   .top-band {
-    background: #0f2f66;
-    border-bottom: 4px solid #f2c200;
+    background: #10213f;
+    border-bottom: 3px solid #f2c200;
     color: #fff;
-    padding: 14px 16px;
+    padding: 10px 12px;
   }
   .header-table { width: 100%; border-collapse: collapse; }
   .header-table td { vertical-align: middle; }
   .logo-box {
     background: #fff;
-    border-radius: 6px;
-    padding: 5px;
-    width: 178px;
+    border-radius: 5px;
+    padding: 4px;
+    width: 154px;
   }
-  .logo { display: block; height: 58px; object-fit: contain; width: 168px; }
+  .logo { display: block; height: 48px; object-fit: contain; width: 146px; }
   .title {
-    font-size: 22px;
+    font-size: 19px;
     font-weight: 800;
     letter-spacing: .4px;
     text-align: right;
@@ -44,24 +44,29 @@
   }
   .subtitle {
     color: #dbeafe;
-    font-size: 10px;
+    font-size: 9px;
     margin-top: 3px;
     text-align: right;
   }
+  .document-card {
+    border: 1px solid #d7e2ef;
+    border-top: 0;
+    padding: 10px 12px 12px;
+  }
   .meta-table {
     border-collapse: collapse;
-    margin-top: 14px;
+    margin-top: 10px;
     width: 100%;
   }
   .meta-table td {
-    border: 1px solid #d1d5db;
-    padding: 7px 8px;
+    border: 1px solid #d7e2ef;
+    padding: 6px 7px;
     vertical-align: top;
   }
   .label {
     color: #475569;
     display: block;
-    font-size: 8px;
+    font-size: 7px;
     font-weight: 800;
     letter-spacing: .3px;
     margin-bottom: 3px;
@@ -69,22 +74,42 @@
   }
   .value {
     color: #111827;
-    font-size: 11px;
+    font-size: 10px;
     font-weight: 700;
   }
   .value-big {
-    color: #0f2f66;
-    font-size: 18px;
+    color: #10213f;
+    font-size: 16px;
     font-weight: 900;
   }
+  .summary-cards {
+    border-collapse: separate;
+    border-spacing: 6px 0;
+    margin-top: 10px;
+    width: 100%;
+  }
+  .summary-cards td {
+    background: #f8fafc;
+    border: 1px solid #dbe3ef;
+    border-radius: 6px;
+    padding: 8px;
+    width: 33.33%;
+  }
+  .summary-number {
+    color: #10213f;
+    display: block;
+    font-size: 15px;
+    font-weight: 900;
+    margin-top: 2px;
+  }
   .section-title {
-    background: #0f2f66;
+    background: #10213f;
     color: #fff;
-    font-size: 10px;
+    font-size: 9px;
     font-weight: 800;
     letter-spacing: .2px;
-    margin-top: 15px;
-    padding: 7px 9px;
+    margin-top: 12px;
+    padding: 6px 8px;
     text-transform: uppercase;
   }
   .summary-table,
@@ -98,21 +123,32 @@
     background: #eaf1fb;
     border: 1px solid #cbd5e1;
     color: #1f2937;
-    font-size: 8px;
+    font-size: 7px;
     font-weight: 800;
-    padding: 6px;
+    padding: 5px 4px;
     text-align: left;
     text-transform: uppercase;
   }
   .summary-table td,
   .items-table td {
     border: 1px solid #dbe3ef;
-    padding: 6px;
+    padding: 5px 4px;
     vertical-align: top;
   }
+  .items-table {
+    table-layout: fixed;
+  }
+  .items-table th,
+  .items-table td {
+    overflow-wrap: break-word;
+    word-break: break-word;
+  }
   .items-table tbody tr:nth-child(even) td { background: #f8fafc; }
+  .items-table thead { display: table-header-group; }
+  .items-table tr { page-break-inside: avoid; }
   .text-right { text-align: right; }
   .text-center { text-align: center; }
+  .nowrap { white-space: nowrap; }
   .muted { color: #64748b; }
   .badge {
     background: #dcfce7;
@@ -120,35 +156,42 @@
     border-radius: 999px;
     color: #166534;
     display: inline-block;
-    font-size: 8px;
+    font-size: 7px;
     font-weight: 800;
-    padding: 3px 7px;
+    padding: 3px 6px;
     text-transform: uppercase;
   }
   .note {
     color: #334155;
-    font-size: 9px;
-    line-height: 1.35;
+    font-size: 8px;
+    line-height: 1.25;
+    margin-top: 2px;
     word-break: break-word;
   }
+  .adjustment {
+    color: #334155;
+    font-size: 8px;
+    line-height: 1.3;
+  }
+  .adjustment strong { color: #111827; }
   .totals-wrap {
     margin-left: auto;
-    margin-top: 12px;
-    width: 330px;
+    margin-top: 10px;
+    width: 280px;
   }
   .totals-table td {
     border: 1px solid #d1d5db;
-    padding: 8px;
+    padding: 6px 7px;
   }
   .total-row td {
-    background: #0f2f66;
+    background: #10213f;
     color: #fff;
-    font-size: 13px;
+    font-size: 12px;
     font-weight: 900;
   }
   .signatures {
     border-collapse: collapse;
-    margin-top: 34px;
+    margin-top: 26px;
     width: 100%;
   }
   .signatures td {
@@ -158,16 +201,16 @@
   }
   .line {
     border-top: 1px solid #111827;
-    margin: 28px auto 7px;
-    width: 230px;
+    margin: 22px auto 6px;
+    width: 200px;
   }
   .footer {
     border-top: 1px solid #e5e7eb;
     color: #64748b;
-    font-size: 8px;
+    font-size: 7px;
     line-height: 1.35;
-    margin-top: 22px;
-    padding-top: 8px;
+    margin-top: 18px;
+    padding-top: 7px;
     text-align: center;
   }
 </style>
@@ -198,6 +241,7 @@
     item.total += monto;
   });
   const resumenProveedores = Array.from(proveedoresMap.values()).sort((a, b) => b.total - a.total);
+  const totalAjustes = totalNotasCredito + totalAbonosPrevios;
 %>
 <div class="page">
   <div class="top-band">
@@ -220,6 +264,7 @@
     </table>
   </div>
 
+  <div class="document-card">
   <table class="meta-table">
     <tr>
       <td style="width:25%;">
@@ -250,7 +295,24 @@
       </td>
       <td>
         <span class="label">Total pagado</span>
-        <span class="value-big">₡<%= money(totalPagado) %></span>
+        <span class="value-big nowrap">CRC <%= money(totalPagado) %></span>
+      </td>
+    </tr>
+  </table>
+
+  <table class="summary-cards">
+    <tr>
+      <td>
+        <span class="label">Total pagado</span>
+        <span class="summary-number nowrap">CRC <%= money(totalPagado) %></span>
+      </td>
+      <td>
+        <span class="label">Ajustes aplicados</span>
+        <span class="summary-number nowrap">CRC <%= money(totalAjustes) %></span>
+      </td>
+      <td>
+        <span class="label">Proveedores</span>
+        <span class="summary-number"><%= resumenProveedores.length %></span>
       </td>
     </tr>
   </table>
@@ -272,7 +334,7 @@
         <tr>
           <td><strong><%= item.proveedor %></strong></td>
           <td class="text-center"><%= item.facturas %></td>
-          <td class="text-right"><strong>₡<%= money(item.total) %></strong></td>
+          <td class="text-right"><strong>CRC <%= money(item.total) %></strong></td>
         </tr>
       <% }) %>
     </tbody>
@@ -282,13 +344,12 @@
   <table class="items-table">
     <thead>
       <tr>
-        <th style="width:72px;">PO</th>
-        <th>Proveedor</th>
-        <th style="width:90px;">Factura</th>
-        <th style="width:90px;">Vencimiento</th>
-        <th style="width:88px;" class="text-right">NC</th>
-        <th style="width:88px;" class="text-right">Abono</th>
-        <th style="width:98px;" class="text-right">Pagado</th>
+        <th style="width:10%;">PO</th>
+        <th style="width:31%;">Proveedor / observación</th>
+        <th style="width:13%;">Factura</th>
+        <th style="width:12%;">Vence</th>
+        <th style="width:16%;" class="text-right">Ajustes</th>
+        <th style="width:18%;" class="text-right">Pagado</th>
       </tr>
     </thead>
     <tbody>
@@ -304,9 +365,11 @@
           </td>
           <td><%= f.factura || '-' %></td>
           <td><%= dateFmt(f.fecha_vencimiento_factura) %></td>
-          <td class="text-right">₡<%= money(f.nota_credito_monto) %></td>
-          <td class="text-right">₡<%= money(f.abono_monto) %></td>
-          <td class="text-right"><strong>₡<%= money(f.total) %></strong></td>
+          <td class="text-right adjustment">
+            <div><strong>NC:</strong> CRC <%= money(f.nota_credito_monto) %></div>
+            <div><strong>Abono:</strong> CRC <%= money(f.abono_monto) %></div>
+          </td>
+          <td class="text-right nowrap"><strong>CRC <%= money(f.total) %></strong></td>
         </tr>
       <% }) %>
     </tbody>
@@ -316,15 +379,15 @@
     <table class="totals-table">
       <tr>
         <td>Notas de crédito aplicadas</td>
-        <td class="text-right">₡<%= money(totalNotasCredito) %></td>
+        <td class="text-right">CRC <%= money(totalNotasCredito) %></td>
       </tr>
       <tr>
         <td>Abonos previos aplicados</td>
-        <td class="text-right">₡<%= money(totalAbonosPrevios) %></td>
+        <td class="text-right">CRC <%= money(totalAbonosPrevios) %></td>
       </tr>
       <tr class="total-row">
         <td>Total pagado</td>
-        <td class="text-right">₡<%= money(totalPagado) %></td>
+        <td class="text-right">CRC <%= money(totalPagado) %></td>
       </tr>
     </table>
   </div>
@@ -346,6 +409,7 @@
 
   <div class="footer">
     Documento generado automáticamente por el sistema interno de Gas Tomza. Este recibo respalda el pago de las facturas indicadas y debe conservarse junto con los comprobantes bancarios correspondientes.
+  </div>
   </div>
 </div>
 </body>
