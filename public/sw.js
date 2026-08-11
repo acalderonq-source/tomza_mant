@@ -1,4 +1,4 @@
-const CACHE_NAME = "tomza-taller-v4";
+const CACHE_NAME = "tomza-taller-v5";
 const STATIC_ASSETS = [
   "/offline.html",
   "/manifest.webmanifest",
@@ -7,8 +7,9 @@ const STATIC_ASSETS = [
   "/css/compras.css",
   "/css/mantenimientos.css",
   "/js/pwa.js",
-  "/js/placa-search.js?v=20260803-3"
+  "/js/placa-search.js?v=20260811-2"
 ];
+const STATIC_ASSET_KEYS = new Set(STATIC_ASSETS);
 
 self.addEventListener("install", event => {
   event.waitUntil(
@@ -28,6 +29,7 @@ self.addEventListener("activate", event => {
 
 self.addEventListener("fetch", event => {
   const request = event.request;
+  const url = new URL(request.url);
 
   if (request.mode === "navigate") {
     event.respondWith(
@@ -37,6 +39,8 @@ self.addEventListener("fetch", event => {
   }
 
   if (request.method !== "GET") return;
+  if (url.pathname.startsWith("/api/")) return;
+  if (!STATIC_ASSET_KEYS.has(`${url.pathname}${url.search}`) && !STATIC_ASSET_KEYS.has(url.pathname)) return;
 
   event.respondWith(
     caches.match(request).then(cached => {

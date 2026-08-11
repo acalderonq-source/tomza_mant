@@ -145,6 +145,15 @@ function puedeVerUnidad(unidad, sedesPermitidas) {
   return sedesPermitidas.length === 0 || sedesPermitidas.includes(unidad.sede);
 }
 
+function actualizarSedeSesionSiPuede(req, sede) {
+  const sedeLimpia = String(sede || "").trim();
+  if (!sedeLimpia) return;
+
+  if (esUsuarioTodasSedes(req.session.user) || req.session.sedeSeleccionada) {
+    req.session.sedeSeleccionada = sedeLimpia;
+  }
+}
+
 function normalizarPlacaUnidad(value) {
   return normalizarPlaca(value) || "";
 }
@@ -163,7 +172,7 @@ async function obtenerUnidadAutorizada(req, id) {
     return { error: 404, mensaje: "Unidad no encontrada" };
   }
 
-  if (!puedeVerUnidad(unidad, sedesPermitidas)) {
+  if (!esUsuarioTodasSedes(req.session.user) && !puedeVerUnidad(unidad, sedesPermitidas)) {
     return { error: 403, mensaje: "No tienes permiso para cambiar esta unidad." };
   }
 
@@ -299,7 +308,7 @@ async function agregarUnidad(req, res) {
     if (existente) {
       const sedesPermitidas = await obtenerSedesPermitidas(req);
 
-      if (!puedeVerUnidad(existente, sedesPermitidas)) {
+      if (!esUsuarioTodasSedes(req.session.user) && !puedeVerUnidad(existente, sedesPermitidas)) {
         return res.redirect(
           `/unidades?error=${encodeURIComponent(`La unidad ${placaNormalizada} ya existe en otra sede.`)}&placa=${encodeURIComponent(placaNormalizada)}&estado=todas`
         );
@@ -313,6 +322,8 @@ async function agregarUnidad(req, res) {
         [sedeAsignada, existente.id]
       );
 
+      actualizarSedeSesionSiPuede(req, sedeAsignada);
+
       return res.redirect(
         `/unidades?success=${encodeURIComponent(`La unidad ${placaNormalizada} ya existía. Se actualizó y quedó activa.`)}&placa=${encodeURIComponent(placaNormalizada)}&estado=todas`
       );
@@ -322,6 +333,8 @@ async function agregarUnidad(req, res) {
       "INSERT INTO unidades (placa, sede, activa, varada, razon_varada) VALUES (?, ?, 1, 0, NULL)",
       [placaNormalizada, sedeAsignada]
     );
+
+    actualizarSedeSesionSiPuede(req, sedeAsignada);
 
     res.redirect(
       `/unidades?success=${encodeURIComponent(`Unidad ${placaNormalizada} agregada correctamente.`)}&placa=${encodeURIComponent(placaNormalizada)}`
@@ -434,6 +447,8 @@ router.post("/:id/sede", async (req, res) => {
         req.session.user.usuario || req.session.user.nombre || req.session.user.rol || null
       ]
     );
+
+    actualizarSedeSesionSiPuede(req, sedeNueva);
 
     return res.redirect(
       `/unidades?success=${encodeURIComponent(`Sede actualizada para ${unidad.placa}.`)}&placa=${encodeURIComponent(unidad.placa)}&estado=todas`

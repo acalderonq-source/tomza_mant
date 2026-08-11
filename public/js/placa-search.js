@@ -1,6 +1,7 @@
 (function () {
   const STYLE_ID = "tomza-plate-search-style";
   const DEFAULT_URL = "/api/unidades/buscar";
+  const CACHE_TTL_MS = 10000;
   const cache = new Map();
   const pending = new Map();
 
@@ -68,6 +69,7 @@
   function normalizePlate(value) {
     const raw = cleanPlate(value);
     if (!raw) return "";
+    if (["GENERAL", "GENERALES", "GENERALTALLER", "GENERALESTALLER"].includes(raw)) return "GENERALES TALLER";
 
     if (/^CLC\d{5,6}$/.test(raw)) return raw.replace(/^CLC/, "CL");
     if (/^CL\d{5,6}$/.test(raw)) return raw;
@@ -96,6 +98,16 @@
     }
 
     return [...values].filter(Boolean);
+  }
+
+  function isGeneralQuery(value) {
+    const raw = cleanPlate(value);
+    return raw && (
+      "GENERAL".includes(raw) ||
+      "GENERALES".includes(raw) ||
+      "GENERALTALLER".includes(raw) ||
+      raw.includes("GENERAL")
+    );
   }
 
   function normalize(value) {
@@ -127,18 +139,21 @@
 
   async function fetchUnits(query, url, signal) {
     const key = `${url}|${query}`;
-    if (cache.has(key)) return cache.get(key);
+    const cached = cache.get(key);
+    if (cached && Date.now() - cached.at < CACHE_TTL_MS) return cached.units;
+    if (cached) cache.delete(key);
     if (pending.has(key)) return pending.get(key);
 
     const request = fetch(`${url}?q=${encodeURIComponent(query)}`, {
-      headers: { Accept: "application/json" },
+      cache: "no-store",
+      headers: { Accept: "application/json", "Cache-Control": "no-cache" },
       signal
     })
       .then(async response => {
         if (!response.ok) return [];
         const data = await response.json();
         const units = Array.isArray(data.unidades) ? data.unidades : [];
-        cache.set(key, units);
+        if (units.length) cache.set(key, { at: Date.now(), units });
         return units;
       })
       .catch(error => {
@@ -193,6 +208,7 @@
     const target = targetSelector ? document.querySelector(targetSelector) : null;
     const mode = input.dataset.placaMode || wrapper?.dataset.placaMode || (target ? "unidad" : "placa");
     const allowFree = input.dataset.placaAllowFree === "true" || wrapper?.dataset.placaAllowFree === "true" || mode === "placa";
+    const allowGeneral = input.dataset.placaAllowGeneral === "true" || wrapper?.dataset.placaAllowGeneral === "true";
     const sedeTargetSelector = input.dataset.placaSedeTarget || wrapper?.dataset.placaSedeTarget || "";
     const sedeTarget = sedeTargetSelector ? document.querySelector(sedeTargetSelector) : null;
     const results = wrapper?.querySelector("[data-placa-results]") || createResultsBox(input);
@@ -225,6 +241,19 @@
       input.dispatchEvent(new CustomEvent("placa:selected", { bubbles: true, detail: unit }));
     }
 
+    function selectGeneral() {
+      input.value = "GENERALES TALLER";
+      if (target) target.value = mode === "unidad" ? "" : "GENERALES TALLER";
+      if (sedeTarget) sedeTarget.value = "General";
+      if (selected) selected.textContent = "GENERALES TALLER · General";
+      close();
+      results.innerHTML = "";
+      input.dispatchEvent(new CustomEvent("placa:selected", {
+        bubbles: true,
+        detail: { placa: "GENERALES TALLER", sede: "General", general: true }
+      }));
+    }
+
     async function renderNow() {
       const query = cleanPlate(input.value);
       if (!allowFree) clearSelection();
@@ -244,8 +273,18 @@
       if (units === null || seq !== requestSeq) return;
 
       results.innerHTML = "";
+      if (allowGeneral && isGeneralQuery(query)) {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "tomza-plate-option";
+        button.innerHTML = "<strong>GENERALES TALLER</strong><span>Compra general</span>";
+        button.addEventListener("click", selectGeneral);
+        results.appendChild(button);
+      }
+
       if (!units.length) {
-        renderMessage(results, "No hay placas con esa búsqueda.");
+        if (!results.children.length) renderMessage(results, "No hay placas con esa búsqueda.");
+        else results.classList.add("is-open");
         return;
       }
 
