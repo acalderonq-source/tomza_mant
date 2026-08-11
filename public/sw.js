@@ -1,4 +1,4 @@
-const CACHE_NAME = "tomza-taller-v5";
+const CACHE_NAME = "tomza-taller-v6";
 const STATIC_ASSETS = [
   "/offline.html",
   "/manifest.webmanifest",
@@ -7,7 +7,7 @@ const STATIC_ASSETS = [
   "/css/compras.css",
   "/css/mantenimientos.css",
   "/js/pwa.js",
-  "/js/placa-search.js?v=20260811-2"
+  "/js/placa-search.js?v=20260811-3"
 ];
 const STATIC_ASSET_KEYS = new Set(STATIC_ASSETS);
 

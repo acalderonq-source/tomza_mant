@@ -46,7 +46,7 @@
       box-shadow: 0 8px 18px rgba(15,23,42,.04);
       display: grid;
       gap: .75rem;
-      grid-template-columns: 1fr;
+      grid-template-columns: minmax(170px, .85fr) minmax(280px, 1.8fr) minmax(95px, .45fr) minmax(140px, .7fr) minmax(140px, .7fr) 46px;
       margin-bottom: .8rem;
       padding: .85rem;
     }
@@ -66,7 +66,7 @@
       text-transform: uppercase;
     }
     .order-lines-table td[data-label="Descripción"] {
-      grid-column: 1 / -1;
+      grid-column: auto;
     }
     .order-lines-table td[data-label="Quitar"] {
       align-items: end;
@@ -81,8 +81,13 @@
       resize: vertical;
     }
     .order-lines-table .removeRow {
-      min-width: 120px;
-      width: auto;
+      height: 38px;
+      min-width: 38px;
+      padding: 0;
+      width: 38px;
+    }
+    .order-lines-table .tomza-plate-results {
+      min-width: 260px;
     }
     .order-totals {
       display: grid;
@@ -113,6 +118,21 @@
       display: flex;
       flex-wrap: wrap;
       gap: .5rem;
+    }
+    @media (max-width: 1180px) {
+      .order-lines-table tr {
+        grid-template-columns: minmax(180px, 1fr) minmax(260px, 1.5fr);
+      }
+      .order-lines-table td[data-label="Descripción"] {
+        grid-column: 1 / -1;
+      }
+      .order-lines-table td[data-label="Quitar"] {
+        justify-content: flex-start;
+      }
+      .order-lines-table .removeRow {
+        min-width: 120px;
+        width: auto;
+      }
     }
     @media (max-width: 768px) {
       .order-lines-table tr {
@@ -295,7 +315,7 @@
   </div>
 </div>
 
-<script src="/js/placa-search.js?v=20260811-1"></script>
+<script src="/js/placa-search.js?v=20260811-3"></script>
 <script>
   let rowIndex = 0;
   const lineasIniciales = <%- JSON.stringify(lineasIniciales) %>;

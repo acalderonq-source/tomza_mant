@@ -109,7 +109,7 @@ router.get("/unidades/buscar", requireAuth, async (req, res) => {
        FROM unidades
        WHERE ${condiciones.join(" AND ")}
        ORDER BY sede, placa
-       LIMIT 20`,
+       LIMIT 80`,
       params
     );
 

@@ -2,6 +2,7 @@
   const STYLE_ID = "tomza-plate-search-style";
   const DEFAULT_URL = "/api/unidades/buscar";
   const CACHE_TTL_MS = 10000;
+  const MAX_RESULTS = 80;
   const cache = new Map();
   const pending = new Map();
 
@@ -18,7 +19,7 @@
         box-shadow: 0 14px 32px rgba(15, 23, 42, .16);
         display: none;
         left: 0;
-        max-height: 230px;
+        max-height: 330px;
         overflow-y: auto;
         position: absolute;
         right: 0;
@@ -134,7 +135,7 @@
         const placa = cleanPlate(unit.placa);
         return variants.some(variant => placa.includes(variant));
       })
-      .slice(0, 20);
+      .slice(0, MAX_RESULTS);
   }
 
   async function fetchUnits(query, url, signal) {
