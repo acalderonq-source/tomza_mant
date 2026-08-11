@@ -18,31 +18,71 @@
     .order-lines-wrap {
       border: 1px solid #e2e8f0;
       border-radius: 12px;
-      overflow-x: auto;
+      overflow: visible;
+      padding: .85rem;
+      background: #f8fafc;
     }
     .order-lines-table {
+      border-collapse: separate;
+      border-spacing: 0 .8rem;
       margin-bottom: 0;
-      min-width: 980px;
-      table-layout: fixed;
+      min-width: 0;
+      width: 100%;
     }
-    .order-lines-table th,
+    .order-lines-table thead {
+      display: none;
+    }
+    .order-lines-table,
+    .order-lines-table tbody,
+    .order-lines-table tr,
     .order-lines-table td {
+      display: block;
+      width: 100%;
+    }
+    .order-lines-table tr {
+      background: #fff;
+      border: 1px solid #dbe3ef;
+      border-radius: 10px;
+      box-shadow: 0 8px 18px rgba(15,23,42,.04);
+      display: grid;
+      gap: .75rem;
+      grid-template-columns: 1fr;
+      margin-bottom: .8rem;
+      padding: .85rem;
+    }
+    .order-lines-table td {
+      border: 0 !important;
+      padding: 0 !important;
       vertical-align: top;
     }
-    .order-lines-table .col-placa { width: 18%; }
-    .order-lines-table .col-descripcion { width: 38%; }
-    .order-lines-table .col-cantidad { width: 11%; }
-    .order-lines-table .col-precio { width: 15%; }
-    .order-lines-table .col-subtotal { width: 15%; }
-    .order-lines-table .col-accion { width: 48px; }
+    .order-lines-table td::before {
+      content: attr(data-label);
+      display: block;
+      color: #475569;
+      font-size: .72rem;
+      font-weight: 850;
+      letter-spacing: .03em;
+      margin-bottom: .25rem;
+      text-transform: uppercase;
+    }
+    .order-lines-table td[data-label="Descripción"] {
+      grid-column: 1 / -1;
+    }
+    .order-lines-table td[data-label="Quitar"] {
+      align-items: end;
+      display: flex;
+      justify-content: flex-end;
+    }
+    .order-lines-table td[data-label="Quitar"]::before {
+      display: none;
+    }
     .order-lines-table textarea {
-      min-height: 76px;
+      min-height: 88px;
       resize: vertical;
     }
     .order-lines-table .removeRow {
-      height: 36px;
-      width: 36px;
-      padding: 0;
+      min-width: 120px;
+      width: auto;
     }
     .order-totals {
       display: grid;
@@ -75,35 +115,8 @@
       gap: .5rem;
     }
     @media (max-width: 768px) {
-      .order-lines-table {
-        min-width: 0;
-      }
-      .order-lines-table thead {
-        display: none;
-      }
-      .order-lines-table,
-      .order-lines-table tbody,
-      .order-lines-table tr,
-      .order-lines-table td {
-        display: block;
-        width: 100%;
-      }
       .order-lines-table tr {
-        border-bottom: 1px solid #e2e8f0;
-        padding: .75rem;
-      }
-      .order-lines-table td {
-        border-bottom: 0 !important;
-        padding: .35rem 0 !important;
-      }
-      .order-lines-table td::before {
-        content: attr(data-label);
-        display: block;
-        color: #475569;
-        font-size: .72rem;
-        font-weight: 800;
-        margin-bottom: .25rem;
-        text-transform: uppercase;
+        grid-template-columns: 1fr;
       }
       .order-total-row {
         grid-template-columns: 1fr;

@@ -41,6 +41,10 @@ function esMensajeroRepuestos(user) {
   return user && ROLES_MENSAJERO_REPUESTOS.includes(user.rol);
 }
 
+function esGeneralTaller(placa) {
+  return normalizarPlaca(placa) === "GENERALES TALLER";
+}
+
 function requireVerRepuestos(req, res, next) {
   if (!ROLES_VER_REPUESTOS.includes(req.session.user.rol) && !esUsuarioPesado(req.session.user)) {
     return res.status(403).send("No autorizado");
@@ -310,14 +314,25 @@ router.post("/", requireGestionRepuestos, async (req, res) => {
       return redirectConFiltros(req, res);
     }
 
-    const [[unidad]] = await pool.query(
-      `SELECT placa, sede
-       FROM unidades
-       WHERE UPPER(TRIM(placa)) = ?
-         ${sedes.length ? "AND sede IN (?)" : ""}
-       LIMIT 1`,
-      sedes.length ? [placa, sedes] : [placa]
-    );
+    let unidad = null;
+
+    if (esGeneralTaller(placa)) {
+      if (sedes.length && !sedes.includes("Taller")) {
+        req.session.error = "No tiene permiso para crear solicitudes GENERAL-TALLER.";
+        return redirectConFiltros(req, res);
+      }
+      unidad = { placa: "GENERAL-TALLER", sede: "Taller" };
+    } else {
+      const [[unidadEncontrada]] = await pool.query(
+        `SELECT placa, sede
+         FROM unidades
+         WHERE UPPER(TRIM(placa)) = ?
+           ${sedes.length ? "AND sede IN (?)" : ""}
+         LIMIT 1`,
+        sedes.length ? [placa, sedes] : [placa]
+      );
+      unidad = unidadEncontrada;
+    }
 
     if (!unidad) {
       req.session.error = "Seleccione una placa válida de las unidades permitidas.";

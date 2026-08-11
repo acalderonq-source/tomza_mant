@@ -242,15 +242,15 @@
     }
 
     function selectGeneral() {
-      input.value = "GENERALES TALLER";
+      input.value = "GENERAL-TALLER";
       if (target) target.value = mode === "unidad" ? "" : "GENERALES TALLER";
-      if (sedeTarget) sedeTarget.value = "General";
-      if (selected) selected.textContent = "GENERALES TALLER · General";
+      if (sedeTarget) sedeTarget.value = "Taller";
+      if (selected) selected.textContent = "GENERAL-TALLER · Taller";
       close();
       results.innerHTML = "";
       input.dispatchEvent(new CustomEvent("placa:selected", {
         bubbles: true,
-        detail: { placa: "GENERALES TALLER", sede: "General", general: true }
+        detail: { placa: "GENERALES TALLER", sede: "Taller", general: true }
       }));
     }
 
@@ -277,7 +277,7 @@
         const button = document.createElement("button");
         button.type = "button";
         button.className = "tomza-plate-option";
-        button.innerHTML = "<strong>GENERALES TALLER</strong><span>Compra general</span>";
+        button.innerHTML = "<strong>GENERAL-TALLER</strong><span>Compra general de taller</span>";
         button.addEventListener("click", selectGeneral);
         results.appendChild(button);
       }

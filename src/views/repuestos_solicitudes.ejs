@@ -516,12 +516,12 @@
               </div>
               <div>
                 <label class="form-label mb-1">Sede</label>
-                <input type="text" id="sedeUnidadSeleccionada" class="form-control" value="" placeholder="Se llena al seleccionar placa" readonly>
+                <input type="text" id="sedeUnidadSeleccionada" class="form-control" value="" placeholder="Se llena al seleccionar placa o GENERAL-TALLER" readonly>
               </div>
               <div>
                 <label class="form-label mb-1">Placa / Unidad</label>
-                <div data-placa-search data-placa-mode="placa" data-placa-target="#placaUnidadValue" data-placa-sede-target="#sedeUnidadSeleccionada" data-placa-allow-free="false" data-placa-source="#unidadesRepuestosData">
-                  <input type="text" id="placaUnidadSearch" class="form-control text-uppercase" placeholder="Escriba la placa..." data-placa-input data-placa-autocomplete required>
+                <div data-placa-search data-placa-mode="placa" data-placa-target="#placaUnidadValue" data-placa-sede-target="#sedeUnidadSeleccionada" data-placa-allow-free="false" data-placa-allow-general="true" data-placa-source="#unidadesRepuestosData">
+                  <input type="text" id="placaUnidadSearch" class="form-control text-uppercase" placeholder="Escriba la placa o GENERAL-TALLER..." data-placa-input data-placa-autocomplete required>
                   <input type="hidden" name="placa" id="placaUnidadValue">
                   <div data-placa-results></div>
                   <div data-placa-selected></div>
@@ -608,6 +608,7 @@
 <% } %>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="/js/placa-search.js?v=20260811-2"></script>
 <script type="application/json" id="unidadesRepuestosData"><%- JSON.stringify(unidadesLista.map(unidad => ({ id: unidad.id, placa: unidad.placa, sede: unidad.sede || '', sedeTexto: mostrarSede(unidad.sede) || '' }))) %></script>
 <script>
   document.querySelectorAll('.js-entregar-repuesto').forEach(button => {
