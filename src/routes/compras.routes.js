@@ -128,6 +128,7 @@ function clasificarPlacaCompra(placa, sede) {
   const sedeLimpia = normalizarSedeDashboard(sede);
   const sedeUpper = sedeLimpia.toUpperCase();
 
+  if (placaLimpia === "ACEITES" || sedeUpper === "ACEITES") return "Aceites";
   if (placaLimpia === "GENERALES GASTOS" || ["GENERAL GASTOS", "GENERALES GASTOS", "GASTOS GENERAL", "GASTOS GENERALES", "GENERALES DE GASTOS"].includes(sedeUpper)) return "Generales de gastos";
   if (placaLimpia === "GENERALES TALLER" || ["GENERAL", "GENERALES", "GENERAL TALLER", "GENERALES TALLER"].includes(sedeUpper)) return "General taller";
   if (placaLimpia === "SIN PLACA") return "Sin placa / revisar";
@@ -138,7 +139,7 @@ function clasificarPlacaCompra(placa, sede) {
 }
 
 function agruparGastosPorPlaca(gastos = []) {
-  const ordenCategorias = ["Cilindreros", "Graneles", "Transportadora", "General taller", "Generales de gastos", "Otros", "Sin placa / revisar"];
+  const ordenCategorias = ["Cilindreros", "Graneles", "Transportadora", "Aceites", "General taller", "Generales de gastos", "Otros", "Sin placa / revisar"];
   const grupos = ordenCategorias.map(nombre => ({
     nombre,
     total: 0,
@@ -4039,6 +4040,7 @@ router.get("/dashboard", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA
       SELECT
         compras.placa,
         CASE
+          WHEN compras.placa = 'ACEITES' THEN 'Aceites'
           WHEN compras.placa = 'GENERALES GASTOS' THEN 'Generales de gastos'
           WHEN compras.placa = 'GENERALES TALLER' THEN 'General taller'
           ELSE COALESCE(MAX(u.sede), 'Por revisar')
@@ -4050,12 +4052,25 @@ router.get("/dashboard", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA
         SELECT
           o.id,
           UPPER(TRIM(COALESCE(
+            CASE
+              WHEN UPPER(TRIM(COALESCE(d.codigo, ''))) IN ('ACEITE', 'ACEITES') THEN 'ACEITES'
+            END,
+            CASE
+              WHEN UPPER(CONCAT_WS(' ', d.descripcion, d.codigo, p.nombre)) REGEXP 'ACEITE|ACEITES|MOBIL|MOVIL|PICO|LIASA' THEN 'ACEITES'
+            END,
             REPLACE(REGEXP_SUBSTR(UPPER(COALESCE(d.codigo, '')), 'CL[[:space:]]*[0-9]{5,6}|C[[:space:]]*[0-9]{5,6}|S[[:space:]]*[0-9]{5,6}'), ' ', ''),
             CASE
               WHEN UPPER(TRIM(COALESCE(d.codigo, ''))) IN ('GENERAL GASTOS', 'GENERALES GASTOS', 'GASTOS GENERAL', 'GASTOS GENERALES', 'GENERALES DE GASTOS') THEN 'GENERALES GASTOS'
             END,
             CASE
               WHEN UPPER(TRIM(COALESCE(d.codigo, ''))) IN ('GENERAL', 'GENERALES', 'GENERAL TALLER', 'GENERALES TALLER') THEN 'GENERALES TALLER'
+            END,
+            CASE
+              WHEN COALESCE(placas_detalle.tiene_placas, 0) = 0 AND (
+                UPPER(TRIM(COALESCE(o.placa_unidad, ''))) IN ('ACEITE', 'ACEITES')
+                OR COALESCE(aceites_detalle.tiene_aceites, 0) > 0
+                OR UPPER(CONCAT_WS(' ', o.observaciones, p.nombre)) REGEXP 'ACEITE|ACEITES|MOBIL|MOVIL|PICO|LIASA'
+              ) THEN 'ACEITES'
             END,
             CASE
               WHEN COALESCE(placas_detalle.tiene_placas, 0) = 0 AND UPPER(TRIM(COALESCE(o.placa_unidad, ''))) IN ('GENERAL GASTOS', 'GENERALES GASTOS', 'GASTOS GENERAL', 'GASTOS GENERALES', 'GENERALES DE GASTOS') THEN 'GENERALES GASTOS'
@@ -4079,6 +4094,13 @@ router.get("/dashboard", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA
           WHERE REGEXP_SUBSTR(UPPER(COALESCE(codigo, '')), 'CL[[:space:]]*[0-9]{5,6}|C[[:space:]]*[0-9]{5,6}|S[[:space:]]*[0-9]{5,6}') IS NOT NULL
           GROUP BY orden_compra_id
         ) placas_detalle ON placas_detalle.orden_compra_id = o.id
+        LEFT JOIN (
+          SELECT orden_compra_id, COUNT(*) AS tiene_aceites
+          FROM ordenes_compra_detalle
+          WHERE UPPER(CONCAT_WS(' ', codigo, descripcion)) REGEXP 'ACEITE|ACEITES|MOBIL|MOVIL|PICO|LIASA'
+          GROUP BY orden_compra_id
+        ) aceites_detalle ON aceites_detalle.orden_compra_id = o.id
+        LEFT JOIN proveedores p ON p.id = o.proveedor_id
         LEFT JOIN ordenes_compra_detalle d ON d.orden_compra_id = o.id AND COALESCE(placas_detalle.tiene_placas, 0) > 0
         ${whereClause}
       ) compras
@@ -4114,12 +4136,25 @@ router.get("/dashboard", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA
             o.id,
             d.id AS detalle_id,
             UPPER(TRIM(COALESCE(
+              CASE
+                WHEN UPPER(TRIM(COALESCE(d.codigo, ''))) IN ('ACEITE', 'ACEITES') THEN 'ACEITES'
+              END,
+              CASE
+                WHEN UPPER(CONCAT_WS(' ', d.descripcion, d.codigo, p.nombre)) REGEXP 'ACEITE|ACEITES|MOBIL|MOVIL|PICO|LIASA' THEN 'ACEITES'
+              END,
               REPLACE(REGEXP_SUBSTR(UPPER(COALESCE(d.codigo, '')), 'CL[[:space:]]*[0-9]{5,6}|C[[:space:]]*[0-9]{5,6}|S[[:space:]]*[0-9]{5,6}'), ' ', ''),
               CASE
                 WHEN UPPER(TRIM(COALESCE(d.codigo, ''))) IN ('GENERAL GASTOS', 'GENERALES GASTOS', 'GASTOS GENERAL', 'GASTOS GENERALES', 'GENERALES DE GASTOS') THEN 'GENERALES GASTOS'
               END,
               CASE
                 WHEN UPPER(TRIM(COALESCE(d.codigo, ''))) IN ('GENERAL', 'GENERALES', 'GENERAL TALLER', 'GENERALES TALLER') THEN 'GENERALES TALLER'
+              END,
+              CASE
+                WHEN COALESCE(placas_detalle.tiene_placas, 0) = 0 AND (
+                  UPPER(TRIM(COALESCE(o.placa_unidad, ''))) IN ('ACEITE', 'ACEITES')
+                  OR COALESCE(aceites_detalle.tiene_aceites, 0) > 0
+                  OR UPPER(CONCAT_WS(' ', o.observaciones, p.nombre)) REGEXP 'ACEITE|ACEITES|MOBIL|MOVIL|PICO|LIASA'
+                ) THEN 'ACEITES'
               END,
               CASE
                 WHEN COALESCE(placas_detalle.tiene_placas, 0) = 0 AND UPPER(TRIM(COALESCE(o.placa_unidad, ''))) IN ('GENERAL GASTOS', 'GENERALES GASTOS', 'GASTOS GENERAL', 'GASTOS GENERALES', 'GENERALES DE GASTOS') THEN 'GENERALES GASTOS'
@@ -4142,6 +4177,13 @@ router.get("/dashboard", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA
             WHERE REGEXP_SUBSTR(UPPER(COALESCE(codigo, '')), 'CL[[:space:]]*[0-9]{5,6}|C[[:space:]]*[0-9]{5,6}|S[[:space:]]*[0-9]{5,6}') IS NOT NULL
             GROUP BY orden_compra_id
           ) placas_detalle ON placas_detalle.orden_compra_id = o.id
+          LEFT JOIN (
+            SELECT orden_compra_id, COUNT(*) AS tiene_aceites
+            FROM ordenes_compra_detalle
+            WHERE UPPER(CONCAT_WS(' ', codigo, descripcion)) REGEXP 'ACEITE|ACEITES|MOBIL|MOVIL|PICO|LIASA'
+            GROUP BY orden_compra_id
+          ) aceites_detalle ON aceites_detalle.orden_compra_id = o.id
+          LEFT JOIN proveedores p ON p.id = o.proveedor_id
           LEFT JOIN ordenes_compra_detalle d ON d.orden_compra_id = o.id AND COALESCE(placas_detalle.tiene_placas, 0) > 0
           ${whereClause}
         ) base

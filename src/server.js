@@ -21,6 +21,10 @@ function isTransientDbError(error) {
   return error && transientDbErrors.has(error.code);
 }
 
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 process.on("unhandledRejection", error => {
   if (isTransientDbError(error)) {
     console.warn("Conexion MySQL interrumpida temporalmente:", error.code);
@@ -95,13 +99,14 @@ const sessionStore = new MySQLStore({
 
 const originalSessionQuery = sessionStore.query.bind(sessionStore);
 sessionStore.query = async (sql, params) => {
-  try {
-    return await originalSessionQuery(sql, params);
-  } catch (error) {
-    if (!isTransientDbError(error)) throw error;
-    console.warn("Reintentando consulta de sesion por error MySQL:", error.code);
-    await new Promise(resolve => setTimeout(resolve, 350));
-    return originalSessionQuery(sql, params);
+  for (let intento = 1; intento <= 4; intento += 1) {
+    try {
+      return await originalSessionQuery(sql, params);
+    } catch (error) {
+      if (!isTransientDbError(error) || intento === 4) throw error;
+      console.warn(`Reintentando consulta de sesion por error MySQL: ${error.code} (${intento}/4)`);
+      await sleep(350 * intento);
+    }
   }
 };
 

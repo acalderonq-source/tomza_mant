@@ -218,7 +218,7 @@
             type="text"
             name="placa_unidad"
             class="form-control text-uppercase"
-            placeholder="Placa o GENERAL"
+            placeholder="Placa, GENERAL o ACEITES"
             value="<%= safeOrden.placa_unidad || '' %>"
             data-placa-autocomplete
             data-placa-mode="placa"
@@ -228,7 +228,7 @@
         </div>
         <div class="col-md-3 d-flex align-items-end">
           <div class="small text-muted">
-            Use una placa para compras de unidad, <strong>GENERAL TALLER</strong> para taller o <strong>GENERAL GASTOS</strong> para gastos generales.
+            Use una placa para compras de unidad, <strong>GENERAL TALLER</strong> para taller, <strong>GENERAL GASTOS</strong> para gastos generales o <strong>ACEITES</strong> para compras de aceites.
           </div>
         </div>
       </div>
@@ -324,7 +324,7 @@
     const tbody = document.querySelector("#itemsTable tbody");
     const newRow = document.createElement("tr");
     newRow.innerHTML = `
-      <td data-label="Placa"><input type="text" name="lineas[${rowIndex}][codigo]" class="form-control text-uppercase" placeholder="Placa o GENERAL" data-placa-autocomplete data-placa-mode="placa" data-placa-allow-free="true" data-placa-allow-general="true"></td>
+      <td data-label="Placa"><input type="text" name="lineas[${rowIndex}][codigo]" class="form-control text-uppercase" placeholder="Placa, GENERAL o ACEITES" data-placa-autocomplete data-placa-mode="placa" data-placa-allow-free="true" data-placa-allow-general="true"></td>
       <td data-label="Descripción"><textarea name="lineas[${rowIndex}][descripcion]" class="form-control" rows="3" required></textarea></td>
       <td data-label="Cantidad"><input type="number" name="lineas[${rowIndex}][cantidad]" class="form-control cantidad" value="1" step="0.01"></td>
       <td data-label="Precio unitario"><input type="number" name="lineas[${rowIndex}][precio_unitario]" class="form-control precio" step="0.01"></td>

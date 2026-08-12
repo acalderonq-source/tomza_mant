@@ -10,15 +10,36 @@ const {
   obtenerSedesTransporte,
   sedeGranelDesdeUsuario
 } = require("../utils/sedes");
+const { extraerPlacasTexto, normalizarPlaca } = require("../utils/placas");
+
+const DB_CONNECTION_ERRORS = new Set(["ECONNRESET", "PROTOCOL_CONNECTION_LOST", "ETIMEDOUT", "ENOTFOUND", "ECONNREFUSED"]);
+const RESUMEN_EJECUTIVO_CACHE_MS = Number(process.env.RESUMEN_EJECUTIVO_CACHE_MS || 1000 * 60);
+const RESUMEN_EJECUTIVO_STALE_MS = Number(process.env.RESUMEN_EJECUTIVO_STALE_MS || 1000 * 60 * 5);
+const resumenEjecutivoCache = new Map();
+
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
 
 async function safeQuery(sql, params = [], fallback = []) {
-  try {
-    const [rows] = await pool.query(sql, params);
-    return rows;
-  } catch (error) {
-    console.warn("Dashboard query omitida:", error.code || error.message);
-    return fallback;
+  for (let intento = 1; intento <= 3; intento += 1) {
+    try {
+      const [rows] = await pool.query(sql, params);
+      return rows;
+    } catch (error) {
+      const temporal = DB_CONNECTION_ERRORS.has(error.code);
+      if (temporal && intento < 3) {
+        console.warn(`Reintentando consulta de dashboard por error MySQL: ${error.code} (${intento}/3)`);
+        await sleep(300 * intento);
+        continue;
+      }
+
+      console.warn("Dashboard query omitida:", error.code || error.message);
+      return fallback;
+    }
   }
+
+  return fallback;
 }
 
 const ROLES_OFICINA_DIA_DIA = ["ADMIN", "TALLER", "PROVEEDURIA_TALLER"];
@@ -28,7 +49,7 @@ const FAMILIAS_GASTO = [
   { clave: "llantas", nombre: "Llantas", color: "#2563eb", palabras: ["llanta", "llantas", "aro", "aros", "rin", "rines"] },
   { clave: "frenos", nombre: "Frenos y seguridad", color: "#dc2626", palabras: ["freno", "frenos", "fibra", "fibras", "clutch", "embrague", "seguridad", "pito"] },
   { clave: "motor", nombre: "Motor y transmisión", color: "#ea580c", palabras: ["motor", "turbo", "inyector", "caja", "transmision", "transmisión", "compresor", "arrancador", "alternador", "bomba", "manguera"] },
-  { clave: "aceites", nombre: "Aceites y fluidos", color: "#0f766e", palabras: ["aceite", "engrase", "filtro", "filtros", "hidraulico", "hidráulico", "coolant", "agua", "radiador", "liquido", "líquido"] },
+  { clave: "aceites", nombre: "Aceites y fluidos", color: "#0f766e", palabras: ["aceite", "aceites", "mobil", "movil", "pico", "liasa", "pico liasa", "pico & liasa", "pico y liasa", "engrase", "filtro", "filtros", "hidraulico", "hidráulico", "coolant", "agua", "radiador", "liquido", "líquido"] },
   { clave: "electrico", nombre: "Eléctrico y luces", color: "#7c3aed", palabras: ["luz", "luces", "bateria", "batería", "cable", "electrico", "eléctrico", "sensor", "marcha", "tablero", "velocimetro", "velocímetro"] },
   { clave: "carroceria", nombre: "Carrocería y estética", color: "#d97706", palabras: ["cabina", "puerta", "bumper", "cajon", "cajón", "rotulacion", "rotulación", "calcomania", "pintura", "pintar", "asiento", "vidrio", "parabrisas"] },
   { clave: "proveedor", nombre: "Pago de proveedor", color: "#0891b2", palabras: ["pago proveedor", "proveedor"] },
@@ -91,6 +112,56 @@ function normalizarPlacaLocal(placa) {
 function esPlacaReal(placa) {
   const limpia = normalizarPlacaLocal(placa);
   return /^CL\d{5,6}$/.test(limpia) || /^C\d{5,6}$/.test(limpia) || /^S\d{5,6}$/.test(limpia);
+}
+
+function crearIndiceUnidades(unidades = []) {
+  const porPlaca = new Map();
+  const porNumero = new Map();
+
+  unidades.forEach(unidad => {
+    const placa = normalizarPlaca(unidad.placa) || normalizarPlacaLocal(unidad.placa);
+    if (!esPlacaReal(placa)) return;
+
+    const registro = { placa, sede: unidad.sede || "" };
+    porPlaca.set(normalizarPlacaLocal(placa), registro);
+
+    const numero = placa.match(/\d{5,6}/)?.[0];
+    if (numero && !porNumero.has(numero)) {
+      porNumero.set(numero, registro);
+    }
+  });
+
+  return { porPlaca, porNumero };
+}
+
+function resolverUnidadDesdeTextos(textos, indiceUnidades) {
+  for (const texto of textos) {
+    const placas = extraerPlacasTexto(texto);
+    for (const placa of placas) {
+      const normalizada = normalizarPlaca(placa) || normalizarPlacaLocal(placa);
+      const exacta = indiceUnidades.porPlaca.get(normalizarPlacaLocal(normalizada));
+      if (exacta) return exacta;
+
+      const numero = normalizarPlacaLocal(normalizada).match(/\d{5,6}/)?.[0];
+      const porNumero = numero ? indiceUnidades.porNumero.get(numero) : null;
+      if (porNumero) return porNumero;
+    }
+  }
+
+  return null;
+}
+
+function resolverUnidadGasto(item, indiceUnidades) {
+  const placaDirecta = normalizarPlaca(item.placa_registrada || item.placa);
+  const directa = placaDirecta ? indiceUnidades.porPlaca.get(normalizarPlacaLocal(placaDirecta)) : null;
+  if (directa) return directa;
+
+  return resolverUnidadDesdeTextos([
+    item.codigo,
+    item.placa_unidad,
+    item.descripcion,
+    item.observaciones
+  ], indiceUnidades);
 }
 
 function clasificarTexto(texto, familias = FAMILIAS_GASTO, fallbackClave = "general") {
@@ -219,12 +290,21 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro }) 
       p.nombre AS proveedor,
       u.placa AS placa_registrada,
       UPPER(TRIM(COALESCE(
-        REPLACE(REGEXP_SUBSTR(UPPER(COALESCE(d.codigo, '')), 'CL[[:space:]]*[0-9]{5,6}|C[[:space:]]*[0-9]{5,6}|S[[:space:]]*[0-9]{5,6}'), ' ', ''),
+        CASE WHEN UPPER(TRIM(COALESCE(d.codigo, ''))) IN ('ACEITE', 'ACEITES') THEN 'ACEITES' END,
+        CASE WHEN UPPER(CONCAT_WS(' ', d.descripcion, d.codigo, o.observaciones, p.nombre)) REGEXP 'ACEITE|ACEITES|MOBIL|MOVIL|PICO|LIASA' THEN 'ACEITES' END,
+        CASE WHEN COALESCE(placas_detalle.tiene_placas, 0) = 0 AND (
+          UPPER(TRIM(COALESCE(o.placa_unidad, ''))) IN ('ACEITE', 'ACEITES')
+          OR UPPER(CONCAT_WS(' ', o.observaciones, p.nombre)) REGEXP 'ACEITE|ACEITES|MOBIL|MOVIL|PICO|LIASA'
+        ) THEN 'ACEITES' END,
+        REPLACE(REPLACE(REPLACE(REGEXP_SUBSTR(UPPER(CONCAT_WS(' ', d.codigo, d.descripcion)), 'CL[[:space:].-]*[0-9]{5,6}|C[[:space:].-]*[0-9]{5,6}|S[[:space:].-]*[0-9]{5,6}'), ' ', ''), '-', ''), '.', ''),
         CASE WHEN COALESCE(placas_detalle.tiene_placas, 0) = 0 THEN REPLACE(NULLIF(UPPER(TRIM(o.placa_unidad)), ''), ' ', '') END,
-        CASE WHEN COALESCE(placas_detalle.tiene_placas, 0) = 0 THEN REPLACE(REGEXP_SUBSTR(UPPER(COALESCE(o.observaciones, '')), 'CL[[:space:]]*[0-9]{5,6}|C[[:space:]]*[0-9]{5,6}|S[[:space:]]*[0-9]{5,6}'), ' ', '') END,
+        CASE WHEN COALESCE(placas_detalle.tiene_placas, 0) = 0 THEN REPLACE(REPLACE(REPLACE(REGEXP_SUBSTR(UPPER(COALESCE(o.observaciones, '')), 'CL[[:space:].-]*[0-9]{5,6}|C[[:space:].-]*[0-9]{5,6}|S[[:space:].-]*[0-9]{5,6}'), ' ', ''), '-', ''), '.', '') END,
         NULL
       ))) AS placa,
       u.sede AS sede,
+      d.codigo AS codigo,
+      o.placa_unidad,
+      o.observaciones,
       COALESCE(d.descripcion, o.observaciones, 'Orden de compra') AS descripcion,
       CASE
         WHEN d.id IS NULL THEN COALESCE(o.total, 0)
@@ -235,14 +315,20 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro }) 
     LEFT JOIN (
       SELECT orden_compra_id, COUNT(*) AS tiene_placas
       FROM ordenes_compra_detalle
-      WHERE REGEXP_SUBSTR(UPPER(COALESCE(codigo, '')), 'CL[[:space:]]*[0-9]{5,6}|C[[:space:]]*[0-9]{5,6}|S[[:space:]]*[0-9]{5,6}') IS NOT NULL
+      WHERE REGEXP_SUBSTR(UPPER(CONCAT_WS(' ', codigo, descripcion)), 'CL[[:space:].-]*[0-9]{5,6}|C[[:space:].-]*[0-9]{5,6}|S[[:space:].-]*[0-9]{5,6}') IS NOT NULL
       GROUP BY orden_compra_id
     ) placas_detalle ON placas_detalle.orden_compra_id = o.id
     LEFT JOIN ordenes_compra_detalle d ON d.orden_compra_id = o.id AND COALESCE(placas_detalle.tiene_placas, 0) > 0
     LEFT JOIN unidades u ON REPLACE(UPPER(TRIM(u.placa)), ' ', '') = UPPER(TRIM(COALESCE(
-      REPLACE(REGEXP_SUBSTR(UPPER(COALESCE(d.codigo, '')), 'CL[[:space:]]*[0-9]{5,6}|C[[:space:]]*[0-9]{5,6}|S[[:space:]]*[0-9]{5,6}'), ' ', ''),
+      CASE WHEN UPPER(TRIM(COALESCE(d.codigo, ''))) IN ('ACEITE', 'ACEITES') THEN 'ACEITES' END,
+      CASE WHEN UPPER(CONCAT_WS(' ', d.descripcion, d.codigo, o.observaciones, p.nombre)) REGEXP 'ACEITE|ACEITES|MOBIL|MOVIL|PICO|LIASA' THEN 'ACEITES' END,
+      CASE WHEN COALESCE(placas_detalle.tiene_placas, 0) = 0 AND (
+        UPPER(TRIM(COALESCE(o.placa_unidad, ''))) IN ('ACEITE', 'ACEITES')
+        OR UPPER(CONCAT_WS(' ', o.observaciones, p.nombre)) REGEXP 'ACEITE|ACEITES|MOBIL|MOVIL|PICO|LIASA'
+      ) THEN 'ACEITES' END,
+      REPLACE(REPLACE(REPLACE(REGEXP_SUBSTR(UPPER(CONCAT_WS(' ', d.codigo, d.descripcion)), 'CL[[:space:].-]*[0-9]{5,6}|C[[:space:].-]*[0-9]{5,6}|S[[:space:].-]*[0-9]{5,6}'), ' ', ''), '-', ''), '.', ''),
       CASE WHEN COALESCE(placas_detalle.tiene_placas, 0) = 0 THEN REPLACE(NULLIF(UPPER(TRIM(o.placa_unidad)), ''), ' ', '') END,
-      CASE WHEN COALESCE(placas_detalle.tiene_placas, 0) = 0 THEN REPLACE(REGEXP_SUBSTR(UPPER(COALESCE(o.observaciones, '')), 'CL[[:space:]]*[0-9]{5,6}|C[[:space:]]*[0-9]{5,6}|S[[:space:]]*[0-9]{5,6}'), ' ', '') END
+      CASE WHEN COALESCE(placas_detalle.tiene_placas, 0) = 0 THEN REPLACE(REPLACE(REPLACE(REGEXP_SUBSTR(UPPER(COALESCE(o.observaciones, '')), 'CL[[:space:].-]*[0-9]{5,6}|C[[:space:].-]*[0-9]{5,6}|S[[:space:].-]*[0-9]{5,6}'), ' ', ''), '-', ''), '.', '') END
     )))
     ${whereOrdenes}
   `, paramsOrdenes, []);
@@ -261,6 +347,9 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro }) 
       u.placa AS placa_registrada,
       NULLIF(pp.placa, '') AS placa,
       u.sede AS sede,
+      pp.numero_factura AS codigo,
+      NULL AS placa_unidad,
+      pp.concepto AS observaciones,
       COALESCE(pp.concepto, pp.numero_factura, 'Pago de proveedor') AS descripcion,
       COALESCE(pp.monto, 0) AS monto
     FROM pagos_proveedor pp
@@ -281,20 +370,34 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro }) 
       NULL AS placa_registrada,
       NULL AS placa,
       'General' AS sede,
+      NULL AS codigo,
+      NULL AS placa_unidad,
+      cc.observacion AS observaciones,
       COALESCE(cc.observacion, 'Reintegro de caja chica') AS descripcion,
       COALESCE(cc.monto, 0) AS monto
     FROM caja_chica_reintegros cc
     ${whereCaja}
   `, cajaParams, []);
 
+  const unidadesReferencia = await safeQuery(
+    "SELECT placa, sede FROM unidades WHERE placa IS NOT NULL AND TRIM(placa) <> ''",
+    [],
+    []
+  );
+  const indiceUnidades = crearIndiceUnidades(unidadesReferencia);
+
   const aplicaSede = (item) => !sedesFiltro.length || sedesFiltro.includes(item.sede);
   const gastos = [...ordenesLineas, ...pagosProveedor, ...cajaChica]
-    .filter(aplicaSede)
     .map(item => {
-      const placaLimpia = normalizarPlacaLocal(item.placa_registrada || item.placa);
-      const placaReal = Boolean(item.placa_registrada) || esPlacaReal(placaLimpia);
-      const sedeReal = Boolean(String(item.sede || "").trim()) && item.sede !== "General";
-      const familia = item.fuente === "PAGO_PROVEEDOR"
+      const unidadResuelta = resolverUnidadGasto(item, indiceUnidades);
+      const placaNormalizada = normalizarPlaca(item.placa_registrada || item.placa);
+      const placaLimpia = unidadResuelta?.placa || (esPlacaReal(placaNormalizada) ? placaNormalizada : "");
+      const placaReal = esPlacaReal(placaLimpia);
+      const sedeFinal = unidadResuelta?.sede || item.sede || "";
+      const sedeReal = Boolean(String(sedeFinal || "").trim()) && sedeFinal !== "General";
+      const familia = item.placa === "ACEITES"
+        ? FAMILIAS_GASTO.find(f => f.clave === "aceites")
+        : item.fuente === "PAGO_PROVEEDOR"
         ? clasificarTexto(`${item.descripcion} ${item.proveedor}`, FAMILIAS_GASTO, "proveedor")
         : item.fuente === "CAJA_CHICA"
         ? FAMILIAS_GASTO.find(f => f.clave === "caja")
@@ -302,13 +405,14 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro }) 
       return {
         ...item,
         placa: placaReal ? placaLimpia : "",
-        sede: sedeReal ? item.sede : "",
+        sede: sedeReal ? sedeFinal : "",
         tienePlacaReal: placaReal,
         tieneSedeReal: sedeReal,
         monto: Number(item.monto || 0),
         familia
       };
     })
+    .filter(aplicaSede)
     .filter(item => item.monto > 0);
 
   const porFuente = new Map();
@@ -318,6 +422,7 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro }) 
   const porPlaca = new Map();
   const porMes = new Map();
   const porDetalleGeneral = new Map();
+  const porDescripcion = new Map();
 
   gastos.forEach(item => {
     const fuenteNombre = item.fuente === "ORDEN" ? "Órdenes de compra" : item.fuente === "PAGO_PROVEEDOR" ? "Pago proveedor" : "Caja chica";
@@ -349,6 +454,13 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro }) 
     const mes = sumarGrupo(porMes, mesKey);
     mes.total += item.monto;
     mes.registros += 1;
+
+    const descripcion = sumarGrupo(porDescripcion, recortarResumen(item.descripcion, 90), {
+      categoria: item.familia.nombre,
+      color: item.familia.color
+    });
+    descripcion.total += item.monto;
+    descripcion.registros += 1;
 
     if (item.familia?.clave === "general") {
       const detalle = sumarGrupo(porDetalleGeneral, describirGasto(item));
@@ -420,6 +532,7 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro }) 
   const mantPorFamilia = new Map();
   const mantPorSede = new Map();
   const mantPorPlaca = new Map();
+  const mantFamiliaPorSede = new Map();
 
   mantenimientos.forEach(item => {
     const tipo = sumarGrupo(mantPorTipo, item.tipo_registro);
@@ -429,8 +542,22 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro }) 
     familia.registros += 1;
 
     if (item.sede) {
-      const sede = sumarGrupo(mantPorSede, etiquetaSedeTomza(item.sede));
+      const sedeNombre = etiquetaSedeTomza(item.sede);
+      const sede = sumarGrupo(mantPorSede, sedeNombre);
       sede.registros += 1;
+
+      if (!mantFamiliaPorSede.has(sedeNombre)) {
+        mantFamiliaPorSede.set(sedeNombre, {
+          nombre: sedeNombre,
+          registros: 0,
+          familias: new Map()
+        });
+      }
+
+      const sedeFamilias = mantFamiliaPorSede.get(sedeNombre);
+      sedeFamilias.registros += 1;
+      const familiaSede = sumarGrupo(sedeFamilias.familias, item.familia.nombre, { color: item.familia.color });
+      familiaSede.registros += 1;
     }
 
     if (esPlacaReal(item.placa) && item.sede) {
@@ -440,12 +567,21 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro }) 
   });
 
   const totalGastos = gastos.reduce((sum, item) => sum + item.monto, 0);
+  const totalOrdenesCompra = gastos.filter(item => item.fuente === "ORDEN").reduce((sum, item) => sum + item.monto, 0);
+  const totalPagosProveedor = gastos.filter(item => item.fuente === "PAGO_PROVEEDOR").reduce((sum, item) => sum + item.monto, 0);
+  const totalCajaChica = gastos.filter(item => item.fuente === "CAJA_CHICA").reduce((sum, item) => sum + item.monto, 0);
   const fuentes = ordenarTop(porFuente, 10);
   const categorias = ordenarTop(porCategoria, 12);
-  const detalleGeneralOtros = ordenarTop(porDetalleGeneral, 5);
-  const proveedores = ordenarTop(porProveedor, 12);
-  const sedes = ordenarTop(porSede, 12);
-  const placas = ordenarTop(porPlaca, 15);
+  const detalleGeneralOtros = ordenarTop(porDetalleGeneral, 1000);
+  const resumenGeneralOtros = {
+    total: detalleGeneralOtros.reduce((sum, item) => sum + Number(item.total || 0), 0),
+    registros: detalleGeneralOtros.reduce((sum, item) => sum + Number(item.registros || 0), 0),
+    conceptos: detalleGeneralOtros.length
+  };
+  const productosServicios = ordenarTop(porDescripcion, 20);
+  const proveedores = ordenarTop(porProveedor, 20);
+  const sedes = ordenarTop(porSede, 20);
+  const placas = ordenarTop(porPlaca, 25);
   const totalGastoConUnidad = Array.from(porPlaca.values()).reduce((sum, item) => sum + Number(item.total || 0), 0);
   const unidadesConGasto = porPlaca.size;
   const [flotaRow] = await safeQuery(
@@ -471,16 +607,20 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro }) 
   const sedesMant = ordenarTopConteo(mantPorSede, 10);
   const placasMant = ordenarTopConteo(mantPorPlaca, 12);
   const tiposMant = ordenarTopConteo(mantPorTipo, 5);
+  const trabajosPorSede = Array.from(mantFamiliaPorSede.values())
+    .map(sede => ({
+      nombre: sede.nombre,
+      registros: sede.registros,
+      trabajos: ordenarTopConteo(sede.familias, 6).map(item => ({
+        ...item,
+        porcentaje: sede.registros ? Math.round((Number(item.registros || 0) / sede.registros) * 100) : 0
+      }))
+    }))
+    .sort((a, b) => Number(b.registros || 0) - Number(a.registros || 0) || String(a.nombre).localeCompare(String(b.nombre), "es"))
+    .slice(0, 12);
 
   const conclusiones = [];
   if (categorias[0]) conclusiones.push(`El mayor gasto está en ${categorias[0].nombre}, con ₡${Math.round(categorias[0].total).toLocaleString("es-CR")}.`);
-  if (categorias[0]?.nombre === "General / otros" && detalleGeneralOtros.length) {
-    const desglose = detalleGeneralOtros
-      .slice(0, 4)
-      .map(item => `${item.nombre} (₡${Math.round(item.total).toLocaleString("es-CR")})`)
-      .join("; ");
-    conclusiones.push(`Ese monto de General / otros se fue principalmente en: ${desglose}.`);
-  }
   if (proveedores[0]) conclusiones.push(`El proveedor con mayor monto es ${proveedores[0].nombre}, acumulando ₡${Math.round(proveedores[0].total).toLocaleString("es-CR")}.`);
   if (placas[0]) conclusiones.push(`La placa con más gasto registrado es ${placas[0].nombre} (${placas[0].sede}), con ₡${Math.round(placas[0].total).toLocaleString("es-CR")}.`);
   if (unidadesConGasto) conclusiones.push(`El costo promedio por unidad es ₡${Math.round(costoPromedioPorUnidad).toLocaleString("es-CR")}, calculado sobre ${unidadesConGasto.toLocaleString("es-CR")} placa(s) con gasto en el periodo.`);
@@ -491,6 +631,14 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro }) 
     totalGastos,
     totalRegistrosGasto: gastos.length,
     totalMantenimientos: mantenimientos.length,
+    resumenFinanciero: {
+      totalOrdenesCompra,
+      totalPagosProveedor,
+      totalCajaChica,
+      movimientosOrdenesCompra: gastos.filter(item => item.fuente === "ORDEN").length,
+      movimientosPagosProveedor: gastos.filter(item => item.fuente === "PAGO_PROVEEDOR").length,
+      movimientosCajaChica: gastos.filter(item => item.fuente === "CAJA_CHICA").length
+    },
     costoUnidad: {
       totalGastoConUnidad,
       totalUnidadesFlota,
@@ -506,6 +654,8 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro }) 
     fuentes,
     categorias,
     detalleGeneralOtros,
+    resumenGeneralOtros,
+    productosServicios,
     proveedores,
     sedes,
     placas,
@@ -514,6 +664,7 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro }) 
     familiasMant,
     sedesMant,
     placasMant,
+    trabajosPorSede,
     recientesGasto: gastos
       .filter(item => item.tienePlacaReal && item.tieneSedeReal)
       .sort((a, b) => new Date(b.fecha || 0) - new Date(a.fecha || 0))
@@ -521,6 +672,48 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro }) 
     recientesMantenimiento: mantenimientos.sort((a, b) => new Date(b.fecha || 0) - new Date(a.fecha || 0)).slice(0, 12),
     conclusiones
   };
+}
+
+function claveResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro }) {
+  return JSON.stringify({
+    fechaDesde: fechaDesde || "",
+    fechaHasta: fechaHasta || "",
+    sedes: Array.isArray(sedesFiltro) ? [...sedesFiltro].sort() : []
+  });
+}
+
+async function obtenerResumenEjecutivoCached(params) {
+  const key = claveResumenEjecutivo(params);
+  const now = Date.now();
+  const cached = resumenEjecutivoCache.get(key);
+
+  if (cached && now - cached.createdAt <= RESUMEN_EJECUTIVO_CACHE_MS) {
+    return { ...cached.data, desdeCache: true, cacheEdadSegundos: Math.round((now - cached.createdAt) / 1000) };
+  }
+
+  try {
+    const data = await obtenerResumenEjecutivo(params);
+    resumenEjecutivoCache.set(key, { data, createdAt: now });
+
+    if (resumenEjecutivoCache.size > 30) {
+      const entradas = [...resumenEjecutivoCache.entries()].sort((a, b) => a[1].createdAt - b[1].createdAt);
+      entradas.slice(0, resumenEjecutivoCache.size - 30).forEach(([cacheKey]) => resumenEjecutivoCache.delete(cacheKey));
+    }
+
+    return data;
+  } catch (error) {
+    if (cached && now - cached.createdAt <= RESUMEN_EJECUTIVO_STALE_MS) {
+      console.warn("Usando resumen ejecutivo en cache por error MySQL:", error.code || error.message);
+      return {
+        ...cached.data,
+        desdeCache: true,
+        cacheVencido: true,
+        cacheEdadSegundos: Math.round((now - cached.createdAt) / 1000)
+      };
+    }
+
+    throw error;
+  }
 }
 
 // =========================================================
@@ -536,7 +729,7 @@ router.get("/resumen-ejecutivo", requireAuth, async (req, res) => {
     const fechaDesde = String(req.query.fecha_desde || "").trim();
     const fechaHasta = String(req.query.fecha_hasta || "").trim();
     const contextoSedes = await resolverSedesUsuario(req);
-    const resumen = await obtenerResumenEjecutivo({
+    const resumen = await obtenerResumenEjecutivoCached({
       fechaDesde,
       fechaHasta,
       sedesFiltro: contextoSedes.sedesFiltro

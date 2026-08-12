@@ -9,10 +9,13 @@ const pool = mysql.createPool({
   password: process.env.MYSQLPASSWORD,
   database: process.env.MYSQLDATABASE,
   waitForConnections: true,
-  connectionLimit: 10,
+  connectionLimit: Number(process.env.MYSQL_CONNECTION_LIMIT || 10),
   queueLimit: 0,
+  connectTimeout: Number(process.env.MYSQL_CONNECT_TIMEOUT_MS || 30000),
   enableKeepAlive: true,
-  keepAliveInitialDelay: 0
+  keepAliveInitialDelay: 0,
+  maxIdle: Number(process.env.MYSQL_MAX_IDLE || 10),
+  idleTimeout: Number(process.env.MYSQL_IDLE_TIMEOUT_MS || 60000)
 });
 
 module.exports = pool;

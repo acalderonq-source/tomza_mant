@@ -70,6 +70,7 @@
   function normalizePlate(value) {
     const raw = cleanPlate(value);
     if (!raw) return "";
+    if (["ACEITE", "ACEITES"].includes(raw)) return "ACEITES";
     if (["GENERAL", "GENERALES", "GENERALTALLER", "GENERALESTALLER"].includes(raw)) return "GENERALES TALLER";
 
     if (/^CLC\d{5,6}$/.test(raw)) return raw.replace(/^CLC/, "CL");
@@ -109,6 +110,11 @@
       "GENERALTALLER".includes(raw) ||
       raw.includes("GENERAL")
     );
+  }
+
+  function isOilQuery(value) {
+    const raw = cleanPlate(value);
+    return raw && ("ACEITES".includes(raw) || "ACEITE".includes(raw));
   }
 
   function normalize(value) {
@@ -255,6 +261,19 @@
       }));
     }
 
+    function selectAceites() {
+      input.value = "ACEITES";
+      if (target) target.value = mode === "unidad" ? "" : "ACEITES";
+      if (sedeTarget) sedeTarget.value = "Aceites";
+      if (selected) selected.textContent = "ACEITES · Aceites";
+      close();
+      results.innerHTML = "";
+      input.dispatchEvent(new CustomEvent("placa:selected", {
+        bubbles: true,
+        detail: { placa: "ACEITES", sede: "Aceites", especial: true }
+      }));
+    }
+
     async function renderNow() {
       const query = cleanPlate(input.value);
       if (!allowFree) clearSelection();
@@ -280,6 +299,15 @@
         button.className = "tomza-plate-option";
         button.innerHTML = "<strong>GENERAL-TALLER</strong><span>Compra general de taller</span>";
         button.addEventListener("click", selectGeneral);
+        results.appendChild(button);
+      }
+
+      if (allowGeneral && isOilQuery(query)) {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "tomza-plate-option";
+        button.innerHTML = "<strong>ACEITES</strong><span>Compra clasificada como aceites</span>";
+        button.addEventListener("click", selectAceites);
         results.appendChild(button);
       }
 

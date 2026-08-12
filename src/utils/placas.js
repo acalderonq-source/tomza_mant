@@ -10,6 +10,8 @@ function normalizarPlaca(value) {
   const raw = limpiarTextoPlaca(value);
   if (!raw) return null;
 
+  if (["ACEITE", "ACEITES"].includes(raw)) return "ACEITES";
+
   const generales = new Set(["GENERAL", "GENERALES", "GENERALTALLER", "GENERALESTALLER"]);
   if (generales.has(raw)) return "GENERALES TALLER";
 
@@ -83,7 +85,7 @@ function agregarFiltroPlacaSql(condiciones, params, column, value) {
 
 function extraerPlacasTexto(value) {
   const texto = String(value || "").toUpperCase();
-  const matches = texto.match(/\b(?:CL|C|S)?\s*\d{5,6}\b/g) || [];
+  const matches = texto.match(/\b(?:CL|C|S)?[\s.-]*\d{5,6}\b/g) || [];
   const placas = matches
     .map(item => normalizarPlaca(item))
     .filter(Boolean);
