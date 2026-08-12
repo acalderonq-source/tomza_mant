@@ -3,7 +3,7 @@ const router = express.Router();
 const pool = require("../db");
 const {
   agregarTallerParaMecanico,
-  SEDES_TRANSPORTE,
+  expandirSedesEquivalentes,
   etiquetaSede: etiquetaSedeTomza,
   esUsuarioTodasSedes,
   obtenerTodasSedes,
@@ -22,7 +22,6 @@ async function safeQuery(sql, params = [], fallback = []) {
 }
 
 const ROLES_OFICINA_DIA_DIA = ["ADMIN", "TALLER", "PROVEEDURIA_TALLER"];
-const SEDES_TRANSPORTE_AGRUPADAS = ["Transportadora", "Granel"];
 const ROLES_RESUMEN_EJECUTIVO = ["ADMIN", "TALLER", "PROVEEDURIA", "PROVEEDURIA_TALLER", "TRAMITES"];
 
 const FAMILIAS_GASTO = [
@@ -61,13 +60,11 @@ function fechaMesKey(value) {
 
 function expandirSedeFiltro(sede) {
   if (!sede) return [];
-  if (SEDES_TRANSPORTE_AGRUPADAS.includes(sede)) return SEDES_TRANSPORTE;
-  return [sede];
+  return expandirSedesEquivalentes(sede);
 }
 
 function etiquetaSede(sede) {
   if (!sede) return "TODAS";
-  if (SEDES_TRANSPORTE_AGRUPADAS.includes(sede)) return "Transportadora + Granel";
   return etiquetaSedeTomza(sede);
 }
 
@@ -120,6 +117,16 @@ function recortarResumen(texto, limite = 150) {
   const limpio = String(texto || "").replace(/\s+/g, " ").trim();
   if (!limpio) return "-";
   return limpio.length > limite ? `${limpio.slice(0, limite - 3)}...` : limpio;
+}
+
+function describirGasto(item) {
+  const descripcion = recortarResumen(item.descripcion, 85);
+  const proveedor = recortarResumen(item.proveedor, 45);
+
+  if (descripcion !== "-" && proveedor !== "-") return `${descripcion} · ${proveedor}`;
+  if (descripcion !== "-") return descripcion;
+  if (proveedor !== "-") return proveedor;
+  return "Sin detalle";
 }
 
 function sumarGrupo(map, key, base = {}) {
@@ -213,8 +220,8 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro }) 
       u.placa AS placa_registrada,
       UPPER(TRIM(COALESCE(
         REPLACE(REGEXP_SUBSTR(UPPER(COALESCE(d.codigo, '')), 'CL[[:space:]]*[0-9]{5,6}|C[[:space:]]*[0-9]{5,6}|S[[:space:]]*[0-9]{5,6}'), ' ', ''),
-        REPLACE(NULLIF(UPPER(TRIM(o.placa_unidad)), ''), ' ', ''),
-        REPLACE(REGEXP_SUBSTR(UPPER(COALESCE(o.observaciones, '')), 'CL[[:space:]]*[0-9]{5,6}|C[[:space:]]*[0-9]{5,6}|S[[:space:]]*[0-9]{5,6}'), ' ', ''),
+        CASE WHEN COALESCE(placas_detalle.tiene_placas, 0) = 0 THEN REPLACE(NULLIF(UPPER(TRIM(o.placa_unidad)), ''), ' ', '') END,
+        CASE WHEN COALESCE(placas_detalle.tiene_placas, 0) = 0 THEN REPLACE(REGEXP_SUBSTR(UPPER(COALESCE(o.observaciones, '')), 'CL[[:space:]]*[0-9]{5,6}|C[[:space:]]*[0-9]{5,6}|S[[:space:]]*[0-9]{5,6}'), ' ', '') END,
         NULL
       ))) AS placa,
       u.sede AS sede,
@@ -225,11 +232,17 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro }) 
       END AS monto
     FROM ordenes_compra o
     LEFT JOIN proveedores p ON p.id = o.proveedor_id
-    LEFT JOIN ordenes_compra_detalle d ON d.orden_compra_id = o.id
+    LEFT JOIN (
+      SELECT orden_compra_id, COUNT(*) AS tiene_placas
+      FROM ordenes_compra_detalle
+      WHERE REGEXP_SUBSTR(UPPER(COALESCE(codigo, '')), 'CL[[:space:]]*[0-9]{5,6}|C[[:space:]]*[0-9]{5,6}|S[[:space:]]*[0-9]{5,6}') IS NOT NULL
+      GROUP BY orden_compra_id
+    ) placas_detalle ON placas_detalle.orden_compra_id = o.id
+    LEFT JOIN ordenes_compra_detalle d ON d.orden_compra_id = o.id AND COALESCE(placas_detalle.tiene_placas, 0) > 0
     LEFT JOIN unidades u ON REPLACE(UPPER(TRIM(u.placa)), ' ', '') = UPPER(TRIM(COALESCE(
       REPLACE(REGEXP_SUBSTR(UPPER(COALESCE(d.codigo, '')), 'CL[[:space:]]*[0-9]{5,6}|C[[:space:]]*[0-9]{5,6}|S[[:space:]]*[0-9]{5,6}'), ' ', ''),
-      REPLACE(NULLIF(UPPER(TRIM(o.placa_unidad)), ''), ' ', ''),
-      REPLACE(REGEXP_SUBSTR(UPPER(COALESCE(o.observaciones, '')), 'CL[[:space:]]*[0-9]{5,6}|C[[:space:]]*[0-9]{5,6}|S[[:space:]]*[0-9]{5,6}'), ' ', '')
+      CASE WHEN COALESCE(placas_detalle.tiene_placas, 0) = 0 THEN REPLACE(NULLIF(UPPER(TRIM(o.placa_unidad)), ''), ' ', '') END,
+      CASE WHEN COALESCE(placas_detalle.tiene_placas, 0) = 0 THEN REPLACE(REGEXP_SUBSTR(UPPER(COALESCE(o.observaciones, '')), 'CL[[:space:]]*[0-9]{5,6}|C[[:space:]]*[0-9]{5,6}|S[[:space:]]*[0-9]{5,6}'), ' ', '') END
     )))
     ${whereOrdenes}
   `, paramsOrdenes, []);
@@ -304,6 +317,7 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro }) 
   const porSede = new Map();
   const porPlaca = new Map();
   const porMes = new Map();
+  const porDetalleGeneral = new Map();
 
   gastos.forEach(item => {
     const fuenteNombre = item.fuente === "ORDEN" ? "Órdenes de compra" : item.fuente === "PAGO_PROVEEDOR" ? "Pago proveedor" : "Caja chica";
@@ -335,6 +349,12 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro }) 
     const mes = sumarGrupo(porMes, mesKey);
     mes.total += item.monto;
     mes.registros += 1;
+
+    if (item.familia?.clave === "general") {
+      const detalle = sumarGrupo(porDetalleGeneral, describirGasto(item));
+      detalle.total += item.monto;
+      detalle.registros += 1;
+    }
   });
 
   const paramsMant = [];
@@ -422,12 +442,29 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro }) 
   const totalGastos = gastos.reduce((sum, item) => sum + item.monto, 0);
   const fuentes = ordenarTop(porFuente, 10);
   const categorias = ordenarTop(porCategoria, 12);
+  const detalleGeneralOtros = ordenarTop(porDetalleGeneral, 5);
   const proveedores = ordenarTop(porProveedor, 12);
   const sedes = ordenarTop(porSede, 12);
   const placas = ordenarTop(porPlaca, 15);
   const totalGastoConUnidad = Array.from(porPlaca.values()).reduce((sum, item) => sum + Number(item.total || 0), 0);
   const unidadesConGasto = porPlaca.size;
+  const [flotaRow] = await safeQuery(
+    `SELECT
+       COUNT(*) AS total,
+       SUM(CASE WHEN COALESCE(activa, 1) = 1 THEN 1 ELSE 0 END) AS activas,
+       SUM(CASE WHEN COALESCE(activa, 1) = 0 THEN 1 ELSE 0 END) AS inactivas,
+       SUM(CASE WHEN COALESCE(varada, 0) = 1 THEN 1 ELSE 0 END) AS varadas
+     FROM unidades
+     ${sedesFiltro.length ? "WHERE sede IN (?)" : ""}`,
+    sedesFiltro.length ? [sedesFiltro] : [],
+    [{ total: 0, activas: 0, inactivas: 0, varadas: 0 }]
+  );
+  const totalUnidadesFlota = Number(flotaRow.total || 0);
+  const unidadesActivasFlota = Number(flotaRow.activas || 0);
+  const unidadesInactivasFlota = Number(flotaRow.inactivas || 0);
+  const unidadesVaradasFlota = Number(flotaRow.varadas || 0);
   const costoPromedioPorUnidad = unidadesConGasto ? totalGastoConUnidad / unidadesConGasto : 0;
+  const costoPromedioPorUnidadFlota = totalUnidadesFlota ? totalGastoConUnidad / totalUnidadesFlota : 0;
   const totalGastoSinUnidad = Math.max(totalGastos - totalGastoConUnidad, 0);
   const meses = Array.from(porMes.values()).sort((a, b) => String(a.nombre).localeCompare(String(b.nombre), "es"));
   const familiasMant = ordenarTopConteo(mantPorFamilia, 10);
@@ -437,9 +474,16 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro }) 
 
   const conclusiones = [];
   if (categorias[0]) conclusiones.push(`El mayor gasto está en ${categorias[0].nombre}, con ₡${Math.round(categorias[0].total).toLocaleString("es-CR")}.`);
+  if (categorias[0]?.nombre === "General / otros" && detalleGeneralOtros.length) {
+    const desglose = detalleGeneralOtros
+      .slice(0, 4)
+      .map(item => `${item.nombre} (₡${Math.round(item.total).toLocaleString("es-CR")})`)
+      .join("; ");
+    conclusiones.push(`Ese monto de General / otros se fue principalmente en: ${desglose}.`);
+  }
   if (proveedores[0]) conclusiones.push(`El proveedor con mayor monto es ${proveedores[0].nombre}, acumulando ₡${Math.round(proveedores[0].total).toLocaleString("es-CR")}.`);
   if (placas[0]) conclusiones.push(`La placa con más gasto registrado es ${placas[0].nombre} (${placas[0].sede}), con ₡${Math.round(placas[0].total).toLocaleString("es-CR")}.`);
-  if (unidadesConGasto) conclusiones.push(`El costo promedio por unidad es ₡${Math.round(costoPromedioPorUnidad).toLocaleString("es-CR")}, calculado sobre ${unidadesConGasto.toLocaleString("es-CR")} placa(s) con gasto real.`);
+  if (unidadesConGasto) conclusiones.push(`El costo promedio por unidad es ₡${Math.round(costoPromedioPorUnidad).toLocaleString("es-CR")}, calculado sobre ${unidadesConGasto.toLocaleString("es-CR")} placa(s) con gasto en el periodo.`);
   if (familiasMant[0]) conclusiones.push(`El mantenimiento más frecuente es ${familiasMant[0].nombre}, con ${familiasMant[0].registros.toLocaleString("es-CR")} registro(s).`);
   if (sedesMant[0]) conclusiones.push(`La sede con más movimiento de taller es ${sedesMant[0].nombre}, con ${sedesMant[0].registros.toLocaleString("es-CR")} mantenimiento(s).`);
 
@@ -449,13 +493,19 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro }) 
     totalMantenimientos: mantenimientos.length,
     costoUnidad: {
       totalGastoConUnidad,
+      totalUnidadesFlota,
+      unidadesActivasFlota,
+      unidadesInactivasFlota,
+      unidadesVaradasFlota,
       unidadesConGasto,
       costoPromedioPorUnidad,
+      costoPromedioPorUnidadFlota,
       totalGastoSinUnidad,
-      formula: "Total de gastos con placa real registrada / cantidad de placas reales con gasto"
+      formula: "Total de gastos con placa real registrada / cantidad de placas con gasto en el periodo"
     },
     fuentes,
     categorias,
+    detalleGeneralOtros,
     proveedores,
     sedes,
     placas,

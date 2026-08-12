@@ -8,6 +8,7 @@ const SEDES_GRANEL = [
 ];
 
 const SEDES_TRANSPORTE = ["Transportadora", ...SEDES_GRANEL];
+const SEDES_GRANEL_CARTAGO_EQUIVALENTES = ["Granel", "granel_cartago"];
 
 const TODAS_SEDES = [
   "Cartago",
@@ -31,6 +32,7 @@ const TODAS_SEDES = [
 ];
 
 const ETIQUETAS_SEDES = {
+  Granel: "Granel Cartago",
   granel_cartago: "Granel Cartago",
   granel_alajuela: "Granel Alajuela",
   granel_la_cruz: "Granel La Cruz",
@@ -62,6 +64,23 @@ function etiquetaSede(sede) {
 
 function esSedeGranel(sede) {
   return normalizarSede(sede).includes("GRANEL");
+}
+
+function esSedeGranelCartago(sede) {
+  const sedeNormalizada = normalizarSede(sede);
+  return SEDES_GRANEL_CARTAGO_EQUIVALENTES.some(valor => normalizarSede(valor) === sedeNormalizada);
+}
+
+function expandirSedeEquivalente(sede) {
+  const sedeLimpia = limpiarSede(sede);
+  if (!sedeLimpia) return [];
+  if (esSedeGranelCartago(sedeLimpia)) return SEDES_GRANEL_CARTAGO_EQUIVALENTES;
+  return [sedeLimpia];
+}
+
+function expandirSedesEquivalentes(sedes) {
+  const lista = Array.isArray(sedes) ? sedes : [sedes];
+  return unirSedes(lista.flatMap(expandirSedeEquivalente));
 }
 
 function esSedeTransporte(sede) {
@@ -182,7 +201,7 @@ function getSedesPermitidas(req) {
 
   }
 
-  return sedes;
+  return expandirSedesEquivalentes(sedes);
 }
 
 module.exports = {
@@ -190,8 +209,11 @@ module.exports = {
   SEDES_GRANEL,
   SEDES_TRANSPORTE,
   etiquetaSede,
+  esSedeGranelCartago,
   esSedeGranel,
   esSedeTransporte,
+  expandirSedeEquivalente,
+  expandirSedesEquivalentes,
   esUsuarioMecanico,
   esUsuarioProveeduria,
   esUsuarioTodasSedes,

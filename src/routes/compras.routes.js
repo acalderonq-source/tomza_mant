@@ -128,14 +128,17 @@ function clasificarPlacaCompra(placa, sede) {
   const sedeLimpia = normalizarSedeDashboard(sede);
   const sedeUpper = sedeLimpia.toUpperCase();
 
+  if (placaLimpia === "GENERALES GASTOS" || ["GENERAL GASTOS", "GENERALES GASTOS", "GASTOS GENERAL", "GASTOS GENERALES", "GENERALES DE GASTOS"].includes(sedeUpper)) return "Generales de gastos";
+  if (placaLimpia === "GENERALES TALLER" || ["GENERAL", "GENERALES", "GENERAL TALLER", "GENERALES TALLER"].includes(sedeUpper)) return "General taller";
+  if (placaLimpia === "SIN PLACA") return "Sin placa / revisar";
   if (esSedeGranelDashboard(sedeLimpia)) return "Graneles";
   if (sedeUpper === "TRANSPORTADORA" || /^S\d{5,6}$/.test(placaLimpia)) return "Transportadora";
-  if (/^C[L]?\d{5,6}$/.test(placaLimpia) && !["TALLER", "TECNICOS", "GENERAL"].includes(sedeUpper)) return "Hinos";
-  return "Los demás";
+  if (/^C[L]?\d{5,6}$/.test(placaLimpia) && !["TALLER", "TECNICOS"].includes(sedeUpper)) return "Cilindreros";
+  return "Otros";
 }
 
 function agruparGastosPorPlaca(gastos = []) {
-  const ordenCategorias = ["Hinos", "Graneles", "Transportadora", "Los demás"];
+  const ordenCategorias = ["Cilindreros", "Graneles", "Transportadora", "General taller", "Generales de gastos", "Otros", "Sin placa / revisar"];
   const grupos = ordenCategorias.map(nombre => ({
     nombre,
     total: 0,
@@ -146,8 +149,8 @@ function agruparGastosPorPlaca(gastos = []) {
 
   gastos.forEach(item => {
     const categoria = clasificarPlacaCompra(item.placa, item.sede);
-    const grupo = porCategoria[categoria] || porCategoria["Los demás"];
-    const sede = normalizarSedeDashboard(item.sede) || "Sin sede";
+    const grupo = porCategoria[categoria] || porCategoria["Otros"];
+    const sede = normalizarSedeDashboard(item.sede) || "Por revisar";
     const total = Number(item.total_gastado || 0);
     const ordenes = Number(item.ordenes || 0);
 
@@ -1261,13 +1264,41 @@ async function obtenerOrdenesReporteCompleto(filtros = {}) {
 
   const ordenIds = ordenes.map(orden => orden.id);
   const placeholders = ordenIds.map(() => "?").join(",");
-  const [lineas] = await pool.query(
+  let [lineas] = await pool.query(
     `SELECT orden_compra_id, codigo, descripcion, cantidad, precio_unitario, subtotal
      FROM ordenes_compra_detalle
      WHERE orden_compra_id IN (${placeholders})
      ORDER BY orden_compra_id, id`,
     ordenIds
   );
+
+  const placasReporte = new Set();
+  ordenes.forEach(orden => {
+    const placa = normalizarPlaca(orden.placa_unidad);
+    if (placa && placa !== "GENERALES TALLER") placasReporte.add(placa);
+  });
+  lineas.forEach(linea => {
+    const placa = normalizarPlaca(linea.codigo);
+    if (placa && placa !== "GENERALES TALLER") placasReporte.add(placa);
+  });
+
+  const sedePorPlaca = new Map();
+  if (placasReporte.size) {
+    const [unidadesReporte] = await pool.query("SELECT placa, sede FROM unidades");
+    unidadesReporte.forEach(unidad => {
+      const placa = normalizarPlaca(unidad.placa);
+      if (placa && placasReporte.has(placa)) sedePorPlaca.set(placa, unidad.sede || "");
+    });
+  }
+
+  lineas = lineas.map(linea => {
+    const placaNormalizada = normalizarPlaca(linea.codigo);
+    return {
+      ...linea,
+      placa_normalizada: placaNormalizada,
+      sede_resuelta: placaNormalizada ? sedePorPlaca.get(placaNormalizada) || "" : ""
+    };
+  });
 
   const lineasPorOrden = lineas.reduce((map, linea) => {
     if (!map.has(linea.orden_compra_id)) map.set(linea.orden_compra_id, []);
@@ -1277,6 +1308,8 @@ async function obtenerOrdenesReporteCompleto(filtros = {}) {
 
   ordenes = ordenes.map(orden => ({
     ...orden,
+    placa_normalizada: normalizarPlaca(orden.placa_unidad),
+    sede_resuelta: sedePorPlaca.get(normalizarPlaca(orden.placa_unidad)) || "",
     lineas: lineasPorOrden.get(orden.id) || []
   }));
 
@@ -1350,6 +1383,8 @@ function agruparOrdenesPorDescripcion(ordenes = []) {
       if (!grupos.has(clave)) {
         grupos.set(clave, {
           descripcion,
+          categorias: new Set(),
+          sedes: new Set(),
           codigos: new Set(),
           proveedores: new Set(),
           ordenes: new Set(),
@@ -1365,6 +1400,10 @@ function agruparOrdenesPorDescripcion(ordenes = []) {
       }
 
       const grupo = grupos.get(clave);
+      const placaLinea = normalizarPlaca(linea.codigo) || normalizarPlaca(orden.placa_unidad);
+      const sedeLinea = linea.sede_resuelta || orden.sede_resuelta || "";
+      grupo.categorias.add(clasificarPlacaCompra(placaLinea, sedeLinea));
+      if (sedeLinea) grupo.sedes.add(textoExcelLimpio(sedeLinea));
       grupo.codigos.add(textoExcelLimpio(linea.codigo));
       grupo.proveedores.add(textoExcelLimpio(orden.proveedor_nombre));
       grupo.ordenes.add(textoExcelLimpio(orden.po_numero));
@@ -1388,6 +1427,8 @@ function agruparOrdenesPorDescripcion(ordenes = []) {
   return Array.from(grupos.values())
     .map(grupo => ({
       ...grupo,
+      categoriasTexto: Array.from(grupo.categorias).filter(Boolean).join(", ") || "Otros",
+      sedesTexto: Array.from(grupo.sedes).filter(Boolean).join(", ") || "-",
       codigosTexto: Array.from(grupo.codigos).filter(Boolean).join(", ") || "-",
       proveedoresTexto: Array.from(grupo.proveedores).filter(Boolean).join(", ") || "-",
       ordenesTexto: Array.from(grupo.ordenes).filter(Boolean).join(", ") || "-",
@@ -1793,6 +1834,8 @@ router.get("/ordenes/reporte/excel", requireAuth, allowRoles("ADMIN", "TALLER", 
       views: [{ state: "frozen", ySplit: 1 }]
     });
     wsProductos.columns = [
+      { header: "Categoria", key: "categoria", width: 18 },
+      { header: "Sede", key: "sede", width: 22 },
       { header: "Descripcion", key: "descripcion", width: 48 },
       { header: "Codigos / placas", key: "codigos", width: 32 },
       { header: "Cantidad total", key: "cantidad_total", width: 16 },
@@ -1812,6 +1855,8 @@ router.get("/ordenes/reporte/excel", requireAuth, allowRoles("ADMIN", "TALLER", 
 
     productosPorDescripcion.forEach(producto => {
       const row = wsProductos.addRow({
+        categoria: producto.categoriasTexto,
+        sede: producto.sedesTexto,
         descripcion: producto.descripcion,
         codigos: producto.codigosTexto,
         cantidad_total: producto.cantidadTotal,
@@ -1827,15 +1872,15 @@ router.get("/ordenes/reporte/excel", requireAuth, allowRoles("ADMIN", "TALLER", 
         proveedores: producto.proveedoresTexto,
         ordenes: producto.ordenesTexto
       });
-      [6, 7, 8, 9, 10].forEach(col => {
+      [8, 9, 10, 11, 12].forEach(col => {
         row.getCell(col).numFmt = '"CRC" #,##0.00';
       });
-      row.getCell(11).numFmt = "yyyy-mm-dd";
-      [1, 2, 12, 13, 14].forEach(col => {
+      row.getCell(13).numFmt = "yyyy-mm-dd";
+      [1, 2, 3, 4, 14, 15, 16].forEach(col => {
         row.getCell(col).alignment = { wrapText: true, vertical: "top" };
       });
     });
-    wsProductos.autoFilter = { from: "A1", to: "N1" };
+    wsProductos.autoFilter = { from: "A1", to: "P1" };
 
     const wsOrdenes = workbook.addWorksheet("Ordenes", {
       views: [{ state: "frozen", ySplit: 1 }]
@@ -3994,8 +4039,9 @@ router.get("/dashboard", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA
       SELECT
         compras.placa,
         CASE
-          WHEN compras.placa = 'GENERALES TALLER' THEN 'General'
-          ELSE COALESCE(MAX(u.sede), 'Sin sede')
+          WHEN compras.placa = 'GENERALES GASTOS' THEN 'Generales de gastos'
+          WHEN compras.placa = 'GENERALES TALLER' THEN 'General taller'
+          ELSE COALESCE(MAX(u.sede), 'Por revisar')
         END AS sede,
         COUNT(DISTINCT compras.id) AS ordenes,
         COALESCE(SUM(compras.monto_linea), 0) AS total_gastado,
@@ -4006,10 +4052,16 @@ router.get("/dashboard", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA
           UPPER(TRIM(COALESCE(
             REPLACE(REGEXP_SUBSTR(UPPER(COALESCE(d.codigo, '')), 'CL[[:space:]]*[0-9]{5,6}|C[[:space:]]*[0-9]{5,6}|S[[:space:]]*[0-9]{5,6}'), ' ', ''),
             CASE
+              WHEN UPPER(TRIM(COALESCE(d.codigo, ''))) IN ('GENERAL GASTOS', 'GENERALES GASTOS', 'GASTOS GENERAL', 'GASTOS GENERALES', 'GENERALES DE GASTOS') THEN 'GENERALES GASTOS'
+            END,
+            CASE
               WHEN UPPER(TRIM(COALESCE(d.codigo, ''))) IN ('GENERAL', 'GENERALES', 'GENERAL TALLER', 'GENERALES TALLER') THEN 'GENERALES TALLER'
             END,
             CASE
-              WHEN UPPER(TRIM(COALESCE(o.placa_unidad, ''))) IN ('GENERAL', 'GENERALES', 'GENERAL TALLER', 'GENERALES TALLER') THEN 'GENERALES TALLER'
+              WHEN COALESCE(placas_detalle.tiene_placas, 0) = 0 AND UPPER(TRIM(COALESCE(o.placa_unidad, ''))) IN ('GENERAL GASTOS', 'GENERALES GASTOS', 'GASTOS GENERAL', 'GASTOS GENERALES', 'GENERALES DE GASTOS') THEN 'GENERALES GASTOS'
+            END,
+            CASE
+              WHEN COALESCE(placas_detalle.tiene_placas, 0) = 0 AND UPPER(TRIM(COALESCE(o.placa_unidad, ''))) IN ('GENERAL', 'GENERALES', 'GENERAL TALLER', 'GENERALES TALLER') THEN 'GENERALES TALLER'
             END,
             CASE WHEN COALESCE(placas_detalle.tiene_placas, 0) = 0 THEN NULLIF(REPLACE(UPPER(TRIM(o.placa_unidad)), ' ', ''), '') END,
             CASE WHEN COALESCE(placas_detalle.tiene_placas, 0) = 0 THEN REPLACE(REGEXP_SUBSTR(UPPER(COALESCE(o.observaciones, '')), 'CL[[:space:]]*[0-9]{5,6}|C[[:space:]]*[0-9]{5,6}|S[[:space:]]*[0-9]{5,6}'), ' ', '') END,
@@ -4021,13 +4073,13 @@ router.get("/dashboard", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA
           END AS monto_linea,
           o.fecha AS ultima_fecha
         FROM ordenes_compra o
-        LEFT JOIN ordenes_compra_detalle d ON d.orden_compra_id = o.id
         LEFT JOIN (
           SELECT orden_compra_id, COUNT(*) AS tiene_placas
           FROM ordenes_compra_detalle
           WHERE REGEXP_SUBSTR(UPPER(COALESCE(codigo, '')), 'CL[[:space:]]*[0-9]{5,6}|C[[:space:]]*[0-9]{5,6}|S[[:space:]]*[0-9]{5,6}') IS NOT NULL
           GROUP BY orden_compra_id
         ) placas_detalle ON placas_detalle.orden_compra_id = o.id
+        LEFT JOIN ordenes_compra_detalle d ON d.orden_compra_id = o.id AND COALESCE(placas_detalle.tiene_placas, 0) > 0
         ${whereClause}
       ) compras
       LEFT JOIN unidades u ON REPLACE(UPPER(TRIM(u.placa)), ' ', '') = compras.placa
@@ -4064,10 +4116,16 @@ router.get("/dashboard", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA
             UPPER(TRIM(COALESCE(
               REPLACE(REGEXP_SUBSTR(UPPER(COALESCE(d.codigo, '')), 'CL[[:space:]]*[0-9]{5,6}|C[[:space:]]*[0-9]{5,6}|S[[:space:]]*[0-9]{5,6}'), ' ', ''),
               CASE
+                WHEN UPPER(TRIM(COALESCE(d.codigo, ''))) IN ('GENERAL GASTOS', 'GENERALES GASTOS', 'GASTOS GENERAL', 'GASTOS GENERALES', 'GENERALES DE GASTOS') THEN 'GENERALES GASTOS'
+              END,
+              CASE
                 WHEN UPPER(TRIM(COALESCE(d.codigo, ''))) IN ('GENERAL', 'GENERALES', 'GENERAL TALLER', 'GENERALES TALLER') THEN 'GENERALES TALLER'
               END,
               CASE
-                WHEN UPPER(TRIM(COALESCE(o.placa_unidad, ''))) IN ('GENERAL', 'GENERALES', 'GENERAL TALLER', 'GENERALES TALLER') THEN 'GENERALES TALLER'
+                WHEN COALESCE(placas_detalle.tiene_placas, 0) = 0 AND UPPER(TRIM(COALESCE(o.placa_unidad, ''))) IN ('GENERAL GASTOS', 'GENERALES GASTOS', 'GASTOS GENERAL', 'GASTOS GENERALES', 'GENERALES DE GASTOS') THEN 'GENERALES GASTOS'
+              END,
+              CASE
+                WHEN COALESCE(placas_detalle.tiene_placas, 0) = 0 AND UPPER(TRIM(COALESCE(o.placa_unidad, ''))) IN ('GENERAL', 'GENERALES', 'GENERAL TALLER', 'GENERALES TALLER') THEN 'GENERALES TALLER'
               END,
               CASE WHEN COALESCE(placas_detalle.tiene_placas, 0) = 0 THEN NULLIF(REPLACE(UPPER(TRIM(o.placa_unidad)), ' ', ''), '') END,
               CASE WHEN COALESCE(placas_detalle.tiene_placas, 0) = 0 THEN REPLACE(REGEXP_SUBSTR(UPPER(COALESCE(o.observaciones, '')), 'CL[[:space:]]*[0-9]{5,6}|C[[:space:]]*[0-9]{5,6}|S[[:space:]]*[0-9]{5,6}'), ' ', '') END,
@@ -4078,13 +4136,13 @@ router.get("/dashboard", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA
               ELSE COALESCE(d.subtotal, d.cantidad * d.precio_unitario, 0)
             END AS monto_linea
           FROM ordenes_compra o
-          LEFT JOIN ordenes_compra_detalle d ON d.orden_compra_id = o.id
           LEFT JOIN (
             SELECT orden_compra_id, COUNT(*) AS tiene_placas
             FROM ordenes_compra_detalle
             WHERE REGEXP_SUBSTR(UPPER(COALESCE(codigo, '')), 'CL[[:space:]]*[0-9]{5,6}|C[[:space:]]*[0-9]{5,6}|S[[:space:]]*[0-9]{5,6}') IS NOT NULL
             GROUP BY orden_compra_id
           ) placas_detalle ON placas_detalle.orden_compra_id = o.id
+          LEFT JOIN ordenes_compra_detalle d ON d.orden_compra_id = o.id AND COALESCE(placas_detalle.tiene_placas, 0) > 0
           ${whereClause}
         ) base
         JOIN ordenes_compra o ON o.id = base.id

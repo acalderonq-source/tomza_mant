@@ -13,6 +13,16 @@ function normalizarPlaca(value) {
   const generales = new Set(["GENERAL", "GENERALES", "GENERALTALLER", "GENERALESTALLER"]);
   if (generales.has(raw)) return "GENERALES TALLER";
 
+  const generalesGastos = new Set([
+    "GENERALGASTOS",
+    "GENERALESGASTOS",
+    "GENERALDEGASTOS",
+    "GENERALESDEGASTOS",
+    "GASTOSGENERAL",
+    "GASTOSGENERALES"
+  ]);
+  if (generalesGastos.has(raw)) return "GENERALES GASTOS";
+
   let match = raw.match(/^CLC(\d{5,6})$/);
   if (match) return `CL${match[1]}`;
 

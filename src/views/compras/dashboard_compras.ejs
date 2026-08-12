@@ -581,7 +581,7 @@
                       <div class="drill-sede-block">
                         <button type="button" class="drill-row js-drill-toggle" data-target="<%= sedeId %>" aria-expanded="false">
                           <span class="drill-row-main">
-                            <span class="drill-row-title"><%= sedeGrupo.nombre || 'Sin sede' %></span>
+                            <span class="drill-row-title"><%= sedeGrupo.nombre || 'Por revisar' %></span>
                             <span class="drill-row-sub"><%= Number(sedeGrupo.placas?.length || 0).toLocaleString('es-CR') %> placa(s) · <%= Number(sedeGrupo.ordenes || 0).toLocaleString('es-CR') %> orden(es)</span>
                           </span>
                           <span class="drill-amount">₡<%= Number(sedeGrupo.total || 0).toLocaleString('es-CR') %></span>
@@ -894,7 +894,7 @@
     new Chart(canvasGastosPlaca, {
       type: 'bar',
       data: {
-        labels: datosPlaca.map(item => `${item.placa || 'SIN PLACA'} · ${item.sede || 'Sin sede'}`),
+        labels: datosPlaca.map(item => `${item.placa || 'POR REVISAR'} · ${item.sede || 'Por revisar'}`),
         datasets: [{
           label: 'Gasto por placa',
           data: datosPlaca.map(item => Number(item.total_gastado || 0)),
