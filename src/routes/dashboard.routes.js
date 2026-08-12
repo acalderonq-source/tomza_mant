@@ -47,14 +47,19 @@ const ROLES_RESUMEN_EJECUTIVO = ["ADMIN", "TALLER", "PROVEEDURIA", "PROVEEDURIA_
 
 const FAMILIAS_GASTO = [
   { clave: "llantas", nombre: "Llantas", color: "#2563eb", palabras: ["llanta", "llantas", "aro", "aros", "rin", "rines"] },
-  { clave: "frenos", nombre: "Frenos y seguridad", color: "#dc2626", palabras: ["freno", "frenos", "fibra", "fibras", "clutch", "embrague", "seguridad", "pito"] },
-  { clave: "motor", nombre: "Motor y transmisión", color: "#ea580c", palabras: ["motor", "turbo", "inyector", "caja", "transmision", "transmisión", "compresor", "arrancador", "alternador", "bomba", "manguera"] },
+  { clave: "frenos", nombre: "Frenos y seguridad", color: "#dc2626", palabras: ["freno", "frenos", "fibra", "fibras", "clutch", "embrague", "seguridad", "pito", "zapata", "tambor", "disco", "plato"] },
+  { clave: "motor", nombre: "Motor y transmisión", color: "#ea580c", palabras: ["motor", "turbo", "inyector", "inyeccion", "inyección", "caja", "transmision", "transmisión", "compresor", "arrancador", "alternador", "bomba", "manguera", "cabezote", "overh", "overhaul", "isx", "detroit", "s60", "s-60", "manifold", "multiple", "múltiple", "piston", "pistón"] },
   { clave: "aceites", nombre: "Aceites y fluidos", color: "#0f766e", palabras: ["aceite", "aceites", "mobil", "movil", "pico", "liasa", "pico liasa", "pico & liasa", "pico y liasa", "engrase", "filtro", "filtros", "hidraulico", "hidráulico", "coolant", "agua", "radiador", "liquido", "líquido"] },
-  { clave: "electrico", nombre: "Eléctrico y luces", color: "#7c3aed", palabras: ["luz", "luces", "bateria", "batería", "cable", "electrico", "eléctrico", "sensor", "marcha", "tablero", "velocimetro", "velocímetro"] },
-  { clave: "carroceria", nombre: "Carrocería y estética", color: "#d97706", palabras: ["cabina", "puerta", "bumper", "cajon", "cajón", "rotulacion", "rotulación", "calcomania", "pintura", "pintar", "asiento", "vidrio", "parabrisas"] },
+  { clave: "suspension", nombre: "Suspensión y dirección", color: "#16a34a", palabras: ["suspension", "suspensión", "resorte", "resortes", "amortiguador", "balancin", "balancín", "rotula", "rótula", "barra", "direccion", "dirección", "tensor", "buje", "bushing", "pin", "muelle"] },
+  { clave: "rodamientos", nombre: "Rodamientos y retenes", color: "#0e7490", palabras: ["roll", "rol ", "rodamiento", "cojinete", "reten", "retén", "retenedor", "sello", "camisa", "bocina", "porta roll"] },
+  { clave: "transportadora", nombre: "Cabezales, carretas y cisternas", color: "#4338ca", palabras: ["cabezal", "cabezales", "carreta", "carretas", "cisterna", "cisternas", "freightliner", "cascadia", "columbia", "century", "quinta rueda", "peterbilt", "hendrickson", "trailer", "remolque", "transportes ortega", "ortega y rojas", "andrea rv"] },
+  { clave: "reparaciones", nombre: "Reparaciones externas", color: "#be123c", palabras: ["mano de obra", "reparacion", "reparación", "rectificacion", "rectificación", "rectificar", "limpieza", "calibracion", "calibración", "laboratorio", "romeros", "romero", "prodiesel", "alfonso mora", "jose guillermo", "guillermo campos", "kevin jesus", "leslie thomas", "edal mora"] },
+  { clave: "electrico", nombre: "Eléctrico y luces", color: "#7c3aed", palabras: ["luz", "luces", "bateria", "batería", "cable", "electrico", "eléctrico", "sensor", "marcha", "tablero", "velocimetro", "velocímetro", "selenoide", "solenoide", "relay", "flasher", "halogeno", "halógeno", "bombillo", "switch", "fusible"] },
+  { clave: "carroceria", nombre: "Carrocería y estética", color: "#d97706", palabras: ["cabina", "puerta", "bumper", "bumber", "cajon", "cajón", "rotulacion", "rotulación", "calcomania", "calcomanía", "pintura", "pintar", "asiento", "vidrio", "parabrisas", "espejo", "retrovisor", "grada", "estribo"] },
+  { clave: "insumos", nombre: "Insumos y herramientas", color: "#64748b", palabras: ["suministro", "suministros", "materiales", "almacen de materiales", "almacén de materiales", "capris", "herramienta", "herramientas", "broca", "brocha", "spray", "loctite", "sellador", "pegamento", "cincho", "cinchos", "soldadura", "guante", "tubo", "conector", "union", "unión", "codo", "terminal", "gaza", "abrazadera", "abrasadera", "tornillo", "tuerca", "arandela"] },
   { clave: "proveedor", nombre: "Pago de proveedor", color: "#0891b2", palabras: ["pago proveedor", "proveedor"] },
   { clave: "caja", nombre: "Caja chica", color: "#f59e0b", palabras: ["caja chica", "reintegro"] },
-  { clave: "general", nombre: "General / otros", color: "#64748b", palabras: [] }
+  { clave: "general", nombre: "Otros por revisar", color: "#475569", palabras: [] }
 ];
 
 const FAMILIAS_MANTENIMIENTO_RESUMEN = FAMILIAS_GASTO.filter(f => !["proveedor", "caja"].includes(f.clave));
@@ -200,6 +205,16 @@ function describirGasto(item) {
   return "Sin detalle";
 }
 
+function describirCompraExacta(item) {
+  const descripcion = recortarResumen(item.descripcion, 150);
+  const proveedor = recortarResumen(item.proveedor, 55);
+
+  if (descripcion !== "-" && proveedor !== "-") return `${descripcion} · ${proveedor}`;
+  if (descripcion !== "-") return descripcion;
+  if (proveedor !== "-") return `Orden de compra · ${proveedor}`;
+  return "Sin detalle";
+}
+
 function sumarGrupo(map, key, base = {}) {
   const nombre = key || "No registrado";
   if (!map.has(nombre)) {
@@ -308,6 +323,8 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro }) 
       COALESCE(d.descripcion, o.observaciones, 'Orden de compra') AS descripcion,
       CASE
         WHEN d.id IS NULL THEN COALESCE(o.total, 0)
+        WHEN COALESCE(detalle_totales.total_detalle, 0) > 0 AND COALESCE(o.total, 0) > 0
+          THEN COALESCE(d.subtotal, d.cantidad * d.precio_unitario, 0) * (COALESCE(o.total, 0) / detalle_totales.total_detalle)
         ELSE COALESCE(d.subtotal, d.cantidad * d.precio_unitario, 0)
       END AS monto
     FROM ordenes_compra o
@@ -318,7 +335,12 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro }) 
       WHERE REGEXP_SUBSTR(UPPER(CONCAT_WS(' ', codigo, descripcion)), 'CL[[:space:].-]*[0-9]{5,6}|C[[:space:].-]*[0-9]{5,6}|S[[:space:].-]*[0-9]{5,6}') IS NOT NULL
       GROUP BY orden_compra_id
     ) placas_detalle ON placas_detalle.orden_compra_id = o.id
-    LEFT JOIN ordenes_compra_detalle d ON d.orden_compra_id = o.id AND COALESCE(placas_detalle.tiene_placas, 0) > 0
+    LEFT JOIN (
+      SELECT orden_compra_id, SUM(COALESCE(subtotal, cantidad * precio_unitario, 0)) AS total_detalle
+      FROM ordenes_compra_detalle
+      GROUP BY orden_compra_id
+    ) detalle_totales ON detalle_totales.orden_compra_id = o.id
+    LEFT JOIN ordenes_compra_detalle d ON d.orden_compra_id = o.id
     LEFT JOIN unidades u ON REPLACE(UPPER(TRIM(u.placa)), ' ', '') = UPPER(TRIM(COALESCE(
       CASE WHEN UPPER(TRIM(COALESCE(d.codigo, ''))) IN ('ACEITE', 'ACEITES') THEN 'ACEITES' END,
       CASE WHEN UPPER(CONCAT_WS(' ', d.descripcion, d.codigo, o.observaciones, p.nombre)) REGEXP 'ACEITE|ACEITES|MOBIL|MOVIL|PICO|LIASA' THEN 'ACEITES' END,
@@ -455,7 +477,7 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro }) 
     mes.total += item.monto;
     mes.registros += 1;
 
-    const descripcion = sumarGrupo(porDescripcion, recortarResumen(item.descripcion, 90), {
+    const descripcion = sumarGrupo(porDescripcion, describirCompraExacta(item), {
       categoria: item.familia.nombre,
       color: item.familia.color
     });
@@ -578,7 +600,7 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro }) 
     registros: detalleGeneralOtros.reduce((sum, item) => sum + Number(item.registros || 0), 0),
     conceptos: detalleGeneralOtros.length
   };
-  const productosServicios = ordenarTop(porDescripcion, 20);
+  const productosServicios = ordenarTop(porDescripcion, 80);
   const proveedores = ordenarTop(porProveedor, 20);
   const sedes = ordenarTop(porSede, 20);
   const placas = ordenarTop(porPlaca, 25);

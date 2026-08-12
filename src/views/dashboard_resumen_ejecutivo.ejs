@@ -485,7 +485,7 @@
     </div>
     <div class="col-xl col-md-6">
       <div class="metric-card" style="--accent:#ef233c">
-        <div class="metric-label">Mayor categoría</div>
+        <div class="metric-label">Mayor tipo de gasto</div>
         <div class="metric-value"><%= categorias[0]?.nombre || '-' %></div>
         <div class="metric-foot">₡<%= money(categorias[0]?.total || 0) %> · <%= pct(categorias[0]?.total, data.totalGastos) %>% del gasto</div>
       </div>
@@ -613,8 +613,8 @@
       <div class="chart-card">
         <div class="card-head">
           <div>
-            <h2 class="card-title"><i class="bi bi-pie-chart-fill me-1"></i>Gasto por categoría</h2>
-            <div class="card-subtitle">Dónde se concentra la plata.</div>
+            <h2 class="card-title"><i class="bi bi-bar-chart-fill me-1"></i>Gasto por tipo operativo</h2>
+            <div class="card-subtitle">Resumen ejecutivo por familia de gasto.</div>
           </div>
         </div>
         <div class="chart-body"><canvas id="chartCategorias"></canvas></div>
@@ -654,7 +654,7 @@
           <div class="mt-3">
             <div class="d-flex justify-content-between align-items-center gap-2 mb-2">
               <div>
-                <div class="card-title fs-6 mb-0">Top General / otros</div>
+                <div class="card-title fs-6 mb-0">Top otros por revisar</div>
                 <div class="card-subtitle">
                   ₡<%= money(resumenGeneralOtros.total || 0) %> en
                   <%= Number(resumenGeneralOtros.conceptos || 0).toLocaleString('es-CR') %> concepto(s).
@@ -691,12 +691,12 @@
   </section>
 
   <section class="row g-3 mb-4">
-    <div class="col-lg-5">
+    <div class="col-lg-12">
       <div class="table-card">
         <div class="card-head">
           <div>
-            <h2 class="card-title">Gasto por categoría completo</h2>
-            <span class="card-subtitle">Monto, movimientos y peso sobre el total.</span>
+            <h2 class="card-title">Gasto por tipo operativo</h2>
+            <span class="card-subtitle">Monto, movimientos y peso sobre el total. Otros por revisar son compras que no traen suficiente detalle para clasificarlas.</span>
           </div>
         </div>
         <div class="table-responsive">
@@ -710,33 +710,6 @@
                   <td><span class="pill pill-soft"><%= Number(item.registros || 0).toLocaleString('es-CR') %></span></td>
                   <td class="text-end money">₡<%= money(item.total) %></td>
                   <td class="text-end"><%= pct(item.total, data.totalGastos) %>%</td>
-                </tr>
-              <% }) %>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-    <div class="col-lg-7">
-      <div class="table-card">
-        <div class="card-head">
-          <div>
-            <h2 class="card-title">Productos y servicios con mayor gasto</h2>
-            <span class="card-subtitle">Sirve para ver qué se compra más y qué pesa más en plata.</span>
-          </div>
-        </div>
-        <div class="table-responsive">
-          <table class="table table-hover align-middle">
-            <thead><tr><th>#</th><th>Descripción</th><th>Categoría</th><th>Mov.</th><th class="text-end">Monto</th></tr></thead>
-            <tbody>
-              <% if (!productosServicios.length) { %><tr><td colspan="5" class="empty-state">No hay productos o servicios para este filtro.</td></tr><% } %>
-              <% productosServicios.forEach((item, i) => { %>
-                <tr>
-                  <td><span class="rank"><%= i + 1 %></span></td>
-                  <td><strong><%= item.nombre %></strong></td>
-                  <td><span class="pill" style="background:<%= item.color || '#eef2f7' %>22;color:<%= item.color || '#334155' %>"><%= item.categoria || '-' %></span></td>
-                  <td><span class="pill pill-soft"><%= Number(item.registros || 0).toLocaleString('es-CR') %></span></td>
-                  <td class="text-end money">₡<%= money(item.total) %></td>
                 </tr>
               <% }) %>
             </tbody>
