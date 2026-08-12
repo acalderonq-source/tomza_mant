@@ -253,6 +253,27 @@
     .pill-blue { background: #dbeafe; color: #1e3a8a; }
     .pill-red { background: #fee2e2; color: #991b1b; }
 
+    .live-badge {
+      align-items: center;
+      background: rgba(255, 255, 255, .14);
+      border: 1px solid rgba(255, 255, 255, .28);
+      border-radius: 999px;
+      color: #fff;
+      display: inline-flex;
+      font-size: .76rem;
+      font-weight: 850;
+      gap: .35rem;
+      padding: .32rem .7rem;
+    }
+
+    .live-dot {
+      background: #22c55e;
+      border-radius: 999px;
+      box-shadow: 0 0 0 4px rgba(34, 197, 94, .22);
+      height: .48rem;
+      width: .48rem;
+    }
+
     .empty-state {
       color: var(--muted);
       font-weight: 800;
@@ -292,11 +313,22 @@
   const tiposMant = safe(data.tiposMant);
   const conclusiones = safe(data.conclusiones);
   const costoUnidad = data.costoUnidad || {};
+  const horaActualizacion = new Intl.DateTimeFormat('es-CR', {
+    timeZone: 'America/Costa_Rica',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit'
+  }).format(new Date());
 %>
 
 <nav class="navbar navbar-dark topbar px-4 py-3">
   <span class="navbar-brand fw-bold"><i class="bi bi-graph-up-arrow me-2"></i>Resumen ejecutivo</span>
   <div class="d-flex align-items-center gap-2 flex-wrap">
+    <span class="live-badge" title="La página se actualiza automáticamente">
+      <span class="live-dot"></span>
+      En vivo · <span id="refreshCountdown">45</span>s
+    </span>
+    <span class="text-white small">Actualizado <%= horaActualizacion %></span>
     <span class="text-white small"><%= user.usuario %> · <%= user.rol %></span>
     <a href="/dashboard" class="btn btn-sm btn-outline-light rounded-pill px-3">Inicio</a>
   </div>
@@ -651,6 +683,32 @@
       }
     });
   }
+
+  (() => {
+    const refreshSeconds = 45;
+    const counter = document.getElementById('refreshCountdown');
+    let remaining = refreshSeconds;
+    let editing = false;
+
+    const setEditing = (value) => {
+      editing = value;
+      remaining = refreshSeconds;
+      if (counter) counter.textContent = String(remaining);
+    };
+
+    document.querySelectorAll('input, select, textarea').forEach(control => {
+      control.addEventListener('focus', () => setEditing(true));
+      control.addEventListener('blur', () => setEditing(false));
+      control.addEventListener('change', () => setEditing(false));
+    });
+
+    window.setInterval(() => {
+      if (document.hidden || editing) return;
+      remaining -= 1;
+      if (counter) counter.textContent = String(Math.max(remaining, 0));
+      if (remaining <= 0) window.location.reload();
+    }, 1000);
+  })();
 </script>
 </body>
 </html>
