@@ -401,6 +401,34 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro }) 
     ${whereCaja}
   `, cajaParams, []);
 
+  const facturasPagadasParams = [];
+  const condicionesFacturasOrdenesPagadas = armarFiltrosFecha("o.fecha_pago", fechaDesde, fechaHasta, facturasPagadasParams);
+  const whereFacturasOrdenesPagadas = condicionesFacturasOrdenesPagadas.length
+    ? `AND ${condicionesFacturasOrdenesPagadas.join(" AND ")}`
+    : "";
+  const facturasIndependientesParams = [];
+  const condicionesFacturasIndependientesPagadas = armarFiltrosFecha("f.fecha_pago", fechaDesde, fechaHasta, facturasIndependientesParams);
+  const whereFacturasIndependientesPagadas = condicionesFacturasIndependientesPagadas.length
+    ? `AND ${condicionesFacturasIndependientesPagadas.join(" AND ")}`
+    : "";
+  const [facturasPagadasRow] = await safeQuery(`
+    SELECT
+      COALESCE(SUM(monto_pagado), 0) AS total,
+      COUNT(*) AS movimientos
+    FROM (
+      SELECT GREATEST(COALESCE(o.total, 0) - COALESCE(o.nota_credito_monto, 0), 0) AS monto_pagado
+      FROM ordenes_compra o
+      WHERE o.facturada = 1
+        AND COALESCE(o.pagada, 0) = 1
+        ${whereFacturasOrdenesPagadas}
+      UNION ALL
+      SELECT GREATEST(COALESCE(f.monto, 0) - COALESCE(f.nota_credito_monto, 0), 0) AS monto_pagado
+      FROM facturas f
+      WHERE COALESCE(f.pagada, 0) = 1
+        ${whereFacturasIndependientesPagadas}
+    ) pagadas
+  `, [...facturasPagadasParams, ...facturasIndependientesParams], [{ total: 0, movimientos: 0 }]);
+
   const unidadesReferencia = await safeQuery(
     "SELECT placa, sede FROM unidades WHERE placa IS NOT NULL AND TRIM(placa) <> ''",
     [],
@@ -592,6 +620,11 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro }) 
   const totalOrdenesCompra = gastos.filter(item => item.fuente === "ORDEN").reduce((sum, item) => sum + item.monto, 0);
   const totalPagosProveedor = gastos.filter(item => item.fuente === "PAGO_PROVEEDOR").reduce((sum, item) => sum + item.monto, 0);
   const totalCajaChica = gastos.filter(item => item.fuente === "CAJA_CHICA").reduce((sum, item) => sum + item.monto, 0);
+  const totalFacturasPagadas = Number(facturasPagadasRow.total || 0);
+  const movimientosFacturasPagadas = Number(facturasPagadasRow.movimientos || 0);
+  const totalPagado = totalFacturasPagadas + totalPagosProveedor + totalCajaChica;
+  const movimientosTotalPagado = movimientosFacturasPagadas +
+    gastos.filter(item => item.fuente === "PAGO_PROVEEDOR" || item.fuente === "CAJA_CHICA").length;
   const fuentes = ordenarTop(porFuente, 10);
   const categorias = ordenarTop(porCategoria, 12);
   const detalleGeneralOtros = ordenarTop(porDetalleGeneral, 1000);
@@ -657,9 +690,13 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro }) 
       totalOrdenesCompra,
       totalPagosProveedor,
       totalCajaChica,
+      totalFacturasPagadas,
+      totalPagado,
       movimientosOrdenesCompra: gastos.filter(item => item.fuente === "ORDEN").length,
       movimientosPagosProveedor: gastos.filter(item => item.fuente === "PAGO_PROVEEDOR").length,
-      movimientosCajaChica: gastos.filter(item => item.fuente === "CAJA_CHICA").length
+      movimientosCajaChica: gastos.filter(item => item.fuente === "CAJA_CHICA").length,
+      movimientosFacturasPagadas,
+      movimientosTotalPagado
     },
     costoUnidad: {
       totalGastoConUnidad,

@@ -484,6 +484,15 @@
       </div>
     </div>
     <div class="col-xl col-md-6">
+      <div class="metric-card" style="--accent:#198754">
+        <div class="metric-label">Total pagado</div>
+        <div class="metric-value">₡<%= money(resumenFinanciero.totalPagado || 0) %></div>
+        <div class="metric-foot">
+          <%= Number(resumenFinanciero.movimientosTotalPagado || 0).toLocaleString('es-CR') %> pago(s): facturas pagadas, proveedores y caja chica
+        </div>
+      </div>
+    </div>
+    <div class="col-xl col-md-6">
       <div class="metric-card" style="--accent:#ef233c">
         <div class="metric-label">Mayor tipo de gasto</div>
         <div class="metric-value"><%= categorias[0]?.nombre || '-' %></div>
@@ -530,6 +539,18 @@
             <thead><tr><th>Origen</th><th>Mov.</th><th class="text-end">Monto</th><th class="text-end">%</th></tr></thead>
             <tbody>
               <tr>
+                <td><strong>Total pagado</strong></td>
+                <td><span class="pill pill-blue"><%= Number(resumenFinanciero.movimientosTotalPagado || 0).toLocaleString('es-CR') %></span></td>
+                <td class="text-end money">₡<%= money(resumenFinanciero.totalPagado || 0) %></td>
+                <td class="text-end">100%</td>
+              </tr>
+              <tr>
+                <td><strong>Facturas pagadas</strong></td>
+                <td><span class="pill pill-soft"><%= Number(resumenFinanciero.movimientosFacturasPagadas || 0).toLocaleString('es-CR') %></span></td>
+                <td class="text-end money">₡<%= money(resumenFinanciero.totalFacturasPagadas || 0) %></td>
+                <td class="text-end"><%= pct(resumenFinanciero.totalFacturasPagadas, resumenFinanciero.totalPagado) %>%</td>
+              </tr>
+              <tr>
                 <td><strong>Órdenes de compra</strong></td>
                 <td><span class="pill pill-blue"><%= Number(resumenFinanciero.movimientosOrdenesCompra || 0).toLocaleString('es-CR') %></span></td>
                 <td class="text-end money">₡<%= money(resumenFinanciero.totalOrdenesCompra || 0) %></td>
@@ -539,13 +560,13 @@
                 <td><strong>Pago proveedor</strong></td>
                 <td><span class="pill pill-soft"><%= Number(resumenFinanciero.movimientosPagosProveedor || 0).toLocaleString('es-CR') %></span></td>
                 <td class="text-end money">₡<%= money(resumenFinanciero.totalPagosProveedor || 0) %></td>
-                <td class="text-end"><%= pct(resumenFinanciero.totalPagosProveedor, data.totalGastos) %>%</td>
+                <td class="text-end"><%= pct(resumenFinanciero.totalPagosProveedor, resumenFinanciero.totalPagado) %>%</td>
               </tr>
               <tr>
                 <td><strong>Caja chica</strong></td>
                 <td><span class="pill pill-soft"><%= Number(resumenFinanciero.movimientosCajaChica || 0).toLocaleString('es-CR') %></span></td>
                 <td class="text-end money">₡<%= money(resumenFinanciero.totalCajaChica || 0) %></td>
-                <td class="text-end"><%= pct(resumenFinanciero.totalCajaChica, data.totalGastos) %>%</td>
+                <td class="text-end"><%= pct(resumenFinanciero.totalCajaChica, resumenFinanciero.totalPagado) %>%</td>
               </tr>
             </tbody>
           </table>
