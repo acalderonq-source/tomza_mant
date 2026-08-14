@@ -374,6 +374,7 @@ async function ensurePagosProveedorTable() {
       placa VARCHAR(50) NULL,
       monto DECIMAL(14,2) NOT NULL DEFAULT 0,
       partida_presupuestaria VARCHAR(150) NULL,
+      pagada TINYINT(1) NOT NULL DEFAULT 0,
       fecha_pago DATE NULL,
       archivo_nombre VARCHAR(255) NULL,
       creado_por INT NULL,
@@ -383,6 +384,17 @@ async function ensurePagosProveedorTable() {
       INDEX idx_pagos_proveedor_proveedor (proveedor_nombre),
       INDEX idx_pagos_proveedor_placa (placa)
     )
+  `);
+
+  if (!(await columnExists("pagos_proveedor", "pagada"))) {
+    await queryWithRetry("ALTER TABLE pagos_proveedor ADD COLUMN pagada TINYINT(1) NOT NULL DEFAULT 0 AFTER partida_presupuestaria");
+  }
+
+  await queryWithRetry(`
+    UPDATE pagos_proveedor
+    SET pagada = 1
+    WHERE fecha_pago IS NOT NULL
+      AND COALESCE(pagada, 0) = 0
   `);
 }
 
@@ -692,7 +704,14 @@ async function obtenerResumenPagosProveedor() {
   await ensurePagosProveedorTable();
 
   const [totalesEmpresa] = await queryWithRetry(`
-    SELECT empresa, COUNT(*) AS pagos, COALESCE(SUM(monto), 0) AS total
+    SELECT
+      empresa,
+      COUNT(*) AS pagos,
+      COALESCE(SUM(monto), 0) AS total,
+      COALESCE(SUM(CASE WHEN COALESCE(pagada, 0) = 1 THEN monto ELSE 0 END), 0) AS total_pagado,
+      COALESCE(SUM(CASE WHEN COALESCE(pagada, 0) = 0 THEN monto ELSE 0 END), 0) AS total_pendiente,
+      SUM(CASE WHEN COALESCE(pagada, 0) = 1 THEN 1 ELSE 0 END) AS pagos_pagados,
+      SUM(CASE WHEN COALESCE(pagada, 0) = 0 THEN 1 ELSE 0 END) AS pagos_pendientes
     FROM pagos_proveedor
     GROUP BY empresa
     ORDER BY FIELD(empresa, 'GAS TOMZA', 'SUPER GAS'), empresa
@@ -701,24 +720,52 @@ async function obtenerResumenPagosProveedor() {
   const [topProveedores] = await queryWithRetry(`
     SELECT proveedor_nombre, COUNT(*) AS pagos, COALESCE(SUM(monto), 0) AS total
     FROM pagos_proveedor
+    WHERE COALESCE(pagada, 0) = 1
     GROUP BY proveedor_nombre
     ORDER BY total DESC
     LIMIT 10
   `);
 
-  const [recientes] = await queryWithRetry(`
+  const [pendientes] = await queryWithRetry(`
     SELECT *
     FROM pagos_proveedor
-    ORDER BY COALESCE(fecha_solicitud, DATE(creado_en)) DESC, id DESC
+    WHERE COALESCE(pagada, 0) = 0
+    ORDER BY COALESCE(fecha_solicitud, DATE(creado_en)) ASC, id ASC
+    LIMIT 500
+  `);
+
+  const [pagados] = await queryWithRetry(`
+    SELECT *
+    FROM pagos_proveedor
+    WHERE COALESCE(pagada, 0) = 1
+    ORDER BY COALESCE(fecha_pago, fecha_solicitud, DATE(creado_en)) DESC, id DESC
     LIMIT 300
+  `);
+
+  const [[estado]] = await queryWithRetry(`
+    SELECT
+      COUNT(*) AS total_registros,
+      COALESCE(SUM(monto), 0) AS total_general,
+      SUM(CASE WHEN COALESCE(pagada, 0) = 1 THEN 1 ELSE 0 END) AS pagados,
+      COALESCE(SUM(CASE WHEN COALESCE(pagada, 0) = 1 THEN monto ELSE 0 END), 0) AS total_pagado,
+      SUM(CASE WHEN COALESCE(pagada, 0) = 0 THEN 1 ELSE 0 END) AS pendientes,
+      COALESCE(SUM(CASE WHEN COALESCE(pagada, 0) = 0 THEN monto ELSE 0 END), 0) AS total_pendiente
+    FROM pagos_proveedor
   `);
 
   return {
     totalesEmpresa,
     topProveedores,
-    recientes,
+    recientes: pagados,
+    pendientes,
+    pagados,
+    estado: estado || {},
     totalGeneral: totalesEmpresa.reduce((sum, item) => sum + Number(item.total || 0), 0),
-    totalPagos: totalesEmpresa.reduce((sum, item) => sum + Number(item.pagos || 0), 0)
+    totalPagos: totalesEmpresa.reduce((sum, item) => sum + Number(item.pagos || 0), 0),
+    totalPagado: Number(estado?.total_pagado || 0),
+    totalPendiente: Number(estado?.total_pendiente || 0),
+    pagosPagados: Number(estado?.pagados || 0),
+    pagosPendientes: Number(estado?.pendientes || 0)
   };
 }
 
@@ -811,6 +858,7 @@ async function obtenerDashboardFinancieroFacturas(filtros = {}) {
   const wherePagos = [];
   const paramsPagos = [];
   agregarFiltroFecha(wherePagos, paramsPagos, fechaPagoProveedor, fecha_desde, fecha_hasta);
+  wherePagos.push("COALESCE(pp.pagada, 0) = 1");
   const wherePagosSql = wherePagos.length ? `WHERE ${wherePagos.join(" AND ")}` : "";
 
   const whereCaja = [];
@@ -2608,8 +2656,8 @@ router.post("/facturas/pagos-proveedor/importar", requireAuth, allowRoles(...ROL
       await connection.query(
         `INSERT INTO pagos_proveedor
          (empresa, fecha_solicitud, proveedor_nombre, cuenta_iban, concepto, numero_factura, placa, monto,
-          partida_presupuestaria, fecha_pago, archivo_nombre, creado_por)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          partida_presupuestaria, pagada, fecha_pago, archivo_nombre, creado_por)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           pago.empresa,
           pago.fecha_solicitud,
@@ -2620,6 +2668,7 @@ router.post("/facturas/pagos-proveedor/importar", requireAuth, allowRoles(...ROL
           pago.placa,
           pago.monto,
           pago.partida_presupuestaria,
+          pago.fecha_pago ? 1 : 0,
           pago.fecha_pago,
           archivoNombre,
           req.session.user.id || null
@@ -2643,6 +2692,82 @@ router.post("/facturas/pagos-proveedor/importar", requireAuth, allowRoles(...ROL
   }
 });
 
+router.post("/facturas/pagos-proveedor/:id/estado", requireAuth, allowRoles(...ROLES_GESTION_FACTURAS), async (req, res) => {
+  try {
+    await ensurePagosProveedorTable();
+    const id = Number(req.params.id);
+    const accion = String(req.body.accion || "").trim();
+    const fechaPago = String(req.body.fecha_pago || "").trim();
+
+    if (!Number.isInteger(id) || id <= 0) {
+      req.session.error = "Pago de proveedor no válido.";
+      return res.redirect("/compras/facturas/pagos-proveedor");
+    }
+
+    if (accion === "pagado") {
+      const fechaFinal = /^\d{4}-\d{2}-\d{2}$/.test(fechaPago)
+        ? fechaPago
+        : new Date().toISOString().slice(0, 10);
+
+      const [result] = await queryWithRetry(
+        "UPDATE pagos_proveedor SET pagada = 1, fecha_pago = ? WHERE id = ?",
+        [fechaFinal, id]
+      );
+
+      req.session[result.affectedRows ? "success" : "error"] = result.affectedRows
+        ? "Pago de proveedor marcado como pagado."
+        : "No se encontró el pago de proveedor.";
+      return res.redirect("/compras/facturas/pagos-proveedor");
+    }
+
+    if (accion === "pendiente") {
+      const [result] = await queryWithRetry(
+        "UPDATE pagos_proveedor SET pagada = 0, fecha_pago = NULL WHERE id = ?",
+        [id]
+      );
+
+      req.session[result.affectedRows ? "success" : "error"] = result.affectedRows
+        ? "Pago de proveedor devuelto a pendiente."
+        : "No se encontró el pago de proveedor.";
+      return res.redirect("/compras/facturas/pagos-proveedor");
+    }
+
+    req.session.error = "Acción no válida.";
+    res.redirect("/compras/facturas/pagos-proveedor");
+  } catch (error) {
+    console.error("Error actualizando estado de pago de proveedor:", error);
+    req.session.error = "Error actualizando el pago de proveedor.";
+    res.redirect("/compras/facturas/pagos-proveedor");
+  }
+});
+
+router.post("/facturas/pagos-proveedor/:id/eliminar", requireAuth, allowRoles(...ROLES_GESTION_FACTURAS), async (req, res) => {
+  try {
+    await ensurePagosProveedorTable();
+    const id = Number(req.params.id);
+
+    if (!Number.isInteger(id) || id <= 0) {
+      req.session.error = "Pago de proveedor no válido.";
+      return res.redirect("/compras/facturas/pagos-proveedor");
+    }
+
+    const [result] = await queryWithRetry(
+      "DELETE FROM pagos_proveedor WHERE id = ?",
+      [id]
+    );
+
+    req.session[result.affectedRows ? "success" : "error"] = result.affectedRows
+      ? "Pago de proveedor eliminado correctamente."
+      : "No se encontró el pago de proveedor.";
+
+    res.redirect("/compras/facturas/pagos-proveedor");
+  } catch (error) {
+    console.error("Error eliminando pago de proveedor:", error);
+    req.session.error = "Error eliminando el pago de proveedor.";
+    res.redirect("/compras/facturas/pagos-proveedor");
+  }
+});
+
 router.get("/facturas/pagos-proveedor", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER", "CONTABILIDAD"), async (req, res) => {
   try {
     await ensurePagosProveedorTable();
@@ -2661,6 +2786,219 @@ router.get("/facturas/pagos-proveedor", requireAuth, allowRoles("ADMIN", "TALLER
   } catch (error) {
     console.error("Error cargando pagos de proveedor:", error);
     res.status(500).send("Error cargando pagos de proveedor");
+  }
+});
+
+router.get("/facturas/pagos-proveedor/reporte/excel", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER", "CONTABILIDAD"), async (req, res) => {
+  try {
+    await ensurePagosProveedorTable();
+
+    const [pagos] = await queryWithRetry(`
+      SELECT
+        pp.id,
+        pp.empresa,
+        pp.fecha_solicitud,
+        pp.proveedor_nombre,
+        pp.cuenta_iban,
+        pp.concepto,
+        pp.numero_factura,
+        pp.placa,
+        pp.monto,
+        pp.partida_presupuestaria,
+        pp.pagada,
+        pp.fecha_pago,
+        pp.archivo_nombre,
+        pp.creado_en,
+        u.usuario AS creado_por_usuario
+      FROM pagos_proveedor pp
+      LEFT JOIN usuarios u ON u.id = pp.creado_por
+      ORDER BY COALESCE(pp.fecha_pago, pp.fecha_solicitud, DATE(pp.creado_en)) DESC, pp.id DESC
+    `);
+
+    const resumenEmpresa = Array.from(pagos.reduce((map, pago) => {
+      const key = pago.empresa || "Sin empresa";
+      if (!map.has(key)) map.set(key, { empresa: key, pagos: 0, total: 0 });
+      const item = map.get(key);
+      item.pagos += 1;
+      item.total += parseMonto(pago.monto);
+      return map;
+    }, new Map()).values()).sort((a, b) => b.total - a.total);
+
+    const resumenProveedor = Array.from(pagos.reduce((map, pago) => {
+      const key = pago.proveedor_nombre || "Sin proveedor";
+      if (!map.has(key)) map.set(key, { proveedor: key, pagos: 0, total: 0 });
+      const item = map.get(key);
+      item.pagos += 1;
+      item.total += parseMonto(pago.monto);
+      return map;
+    }, new Map()).values()).sort((a, b) => b.total - a.total || a.proveedor.localeCompare(b.proveedor, "es"));
+
+    const totalGeneral = pagos.reduce((sum, pago) => sum + parseMonto(pago.monto), 0);
+    const totalPagado = pagos.reduce((sum, pago) => sum + (Number(pago.pagada || 0) ? parseMonto(pago.monto) : 0), 0);
+    const totalPendiente = Math.max(totalGeneral - totalPagado, 0);
+
+    const workbook = new ExcelJS.Workbook();
+    workbook.creator = "Gas Tomza";
+    workbook.created = new Date();
+    workbook.modified = new Date();
+    workbook.views = [{ activeTab: 0 }];
+
+    const aplicarBordes = worksheet => {
+      worksheet.eachRow(row => {
+        row.eachCell(cell => {
+          cell.border = {
+            top: { style: "thin", color: { argb: "FFE2E8F0" } },
+            left: { style: "thin", color: { argb: "FFE2E8F0" } },
+            bottom: { style: "thin", color: { argb: "FFE2E8F0" } },
+            right: { style: "thin", color: { argb: "FFE2E8F0" } }
+          };
+          cell.alignment = cell.alignment || { vertical: "middle" };
+        });
+      });
+    };
+
+    const pintarTitulo = (worksheet, rango, titulo) => {
+      worksheet.mergeCells(rango);
+      const cell = worksheet.getCell(rango.split(":")[0]);
+      cell.value = titulo;
+      cell.font = { bold: true, size: 16, color: { argb: "FFFFFFFF" } };
+      cell.alignment = { vertical: "middle", horizontal: "center" };
+      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF0F3B82" } };
+      worksheet.getRow(1).height = 26;
+    };
+
+    const pintarHeader = row => {
+      row.font = { bold: true, color: { argb: "FFFFFFFF" } };
+      row.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF111827" } };
+      row.alignment = { vertical: "middle", horizontal: "center" };
+      row.height = 20;
+    };
+
+    const ws = workbook.addWorksheet("Historial completo", {
+      views: [{ state: "frozen", ySplit: 7 }]
+    });
+
+    ws.columns = [
+      { header: "ID", key: "id", width: 10 },
+      { header: "Empresa", key: "empresa", width: 18 },
+      { header: "Fecha solicitud", key: "fecha_solicitud", width: 16 },
+      { header: "Fecha pago", key: "fecha_pago", width: 16 },
+      { header: "Proveedor", key: "proveedor_nombre", width: 36 },
+      { header: "Cuenta IBAN", key: "cuenta_iban", width: 28 },
+      { header: "Concepto", key: "concepto", width: 42 },
+      { header: "N. factura", key: "numero_factura", width: 22 },
+      { header: "Placa", key: "placa", width: 14 },
+      { header: "Monto", key: "monto", width: 16 },
+      { header: "Estado", key: "estado", width: 14 },
+      { header: "Partida presupuestaria", key: "partida_presupuestaria", width: 26 },
+      { header: "Archivo", key: "archivo_nombre", width: 30 },
+      { header: "Creado por", key: "creado_por_usuario", width: 18 },
+      { header: "Creado en", key: "creado_en", width: 20 }
+    ];
+
+    pintarTitulo(ws, "A1:O1", "Historial completo de pagos de proveedor");
+    ws.getCell("A3").value = "Generado";
+    ws.getCell("B3").value = new Date();
+    ws.getCell("B3").numFmt = "yyyy-mm-dd hh:mm";
+    ws.getCell("D3").value = "Pagos";
+    ws.getCell("E3").value = pagos.length;
+    ws.getCell("G3").value = "Total pagado";
+    ws.getCell("H3").value = totalPagado;
+    ws.getCell("H3").numFmt = '"CRC" #,##0.00';
+    ws.getCell("J3").value = "Pendiente";
+    ws.getCell("K3").value = totalPendiente;
+    ws.getCell("K3").numFmt = '"CRC" #,##0.00';
+    ["A3", "D3", "G3", "J3"].forEach(cell => {
+      ws.getCell(cell).font = { bold: true, color: { argb: "FF475569" } };
+    });
+    ws.getCell("H3").font = { bold: true, color: { argb: "FF14532D" } };
+    ws.getCell("K3").font = { bold: true, color: { argb: "FF991B1B" } };
+
+    const header = ws.getRow(6);
+    header.values = ws.columns.map(col => col.header);
+    pintarHeader(header);
+
+    let rowNumber = 7;
+    pagos.forEach(pago => {
+      const row = ws.getRow(rowNumber++);
+      row.values = [
+        pago.id,
+        pago.empresa || "-",
+        pago.fecha_solicitud ? new Date(pago.fecha_solicitud) : null,
+        pago.fecha_pago ? new Date(pago.fecha_pago) : null,
+        pago.proveedor_nombre || "-",
+        pago.cuenta_iban || "-",
+        pago.concepto || "-",
+        pago.numero_factura || "-",
+        pago.placa || "-",
+        parseMonto(pago.monto),
+        Number(pago.pagada || 0) ? "Pagado" : "Pendiente",
+        pago.partida_presupuestaria || "-",
+        pago.archivo_nombre || "-",
+        pago.creado_por_usuario || "-",
+        pago.creado_en ? new Date(pago.creado_en) : null
+      ];
+      [3, 4].forEach(col => { row.getCell(col).numFmt = "yyyy-mm-dd"; });
+      row.getCell(10).numFmt = '"CRC" #,##0.00';
+      row.getCell(11).font = { bold: true, color: { argb: Number(pago.pagada || 0) ? "FF14532D" : "FF991B1B" } };
+      row.getCell(15).numFmt = "yyyy-mm-dd hh:mm";
+      row.getCell(7).alignment = { wrapText: true, vertical: "top" };
+    });
+
+    ws.autoFilter = { from: "A6", to: "O6" };
+    aplicarBordes(ws);
+
+    const wsProveedor = workbook.addWorksheet("Resumen proveedor", {
+      views: [{ state: "frozen", ySplit: 5 }]
+    });
+    wsProveedor.columns = [
+      { header: "Proveedor", key: "proveedor", width: 44 },
+      { header: "Cantidad de pagos", key: "pagos", width: 18 },
+      { header: "Total pagado", key: "total", width: 18 }
+    ];
+    pintarTitulo(wsProveedor, "A1:C1", "Resumen por proveedor");
+    wsProveedor.getCell("A3").value = "Total general";
+    wsProveedor.getCell("B3").value = pagos.length;
+    wsProveedor.getCell("C3").value = totalGeneral;
+    wsProveedor.getCell("C3").numFmt = '"CRC" #,##0.00';
+    wsProveedor.getRow(5).values = wsProveedor.columns.map(col => col.header);
+    pintarHeader(wsProveedor.getRow(5));
+    resumenProveedor.forEach(item => {
+      const row = wsProveedor.addRow([item.proveedor, item.pagos, item.total]);
+      row.getCell(3).numFmt = '"CRC" #,##0.00';
+    });
+    wsProveedor.autoFilter = { from: "A5", to: "C5" };
+    aplicarBordes(wsProveedor);
+
+    const wsEmpresa = workbook.addWorksheet("Resumen empresa", {
+      views: [{ state: "frozen", ySplit: 5 }]
+    });
+    wsEmpresa.columns = [
+      { header: "Empresa", key: "empresa", width: 24 },
+      { header: "Cantidad de pagos", key: "pagos", width: 18 },
+      { header: "Total pagado", key: "total", width: 18 }
+    ];
+    pintarTitulo(wsEmpresa, "A1:C1", "Resumen por empresa");
+    wsEmpresa.getCell("A3").value = "Total general";
+    wsEmpresa.getCell("B3").value = pagos.length;
+    wsEmpresa.getCell("C3").value = totalGeneral;
+    wsEmpresa.getCell("C3").numFmt = '"CRC" #,##0.00';
+    wsEmpresa.getRow(5).values = wsEmpresa.columns.map(col => col.header);
+    pintarHeader(wsEmpresa.getRow(5));
+    resumenEmpresa.forEach(item => {
+      const row = wsEmpresa.addRow([item.empresa, item.pagos, item.total]);
+      row.getCell(3).numFmt = '"CRC" #,##0.00';
+    });
+    wsEmpresa.autoFilter = { from: "A5", to: "C5" };
+    aplicarBordes(wsEmpresa);
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    res.setHeader("Content-Disposition", `attachment; filename=historial_pagos_proveedor_${new Date().toISOString().slice(0, 19).replace(/:/g, "-")}.xlsx`);
+    res.send(Buffer.from(buffer));
+  } catch (error) {
+    console.error("Error descargando Excel de pagos de proveedor:", error);
+    res.status(500).send("Error descargando Excel de pagos de proveedor");
   }
 });
 

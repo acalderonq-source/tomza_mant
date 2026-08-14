@@ -169,6 +169,39 @@
       font-size: .78rem;
       margin-top: .1rem;
     }
+    .status-pill {
+      border-radius: 999px;
+      display: inline-flex;
+      font-size: .72rem;
+      font-weight: 900;
+      padding: .25rem .55rem;
+      white-space: nowrap;
+    }
+    .status-pill.paid { background: #dcfce7; color: #14532d; }
+    .status-pill.pending { background: #fef3c7; color: #92400e; }
+    .action-form {
+      align-items: center;
+      display: flex;
+      gap: .35rem;
+      justify-content: flex-end;
+      min-width: 245px;
+    }
+    .payment-actions {
+      align-items: center;
+      display: flex;
+      flex-wrap: wrap;
+      gap: .35rem;
+      justify-content: flex-end;
+    }
+    .action-form .form-control {
+      max-width: 138px;
+    }
+    .section-band {
+      border-left: 5px solid #f59e0b;
+    }
+    .section-band.paid {
+      border-left-color: #16a34a;
+    }
     @media (max-width: 768px) {
       .hero h1 { font-size: 1.3rem; }
       .panel-head { align-items: stretch; flex-direction: column; }
@@ -196,6 +229,18 @@
         content: attr(data-label);
         font-weight: 800;
       }
+      .action-form {
+        justify-content: space-between;
+        min-width: 0;
+        width: 100%;
+      }
+      .payment-actions {
+        justify-content: stretch;
+        width: 100%;
+      }
+      .action-form .form-control {
+        max-width: 160px;
+      }
     }
   </style>
 </head>
@@ -215,7 +260,19 @@
 
 <main class="container-fluid page-wrap py-4">
   <%
-    const pagos = pagosProveedor || { totalesEmpresa: [], topProveedores: [], recientes: [], totalGeneral: 0, totalPagos: 0 };
+    const pagos = pagosProveedor || {
+      totalesEmpresa: [],
+      topProveedores: [],
+      recientes: [],
+      pendientes: [],
+      pagados: [],
+      totalGeneral: 0,
+      totalPagos: 0,
+      totalPagado: 0,
+      totalPendiente: 0,
+      pagosPagados: 0,
+      pagosPendientes: 0
+    };
     const puedeImportar = ['ADMIN', 'TALLER', 'PROVEEDURIA_TALLER'].includes(user.rol);
     const fecha = value => {
       if (!value) return '—';
@@ -242,11 +299,11 @@
     <div class="d-flex justify-content-between gap-3 flex-wrap">
       <div>
         <h1>Pago de proveedor</h1>
-        <p>Importa la plantilla de pagos y consulta lo acumulado por Gas Tomza y Super Gas.</p>
+        <p>Importa la plantilla, separa pendientes de pagados y registra la fecha real de pago.</p>
       </div>
       <div class="text-end">
-        <div class="small text-white-50">Total general</div>
-        <div class="fs-3 fw-black"><%= moneda(pagos.totalGeneral) %></div>
+        <div class="small text-white-50">Total pagado</div>
+        <div class="fs-3 fw-black"><%= moneda(pagos.totalPagado) %></div>
       </div>
     </div>
   </section>
@@ -266,14 +323,23 @@
 
   <div class="stat-grid">
     <div class="stat-card">
-      <div class="stat-label">Pagos importados</div>
+      <div class="stat-label">Registros importados</div>
       <div class="stat-value"><%= Number(pagos.totalPagos || 0).toLocaleString('es-CR') %></div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Pendientes · <%= Number(pagos.pagosPendientes || 0).toLocaleString('es-CR') %></div>
+      <div class="stat-value text-warning"><%= moneda(pagos.totalPendiente) %></div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Pagados · <%= Number(pagos.pagosPagados || 0).toLocaleString('es-CR') %></div>
+      <div class="stat-value text-success"><%= moneda(pagos.totalPagado) %></div>
     </div>
     <% if (pagos.totalesEmpresa.length) { %>
       <% pagos.totalesEmpresa.forEach(item => { %>
         <div class="stat-card">
-          <div class="stat-label"><%= item.empresa %> · <%= item.pagos %> pago(s)</div>
-          <div class="stat-value"><%= moneda(item.total) %></div>
+          <div class="stat-label"><%= item.empresa %> · pagado</div>
+          <div class="stat-value"><%= moneda(item.total_pagado || 0) %></div>
+          <div class="small text-muted">Pendiente: <%= moneda(item.total_pendiente || 0) %></div>
         </div>
       <% }) %>
     <% } else { %>
@@ -297,7 +363,7 @@
               <input type="file" class="form-control mb-2" id="archivoPagoProveedor" accept=".xlsx,.xls" required>
               <input type="hidden" name="archivo_pago_data" id="archivoPagoProveedorData">
               <input type="hidden" name="archivo_pago_nombre" id="archivoPagoProveedorNombre">
-              <div class="small text-muted mb-3">Detecta Gas Tomza arriba y Super Gas abajo. Si el pago ya existe, lo omite.</div>
+              <div class="small text-muted mb-3">Detecta Gas Tomza arriba y Super Gas abajo. Si trae fecha de pago entra como pagado; si no, queda pendiente.</div>
               <button class="btn btn-success w-100">
                 <i class="bi bi-file-earmark-excel"></i> Importar pagos
               </button>
@@ -310,7 +376,7 @@
 
       <section class="panel mt-3">
         <div class="panel-head">
-          <h2 class="panel-title">Mayores proveedores</h2>
+          <h2 class="panel-title">Mayores proveedores pagados</h2>
         </div>
         <div class="p-3 provider-list">
           <% if (pagos.topProveedores.length) { %>
@@ -324,7 +390,7 @@
               </div>
             <% }) %>
           <% } else { %>
-            <div class="text-muted">Sin proveedores importados.</div>
+            <div class="text-muted">Sin proveedores pagados.</div>
           <% } %>
 
           <% if (pagos.topProveedores.length) { %>
@@ -349,45 +415,134 @@
     </div>
 
     <div class="col-lg-8">
-      <section class="panel">
+      <section class="panel section-band">
         <div class="panel-head">
           <div>
-            <h2 class="panel-title">Historial de pagos de proveedor</h2>
-            <div class="small text-muted">Todo pago importado queda guardado como historial. Mostrando últimos 300 registros.</div>
+            <h2 class="panel-title">Pagos pendientes</h2>
+            <div class="small text-muted">Registros importados que todavía no tienen fecha de pago.</div>
           </div>
-          <a href="/compras/facturas" class="btn btn-sm btn-outline-secondary">Volver a facturas</a>
+          <div class="d-flex gap-2 flex-wrap">
+            <a href="/compras/facturas/pagos-proveedor/reporte/excel" class="btn btn-sm btn-success">
+              <i class="bi bi-file-earmark-excel"></i> Descargar Excel
+            </a>
+            <a href="/compras/facturas" class="btn btn-sm btn-outline-secondary">Volver a facturas</a>
+          </div>
         </div>
         <div class="table-wrap">
           <table class="table table-hover align-middle payments-table">
             <thead>
               <tr>
                 <th>Empresa</th>
-                <th>Fecha</th>
+                <th>Fecha solicitud</th>
                 <th>Proveedor</th>
                 <th>Concepto</th>
                 <th>Factura</th>
                 <th>Placa</th>
                 <th class="text-end">Monto</th>
+                <th class="text-end">Pago</th>
               </tr>
             </thead>
             <tbody>
-              <% if (pagos.recientes.length) { %>
-                <% pagos.recientes.forEach(pago => { %>
+              <% if (pagos.pendientes.length) { %>
+                <% pagos.pendientes.forEach(pago => { %>
                   <tr>
                     <td data-label="Empresa">
                       <span class="company-pill <%= pago.empresa === 'SUPER GAS' ? 'super' : 'tomza' %>"><%= pago.empresa %></span>
                     </td>
-                    <td data-label="Fecha"><%= fecha(pago.fecha_solicitud) %></td>
+                    <td data-label="Fecha solicitud"><%= fecha(pago.fecha_solicitud) %></td>
                     <td data-label="Proveedor"><strong><%= pago.proveedor_nombre %></strong></td>
                     <td data-label="Concepto"><%= pago.concepto || '—' %></td>
                     <td data-label="Factura"><%= pago.numero_factura || '—' %></td>
                     <td data-label="Placa"><%= pago.placa || '—' %></td>
                     <td data-label="Monto" class="text-end fw-bold"><%= moneda(pago.monto) %></td>
+                    <td data-label="Pago" class="text-end">
+                      <% if (puedeImportar) { %>
+                        <div class="payment-actions">
+                          <form method="POST" action="/compras/facturas/pagos-proveedor/<%= pago.id %>/estado" class="action-form">
+                            <input type="hidden" name="accion" value="pagado">
+                            <input type="date" name="fecha_pago" class="form-control form-control-sm" value="<%= new Date().toISOString().slice(0, 10) %>">
+                            <button class="btn btn-sm btn-success">Pagado</button>
+                          </form>
+                          <form method="POST" action="/compras/facturas/pagos-proveedor/<%= pago.id %>/eliminar" onsubmit="return confirm('¿Eliminar este pago de proveedor?');">
+                            <button class="btn btn-sm btn-outline-danger" title="Eliminar pago">
+                              <i class="bi bi-trash"></i>
+                            </button>
+                          </form>
+                        </div>
+                      <% } else { %>
+                        <span class="status-pill pending">Pendiente</span>
+                      <% } %>
+                    </td>
                   </tr>
                 <% }) %>
               <% } else { %>
                 <tr>
-                  <td colspan="7" class="text-center text-muted py-4">Todavía no hay pagos importados.</td>
+                  <td colspan="8" class="text-center text-muted py-4">No hay pagos pendientes.</td>
+                </tr>
+              <% } %>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel section-band paid mt-3">
+        <div class="panel-head">
+          <div>
+            <h2 class="panel-title">Pagos realizados</h2>
+            <div class="small text-muted">Mostrando los últimos 300 pagos marcados como pagados.</div>
+          </div>
+          <span class="status-pill paid"><%= Number(pagos.pagosPagados || 0).toLocaleString('es-CR') %> pagados</span>
+        </div>
+        <div class="table-wrap">
+          <table class="table table-hover align-middle payments-table">
+            <thead>
+              <tr>
+                <th>Empresa</th>
+                <th>Fecha pago</th>
+                <th>Proveedor</th>
+                <th>Concepto</th>
+                <th>Factura</th>
+                <th>Placa</th>
+                <th class="text-end">Monto</th>
+                <th class="text-end">Estado</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% if (pagos.pagados.length) { %>
+                <% pagos.pagados.forEach(pago => { %>
+                  <tr>
+                    <td data-label="Empresa">
+                      <span class="company-pill <%= pago.empresa === 'SUPER GAS' ? 'super' : 'tomza' %>"><%= pago.empresa %></span>
+                    </td>
+                    <td data-label="Fecha pago"><%= fecha(pago.fecha_pago) %></td>
+                    <td data-label="Proveedor"><strong><%= pago.proveedor_nombre %></strong></td>
+                    <td data-label="Concepto"><%= pago.concepto || '—' %></td>
+                    <td data-label="Factura"><%= pago.numero_factura || '—' %></td>
+                    <td data-label="Placa"><%= pago.placa || '—' %></td>
+                    <td data-label="Monto" class="text-end fw-bold"><%= moneda(pago.monto) %></td>
+                    <td data-label="Estado" class="text-end">
+                      <% if (puedeImportar) { %>
+                        <div class="payment-actions">
+                          <form method="POST" action="/compras/facturas/pagos-proveedor/<%= pago.id %>/estado" class="action-form">
+                            <input type="hidden" name="accion" value="pendiente">
+                            <span class="status-pill paid">Pagado</span>
+                            <button class="btn btn-sm btn-outline-secondary">Desmarcar</button>
+                          </form>
+                          <form method="POST" action="/compras/facturas/pagos-proveedor/<%= pago.id %>/eliminar" onsubmit="return confirm('¿Eliminar este pago de proveedor?');">
+                            <button class="btn btn-sm btn-outline-danger" title="Eliminar pago">
+                              <i class="bi bi-trash"></i>
+                            </button>
+                          </form>
+                        </div>
+                      <% } else { %>
+                        <span class="status-pill paid">Pagado</span>
+                      <% } %>
+                    </td>
+                  </tr>
+                <% }) %>
+              <% } else { %>
+                <tr>
+                  <td colspan="8" class="text-center text-muted py-4">Todavía no hay pagos realizados.</td>
                 </tr>
               <% } %>
             </tbody>
