@@ -369,6 +369,7 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro }) 
       u.placa AS placa_registrada,
       NULLIF(pp.placa, '') AS placa,
       u.sede AS sede,
+      COALESCE(pp.pagada, 0) AS pagada,
       pp.numero_factura AS codigo,
       NULL AS placa_unidad,
       pp.concepto AS observaciones,
@@ -619,12 +620,17 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro }) 
   const totalGastos = gastos.reduce((sum, item) => sum + item.monto, 0);
   const totalOrdenesCompra = gastos.filter(item => item.fuente === "ORDEN").reduce((sum, item) => sum + item.monto, 0);
   const totalPagosProveedor = gastos.filter(item => item.fuente === "PAGO_PROVEEDOR").reduce((sum, item) => sum + item.monto, 0);
+  const pagosProveedorPagados = gastos.filter(item => item.fuente === "PAGO_PROVEEDOR" && Number(item.pagada || 0) === 1);
+  const pagosProveedorPendientes = gastos.filter(item => item.fuente === "PAGO_PROVEEDOR" && Number(item.pagada || 0) !== 1);
+  const totalPagosProveedorPagados = pagosProveedorPagados.reduce((sum, item) => sum + item.monto, 0);
+  const totalPagosProveedorPendientes = pagosProveedorPendientes.reduce((sum, item) => sum + item.monto, 0);
   const totalCajaChica = gastos.filter(item => item.fuente === "CAJA_CHICA").reduce((sum, item) => sum + item.monto, 0);
   const totalFacturasPagadas = Number(facturasPagadasRow.total || 0);
   const movimientosFacturasPagadas = Number(facturasPagadasRow.movimientos || 0);
-  const totalPagado = totalFacturasPagadas + totalPagosProveedor + totalCajaChica;
+  const totalPagado = totalFacturasPagadas + totalPagosProveedorPagados + totalCajaChica;
   const movimientosTotalPagado = movimientosFacturasPagadas +
-    gastos.filter(item => item.fuente === "PAGO_PROVEEDOR" || item.fuente === "CAJA_CHICA").length;
+    pagosProveedorPagados.length +
+    gastos.filter(item => item.fuente === "CAJA_CHICA").length;
   const fuentes = ordenarTop(porFuente, 10);
   const categorias = ordenarTop(porCategoria, 12);
   const detalleGeneralOtros = ordenarTop(porDetalleGeneral, 1000);
@@ -689,11 +695,15 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro }) 
     resumenFinanciero: {
       totalOrdenesCompra,
       totalPagosProveedor,
+      totalPagosProveedorPagados,
+      totalPagosProveedorPendientes,
       totalCajaChica,
       totalFacturasPagadas,
       totalPagado,
       movimientosOrdenesCompra: gastos.filter(item => item.fuente === "ORDEN").length,
       movimientosPagosProveedor: gastos.filter(item => item.fuente === "PAGO_PROVEEDOR").length,
+      movimientosPagosProveedorPagados: pagosProveedorPagados.length,
+      movimientosPagosProveedorPendientes: pagosProveedorPendientes.length,
       movimientosCajaChica: gastos.filter(item => item.fuente === "CAJA_CHICA").length,
       movimientosFacturasPagadas,
       movimientosTotalPagado

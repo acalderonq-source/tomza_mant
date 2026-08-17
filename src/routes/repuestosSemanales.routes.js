@@ -83,6 +83,37 @@ function redirectConFiltros(req, res) {
   res.redirect(`/repuestos-semanales${params.toString() ? `?${params.toString()}` : ""}`);
 }
 
+function fechaValida(value, fallback = proximaSemanaCostaRica()) {
+  const fecha = String(value || "").trim();
+  return /^\d{4}-\d{2}-\d{2}$/.test(fecha) ? fecha : fallback;
+}
+
+function textoComparable(value) {
+  return String(value || "")
+    .trim()
+    .toUpperCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[_\s]+/g, "-");
+}
+
+function excluirDePedidoCedis(item) {
+  const placa = textoComparable(item.placa);
+  const sede = textoComparable(item.sede);
+  const solicitud = textoComparable(item.solicitud);
+  const marcado = textoComparable(item.marcado_rojo);
+  const excluidos = new Set(["MUEBLE", "GENERAL-TALLER", "GENERALES-TALLER"]);
+
+  return excluidos.has(placa) ||
+    excluidos.has(sede) ||
+    solicitud.includes("GENERAL-TALLER") ||
+    solicitud.includes("GENERALES-TALLER") ||
+    solicitud.includes("MUEBLE") ||
+    marcado.includes("GENERAL-TALLER") ||
+    marcado.includes("GENERALES-TALLER") ||
+    marcado.includes("MUEBLE");
+}
+
 async function sedesDisponibles(req) {
   if (["ADMIN", "TALLER"].includes(req.session.user.rol) || ROLES_PROVEEDURIA.includes(req.session.user.rol)) {
     return obtenerTodasSedes(pool);
@@ -203,7 +234,7 @@ async function obtenerSolicitudesFiltradas(req) {
 function agruparParaPedido(solicitudes) {
   const grupos = new Map();
 
-  solicitudes.forEach(item => {
+  solicitudes.filter(item => !excluirDePedidoCedis(item)).forEach(item => {
     const key = `${item.fecha_iso || item.fecha}|${item.sede}`;
     if (!grupos.has(key)) {
       grupos.set(key, {
@@ -302,7 +333,7 @@ router.post("/", requireGestion, async (req, res) => {
   try {
     await ensureRepuestosSemanalesTable(pool);
 
-    const fecha = proximaSemanaCostaRica();
+    const fecha = fechaValida(req.body.fecha);
     const sedeFallback = String(req.body.sede || req.query.sede || "").trim();
     const sedeResuelta = await resolverSedePorPlaca(req, req.body.placa, sedeFallback);
     const solicitud = String(req.body.solicitud || "").trim();
@@ -352,6 +383,7 @@ router.post("/:id/editar", requireGestion, async (req, res) => {
     }
 
     const actual = actuales[0];
+    const fecha = fechaValida(req.body.fecha, actual.fecha_iso || proximaSemanaCostaRica());
     const sedeFallback = String(req.body.sede || actual.sede || req.query.sede || "").trim();
     const sedeResuelta = await resolverSedePorPlaca(req, req.body.placa, sedeFallback);
     const solicitud = String(req.body.solicitud || "").trim();
@@ -365,17 +397,18 @@ router.post("/:id/editar", requireGestion, async (req, res) => {
 
     await pool.query(
       `UPDATE repuestos_semanales
-       SET sede = ?,
+       SET fecha = ?,
+           sede = ?,
            placa = ?,
            solicitud = ?,
            marcado_rojo = ?,
            estado = ?
        WHERE id = ?`,
-      [sedeResuelta.sede, sedeResuelta.placa, solicitud, marcadoRojo || null, estado, req.params.id]
+      [fecha, sedeResuelta.sede, sedeResuelta.placa, solicitud, marcadoRojo || null, estado, req.params.id]
     );
 
     req.session.success = "Repuesto semanal actualizado.";
-    res.redirect(`/repuestos-semanales?fecha=${encodeURIComponent(actual.fecha_iso || req.body.fecha || "")}&sede=${encodeURIComponent(sedeResuelta.sede)}`);
+    res.redirect(`/repuestos-semanales?fecha=${encodeURIComponent(fecha)}&sede=${encodeURIComponent(sedeResuelta.sede)}`);
   } catch (error) {
     console.error("Error editando repuesto semanal:", error);
     req.session.error = "Error editando repuesto semanal.";

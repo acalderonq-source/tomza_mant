@@ -83,7 +83,7 @@
     .finance-grid {
       display: grid;
       gap: .75rem;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
+      grid-template-columns: repeat(4, minmax(0, 1fr));
       margin-top: 1rem;
     }
     .finance-pill {
@@ -252,7 +252,7 @@
         <div class="finance-label">Dashboard financiero de facturas</div>
         <div class="finance-total">₡<%= money(safeFinResumen.totalGeneral) %></div>
         <div class="small mt-2" style="color: rgba(255,255,255,.78);">
-          Suma de órdenes de compra, pagos de proveedor y reintegros de caja chica
+          Suma de órdenes de compra, pagos de proveedor, caja chica y reintegros de gastos
           <% if (filtrosActuales.fecha_desde || filtrosActuales.fecha_hasta) { %>
             · Rango filtrado
           <% } else { %>
@@ -277,6 +277,10 @@
       <div class="finance-pill">
         <div class="finance-label">Caja chica</div>
         <strong>₡<%= money(safeFinResumen.totalCajaChica) %></strong>
+      </div>
+      <div class="finance-pill">
+        <div class="finance-label">Reintegro gastos</div>
+        <strong>₡<%= money(safeFinResumen.totalReintegrosGastos) %></strong>
       </div>
     </div>
   </section>
@@ -546,7 +550,8 @@
         datasets: [
           { label: 'Órdenes', data: finMes.map(item => Number(item.ordenes || 0)), backgroundColor: '#0f3b82', borderRadius: 7 },
           { label: 'Pago proveedor', data: finMes.map(item => Number(item.pagosProveedor || 0)), backgroundColor: '#0ea5e9', borderRadius: 7 },
-          { label: 'Caja chica', data: finMes.map(item => Number(item.cajaChica || 0)), backgroundColor: '#f59e0b', borderRadius: 7 }
+          { label: 'Caja chica', data: finMes.map(item => Number(item.cajaChica || 0)), backgroundColor: '#f59e0b', borderRadius: 7 },
+          { label: 'Reintegro gastos', data: finMes.map(item => Number(item.reintegrosGastos || 0)), backgroundColor: '#7c3aed', borderRadius: 7 }
         ]
       },
       options: {

@@ -52,6 +52,7 @@
     .amount-original { color: #64748b; font-size: .78rem; text-decoration: line-through; }
     .amount-credit { color: #0369a1; font-size: .8rem; font-weight: 700; }
     .amount-payment { color: #15803d; font-size: .8rem; font-weight: 700; }
+    .amount-paid { color: #166534; font-size: .85rem; font-weight: 800; }
     .amount-balance { color: #111827; font-size: .98rem; font-weight: 800; }
     .provider-search {
       border-color: #bfdbfe;
@@ -452,6 +453,7 @@
     const totalFacturas = facturas.reduce((sum, f) => sum + (parseFloat(f.monto_original ?? f.monto) || 0), 0);
     const totalNotasCredito = facturas.reduce((sum, f) => sum + (parseFloat(f.nota_credito_monto) || 0), 0);
     const totalAbonos = facturas.reduce((sum, f) => sum + (parseFloat(f.abono_monto) || 0), 0);
+    const totalPagado = facturas.reduce((sum, f) => sum + (parseFloat(f.monto_pagado) || 0), 0);
     const totalSaldo = facturas.reduce((sum, f) => {
       if (f.pagada || f.cubierta_por_nc) return sum;
       return sum + (parseFloat(f.saldo ?? f.monto) || 0);
@@ -490,6 +492,10 @@
       <div class="summary-value">₡<%= totalAbonos.toLocaleString('es-CR', { maximumFractionDigits: 0 }) %></div>
     </div>
     <div class="summary-card">
+      <div class="summary-label">Pagado</div>
+      <div class="summary-value">₡<%= totalPagado.toLocaleString('es-CR', { maximumFractionDigits: 0 }) %></div>
+    </div>
+    <div class="summary-card">
       <div class="summary-label">Saldo pendiente</div>
       <div class="summary-value">₡<%= totalSaldo.toLocaleString('es-CR', { maximumFractionDigits: 0 }) %></div>
     </div>
@@ -511,6 +517,9 @@
         </a>
         <a href="/compras/facturas/caja-chica" class="btn btn-outline-warning btn-sm">
           <i class="bi bi-wallet2"></i> Caja chica
+        </a>
+        <a href="/compras/facturas/reintegro-gastos" class="btn btn-outline-secondary btn-sm">
+          <i class="bi bi-cash-stack"></i> Reintegro gastos
         </a>
         <a href="/compras/facturas/recibo-preview" target="_blank" class="btn btn-outline-dark btn-sm">
           <i class="bi bi-receipt"></i> Vista recibo
@@ -578,13 +587,17 @@
                 </td>
                 <td data-label="Monto" class="monto-factura money" data-val="<%= f.saldo ?? f.monto %>">
                   <div class="amount-stack">
-                    <% if (f.tiene_nc || f.tiene_abono) { %>
+                    <% const montoPagadoFactura = parseFloat(f.monto_pagado || 0); %>
+                    <% if (f.tiene_nc || f.tiene_abono || montoPagadoFactura > 0) { %>
                       <span class="amount-original">Factura: ₡<%= parseFloat(f.monto_original ?? f.monto).toLocaleString('es-CR') %></span>
                       <% if (f.tiene_nc) { %>
                         <span class="amount-credit">NC: -₡<%= parseFloat(f.nota_credito_monto || 0).toLocaleString('es-CR') %></span>
                       <% } %>
                       <% if (f.tiene_abono) { %>
                         <span class="amount-payment">Abonos: -₡<%= parseFloat(f.abono_monto || 0).toLocaleString('es-CR') %></span>
+                      <% } %>
+                      <% if (montoPagadoFactura > 0) { %>
+                        <span class="amount-paid">Pagado: ₡<%= montoPagadoFactura.toLocaleString('es-CR') %></span>
                       <% } %>
                       <span class="amount-balance">Saldo: ₡<%= parseFloat(f.saldo || 0).toLocaleString('es-CR') %></span>
                     <% } else { %>
@@ -685,10 +698,15 @@
                           <i class="bi bi-cash-coin"></i> Abonar
                         </button>
                         <button
-                          type="submit"
-                          form="pagar-factura-<%= f.tipo %>-<%= f.id %>"
-                          class="btn btn-sm btn-success"
-                          onclick="return confirm('¿Marcar esta factura como pagada?')">
+                          type="button"
+                          class="btn btn-sm btn-success btn-pagar-factura"
+                          data-bs-toggle="modal"
+                          data-bs-target="#pagarFacturaModal"
+                          data-id="<%= f.id %>"
+                          data-tipo="<%= f.tipo %>"
+                          data-numero="<%= f.numero_factura || '' %>"
+                          data-proveedor-nombre="<%= f.proveedor_nombre || '' %>"
+                          data-saldo="<%= f.saldo || 0 %>">
                           <i class="bi bi-check-circle"></i> Pagar
                         </button>
                       <% } else { %>
@@ -723,7 +741,13 @@
       <% if (puedeModificarCompras) { %>
         <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mt-3 bulk-pay-bar">
           <div>
-            <button type="submit" class="btn btn-success" id="btnPagarSeleccionadas" disabled>
+            <button
+              type="button"
+              class="btn btn-success"
+              id="btnPagarSeleccionadas"
+              data-bs-toggle="modal"
+              data-bs-target="#pagarMultipleModal"
+              disabled>
               <i class="bi bi-check2-circle"></i> Pagar seleccionadas
             </button>
           </div>
@@ -901,6 +925,65 @@
           <button class="btn btn-dark">Guardar cambios</button>
         </div>
       </form>
+    </div>
+  </div>
+  </div>
+
+  <div class="modal fade" id="pagarFacturaModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="POST" id="pagarFacturaForm">
+        <div class="modal-header">
+          <div>
+            <h5 class="modal-title"><i class="bi bi-check-circle me-1"></i> Pagar factura</h5>
+            <small class="text-muted" id="pagarFacturaSubtitulo"></small>
+          </div>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" name="tipo" id="pagarFacturaTipo">
+          <div class="alert alert-success py-2">
+            Monto a pagar: <strong id="pagarFacturaSaldoTexto">₡0</strong>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Fecha en que se pagó</label>
+            <input type="date" name="fecha_pago" id="pagarFacturaFecha" class="form-control" value="<%= hoy %>" required>
+          </div>
+          <small class="text-muted">Esta fecha quedará guardada como fecha de pago de la factura.</small>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button class="btn btn-success">Confirmar pago</button>
+        </div>
+      </form>
+    </div>
+  </div>
+  </div>
+
+  <div class="modal fade" id="pagarMultipleModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div>
+          <h5 class="modal-title"><i class="bi bi-check2-circle me-1"></i> Pagar seleccionadas</h5>
+          <small class="text-muted">Se marcarán como pagadas las facturas seleccionadas.</small>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="alert alert-success py-2">
+          Total seleccionado: <strong id="pagarMultipleTotalTexto">₡0</strong>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Fecha en que se pagaron</label>
+          <input type="date" name="fecha_pago" id="pagarMultipleFecha" class="form-control" value="<%= hoy %>" form="multiplePagoForm" required>
+        </div>
+        <small class="text-muted">La misma fecha se aplicará a todas las facturas seleccionadas.</small>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button type="submit" class="btn btn-success" form="multiplePagoForm">Confirmar y descargar recibo</button>
+      </div>
     </div>
   </div>
   </div>
@@ -1201,6 +1284,20 @@
     });
   });
 
+  document.querySelectorAll('.btn-pagar-factura').forEach(button => {
+    button.addEventListener('click', () => {
+      const data = button.dataset;
+      const form = document.getElementById('pagarFacturaForm');
+      if (!form) return;
+
+      form.action = `/compras/facturas/${data.id}/pagar`;
+      setValue('pagarFacturaTipo', data.tipo);
+      setValue('pagarFacturaFecha', '<%= hoy %>');
+      setText('pagarFacturaSubtitulo', `Factura ${data.numero || '-'} · ${data.proveedorNombre || 'Sin proveedor'}`);
+      setText('pagarFacturaSaldoTexto', formatoColones(data.saldo));
+    });
+  });
+
   document.querySelectorAll('.provider-search').forEach(input => {
     input.addEventListener('input', () => {
       const target = document.getElementById(input.dataset.providerTarget);
@@ -1303,6 +1400,7 @@
   const checkboxes = document.querySelectorAll('.check-factura');
   const btnPagar = document.getElementById('btnPagarSeleccionadas');
   const totalSpan = document.getElementById('totalSeleccionado');
+  const totalMultipleTexto = document.getElementById('pagarMultipleTotalTexto');
   const selectTodos = document.getElementById('seleccionarTodos');
 
   function actualizarTotal() {
@@ -1316,6 +1414,9 @@
       }
     });
     totalSpan.innerText = '₡' + total.toLocaleString('es-CR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    if (totalMultipleTexto) {
+      totalMultipleTexto.innerText = '₡' + total.toLocaleString('es-CR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
     btnPagar.disabled = (seleccionadas === 0);
   }
 

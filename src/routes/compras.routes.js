@@ -289,6 +289,32 @@ async function columnExists(tableName, columnName) {
   return Number(row.count) > 0;
 }
 
+async function columnInfo(tableName, columnName) {
+  const [[row]] = await queryWithRetry(
+    `SELECT DATA_TYPE AS dataType, CHARACTER_MAXIMUM_LENGTH AS maxLength
+     FROM INFORMATION_SCHEMA.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE()
+       AND TABLE_NAME = ?
+       AND COLUMN_NAME = ?`,
+    [tableName, columnName]
+  );
+  return row || null;
+}
+
+async function ensureFacturaNumeroColumns() {
+  const columns = [
+    ["facturas", "numero_factura"],
+    ["ordenes_compra", "factura"]
+  ];
+
+  for (const [table, column] of columns) {
+    const info = await columnInfo(table, column);
+    if (info && String(info.dataType).toLowerCase() !== "text") {
+      await queryWithRetry(`ALTER TABLE ${table} MODIFY COLUMN ${column} TEXT NULL`);
+    }
+  }
+}
+
 async function ensureNotaCreditoColumns() {
   const tables = ["ordenes_compra", "facturas"];
   const columns = [
@@ -325,6 +351,8 @@ async function ensureAbonoColumns() {
 }
 
 async function ensureFacturaRecepcionColumns() {
+  await ensureFacturaNumeroColumns();
+
   const ordenColumns = [
     ["factura_fecha", "DATE NULL"],
     ["factura_fecha_recepcion", "DATE NULL"],
@@ -408,6 +436,24 @@ async function ensureCajaChicaTable() {
       creado_por INT NULL,
       creado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
       INDEX idx_caja_chica_fecha (fecha)
+    )
+  `);
+}
+
+async function ensureReintegroGastosTable() {
+  await queryWithRetry(`
+    CREATE TABLE IF NOT EXISTS reintegros_gastos (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      fecha DATE NOT NULL,
+      entregado_a VARCHAR(180) NOT NULL,
+      numero_factura VARCHAR(100) NOT NULL,
+      monto DECIMAL(14,2) NOT NULL DEFAULT 0,
+      observacion TEXT NULL,
+      creado_por INT NULL,
+      creado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      INDEX idx_reintegros_gastos_fecha (fecha),
+      INDEX idx_reintegros_gastos_entregado_a (entregado_a),
+      INDEX idx_reintegros_gastos_factura (numero_factura)
     )
   `);
 }
@@ -829,6 +875,49 @@ async function obtenerResumenCajaChica() {
   };
 }
 
+async function obtenerResumenReintegroGastos() {
+  await ensureReintegroGastosTable();
+
+  const [resumenRows] = await queryWithRetry(`
+    SELECT
+      COUNT(*) AS registros,
+      COALESCE(SUM(monto), 0) AS total,
+      COALESCE(SUM(CASE WHEN YEAR(fecha) = YEAR(CURDATE()) AND MONTH(fecha) = MONTH(CURDATE()) THEN monto ELSE 0 END), 0) AS total_mes
+    FROM reintegros_gastos
+  `);
+
+  const [porMes] = await queryWithRetry(`
+    SELECT DATE_FORMAT(fecha, '%Y-%m') AS mes, COUNT(*) AS registros, COALESCE(SUM(monto), 0) AS total
+    FROM reintegros_gastos
+    GROUP BY DATE_FORMAT(fecha, '%Y-%m')
+    ORDER BY mes DESC
+    LIMIT 12
+  `);
+
+  const [porPersona] = await queryWithRetry(`
+    SELECT entregado_a, COUNT(*) AS registros, COALESCE(SUM(monto), 0) AS total
+    FROM reintegros_gastos
+    GROUP BY entregado_a
+    ORDER BY total DESC, entregado_a ASC
+    LIMIT 10
+  `);
+
+  const [historial] = await queryWithRetry(`
+    SELECT r.*, u.usuario AS creado_por_usuario
+    FROM reintegros_gastos r
+    LEFT JOIN usuarios u ON u.id = r.creado_por
+    ORDER BY r.fecha DESC, r.id DESC
+    LIMIT 300
+  `);
+
+  return {
+    resumen: resumenRows[0] || { registros: 0, total: 0, total_mes: 0 },
+    porMes,
+    porPersona,
+    historial
+  };
+}
+
 function agregarFiltroFecha(sqlParts, params, campoFecha, fechaDesde, fechaHasta) {
   if (fechaDesde) {
     sqlParts.push(`${campoFecha} >= ?`);
@@ -843,6 +932,7 @@ function agregarFiltroFecha(sqlParts, params, campoFecha, fechaDesde, fechaHasta
 async function obtenerDashboardFinancieroFacturas(filtros = {}) {
   await ensurePagosProveedorTable();
   await ensureCajaChicaTable();
+  await ensureReintegroGastosTable();
 
   const { proveedor_id, fecha_desde, fecha_hasta } = filtros;
   const whereOrdenes = [];
@@ -866,6 +956,11 @@ async function obtenerDashboardFinancieroFacturas(filtros = {}) {
   agregarFiltroFecha(whereCaja, paramsCaja, "cc.fecha", fecha_desde, fecha_hasta);
   const whereCajaSql = whereCaja.length ? `WHERE ${whereCaja.join(" AND ")}` : "";
 
+  const whereReintegros = [];
+  const paramsReintegros = [];
+  agregarFiltroFecha(whereReintegros, paramsReintegros, "rg.fecha", fecha_desde, fecha_hasta);
+  const whereReintegrosSql = whereReintegros.length ? `WHERE ${whereReintegros.join(" AND ")}` : "";
+
   const [[ordenesResumen]] = await queryWithRetry(`
     SELECT COUNT(*) AS registros, COALESCE(SUM(total), 0) AS total
     FROM ordenes_compra o
@@ -883,6 +978,12 @@ async function obtenerDashboardFinancieroFacturas(filtros = {}) {
     FROM caja_chica_reintegros cc
     ${whereCajaSql}
   `, paramsCaja);
+
+  const [[reintegrosResumen]] = await queryWithRetry(`
+    SELECT COUNT(*) AS registros, COALESCE(SUM(monto), 0) AS total
+    FROM reintegros_gastos rg
+    ${whereReintegrosSql}
+  `, paramsReintegros);
 
   const [ordenesMes] = await queryWithRetry(`
     SELECT DATE_FORMAT(o.fecha, '%Y-%m') AS mes, COUNT(*) AS registros, COALESCE(SUM(o.total), 0) AS total
@@ -905,11 +1006,18 @@ async function obtenerDashboardFinancieroFacturas(filtros = {}) {
     GROUP BY DATE_FORMAT(cc.fecha, '%Y-%m')
   `, paramsCaja);
 
+  const [reintegrosMes] = await queryWithRetry(`
+    SELECT DATE_FORMAT(rg.fecha, '%Y-%m') AS mes, COUNT(*) AS registros, COALESCE(SUM(rg.monto), 0) AS total
+    FROM reintegros_gastos rg
+    ${whereReintegrosSql}
+    GROUP BY DATE_FORMAT(rg.fecha, '%Y-%m')
+  `, paramsReintegros);
+
   const porMesMap = new Map();
   const asegurarMes = (mes) => {
     const key = mes || "Sin fecha";
     if (!porMesMap.has(key)) {
-      porMesMap.set(key, { mes: key, ordenes: 0, pagosProveedor: 0, cajaChica: 0, total: 0 });
+      porMesMap.set(key, { mes: key, ordenes: 0, pagosProveedor: 0, cajaChica: 0, reintegrosGastos: 0, total: 0 });
     }
     return porMesMap.get(key);
   };
@@ -929,14 +1037,21 @@ async function obtenerDashboardFinancieroFacturas(filtros = {}) {
     item.cajaChica += Number(row.total || 0);
     item.total += Number(row.total || 0);
   });
+  reintegrosMes.forEach(row => {
+    const item = asegurarMes(row.mes);
+    item.reintegrosGastos += Number(row.total || 0);
+    item.total += Number(row.total || 0);
+  });
 
   const totalOrdenes = Number(ordenesResumen?.total || 0);
   const totalPagosProveedor = Number(pagosResumen?.total || 0);
   const totalCajaChica = Number(cajaResumen?.total || 0);
+  const totalReintegrosGastos = Number(reintegrosResumen?.total || 0);
   const porTipo = [
     { tipo: "Ordenes de compra", total: totalOrdenes, registros: Number(ordenesResumen?.registros || 0), color: "#0f3b82" },
     { tipo: "Pago de proveedor", total: totalPagosProveedor, registros: Number(pagosResumen?.registros || 0), color: "#0ea5e9" },
-    { tipo: "Caja chica", total: totalCajaChica, registros: Number(cajaResumen?.registros || 0), color: "#f59e0b" }
+    { tipo: "Caja chica", total: totalCajaChica, registros: Number(cajaResumen?.registros || 0), color: "#f59e0b" },
+    { tipo: "Reintegro de gastos", total: totalReintegrosGastos, registros: Number(reintegrosResumen?.registros || 0), color: "#7c3aed" }
   ];
 
   return {
@@ -944,7 +1059,8 @@ async function obtenerDashboardFinancieroFacturas(filtros = {}) {
       totalOrdenes,
       totalPagosProveedor,
       totalCajaChica,
-      totalGeneral: totalOrdenes + totalPagosProveedor + totalCajaChica,
+      totalReintegrosGastos,
+      totalGeneral: totalOrdenes + totalPagosProveedor + totalCajaChica + totalReintegrosGastos,
       registros: porTipo.reduce((sum, item) => sum + item.registros, 0)
     },
     porTipo,
@@ -1058,11 +1174,13 @@ async function obtenerFacturasCompras(filtros = {}) {
 
   const facturasConEstado = facturasUnidas.map(f => {
     const saldos = calcularSaldoFactura(f.monto, f.nota_credito_monto, f.abono_monto, f.pagada);
+    const montoPagado = f.pagada ? saldos.basePagar : saldos.abonoMonto;
     return {
       ...f,
       monto_original: saldos.montoOriginal,
       nota_credito_monto: saldos.notaCreditoMonto,
       abono_monto: saldos.abonoMonto,
+      monto_pagado: montoPagado,
       saldo: saldos.saldo,
       cubierta_por_nc: saldos.notaCreditoMonto > 0 && saldos.basePagar <= 0,
       tiene_nc: saldos.notaCreditoMonto > 0 || Boolean(f.nota_credito_numero),
@@ -3055,6 +3173,71 @@ router.post("/facturas/caja-chica", requireAuth, allowRoles(...ROLES_GESTION_FAC
   }
 });
 
+router.get("/facturas/reintegro-gastos", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER", "CONTABILIDAD"), async (req, res) => {
+  try {
+    const reintegroGastos = await obtenerResumenReintegroGastos();
+    const success = req.session.success;
+    const error = req.session.error;
+    delete req.session.success;
+    delete req.session.error;
+
+    res.render("compras/reintegro_gastos", {
+      user: req.session.user,
+      reintegroGastos,
+      success,
+      error,
+      hoy: new Date().toISOString().slice(0, 10)
+    });
+  } catch (error) {
+    console.error("Error cargando reintegro de gastos:", error);
+    res.status(500).send("Error cargando reintegro de gastos");
+  }
+});
+
+router.post("/facturas/reintegro-gastos", requireAuth, allowRoles(...ROLES_GESTION_FACTURAS), async (req, res) => {
+  try {
+    await ensureReintegroGastosTable();
+    const fecha = String(req.body.fecha || "").trim();
+    const entregadoA = String(req.body.entregado_a || "").trim();
+    const numeroFactura = String(req.body.numero_factura || "").trim();
+    const monto = parseMontoCotizacion(req.body.monto);
+    const observacion = String(req.body.observacion || "").trim();
+
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha)) {
+      req.session.error = "Debe indicar una fecha válida.";
+      return res.redirect("/compras/facturas/reintegro-gastos");
+    }
+
+    if (!entregadoA) {
+      req.session.error = "Debe indicar a quién se le dio el monto.";
+      return res.redirect("/compras/facturas/reintegro-gastos");
+    }
+
+    if (!numeroFactura) {
+      req.session.error = "Debe indicar el número de factura.";
+      return res.redirect("/compras/facturas/reintegro-gastos");
+    }
+
+    if (!monto || monto <= 0) {
+      req.session.error = "Debe indicar un monto mayor a cero.";
+      return res.redirect("/compras/facturas/reintegro-gastos");
+    }
+
+    await queryWithRetry(
+      `INSERT INTO reintegros_gastos (fecha, entregado_a, numero_factura, monto, observacion, creado_por)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [fecha, entregadoA, numeroFactura, monto, observacion || null, req.session.user.id || null]
+    );
+
+    req.session.success = `Reintegro de gastos registrado por ₡${monto.toLocaleString("es-CR", { maximumFractionDigits: 0 })}.`;
+    res.redirect("/compras/facturas/reintegro-gastos");
+  } catch (error) {
+    console.error("Error guardando reintegro de gastos:", error);
+    req.session.error = "No se pudo guardar el reintegro de gastos.";
+    res.redirect("/compras/facturas/reintegro-gastos");
+  }
+});
+
 // ===================== LISTADO DE FACTURAS (unificado) =====================
 router.get("/facturas", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER", "CONTABILIDAD"), async (req, res) => {
   try {
@@ -4022,7 +4205,12 @@ router.post("/facturas/:id/pagar", requireAuth, allowRoles("ADMIN", "TALLER", "P
     await ensureAbonoColumns();
     const id = req.params.id;
     const { tipo } = req.body;
-    const fechaPago = new Date().toISOString().slice(0, 10);
+    const fechaPago = String(req.body.fecha_pago || "").trim();
+
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(fechaPago)) {
+      req.session.error = "Debe indicar una fecha de pago válida.";
+      return res.redirect("/compras/facturas");
+    }
 
     if (tipo === 'orden') {
       const [result] = await pool.query(
@@ -4062,11 +4250,12 @@ router.post("/facturas/:id/pagar", requireAuth, allowRoles("ADMIN", "TALLER", "P
       return res.redirect("/compras/facturas");
     }
 
-    req.session.success = "Factura marcada como pagada.";
+    req.session.success = `Factura marcada como pagada el ${new Date(`${fechaPago}T00:00:00`).toLocaleDateString("es-CR")}.`;
     res.redirect("/compras/facturas");
   } catch (error) {
     console.error("Error al pagar factura:", error);
-    res.status(500).send("Error interno");
+    req.session.error = "Error interno al pagar la factura.";
+    res.redirect("/compras/facturas");
   }
 });
 
@@ -4131,13 +4320,18 @@ router.post("/facturas/pagar-multiple", requireAuth, allowRoles("ADMIN", "TALLER
     await ensureAbonoColumns();
     const { facturas_ids } = req.body;
     const seleccionadas = toArray(facturas_ids).map(parseFacturaRef).filter(Boolean);
+    const fechaPago = String(req.body.fecha_pago || "").trim();
 
     if (!seleccionadas.length) {
       req.session.error = "No seleccionó ninguna factura.";
       return res.redirect("/compras/facturas");
     }
 
-    const fechaPago = new Date().toISOString().slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(fechaPago)) {
+      req.session.error = "Debe indicar una fecha de pago válida.";
+      return res.redirect("/compras/facturas");
+    }
+
     const ordenIds = seleccionadas.filter(f => f.tipo === 'orden').map(f => f.id);
     const independientesIds = seleccionadas.filter(f => f.tipo === 'independiente').map(f => f.id);
     const facturas = [];

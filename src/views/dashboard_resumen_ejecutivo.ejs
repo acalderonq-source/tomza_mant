@@ -265,6 +265,35 @@
 
     .table td { vertical-align: middle; }
 
+    .financial-card .table-responsive { overflow-x: hidden; }
+
+    .finance-table { table-layout: fixed; }
+
+    .finance-table th:nth-child(1),
+    .finance-table td:nth-child(1) { width: 48%; }
+
+    .finance-table th:nth-child(2),
+    .finance-table td:nth-child(2) {
+      text-align: center;
+      width: 14%;
+    }
+
+    .finance-table th:nth-child(3),
+    .finance-table td:nth-child(3) { width: 27%; }
+
+    .finance-table th:nth-child(4),
+    .finance-table td:nth-child(4) { width: 11%; }
+
+    .finance-table td {
+      padding: .72rem .55rem;
+    }
+
+    .finance-total td {
+      background: #f8fafc;
+      border-bottom: 2px solid #dbeafe;
+      font-weight: 950;
+    }
+
     .rank {
       align-items: center;
       background: #eaf1ff;
@@ -282,6 +311,11 @@
       color: #0f172a;
       font-weight: 950;
       white-space: nowrap;
+    }
+
+    .finance-table .money {
+      font-size: .82rem;
+      letter-spacing: -.01em;
     }
 
     .pill {
@@ -488,7 +522,7 @@
         <div class="metric-label">Total pagado</div>
         <div class="metric-value">₡<%= money(resumenFinanciero.totalPagado || 0) %></div>
         <div class="metric-foot">
-          <%= Number(resumenFinanciero.movimientosTotalPagado || 0).toLocaleString('es-CR') %> pago(s): facturas pagadas, proveedores y caja chica
+          Facturas, proveedores pagados y caja chica
         </div>
       </div>
     </div>
@@ -527,40 +561,42 @@
 
   <section class="row g-3 mb-4">
     <div class="col-lg-4">
-      <div class="table-card">
+      <div class="table-card financial-card">
         <div class="card-head">
           <div>
-            <h2 class="card-title"><i class="bi bi-wallet2 me-1"></i>Resumen financiero</h2>
-            <div class="card-subtitle">Origen del dinero registrado en el periodo.</div>
+            <h2 class="card-title">Resumen financiero</h2>
+            <div class="card-subtitle">Pagos y pendientes del periodo.</div>
           </div>
         </div>
         <div class="table-responsive">
-          <table class="table table-hover align-middle">
+          <table class="table table-hover align-middle finance-table">
             <thead><tr><th>Origen</th><th>Mov.</th><th class="text-end">Monto</th><th class="text-end">%</th></tr></thead>
             <tbody>
-              <tr>
+              <tr class="finance-total">
                 <td><strong>Total pagado</strong></td>
                 <td><span class="pill pill-blue"><%= Number(resumenFinanciero.movimientosTotalPagado || 0).toLocaleString('es-CR') %></span></td>
                 <td class="text-end money">₡<%= money(resumenFinanciero.totalPagado || 0) %></td>
                 <td class="text-end">100%</td>
               </tr>
               <tr>
-                <td><strong>Facturas pagadas</strong></td>
+                <td>
+                  <strong>Facturas pagadas</strong>
+                </td>
                 <td><span class="pill pill-soft"><%= Number(resumenFinanciero.movimientosFacturasPagadas || 0).toLocaleString('es-CR') %></span></td>
                 <td class="text-end money">₡<%= money(resumenFinanciero.totalFacturasPagadas || 0) %></td>
                 <td class="text-end"><%= pct(resumenFinanciero.totalFacturasPagadas, resumenFinanciero.totalPagado) %>%</td>
               </tr>
               <tr>
-                <td><strong>Órdenes de compra</strong></td>
-                <td><span class="pill pill-blue"><%= Number(resumenFinanciero.movimientosOrdenesCompra || 0).toLocaleString('es-CR') %></span></td>
-                <td class="text-end money">₡<%= money(resumenFinanciero.totalOrdenesCompra || 0) %></td>
-                <td class="text-end"><%= pct(resumenFinanciero.totalOrdenesCompra, data.totalGastos) %>%</td>
+                <td><strong>Pago proveedor pagado</strong></td>
+                <td><span class="pill pill-blue"><%= Number(resumenFinanciero.movimientosPagosProveedorPagados || 0).toLocaleString('es-CR') %></span></td>
+                <td class="text-end money">₡<%= money(resumenFinanciero.totalPagosProveedorPagados || 0) %></td>
+                <td class="text-end"><%= pct(resumenFinanciero.totalPagosProveedorPagados, resumenFinanciero.totalPagado) %>%</td>
               </tr>
               <tr>
-                <td><strong>Pago proveedor</strong></td>
-                <td><span class="pill pill-soft"><%= Number(resumenFinanciero.movimientosPagosProveedor || 0).toLocaleString('es-CR') %></span></td>
-                <td class="text-end money">₡<%= money(resumenFinanciero.totalPagosProveedor || 0) %></td>
-                <td class="text-end"><%= pct(resumenFinanciero.totalPagosProveedor, resumenFinanciero.totalPagado) %>%</td>
+                <td><strong>Pago proveedor pendiente</strong></td>
+                <td><span class="pill pill-red"><%= Number(resumenFinanciero.movimientosPagosProveedorPendientes || 0).toLocaleString('es-CR') %></span></td>
+                <td class="text-end money">₡<%= money(resumenFinanciero.totalPagosProveedorPendientes || 0) %></td>
+                <td class="text-end"><%= pct(resumenFinanciero.totalPagosProveedorPendientes, resumenFinanciero.totalPagosProveedor || 0) %>%</td>
               </tr>
               <tr>
                 <td><strong>Caja chica</strong></td>

@@ -305,7 +305,7 @@
         </a>
         <% if (puedeGestionar) { %>
           <button type="button" class="btn btn-warning btn-sm rounded-pill fw-bold px-3" data-bs-toggle="modal" data-bs-target="#nuevoSemanalModal">
-            <i class="bi bi-plus-circle"></i> Agregar próxima semana
+            <i class="bi bi-plus-circle"></i> Agregar repuesto
           </button>
         <% } %>
       </div>
@@ -325,7 +325,7 @@
   <section class="panel mb-3">
     <form method="GET" action="/repuestos-semanales" class="filters">
       <div>
-        <label class="form-label mb-1">Semana a revisar</label>
+        <label class="form-label mb-1">Semana destino</label>
         <input type="date" name="fecha" class="form-control form-control-sm" value="<%= filtros.fecha || fechaHoy %>">
       </div>
       <div>
@@ -410,6 +410,7 @@
                         data-bs-toggle="modal"
                         data-bs-target="#editarSemanalModal"
                         data-id="<%= item.id %>"
+                        data-fecha="<%= item.fecha_iso || '' %>"
                         data-placa="<%= item.placa %>"
                         data-sede="<%= item.sede || '' %>"
                         data-estado="<%= item.estado || 'PENDIENTE' %>"
@@ -472,9 +473,13 @@
           <div class="modal-body">
             <div class="form-grid">
               <div class="span-2 alert alert-warning mb-0 py-2">
-                <strong>Semana automática:</strong> esta solicitud se guardará para <%= fechaSemanaNueva %>.
+                <strong>Pedido CEDIS:</strong> MUEBLE y GENERAL-TALLER quedan en pantalla, pero no salen en la descarga del pedido.
               </div>
-              <div class="span-2">
+              <div>
+                <label class="form-label mb-1">Semana destino</label>
+                <input type="date" name="fecha" class="form-control" value="<%= fechaSemanaNueva %>" required>
+              </div>
+              <div>
                 <label class="form-label mb-1">Sede automática</label>
                 <input type="hidden" name="sede" id="sedeNuevaSemanal" value="<%= filtros.sede || '' %>">
                 <input type="text" id="sedeNuevaSemanalTexto" class="form-control" value="<%= filtros.sede ? mostrarSede(filtros.sede) : '' %>" placeholder="Se llena al seleccionar la placa" readonly>
@@ -488,6 +493,7 @@
                     <option value="<%= unidad.placa %>" data-sede="<%= unidad.sede || '' %>"><%= unidad.placa %> · <%= mostrarSede(unidad.sede) %></option>
                   <% }) %>
                   <option value="GENERALES">GENERALES</option>
+                  <option value="GENERAL-TALLER">GENERAL-TALLER</option>
                   <option value="MUEBLE">MUEBLE</option>
                   <option value="LLANTAS">LLANTAS</option>
                   <option value="SUMINISTRO LIMPIEZA">SUMINISTRO LIMPIEZA</option>
@@ -524,7 +530,6 @@
     <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
       <div class="modal-content">
         <form method="POST" id="editarSemanalForm">
-          <input type="hidden" name="fecha" value="<%= filtros.fecha || '' %>">
           <input type="hidden" name="sede" id="sedeEditarSemanal" value="">
           <div class="modal-header">
             <div>
@@ -535,6 +540,10 @@
           </div>
           <div class="modal-body">
             <div class="form-grid">
+              <div>
+                <label class="form-label mb-1">Semana destino</label>
+                <input type="date" name="fecha" id="fechaEditarSemanal" class="form-control" required>
+              </div>
               <div>
                 <label class="form-label mb-1">Placa / grupo</label>
                 <input type="text" name="placa" id="placaEditarSemanal" class="form-control text-uppercase" list="placasSemanalesList" required>
@@ -670,8 +679,10 @@
     button.addEventListener('click', () => {
       const form = document.getElementById('editarSemanalForm');
       const estado = document.getElementById('estadoEditarSemanal');
+      const fecha = document.getElementById('fechaEditarSemanal');
       if (!form) return;
       form.action = `/repuestos-semanales/${button.dataset.id}/editar`;
+      if (fecha) fecha.value = button.dataset.fecha || '<%= filtros.fecha || fechaSemanaNueva %>';
       if (placaEditar) placaEditar.value = button.dataset.placa || '';
       if (sedeEditar) sedeEditar.value = button.dataset.sede || '';
       if (sedeEditarTexto) sedeEditarTexto.value = textoSede(button.dataset.sede);
