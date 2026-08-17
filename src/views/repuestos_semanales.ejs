@@ -170,8 +170,46 @@
       border-radius: 12px;
       display: grid;
       gap: .75rem;
-      grid-template-columns: minmax(220px, 1fr) auto auto;
+      grid-template-columns: 1fr auto auto;
       padding: .85rem;
+    }
+
+    .pedido-sedes-grid {
+      display: grid;
+      gap: .65rem;
+      grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+      margin-bottom: .85rem;
+    }
+
+    .pedido-sede-card {
+      background: #fff;
+      border: 1px solid #dbe3ef;
+      border-radius: 12px;
+      box-shadow: 0 8px 20px rgba(15, 23, 42, .05);
+      color: #0f172a;
+      padding: .75rem;
+      text-align: left;
+      transition: .15s ease;
+      width: 100%;
+    }
+
+    .pedido-sede-card:hover,
+    .pedido-sede-card.is-active {
+      border-color: #0f6684;
+      box-shadow: 0 10px 24px rgba(15, 102, 132, .15);
+      transform: translateY(-1px);
+    }
+
+    .pedido-sede-title {
+      font-weight: 950;
+      line-height: 1.1;
+    }
+
+    .pedido-sede-meta {
+      color: #64748b;
+      font-size: .78rem;
+      font-weight: 800;
+      margin-top: .25rem;
     }
 
     .pedido-list {
@@ -586,26 +624,40 @@
     <div class="modal-content">
       <form method="GET" action="/repuestos-semanales/pedido-cedis.pdf" id="pedidoCedisForm">
         <input type="hidden" name="fecha" value="<%= filtros.fecha || '' %>">
+        <input type="hidden" name="sede" id="pedidoSedeSelect" value="<%= filtros.sede || (sedesConPedido.length === 1 ? sedesConPedido[0] : '') %>">
         <div class="modal-header">
           <div>
             <h5 class="modal-title fw-bold mb-0"><i class="bi bi-file-earmark-pdf me-1"></i> Descargar pedido CEDIS</h5>
-            <div class="small opacity-75">Seleccione la sede y deje marcado solo lo que va en el pedido.</div>
+            <div class="small opacity-75">Elija una sede y marque solo los repuestos que van en el pedido.</div>
           </div>
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
         </div>
         <div class="modal-body">
+          <div class="pedido-sedes-grid">
+            <% sedesConPedido.forEach(sede => { %>
+              <%
+                const itemsSede = lista.filter(item => item.sede === sede);
+                const incluidosSede = itemsSede.filter(item => !esExcluidoPedidoVista(item)).length;
+                const activaSede = (filtros.sede || (sedesConPedido.length === 1 ? sedesConPedido[0] : '')) === sede;
+              %>
+              <button
+                type="button"
+                class="pedido-sede-card js-pedido-sede <%= activaSede ? 'is-active' : '' %>"
+                data-sede="<%= sede %>">
+                <div class="pedido-sede-title"><%= mostrarSede(sede) %></div>
+                <div class="pedido-sede-meta"><%= incluidosSede %> para descargar · <%= itemsSede.length %> total</div>
+              </button>
+            <% }) %>
+          </div>
+
           <div class="pedido-toolbar">
             <div>
-              <label class="form-label mb-1">Sede a descargar</label>
-              <select name="sede" id="pedidoSedeSelect" class="form-select" required>
-                <option value="">Seleccione una sede</option>
-                <% sedesConPedido.forEach(sede => { %>
-                  <option value="<%= sede %>" <%= filtros.sede === sede ? 'selected' : '' %>><%= mostrarSede(sede) %></option>
-                <% }) %>
-              </select>
+              <label class="form-label mb-1">Pedido seleccionado</label>
+              <div class="fw-bold" id="pedidoSedeTitulo">Seleccione una sede</div>
+              <div class="text-muted small">Abajo puede quitar del PDF lo que no desea cotizar.</div>
             </div>
-            <button type="button" class="btn btn-outline-dark btn-sm mt-md-4" id="pedidoMarcarTodos">Marcar todo</button>
-            <button type="button" class="btn btn-outline-secondary btn-sm mt-md-4" id="pedidoLimpiar">Limpiar</button>
+            <button type="button" class="btn btn-outline-dark btn-sm" id="pedidoMarcarTodos">Marcar todo</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm" id="pedidoLimpiar">Limpiar</button>
           </div>
 
           <div class="alert alert-warning py-2 my-3">
@@ -883,6 +935,8 @@
   });
 
   const pedidoSedeSelect = document.getElementById('pedidoSedeSelect');
+  const pedidoSedeTitulo = document.getElementById('pedidoSedeTitulo');
+  const pedidoSedeButtons = document.querySelectorAll('.js-pedido-sede');
   const pedidoLista = document.getElementById('pedidoCedisLista');
   const pedidoForm = document.getElementById('pedidoCedisForm');
   const pedidoMarcarTodos = document.getElementById('pedidoMarcarTodos');
@@ -900,6 +954,22 @@
   function pedidosVisibles() {
     const sede = pedidoSedeSelect?.value || '';
     return pedidosCedis.filter(item => item.sede === sede);
+  }
+
+  function nombreSedePedido(sede) {
+    const item = pedidosCedis.find(pedido => pedido.sede === sede);
+    return item?.sedeTexto || sede || '';
+  }
+
+  function activarSedePedido(sede) {
+    if (pedidoSedeSelect) pedidoSedeSelect.value = sede || '';
+    pedidoSedeButtons.forEach(button => {
+      button.classList.toggle('is-active', button.dataset.sede === sede);
+    });
+    if (pedidoSedeTitulo) {
+      pedidoSedeTitulo.textContent = sede ? nombreSedePedido(sede) : 'Seleccione una sede';
+    }
+    renderPedidosCedis();
   }
 
   function renderPedidosCedis() {
@@ -936,7 +1006,9 @@
     }).join('');
   }
 
-  pedidoSedeSelect?.addEventListener('change', renderPedidosCedis);
+  pedidoSedeButtons.forEach(button => {
+    button.addEventListener('click', () => activarSedePedido(button.dataset.sede || ''));
+  });
 
   pedidoMarcarTodos?.addEventListener('click', () => {
     pedidoLista?.querySelectorAll('.pedido-check:not(:disabled)').forEach(input => { input.checked = true; });
@@ -947,6 +1019,12 @@
   });
 
   pedidoForm?.addEventListener('submit', event => {
+    if (!pedidoSedeSelect?.value) {
+      event.preventDefault();
+      alert('Seleccione una sede para generar el pedido.');
+      return;
+    }
+
     const seleccionados = pedidoLista?.querySelectorAll('.pedido-check:checked:not(:disabled)').length || 0;
     if (!seleccionados) {
       event.preventDefault();
@@ -954,7 +1032,9 @@
     }
   });
 
-  document.getElementById('pedidoCedisModal')?.addEventListener('shown.bs.modal', renderPedidosCedis);
+  document.getElementById('pedidoCedisModal')?.addEventListener('shown.bs.modal', () => {
+    activarSedePedido(pedidoSedeSelect?.value || '');
+  });
 </script>
 </body>
 </html>
