@@ -14,7 +14,7 @@ const {
   normalizarEstadoSemanal
 } = require("../utils/repuestosSemanales");
 const { normalizarPlaca: normalizarPlacaSistema, agregarFiltroPlacaSql } = require("../utils/placas");
-const { generarPdfPedidoCedis } = require("../utils/pdfPedidoCedis");
+const { generarPdfPedidoCedis, dividirRepuestosSeleccionables } = require("../utils/pdfPedidoCedis");
 
 const ROLES_PROVEEDURIA = ["PROVEEDURIA_TALLER", "PROVEEDURIA"];
 const ROLES_VER = ["ADMIN", "TALLER", "MECANICO", "SUPERVISOR_PESADO", ...ROLES_PROVEEDURIA];
@@ -83,6 +83,45 @@ function normalizarIds(value) {
   return normalizarArray(value)
     .map(id => parseInt(id, 10))
     .filter(Number.isInteger);
+}
+
+function normalizarPedidoItems(value) {
+  return normalizarArray(value)
+    .map(raw => {
+      const [idRaw, indexRaw] = String(raw || "").split(":");
+      const id = parseInt(idRaw, 10);
+      const index = parseInt(indexRaw, 10);
+      if (!Number.isInteger(id) || !Number.isInteger(index) || index < 0) return null;
+      return { id, index };
+    })
+    .filter(Boolean);
+}
+
+function prepararSolicitudesPedidoPorItems(solicitudes, pedidoItems) {
+  if (!pedidoItems.length) return solicitudes;
+
+  const itemsPorSolicitud = new Map();
+  pedidoItems.forEach(item => {
+    if (!itemsPorSolicitud.has(item.id)) itemsPorSolicitud.set(item.id, new Set());
+    itemsPorSolicitud.get(item.id).add(item.index);
+  });
+
+  return solicitudes.flatMap(solicitud => {
+    const indices = itemsPorSolicitud.get(Number(solicitud.id));
+    if (!indices) return [];
+
+    const partes = dividirRepuestosSeleccionables(solicitud);
+    return partes
+      .map((parte, index) => ({ parte, index }))
+      .filter(({ index }) => indices.has(index))
+      .map(({ parte, index }) => ({
+        ...solicitud,
+        solicitud: parte,
+        marcado_rojo: null,
+        cantidad: index === 0 ? solicitud.cantidad : "",
+        _pedido_item_index: index
+      }));
+  });
 }
 
 function redirectConFiltros(req, res) {
@@ -310,6 +349,7 @@ router.get("/", async (req, res) => {
       puedeGestionar: ROLES_GESTION.includes(req.session.user.rol),
       etiquetaEstadoSemanal,
       etiquetaSede,
+      dividirRepuestosSeleccionables,
       success,
       error
     });
@@ -323,8 +363,14 @@ router.get("/pedido-cedis.pdf", async (req, res) => {
   try {
     await ensureRepuestosSemanalesTable(pool);
 
+    const pedidoItems = normalizarPedidoItems(req.query.pedido_items);
+    if (pedidoItems.length) {
+      req.query.solicitud_ids = [...new Set(pedidoItems.map(item => item.id))];
+    }
+
     const { solicitudes, filtros } = await obtenerSolicitudesFiltradas(req);
-    const grupos = agruparParaPedido(solicitudes);
+    const solicitudesPedido = prepararSolicitudesPedidoPorItems(solicitudes, pedidoItems);
+    const grupos = agruparParaPedido(solicitudesPedido);
 
     if (!grupos.length) {
       return res.status(404).send("No hay datos para generar el pedido.");

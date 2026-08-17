@@ -210,6 +210,10 @@ function expandirItemsPorRepuesto(items) {
   });
 }
 
+function dividirRepuestosSeleccionables(item) {
+  return dividirDescripcionRepuestos(descripcionItem(item));
+}
+
 function logoTomza() {
   const logoPath = path.join(process.cwd(), "public", "img", "logo_tomza.jpg");
   if (fs.existsSync(logoPath)) {
@@ -379,4 +383,4 @@ function generarPdfPedidoCedis(grupos) {
   });
 }
 
-module.exports = { generarPdfPedidoCedis };
+module.exports = { generarPdfPedidoCedis, dividirRepuestosSeleccionables };

@@ -408,6 +408,13 @@
   const fechaSemanaNueva = (typeof fechaProximaSemana !== 'undefined' && fechaProximaSemana) || filtros.fecha || fechaHoy;
   const textoSeguroData = value => String(value || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   const textoComparableVista = value => String(value || '').trim().toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[_\s]+/g, '-');
+  const dividirPedidoVista = item => {
+    if (typeof dividirRepuestosSeleccionables === 'function') {
+      return dividirRepuestosSeleccionables(item).filter(Boolean);
+    }
+    const texto = String(item.marcado_rojo || item.solicitud || '').trim();
+    return texto ? [texto] : [''];
+  };
   const esExcluidoPedidoVista = item => {
     const placa = textoComparableVista(item.placa);
     const sede = textoComparableVista(item.sede);
@@ -432,6 +439,7 @@
     marcado_rojo: item.marcado_rojo || '',
     estado: item.estado || '',
     fecha: item.fecha_iso || '',
+    partes: dividirPedidoVista(item).map((texto, index) => ({ index, texto })),
     excluido: esExcluidoPedidoVista(item)
   }));
   const pedidoPdfParams = new URLSearchParams();
@@ -637,7 +645,9 @@
             <% sedesConPedido.forEach(sede => { %>
               <%
                 const itemsSede = lista.filter(item => item.sede === sede);
-                const incluidosSede = itemsSede.filter(item => !esExcluidoPedidoVista(item)).length;
+                const incluidosSede = itemsSede
+                  .filter(item => !esExcluidoPedidoVista(item))
+                  .reduce((total, item) => total + dividirPedidoVista(item).length, 0);
                 const activaSede = (filtros.sede || (sedesConPedido.length === 1 ? sedesConPedido[0] : '')) === sede;
               %>
               <button
@@ -988,21 +998,26 @@
     }
 
     pedidoLista.innerHTML = items.map(item => {
+      const partes = Array.isArray(item.partes) && item.partes.length
+        ? item.partes
+        : [{ index: 0, texto: item.solicitud || item.marcado_rojo || 'Repuesto' }];
       const disabled = item.excluido ? 'disabled' : '';
       const checked = item.excluido ? '' : 'checked';
       const badge = item.excluido ? 'Fuera del pedido' : (item.estado || 'Pendiente');
-      return `
+
+      return partes.map(parte => `
         <label class="pedido-item ${item.excluido ? 'is-excluded' : ''}">
-          <input class="form-check-input pedido-check" type="checkbox" name="solicitud_ids" value="${item.id}" ${checked} ${disabled}>
+          <input class="form-check-input pedido-check" type="checkbox" name="pedido_items" value="${item.id}:${parte.index}" ${checked} ${disabled}>
           <div class="pedido-plate">${escapeHtml(item.placa)}</div>
           <div>
-            <div class="pedido-text fw-bold">${escapeHtml(item.solicitud)}</div>
-            ${item.marcado_rojo ? `<div class="pedido-text text-danger mt-1">${escapeHtml(item.marcado_rojo)}</div>` : ''}
-            <div class="text-muted small mt-1">${escapeHtml(item.sedeTexto || item.sede)}</div>
+            <div class="pedido-text fw-bold">${escapeHtml(parte.texto)}</div>
+            <div class="text-muted small mt-1">
+              ${escapeHtml(item.sedeTexto || item.sede)} · solicitud #${escapeHtml(item.id)}
+            </div>
           </div>
           <span class="pedido-status ${item.excluido ? 'bg-secondary text-white' : 'bg-light text-dark'}">${escapeHtml(badge)}</span>
         </label>
-      `;
+      `).join('');
     }).join('');
   }
 
