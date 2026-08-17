@@ -157,6 +157,45 @@
       color: #64748b;
       font-size: .8rem;
     }
+    .business-grid {
+      display: grid;
+      gap: .75rem;
+    }
+    .business-card {
+      border: 1px solid #dbe3ef;
+      border-radius: 14px;
+      overflow: hidden;
+    }
+    .business-toggle {
+      align-items: center;
+      background: linear-gradient(135deg, #f8fafc, #eef4ff);
+      border: 0;
+      color: #111827;
+      display: flex;
+      gap: .75rem;
+      justify-content: space-between;
+      padding: .85rem 1rem;
+      text-align: left;
+      width: 100%;
+    }
+    .business-title {
+      font-size: 1rem;
+      font-weight: 900;
+    }
+    .business-subtitle {
+      color: #64748b;
+      font-size: .82rem;
+      margin-top: .1rem;
+    }
+    .business-count {
+      background: #111827;
+      border-radius: 999px;
+      color: #fff;
+      font-size: .75rem;
+      font-weight: 850;
+      padding: .35rem .65rem;
+      white-space: nowrap;
+    }
     .tomza-plate-search {
       position: relative;
     }
@@ -253,6 +292,22 @@
   const compradas = solicitudes.filter(s => s.estado === 'COMPRADA').length;
   const recibidas = solicitudes.filter(s => s.estado === 'RECIBIDA').length;
   const puedeSolicitar = ['ADMIN', 'SUPERVISOR', 'SUPERVISOR_PESADO', 'TALLER', 'MECANICO'].includes(user.rol);
+  const puedeEditarLlanta = typeof puedeEditarSolicitud !== 'undefined' ? puedeEditarSolicitud : false;
+  const textoSeguroData = value => String(value || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const negocioTexto = solicitud => {
+    if (typeof negocioLlanta === 'function') return negocioLlanta(solicitud);
+    const sede = String(solicitud.sede || '').toUpperCase();
+    const placa = String(solicitud.placa || '').toUpperCase();
+    if (sede.includes('GRANEL')) return 'Granel';
+    if (sede === 'TRANSPORTADORA' || /^S\d{5,6}$/.test(placa)) return 'Transportadora';
+    if (sede === 'TALLER' || sede === 'TECNICOS') return 'Otros';
+    return 'Cilindros';
+  };
+  const ordenarNegocios = (a, b) => {
+    const orden = ['Cilindros', 'Granel', 'Transportadora', 'Otros'];
+    return (orden.indexOf(a.negocio) === -1 ? 99 : orden.indexOf(a.negocio)) -
+      (orden.indexOf(b.negocio) === -1 ? 99 : orden.indexOf(b.negocio));
+  };
   const badgeEstado = (estado) => {
     if (estado === 'RECIBIDA') return 'badge-closed';
     if (estado === 'COMPRADA') return 'badge-today';
@@ -316,6 +371,15 @@
       }
       grupo.solicitudes.push(s);
     });
+  gruposSemana.forEach(grupo => {
+    const mapa = new Map();
+    grupo.solicitudes.forEach(s => {
+      const negocio = negocioTexto(s);
+      if (!mapa.has(negocio)) mapa.set(negocio, { negocio, solicitudes: [] });
+      mapa.get(negocio).solicitudes.push(s);
+    });
+    grupo.negocios = [...mapa.values()].sort(ordenarNegocios);
+  });
   const cotizacionSemanaUrl = (grupo) => {
     const params = new URLSearchParams();
     grupo.solicitudes.forEach(s => params.append('solicitud_ids', s.id));
@@ -514,84 +578,125 @@
                     </div>
                   <% } %>
 
-                  <div class="llantas-list p-0">
-                    <% grupo.solicitudes.forEach(s => { %>
-                      <article class="llanta-card">
-                        <div class="llanta-card-header">
+                  <div class="business-grid">
+                    <% grupo.negocios.forEach((negocioGrupo, negocioIndex) => { %>
+                      <%
+                        const negocioCollapseId = `negocio${collapseId}${negocioIndex}`;
+                        const totalLlantasNegocio = negocioGrupo.solicitudes.reduce((sum, item) => sum + (parseInt(item.cantidad, 10) || 0), 0);
+                      %>
+                      <section class="business-card">
+                        <button class="business-toggle" type="button" data-bs-toggle="collapse" data-bs-target="#<%= negocioCollapseId %>">
                           <div>
-                            <h3 class="llanta-title">Solicitud #<%= s.id %> · <%= s.placa %></h3>
-                            <div class="llanta-meta"><%= s.sede %> · <%= fechaCorta(s.fecha_solicitud) %></div>
+                            <div class="business-title"><%= negocioGrupo.negocio %></div>
+                            <div class="business-subtitle"><%= totalLlantasNegocio %> llanta(s) · <%= negocioGrupo.solicitudes.length %> solicitud(es)</div>
                           </div>
-                          <span class="badge <%= badgeEstado(s.estado) %>"><%= s.estado %></span>
+                          <span class="business-count">Ver solicitudes</span>
+                        </button>
+
+                        <div class="collapse" id="<%= negocioCollapseId %>">
+                          <div class="llantas-list">
+                            <% negocioGrupo.solicitudes.forEach(s => { %>
+                              <article class="llanta-card">
+                                <div class="llanta-card-header">
+                                  <div>
+                                    <h3 class="llanta-title">Solicitud #<%= s.id %> · <%= s.placa %></h3>
+                                    <div class="llanta-meta"><%= s.sede %> · <%= negocioTexto(s) %> · <%= fechaCorta(s.fecha_solicitud) %></div>
+                                  </div>
+                                  <span class="badge <%= badgeEstado(s.estado) %>"><%= s.estado %></span>
+                                </div>
+
+                                <div class="llanta-grid">
+                                  <div class="llanta-field">
+                                    <div class="llanta-label">Llanta solicitada</div>
+                                    <div class="llanta-value"><%= s.cantidad %> x <%= s.medida %></div>
+                                    <small class="text-muted"><%= s.posicion || 'Posición no indicada' %><% if (s.marca_sugerida) { %> · <%= s.marca_sugerida %><% } %></small>
+                                  </div>
+                                  <div class="llanta-field">
+                                    <div class="llanta-label">Motivo</div>
+                                    <div class="llanta-value"><%= s.motivo || '—' %></div>
+                                  </div>
+                                  <div class="llanta-field">
+                                    <div class="llanta-label">Cotización</div>
+                                    <% if (s.estado === 'COTIZADA' || s.fecha_cotizada) { %>
+                                      <div class="llanta-value">Cotizada</div>
+                                      <% if (s.fecha_cotizada) { %>
+                                        <small class="text-muted">Fecha: <%= fechaCorta(s.fecha_cotizada) %></small>
+                                      <% } %>
+                                    <% } else { %>
+                                      <div class="llanta-value text-muted">Sin cotización</div>
+                                    <% } %>
+                                  </div>
+                                  <div class="llanta-field">
+                                    <div class="llanta-label">Seguimiento</div>
+                                    <div class="status-flow mt-1">
+                                      <% estados.forEach(estado => { %>
+                                        <span class="status-chip <%= estados.indexOf(s.estado) >= estados.indexOf(estado) ? 'active' : '' %>"><%= estado.charAt(0) %></span>
+                                      <% }) %>
+                                    </div>
+                                    <% if (s.fecha_recibida) { %>
+                                      <small class="text-muted d-block mt-2">Recibida: <%= fechaCorta(s.fecha_recibida) %></small>
+                                    <% } %>
+                                  </div>
+                                </div>
+
+                                <% if (puedeCotizar && s.estado === 'SOLICITADA') { %>
+                                  <form method="POST" action="/llantas/<%= s.id %>/cotizar" class="cotizar-panel">
+                                    <input type="hidden" name="sede" value="<%= filtros.sede || '' %>">
+                                    <input type="hidden" name="estado" value="<%= filtros.estado || '' %>">
+                                    <input type="hidden" name="placa" value="<%= filtros.placa || '' %>">
+                                    <div class="d-flex justify-content-end">
+                                      <button class="btn btn-sm btn-primary" onclick="return confirm('¿Marcar esta solicitud como cotizada?')">Marcar cotizada</button>
+                                    </div>
+                                  </form>
+                                <% } %>
+
+                                <div class="llanta-actions">
+                                  <% if (puedeEditarLlanta) { %>
+                                    <button
+                                      type="button"
+                                      class="btn btn-sm btn-outline-primary js-editar-llanta"
+                                      data-bs-toggle="modal"
+                                      data-bs-target="#editarLlantaModal"
+                                      data-id="<%= s.id %>"
+                                      data-unidad-id="<%= s.unidad_id || '' %>"
+                                      data-placa="<%= s.placa %>"
+                                      data-sede="<%= s.sede || '' %>"
+                                      data-medida="<%- textoSeguroData(s.medida) %>"
+                                      data-cantidad="<%= s.cantidad || 1 %>"
+                                      data-posicion="<%- textoSeguroData(s.posicion) %>"
+                                      data-marca="<%- textoSeguroData(s.marca_sugerida) %>"
+                                      data-motivo="<%- textoSeguroData(s.motivo) %>"
+                                      data-observaciones="<%- textoSeguroData(s.observaciones) %>"
+                                      data-estado="<%= s.estado || 'SOLICITADA' %>">
+                                      <i class="bi bi-pencil-square me-1"></i> Editar
+                                    </button>
+                                  <% } %>
+
+                                  <a href="/llantas/<%= s.id %>/cotizacion.pdf" class="btn btn-sm btn-outline-dark"><i class="bi bi-file-pdf me-1"></i> Descargar cotización</a>
+
+                                  <% if (puedeComprar && ['SOLICITADA', 'COTIZADA'].includes(s.estado)) { %>
+                                    <form method="POST" action="/llantas/<%= s.id %>/comprar">
+                                      <input type="hidden" name="sede" value="<%= filtros.sede || '' %>">
+                                      <input type="hidden" name="estado" value="<%= filtros.estado || '' %>">
+                                      <input type="hidden" name="placa" value="<%= filtros.placa || '' %>">
+                                      <button class="btn btn-sm btn-success" onclick="return confirm('¿Marcar esta solicitud como comprada?')"><i class="bi bi-cart-check me-1"></i> Marcar comprada</button>
+                                    </form>
+                                  <% } %>
+
+                                  <% if (puedeRecibir && s.estado === 'COMPRADA') { %>
+                                    <form method="POST" action="/llantas/<%= s.id %>/recibir">
+                                      <input type="hidden" name="sede" value="<%= filtros.sede || '' %>">
+                                      <input type="hidden" name="estado" value="<%= filtros.estado || '' %>">
+                                      <input type="hidden" name="placa" value="<%= filtros.placa || '' %>">
+                                      <button class="btn btn-sm btn-success" onclick="return confirm('¿Confirmar que la llanta llegó a sede?')"><i class="bi bi-check-circle me-1"></i> Marcar recibida</button>
+                                    </form>
+                                  <% } %>
+                                </div>
+                              </article>
+                            <% }) %>
+                          </div>
                         </div>
-
-                        <div class="llanta-grid">
-                          <div class="llanta-field">
-                            <div class="llanta-label">Llanta solicitada</div>
-                            <div class="llanta-value"><%= s.cantidad %> x <%= s.medida %></div>
-                            <small class="text-muted"><%= s.posicion || 'Posición no indicada' %><% if (s.marca_sugerida) { %> · <%= s.marca_sugerida %><% } %></small>
-                          </div>
-                          <div class="llanta-field">
-                            <div class="llanta-label">Motivo</div>
-                            <div class="llanta-value"><%= s.motivo || '—' %></div>
-                          </div>
-                          <div class="llanta-field">
-                            <div class="llanta-label">Cotización</div>
-                            <% if (s.estado === 'COTIZADA' || s.fecha_cotizada) { %>
-                              <div class="llanta-value">Cotizada</div>
-                              <% if (s.fecha_cotizada) { %>
-                                <small class="text-muted">Fecha: <%= fechaCorta(s.fecha_cotizada) %></small>
-                              <% } %>
-                            <% } else { %>
-                              <div class="llanta-value text-muted">Sin cotización</div>
-                            <% } %>
-                          </div>
-                          <div class="llanta-field">
-                            <div class="llanta-label">Seguimiento</div>
-                            <div class="status-flow mt-1">
-                              <% estados.forEach(estado => { %>
-                                <span class="status-chip <%= estados.indexOf(s.estado) >= estados.indexOf(estado) ? 'active' : '' %>"><%= estado.charAt(0) %></span>
-                              <% }) %>
-                            </div>
-                            <% if (s.fecha_recibida) { %>
-                              <small class="text-muted d-block mt-2">Recibida: <%= fechaCorta(s.fecha_recibida) %></small>
-                            <% } %>
-                          </div>
-                        </div>
-
-                        <% if (puedeCotizar && s.estado === 'SOLICITADA') { %>
-                          <form method="POST" action="/llantas/<%= s.id %>/cotizar" class="cotizar-panel">
-                            <input type="hidden" name="sede" value="<%= filtros.sede || '' %>">
-                            <input type="hidden" name="estado" value="<%= filtros.estado || '' %>">
-                            <input type="hidden" name="placa" value="<%= filtros.placa || '' %>">
-                            <div class="d-flex justify-content-end">
-                              <button class="btn btn-sm btn-primary" onclick="return confirm('¿Marcar esta solicitud como cotizada?')">Marcar cotizada</button>
-                            </div>
-                          </form>
-                        <% } %>
-
-                        <div class="llanta-actions">
-                          <a href="/llantas/<%= s.id %>/cotizacion.pdf" class="btn btn-sm btn-outline-dark"><i class="bi bi-file-pdf me-1"></i> Descargar cotización</a>
-
-                          <% if (puedeComprar && ['SOLICITADA', 'COTIZADA'].includes(s.estado)) { %>
-                            <form method="POST" action="/llantas/<%= s.id %>/comprar">
-                              <input type="hidden" name="sede" value="<%= filtros.sede || '' %>">
-                              <input type="hidden" name="estado" value="<%= filtros.estado || '' %>">
-                              <input type="hidden" name="placa" value="<%= filtros.placa || '' %>">
-                              <button class="btn btn-sm btn-success" onclick="return confirm('¿Marcar esta solicitud como comprada?')"><i class="bi bi-cart-check me-1"></i> Marcar comprada</button>
-                            </form>
-                          <% } %>
-
-                          <% if (puedeRecibir && s.estado === 'COMPRADA') { %>
-                            <form method="POST" action="/llantas/<%= s.id %>/recibir">
-                              <input type="hidden" name="sede" value="<%= filtros.sede || '' %>">
-                              <input type="hidden" name="estado" value="<%= filtros.estado || '' %>">
-                              <input type="hidden" name="placa" value="<%= filtros.placa || '' %>">
-                              <button class="btn btn-sm btn-success" onclick="return confirm('¿Confirmar que la llanta llegó a sede?')"><i class="bi bi-check-circle me-1"></i> Marcar recibida</button>
-                            </form>
-                          <% } %>
-                        </div>
-                      </article>
+                      </section>
                     <% }) %>
                   </div>
                 </div>
@@ -603,6 +708,80 @@
     </div>
   </div>
 </div>
+
+<% if (puedeEditarLlanta) { %>
+  <div class="modal fade" id="editarLlantaModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+      <div class="modal-content">
+        <form method="POST" id="editarLlantaForm">
+          <input type="hidden" name="sede" value="<%= filtros.sede || '' %>">
+          <input type="hidden" name="placa" value="<%= filtros.placa || '' %>">
+          <div class="modal-header">
+            <div>
+              <h5 class="modal-title">Editar solicitud de llanta</h5>
+              <div class="bulk-meta" id="editarLlantaResumen">Solicitud</div>
+            </div>
+            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body">
+            <div class="row g-3">
+              <div class="col-md-5">
+                <label class="form-label">Placa / sede</label>
+                <div class="tomza-plate-search">
+                  <input type="text" id="editarLlantaPlacaSearch" class="form-control text-uppercase" placeholder="Escriba la placa" autocomplete="off" required>
+                  <input type="hidden" name="unidad_id" id="editarLlantaUnidadId" required>
+                  <div class="tomza-plate-results" id="editarLlantaPlacaResults"></div>
+                  <div class="tomza-plate-selected" id="editarLlantaPlacaSelected"></div>
+                </div>
+              </div>
+              <div class="col-md-4">
+                <label class="form-label">Medida</label>
+                <input name="medida" id="editarLlantaMedida" class="form-control" required>
+              </div>
+              <div class="col-md-3">
+                <label class="form-label">Cantidad</label>
+                <input name="cantidad" id="editarLlantaCantidad" type="number" min="1" class="form-control" required>
+              </div>
+              <div class="col-md-4">
+                <label class="form-label">Posición</label>
+                <input name="posicion" id="editarLlantaPosicion" class="form-control">
+              </div>
+              <div class="col-md-4">
+                <label class="form-label">Marca sugerida</label>
+                <input name="marca_sugerida" id="editarLlantaMarca" class="form-control">
+              </div>
+              <div class="col-md-4">
+                <label class="form-label">Estado</label>
+                <% if (puedeGestionar) { %>
+                  <select name="estado" id="editarLlantaEstado" class="form-select">
+                    <% estados.forEach(estado => { %>
+                      <option value="<%= estado %>"><%= estado %></option>
+                    <% }) %>
+                  </select>
+                <% } else { %>
+                  <input type="hidden" name="estado" id="editarLlantaEstado" value="">
+                  <input type="text" id="editarLlantaEstadoTexto" class="form-control" readonly>
+                <% } %>
+              </div>
+              <div class="col-md-12">
+                <label class="form-label">Motivo</label>
+                <textarea name="motivo" id="editarLlantaMotivo" class="form-control" rows="2"></textarea>
+              </div>
+              <div class="col-md-12">
+                <label class="form-label">Observaciones</label>
+                <textarea name="observaciones" id="editarLlantaObservaciones" class="form-control" rows="2"></textarea>
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+            <button class="btn btn-primary"><i class="bi bi-save me-1"></i> Guardar cambios</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+<% } %>
 
 <div class="modal fade" id="solicitudModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-lg">
@@ -662,14 +841,9 @@
 <script type="application/json" id="llantasUnidadesData"><%- JSON.stringify(unidades.map(u => ({ id: u.id, placa: u.placa, sede: u.sede || '' }))) %></script>
 <script>
   (() => {
-    const input = document.getElementById("llantaPlacaSearch");
-    const unidadId = document.getElementById("llantaUnidadId");
-    const results = document.getElementById("llantaPlacaResults");
-    const selected = document.getElementById("llantaPlacaSelected");
     const source = document.getElementById("llantasUnidadesData");
-    const form = document.querySelector("#solicitudModal form");
 
-    if (!input || !unidadId || !results || !selected || !source) return;
+    if (!source) return;
 
     let unidades = [];
     try {
@@ -701,31 +875,43 @@
       return [...valores].filter(Boolean);
     }
 
-    function cerrar() {
+    function unidadPorId(id) {
+      return unidades.find(unidad => String(unidad.id) === String(id));
+    }
+
+    function unidadPorPlaca(placa) {
+      const normalizada = limpiarPlaca(placa);
+      return unidades.find(unidad => limpiarPlaca(unidad.placa) === normalizada);
+    }
+
+    function cerrar(results) {
       results.classList.remove("is-open");
     }
 
-    function seleccionar(unidad) {
+    function seleccionar(unidad, input, unidadId, selected, results) {
       input.value = unidad.placa || "";
       unidadId.value = unidad.id || "";
       selected.textContent = `${unidad.placa || ""} · ${unidad.sede || "Sin sede"}`;
       results.innerHTML = "";
-      cerrar();
+      cerrar(results);
     }
 
-    function mensaje(texto) {
+    function mensaje(texto, results) {
       results.innerHTML = `<div class="tomza-plate-empty">${texto}</div>`;
       results.classList.add("is-open");
     }
 
-    function render() {
+    function initPlateSearch({ input, unidadId, results, selected, form }) {
+      if (!input || !unidadId || !results || !selected) return;
+
+      function render() {
       const texto = limpiarPlaca(input.value);
       unidadId.value = "";
       selected.textContent = "";
 
       if (texto.length < 2) {
         results.innerHTML = "";
-        cerrar();
+        cerrar(results);
         return;
       }
 
@@ -740,7 +926,7 @@
       results.innerHTML = "";
 
       if (!encontradas.length) {
-        mensaje("No hay placas con esa busqueda.");
+        mensaje("No hay placas con esa busqueda.", results);
         return;
       }
 
@@ -749,27 +935,77 @@
         button.type = "button";
         button.className = "tomza-plate-option";
         button.innerHTML = `<strong>${unidad.placa || ""}</strong><span>${unidad.sede || "Sin sede"}</span>`;
-        button.addEventListener("click", () => seleccionar(unidad));
+        button.addEventListener("click", () => seleccionar(unidad, input, unidadId, selected, results));
         results.appendChild(button);
       });
 
       results.classList.add("is-open");
     }
 
-    input.addEventListener("input", render);
-    input.addEventListener("focus", render);
+      input.addEventListener("input", render);
+      input.addEventListener("focus", render);
 
-    document.addEventListener("click", event => {
-      if (!event.target.closest(".tomza-plate-search")) cerrar();
+      form?.addEventListener("submit", event => {
+        if (!unidadId.value) {
+          const unidad = unidadPorPlaca(input.value);
+          if (unidad) {
+            seleccionar(unidad, input, unidadId, selected, results);
+            return;
+          }
+
+          event.preventDefault();
+          selected.textContent = "Seleccione una placa de la lista.";
+          input.focus();
+          render();
+        }
+      });
+    }
+
+    initPlateSearch({
+      input: document.getElementById("llantaPlacaSearch"),
+      unidadId: document.getElementById("llantaUnidadId"),
+      results: document.getElementById("llantaPlacaResults"),
+      selected: document.getElementById("llantaPlacaSelected"),
+      form: document.querySelector("#solicitudModal form")
     });
 
-    form?.addEventListener("submit", event => {
-      if (!unidadId.value) {
-        event.preventDefault();
-        selected.textContent = "Seleccione una placa de la lista.";
-        input.focus();
-        render();
-      }
+    initPlateSearch({
+      input: document.getElementById("editarLlantaPlacaSearch"),
+      unidadId: document.getElementById("editarLlantaUnidadId"),
+      results: document.getElementById("editarLlantaPlacaResults"),
+      selected: document.getElementById("editarLlantaPlacaSelected"),
+      form: document.getElementById("editarLlantaForm")
+    });
+
+    document.addEventListener("click", event => {
+      if (event.target.closest(".tomza-plate-search")) return;
+      document.querySelectorAll(".tomza-plate-results").forEach(cerrar);
+    });
+
+    document.querySelectorAll(".js-editar-llanta").forEach(button => {
+      button.addEventListener("click", () => {
+        const form = document.getElementById("editarLlantaForm");
+        if (!form) return;
+
+        const unidad = unidadPorId(button.dataset.unidadId) || unidadPorPlaca(button.dataset.placa);
+        form.action = `/llantas/${button.dataset.id}/editar`;
+
+        document.getElementById("editarLlantaResumen").textContent = `#${button.dataset.id} · ${button.dataset.placa || ""} · ${button.dataset.sede || ""}`;
+        document.getElementById("editarLlantaPlacaSearch").value = button.dataset.placa || "";
+        document.getElementById("editarLlantaUnidadId").value = unidad?.id || button.dataset.unidadId || "";
+        document.getElementById("editarLlantaPlacaSelected").textContent = unidad
+          ? `${unidad.placa || ""} · ${unidad.sede || "Sin sede"}`
+          : `${button.dataset.placa || ""} · ${button.dataset.sede || ""}`;
+        document.getElementById("editarLlantaMedida").value = button.dataset.medida || "";
+        document.getElementById("editarLlantaCantidad").value = button.dataset.cantidad || "1";
+        document.getElementById("editarLlantaPosicion").value = button.dataset.posicion || "";
+        document.getElementById("editarLlantaMarca").value = button.dataset.marca || "";
+        document.getElementById("editarLlantaMotivo").value = button.dataset.motivo || "";
+        document.getElementById("editarLlantaObservaciones").value = button.dataset.observaciones || "";
+        document.getElementById("editarLlantaEstado").value = button.dataset.estado || "SOLICITADA";
+        const estadoTexto = document.getElementById("editarLlantaEstadoTexto");
+        if (estadoTexto) estadoTexto.value = button.dataset.estado || "SOLICITADA";
+      });
     });
   })();
 </script>

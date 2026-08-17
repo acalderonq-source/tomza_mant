@@ -74,6 +74,17 @@ function limpiarPlacaLibre(value) {
   return raw.replace(/\s+/g, " ");
 }
 
+function normalizarArray(value) {
+  if (!value) return [];
+  return Array.isArray(value) ? value : [value];
+}
+
+function normalizarIds(value) {
+  return normalizarArray(value)
+    .map(id => parseInt(id, 10))
+    .filter(Number.isInteger);
+}
+
 function redirectConFiltros(req, res) {
   const params = new URLSearchParams();
   ["fecha", "sede", "placa", "estado"].forEach(key => {
@@ -177,9 +188,15 @@ async function obtenerSolicitudesFiltradas(req) {
   const placaFiltro = limpiarPlacaLibre(req.query.placa);
   const estadoFiltro = normalizarEstadoSemanal(req.query.estado);
   const estadoRaw = String(req.query.estado || "").trim().toUpperCase();
+  const ids = normalizarIds(req.query.solicitud_ids);
 
   const condiciones = ["1=1"];
   const params = [];
+
+  if (ids.length) {
+    condiciones.push("rs.id IN (?)");
+    params.push(ids);
+  }
 
   if (fechaFiltro) {
     condiciones.push("rs.fecha = ?");

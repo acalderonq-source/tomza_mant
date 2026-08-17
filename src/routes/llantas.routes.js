@@ -4,7 +4,13 @@ const path = require("path");
 const ejs = require("ejs");
 const pdf = require("html-pdf");
 const pool = require("../db");
-const { agregarTallerParaMecanico, esUsuarioTodasSedes, TODAS_SEDES, sedeGranelDesdeUsuario } = require("../utils/sedes");
+const {
+  agregarTallerParaMecanico,
+  esSedeGranel,
+  esUsuarioTodasSedes,
+  TODAS_SEDES,
+  sedeGranelDesdeUsuario
+} = require("../utils/sedes");
 const { agregarFiltroPlacaSql } = require("../utils/placas");
 
 const router = express.Router();
@@ -16,6 +22,7 @@ const ROLES_COMPRAR = ["ADMIN", "PROVEEDURIA_TALLER", "PROVEEDURIA"];
 const ROLES_RECIBIR = ["ADMIN", "TALLER", "MECANICO"];
 const ROLES_VER_COTIZACION = ["ADMIN", "TALLER", "PROVEEDURIA_TALLER", "PROVEEDURIA", "SUPERVISOR", "SUPERVISOR_PESADO", "MECANICO"];
 const ROLES_SOLICITAR = ["ADMIN", "SUPERVISOR", "SUPERVISOR_PESADO", "TALLER", "MECANICO"];
+const ROLES_EDITAR = ["ADMIN", "TALLER", "MECANICO", "SUPERVISOR", "SUPERVISOR_PESADO", "PROVEEDURIA_TALLER", "PROVEEDURIA"];
 
 function requireAuth(req, res, next) {
   if (!req.session.user) return res.redirect("/login");
@@ -32,6 +39,10 @@ function allowRoles(...roles) {
 
 function puedeGestionar(user) {
   return [...new Set([...ROLES_COTIZAR, ...ROLES_COMPRAR, ...ROLES_RECIBIR])].includes(user.rol);
+}
+
+function puedeEditar(user) {
+  return ROLES_EDITAR.includes(user.rol);
 }
 
 function permisosLlantas(user) {
@@ -221,6 +232,16 @@ function descripcionLlanta(solicitud) {
   ].filter(Boolean).join(", ");
 }
 
+function negocioLlanta(solicitud) {
+  const sede = String(solicitud.sede || "").trim();
+  const placa = String(solicitud.placa || "").trim().toUpperCase();
+
+  if (esSedeGranel(sede)) return "Granel";
+  if (sede.toUpperCase() === "TRANSPORTADORA" || /^S\d{5,6}$/.test(placa)) return "Transportadora";
+  if (["TALLER", "TECNICOS"].includes(sede.toUpperCase())) return "Otros";
+  return "Cilindros";
+}
+
 function prepararCotizacion(solicitudes) {
   const ordenSedes = [
     "Cartago",
@@ -241,6 +262,7 @@ function prepararCotizacion(solicitudes) {
   const filas = solicitudes
     .map(solicitud => ({
       ...solicitud,
+      negocio: negocioLlanta(solicitud),
       cedi: nombreCedi(solicitud.sede),
       entregar: destinoEntrega(solicitud.sede),
       descripcion: descripcionLlanta(solicitud)
@@ -332,6 +354,8 @@ router.get("/", async (req, res) => {
       estados: ESTADOS,
       filtros: { sede, estado, placa },
       puedeGestionar: puedeGestionar(req.session.user),
+      puedeEditarSolicitud: puedeEditar(req.session.user),
+      negocioLlanta,
       ...permisosLlantas(req.session.user)
     });
   } catch (error) {
@@ -474,6 +498,79 @@ router.post("/solicitar", allowRoles(...ROLES_SOLICITAR), async (req, res) => {
   } catch (error) {
     console.error("Error creando solicitud de llanta:", error);
     res.status(500).send("Error creando solicitud");
+  }
+});
+
+router.post("/:id/editar", allowRoles(...ROLES_EDITAR), async (req, res) => {
+  try {
+    await ensureTables();
+    const id = req.params.id;
+    const { solicitud, error } = await cargarSolicitudAutorizada(req, id);
+    if (error === "not_found") return res.status(404).send("Solicitud no encontrada");
+    if (error === "forbidden") return res.status(403).send("No autorizado para esta sede");
+
+    const {
+      unidad_id,
+      medida,
+      cantidad,
+      posicion,
+      marca_sugerida,
+      motivo,
+      observaciones,
+      estado
+    } = req.body;
+
+    const sedesPermitidas = await obtenerSedesPermitidas(req);
+    const [[unidad]] = await pool.query("SELECT id, placa, sede FROM unidades WHERE id = ?", [unidad_id || solicitud.unidad_id]);
+    if (!unidad) return res.status(404).send("Unidad no encontrada");
+    if (!sedesPermitidas.includes(unidad.sede)) return res.status(403).send("No autorizado para esta sede");
+
+    const estadoNormalizado = puedeGestionar(req.session.user) && ESTADOS.includes(estado)
+      ? estado
+      : solicitud.estado;
+    const cantidadNormalizada = parseInt(cantidad, 10) || 1;
+    const medidaNormalizada = String(medida || "").trim();
+
+    if (!medidaNormalizada || cantidadNormalizada < 1) {
+      return res.status(400).send("Debe indicar medida y cantidad.");
+    }
+
+    await pool.query(
+      `UPDATE solicitudes_llantas
+       SET unidad_id = ?,
+           placa = ?,
+           sede = ?,
+           medida = ?,
+           cantidad = ?,
+           posicion = ?,
+           marca_sugerida = ?,
+           motivo = ?,
+           observaciones = ?,
+           estado = ?
+       WHERE id = ?`,
+      [
+        unidad.id,
+        unidad.placa,
+        unidad.sede,
+        medidaNormalizada,
+        cantidadNormalizada,
+        posicion || null,
+        marca_sugerida || null,
+        motivo || null,
+        observaciones || null,
+        estadoNormalizado,
+        id
+      ]
+    );
+
+    if (estadoNormalizado !== solicitud.estado) {
+      await registrarHistorial(id, solicitud.estado, estadoNormalizado, req.session.user.id, "Solicitud editada");
+    }
+
+    res.redirect(redirectConFiltros(req));
+  } catch (error) {
+    console.error("Error editando solicitud de llanta:", error);
+    res.status(500).send("Error editando solicitud");
   }
 });
 

@@ -140,6 +140,95 @@
       width: 120px;
     }
 
+    .semana-cell {
+      color: #334155;
+      font-size: .78rem;
+      font-weight: 900;
+      text-align: center;
+      white-space: nowrap;
+      width: 120px;
+    }
+
+    .week-box {
+      background: #fff8db;
+      border: 2px solid #f59e0b;
+      border-radius: 12px;
+      padding: .75rem;
+    }
+
+    .week-box input {
+      border-color: #f59e0b;
+      font-size: 1rem;
+      font-weight: 800;
+      height: 44px;
+    }
+
+    .pedido-toolbar {
+      align-items: center;
+      background: #f8fafc;
+      border: 1px solid #dbe3ef;
+      border-radius: 12px;
+      display: grid;
+      gap: .75rem;
+      grid-template-columns: minmax(220px, 1fr) auto auto;
+      padding: .85rem;
+    }
+
+    .pedido-list {
+      display: grid;
+      gap: .55rem;
+      margin-top: .85rem;
+      max-height: 52vh;
+      overflow: auto;
+      padding-right: .25rem;
+    }
+
+    .pedido-item {
+      align-items: flex-start;
+      background: #fff;
+      border: 1px solid #dbe3ef;
+      border-radius: 12px;
+      display: grid;
+      gap: .65rem;
+      grid-template-columns: auto 120px minmax(0, 1fr) auto;
+      padding: .7rem;
+    }
+
+    .pedido-item.is-excluded {
+      background: #f1f5f9;
+      color: #64748b;
+    }
+
+    .pedido-plate {
+      color: #0f172a;
+      font-weight: 950;
+      white-space: nowrap;
+    }
+
+    .pedido-text {
+      font-size: .86rem;
+      line-height: 1.25;
+    }
+
+    .pedido-status {
+      border-radius: 999px;
+      font-size: .68rem;
+      font-weight: 900;
+      padding: .28rem .5rem;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+
+    .pedido-empty {
+      background: #f8fafc;
+      border: 1px dashed #cbd5e1;
+      border-radius: 12px;
+      color: #64748b;
+      font-weight: 800;
+      padding: 1rem;
+      text-align: center;
+    }
+
     .solicitud-cell { min-width: 420px; }
 
     .rojo-cell {
@@ -200,6 +289,11 @@
       .summary-grid,
       .form-grid {
         grid-template-columns: 1fr 1fr;
+      }
+
+      .pedido-toolbar,
+      .pedido-item {
+        grid-template-columns: 1fr;
       }
     }
 
@@ -275,6 +369,33 @@
   const estadoClase = estado => String(estado || '').toLowerCase();
   const fechaSemanaNueva = (typeof fechaProximaSemana !== 'undefined' && fechaProximaSemana) || filtros.fecha || fechaHoy;
   const textoSeguroData = value => String(value || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const textoComparableVista = value => String(value || '').trim().toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[_\s]+/g, '-');
+  const esExcluidoPedidoVista = item => {
+    const placa = textoComparableVista(item.placa);
+    const sede = textoComparableVista(item.sede);
+    const solicitud = textoComparableVista(item.solicitud);
+    const marcado = textoComparableVista(item.marcado_rojo);
+    return ['MUEBLE', 'GENERAL-TALLER', 'GENERALES-TALLER'].includes(placa) ||
+      ['MUEBLE', 'GENERAL-TALLER', 'GENERALES-TALLER'].includes(sede) ||
+      solicitud.includes('MUEBLE') ||
+      solicitud.includes('GENERAL-TALLER') ||
+      solicitud.includes('GENERALES-TALLER') ||
+      marcado.includes('MUEBLE') ||
+      marcado.includes('GENERAL-TALLER') ||
+      marcado.includes('GENERALES-TALLER');
+  };
+  const sedesConPedido = [...new Set(lista.map(item => item.sede).filter(Boolean))];
+  const pedidoSeleccionData = lista.map(item => ({
+    id: item.id,
+    sede: item.sede || '',
+    sedeTexto: mostrarSede(item.sede),
+    placa: item.placa || '',
+    solicitud: item.solicitud || '',
+    marcado_rojo: item.marcado_rojo || '',
+    estado: item.estado || '',
+    fecha: item.fecha_iso || '',
+    excluido: esExcluidoPedidoVista(item)
+  }));
   const pedidoPdfParams = new URLSearchParams();
   ['fecha', 'sede', 'placa', 'estado'].forEach(key => {
     if (filtros[key]) pedidoPdfParams.set(key, filtros[key]);
@@ -300,12 +421,12 @@
         <div class="opacity-75">Formato semanal por sede. Lo marcado en rojo representa lo que va llegando.</div>
       </div>
       <div class="d-flex gap-2 flex-wrap">
-        <a href="<%= pedidoPdfUrl %>" class="btn btn-light btn-sm rounded-pill fw-bold px-3">
+        <button type="button" class="btn btn-light btn-sm rounded-pill fw-bold px-3" data-bs-toggle="modal" data-bs-target="#pedidoCedisModal">
           <i class="bi bi-file-earmark-pdf"></i> Descargar pedido
-        </a>
+        </button>
         <% if (puedeGestionar) { %>
           <button type="button" class="btn btn-warning btn-sm rounded-pill fw-bold px-3" data-bs-toggle="modal" data-bs-target="#nuevoSemanalModal">
-            <i class="bi bi-plus-circle"></i> Agregar repuesto
+            <i class="bi bi-plus-circle"></i> Agregar con semana
           </button>
         <% } %>
       </div>
@@ -368,6 +489,7 @@
           <thead>
             <tr>
               <th>Placa</th>
+              <th>Semana</th>
               <th>Solicitud de repuestos</th>
               <th>Va llegando</th>
               <th>Estado</th>
@@ -380,7 +502,7 @@
             <% lista.forEach(item => { %>
               <%
                 const grupoActual = `${item.fecha_formato || ''}|${item.sede || ''}`;
-                const columnas = puedeGestionar ? 6 : 5;
+                const columnas = puedeGestionar ? 7 : 6;
               %>
               <% if (grupoActual !== grupoAnterior) { grupoAnterior = grupoActual; %>
                 <tr class="sede-row">
@@ -389,6 +511,7 @@
               <% } %>
               <tr class="item-row">
                 <td data-label="Placa" class="placa-cell"><%= item.placa %></td>
+                <td data-label="Semana" class="semana-cell"><%= item.fecha_formato || '-' %></td>
                 <td data-label="Solicitud" class="solicitud-cell"><%= item.solicitud %></td>
                 <td data-label="Va llegando" class="rojo-cell">
                   <% if (item.marcado_rojo) { %>
@@ -458,6 +581,52 @@
   </section>
 </main>
 
+<div class="modal fade" id="pedidoCedisModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content">
+      <form method="GET" action="/repuestos-semanales/pedido-cedis.pdf" id="pedidoCedisForm">
+        <input type="hidden" name="fecha" value="<%= filtros.fecha || '' %>">
+        <div class="modal-header">
+          <div>
+            <h5 class="modal-title fw-bold mb-0"><i class="bi bi-file-earmark-pdf me-1"></i> Descargar pedido CEDIS</h5>
+            <div class="small opacity-75">Seleccione la sede y deje marcado solo lo que va en el pedido.</div>
+          </div>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+        </div>
+        <div class="modal-body">
+          <div class="pedido-toolbar">
+            <div>
+              <label class="form-label mb-1">Sede a descargar</label>
+              <select name="sede" id="pedidoSedeSelect" class="form-select" required>
+                <option value="">Seleccione una sede</option>
+                <% sedesConPedido.forEach(sede => { %>
+                  <option value="<%= sede %>" <%= filtros.sede === sede ? 'selected' : '' %>><%= mostrarSede(sede) %></option>
+                <% }) %>
+              </select>
+            </div>
+            <button type="button" class="btn btn-outline-dark btn-sm mt-md-4" id="pedidoMarcarTodos">Marcar todo</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm mt-md-4" id="pedidoLimpiar">Limpiar</button>
+          </div>
+
+          <div class="alert alert-warning py-2 my-3">
+            <strong>Importante:</strong> MUEBLE y GENERAL-TALLER quedan fuera del PDF aunque aparezcan en pantalla.
+          </div>
+
+          <div id="pedidoCedisLista" class="pedido-list">
+            <div class="pedido-empty">Seleccione una sede para ver los pedidos.</div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button class="btn btn-dark" id="pedidoGenerarBtn">
+            <i class="bi bi-download me-1"></i> Generar pedido seleccionado
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
 <% if (puedeGestionar) { %>
   <div class="modal fade" id="nuevoSemanalModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
@@ -475,9 +644,10 @@
               <div class="span-2 alert alert-warning mb-0 py-2">
                 <strong>Pedido CEDIS:</strong> MUEBLE y GENERAL-TALLER quedan en pantalla, pero no salen en la descarga del pedido.
               </div>
-              <div>
+              <div class="week-box">
                 <label class="form-label mb-1">Semana destino</label>
                 <input type="date" name="fecha" class="form-control" value="<%= fechaSemanaNueva %>" required>
+                <div class="form-text fw-bold">Seleccione la fecha de la semana para la que va este pedido.</div>
               </div>
               <div>
                 <label class="form-label mb-1">Sede automática</label>
@@ -540,9 +710,10 @@
           </div>
           <div class="modal-body">
             <div class="form-grid">
-              <div>
+              <div class="week-box">
                 <label class="form-label mb-1">Semana destino</label>
                 <input type="date" name="fecha" id="fechaEditarSemanal" class="form-control" required>
+                <div class="form-text fw-bold">Puede mover esta solicitud a otra semana.</div>
               </div>
               <div>
                 <label class="form-label mb-1">Placa / grupo</label>
@@ -611,6 +782,7 @@
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script type="application/json" id="unidadesSemanalData"><%- JSON.stringify(unidadesLista.map(unidad => ({ placa: unidad.placa, sede: unidad.sede || '' }))) %></script>
 <script type="application/json" id="sedesSemanalData"><%- JSON.stringify(Object.fromEntries(sedesLista.map(sede => [sede, mostrarSede(sede)]))) %></script>
+<script type="application/json" id="pedidoCedisData"><%- JSON.stringify(pedidoSeleccionData) %></script>
 <script>
   const unidadesSemanal = (() => {
     try { return JSON.parse(document.getElementById('unidadesSemanalData')?.textContent || '[]'); }
@@ -619,6 +791,10 @@
   const sedesSemanal = (() => {
     try { return JSON.parse(document.getElementById('sedesSemanalData')?.textContent || '{}'); }
     catch (_) { return {}; }
+  })();
+  const pedidosCedis = (() => {
+    try { return JSON.parse(document.getElementById('pedidoCedisData')?.textContent || '[]'); }
+    catch (_) { return []; }
   })();
 
   function limpiarPlacaVista(value) {
@@ -705,6 +881,80 @@
       if (resumen) resumen.textContent = `${button.dataset.placa || ''} · ${button.dataset.solicitud || 'Solicitud'}`;
     });
   });
+
+  const pedidoSedeSelect = document.getElementById('pedidoSedeSelect');
+  const pedidoLista = document.getElementById('pedidoCedisLista');
+  const pedidoForm = document.getElementById('pedidoCedisForm');
+  const pedidoMarcarTodos = document.getElementById('pedidoMarcarTodos');
+  const pedidoLimpiar = document.getElementById('pedidoLimpiar');
+
+  function escapeHtml(value) {
+    return String(value || '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  function pedidosVisibles() {
+    const sede = pedidoSedeSelect?.value || '';
+    return pedidosCedis.filter(item => item.sede === sede);
+  }
+
+  function renderPedidosCedis() {
+    if (!pedidoLista) return;
+    const sede = pedidoSedeSelect?.value || '';
+
+    if (!sede) {
+      pedidoLista.innerHTML = '<div class="pedido-empty">Seleccione una sede para ver los pedidos.</div>';
+      return;
+    }
+
+    const items = pedidosVisibles();
+    if (!items.length) {
+      pedidoLista.innerHTML = '<div class="pedido-empty">No hay pedidos para esa sede con los filtros actuales.</div>';
+      return;
+    }
+
+    pedidoLista.innerHTML = items.map(item => {
+      const disabled = item.excluido ? 'disabled' : '';
+      const checked = item.excluido ? '' : 'checked';
+      const badge = item.excluido ? 'Fuera del pedido' : (item.estado || 'Pendiente');
+      return `
+        <label class="pedido-item ${item.excluido ? 'is-excluded' : ''}">
+          <input class="form-check-input pedido-check" type="checkbox" name="solicitud_ids" value="${item.id}" ${checked} ${disabled}>
+          <div class="pedido-plate">${escapeHtml(item.placa)}</div>
+          <div>
+            <div class="pedido-text fw-bold">${escapeHtml(item.solicitud)}</div>
+            ${item.marcado_rojo ? `<div class="pedido-text text-danger mt-1">${escapeHtml(item.marcado_rojo)}</div>` : ''}
+            <div class="text-muted small mt-1">${escapeHtml(item.sedeTexto || item.sede)}</div>
+          </div>
+          <span class="pedido-status ${item.excluido ? 'bg-secondary text-white' : 'bg-light text-dark'}">${escapeHtml(badge)}</span>
+        </label>
+      `;
+    }).join('');
+  }
+
+  pedidoSedeSelect?.addEventListener('change', renderPedidosCedis);
+
+  pedidoMarcarTodos?.addEventListener('click', () => {
+    pedidoLista?.querySelectorAll('.pedido-check:not(:disabled)').forEach(input => { input.checked = true; });
+  });
+
+  pedidoLimpiar?.addEventListener('click', () => {
+    pedidoLista?.querySelectorAll('.pedido-check:not(:disabled)').forEach(input => { input.checked = false; });
+  });
+
+  pedidoForm?.addEventListener('submit', event => {
+    const seleccionados = pedidoLista?.querySelectorAll('.pedido-check:checked:not(:disabled)').length || 0;
+    if (!seleccionados) {
+      event.preventDefault();
+      alert('Seleccione al menos un repuesto para generar el pedido.');
+    }
+  });
+
+  document.getElementById('pedidoCedisModal')?.addEventListener('shown.bs.modal', renderPedidosCedis);
 </script>
 </body>
 </html>
