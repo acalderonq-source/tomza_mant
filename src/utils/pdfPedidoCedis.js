@@ -104,6 +104,66 @@ function dividirPorConjuncionInteligente(texto) {
   return texto.split(regex);
 }
 
+function normalizarFiltroLista(value) {
+  const texto = limpiarDescripcionRepuesto(value);
+  if (!texto) return [];
+
+  const lower = texto.toLowerCase();
+  const matchFiltro = lower.match(/^filtros?\s*(?:de\s+)?(.+)$/i);
+  if (!matchFiltro) return null;
+
+  const detalle = limpiarDescripcionRepuesto(matchFiltro[1]);
+  if (!detalle) return [texto];
+
+  const partes = detalle
+    .replace(/\s+y\s+/gi, ",")
+    .replace(/\s*\/\s*/g, ",")
+    .split(/[\s,]+/)
+    .map(limpiarDescripcionRepuesto)
+    .filter(Boolean);
+
+  const tipos = ["aceite", "diesel", "aire", "agua", "combustible", "hidraulico", "hidráulico"];
+  const filtradas = partes.filter(parte => tipos.includes(parte.toLowerCase()));
+
+  if (!filtradas.length) return [texto];
+
+  return filtradas.map(parte => {
+    const tipo = parte.toLowerCase();
+    if (tipo === "aceite" || tipo === "aire" || tipo === "agua") return `Filtro de ${parte}`;
+    return `Filtro ${parte}`;
+  });
+}
+
+function normalizarPartesRepuestos(partes) {
+  const resultado = [];
+  let contextoFiltro = false;
+  const tiposFiltro = new Set(["aceite", "diesel", "aire", "agua", "combustible", "hidraulico", "hidráulico"]);
+
+  partes.forEach(parte => {
+    const filtroExpandido = normalizarFiltroLista(parte);
+
+    if (Array.isArray(filtroExpandido)) {
+      contextoFiltro = true;
+      resultado.push(...filtroExpandido);
+      return;
+    }
+
+    const lower = parte.toLowerCase();
+    if (contextoFiltro && tiposFiltro.has(lower)) {
+      if (["aceite", "aire", "agua"].includes(lower)) {
+        resultado.push(`Filtro de ${parte}`);
+      } else {
+        resultado.push(`Filtro ${parte}`);
+      }
+      return;
+    }
+
+    resultado.push(parte);
+  });
+
+  return resultado;
+}
+
 function dividirDescripcionRepuestos(value) {
   const texto = descripcionItem({ solicitud: value });
   if (!texto) return [""];
@@ -124,9 +184,10 @@ function dividirDescripcionRepuestos(value) {
 
   if (!partes.length) return [texto];
 
+  const partesNormalizadas = normalizarPartesRepuestos(partes);
   const sinDuplicados = [];
   const vistos = new Set();
-  partes.forEach(parte => {
+  partesNormalizadas.forEach(parte => {
     const clave = parte.toLowerCase();
     if (!vistos.has(clave)) {
       vistos.add(clave);
@@ -159,7 +220,8 @@ function logoTomza() {
 
 function crearTablaPedido(grupo) {
   const items = expandirItemsPorRepuesto(grupo.items);
-  const bodyRowsCount = Math.max(items.length, 14);
+  const bodyRowsCount = Math.max(items.length, 1);
+  const rowSpanMargin = Math.max(10, Math.min(118, Math.round((bodyRowsCount * 16) / 2) - 8));
   const body = [
     [
       { text: "CEDI", style: "tableHead" },
@@ -179,7 +241,7 @@ function crearTablaPedido(grupo) {
         text: tituloSede(grupo.sede),
         rowSpan: bodyRowsCount,
         alignment: "center",
-        margin: [0, 118, 0, 0],
+        margin: [0, rowSpanMargin, 0, 0],
         fontSize: 12
       });
       row.push({
@@ -188,7 +250,7 @@ function crearTablaPedido(grupo) {
         alignment: "center",
         bold: true,
         fillColor: YELLOW,
-        margin: [0, 118, 0, 0],
+        margin: [0, rowSpanMargin, 0, 0],
         fontSize: 12
       });
     } else {
