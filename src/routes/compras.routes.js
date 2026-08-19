@@ -114,6 +114,10 @@ function normalizarTextoBusqueda(value) {
     .trim();
 }
 
+function normalizarClaveCierre(value) {
+  return normalizarTextoBusqueda(value).replace(/[^a-z0-9]/g, "");
+}
+
 function normalizarSedeDashboard(value) {
   return String(value || "").trim();
 }
@@ -400,15 +404,17 @@ async function ensurePagosProveedorTable() {
       concepto TEXT NULL,
       numero_factura VARCHAR(100) NULL,
       placa VARCHAR(50) NULL,
-      monto DECIMAL(14,2) NOT NULL DEFAULT 0,
+      monto DECIMAL(14,4) NOT NULL DEFAULT 0,
       partida_presupuestaria VARCHAR(150) NULL,
       pagada TINYINT(1) NOT NULL DEFAULT 0,
       fecha_pago DATE NULL,
+      periodo_cierre CHAR(7) NULL,
       archivo_nombre VARCHAR(255) NULL,
       creado_por INT NULL,
       creado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
       INDEX idx_pagos_proveedor_empresa (empresa),
       INDEX idx_pagos_proveedor_fecha (fecha_solicitud),
+      INDEX idx_pagos_proveedor_periodo_cierre (periodo_cierre),
       INDEX idx_pagos_proveedor_proveedor (proveedor_nombre),
       INDEX idx_pagos_proveedor_placa (placa)
     )
@@ -418,11 +424,64 @@ async function ensurePagosProveedorTable() {
     await queryWithRetry("ALTER TABLE pagos_proveedor ADD COLUMN pagada TINYINT(1) NOT NULL DEFAULT 0 AFTER partida_presupuestaria");
   }
 
+  const [[montoColumn]] = await queryWithRetry(
+    `SELECT NUMERIC_SCALE AS numeric_scale, NUMERIC_PRECISION AS numeric_precision
+     FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE()
+       AND TABLE_NAME = 'pagos_proveedor'
+       AND COLUMN_NAME = 'monto'
+     LIMIT 1`
+  );
+  if (Number(montoColumn?.numeric_scale || 0) < 4 || Number(montoColumn?.numeric_precision || 0) < 14) {
+    await queryWithRetry("ALTER TABLE pagos_proveedor MODIFY COLUMN monto DECIMAL(14,4) NOT NULL DEFAULT 0");
+  }
+
+  if (!(await columnExists("pagos_proveedor", "periodo_cierre"))) {
+    await queryWithRetry("ALTER TABLE pagos_proveedor ADD COLUMN periodo_cierre CHAR(7) NULL AFTER fecha_pago");
+  }
+
   await queryWithRetry(`
     UPDATE pagos_proveedor
-    SET pagada = 1
+    SET pagada = 1,
+        periodo_cierre = COALESCE(periodo_cierre, DATE_FORMAT(fecha_pago, '%Y-%m'))
     WHERE fecha_pago IS NOT NULL
       AND COALESCE(pagada, 0) = 0
+  `);
+
+  await queryWithRetry(`
+    UPDATE pagos_proveedor
+    SET periodo_cierre = DATE_FORMAT(COALESCE(fecha_pago, fecha_solicitud, DATE(creado_en)), '%Y-%m')
+    WHERE periodo_cierre IS NULL
+      AND (fecha_pago IS NOT NULL OR fecha_solicitud IS NOT NULL OR creado_en IS NOT NULL)
+  `);
+}
+
+async function ensurePeriodoCierreColumns() {
+  await ensurePagosProveedorTable();
+
+  const columns = [
+    ["ordenes_compra", "fecha_pago"],
+    ["facturas", "fecha_pago"]
+  ];
+
+  for (const [table, afterColumn] of columns) {
+    if (!(await columnExists(table, "periodo_cierre"))) {
+      await queryWithRetry(`ALTER TABLE ${table} ADD COLUMN periodo_cierre CHAR(7) NULL AFTER ${afterColumn}`);
+    }
+  }
+
+  await queryWithRetry(`
+    UPDATE ordenes_compra
+    SET periodo_cierre = DATE_FORMAT(fecha_pago, '%Y-%m')
+    WHERE periodo_cierre IS NULL
+      AND fecha_pago IS NOT NULL
+  `);
+
+  await queryWithRetry(`
+    UPDATE facturas
+    SET periodo_cierre = DATE_FORMAT(fecha_pago, '%Y-%m')
+    WHERE periodo_cierre IS NULL
+      AND fecha_pago IS NOT NULL
   `);
 }
 
@@ -588,6 +647,39 @@ function fechaExcelToSql(value) {
   return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString().slice(0, 10);
 }
 
+function normalizarPeriodoCierre(value, fallbackDate = null) {
+  const texto = String(value || "").trim();
+  if (/^\d{4}-\d{2}$/.test(texto)) return texto;
+
+  const fechaFallback = fechaExcelToSql(fallbackDate);
+  if (fechaFallback) return fechaFallback.slice(0, 7);
+
+  return null;
+}
+
+function rangoFechasDesdePeriodo(periodo) {
+  const limpio = normalizarPeriodoCierre(periodo);
+  if (!limpio) return { desde: "", hasta: "" };
+
+  const [year, month] = limpio.split("-").map(Number);
+  const ultimoDia = new Date(year, month, 0).getDate();
+  return {
+    desde: `${limpio}-01`,
+    hasta: `${limpio}-${String(ultimoDia).padStart(2, "0")}`
+  };
+}
+
+function etiquetaPeriodoCierre(periodo) {
+  const limpio = normalizarPeriodoCierre(periodo);
+  if (!limpio) return "-";
+
+  const [year, month] = limpio.split("-");
+  const date = new Date(`${year}-${month}-01T00:00:00`);
+  if (Number.isNaN(date.getTime())) return limpio;
+
+  return date.toLocaleDateString("es-CR", { month: "long", year: "numeric" });
+}
+
 function parseMontoExcel(value) {
   if (typeof value === "number") return Number.isFinite(value) ? value : 0;
   let text = String(value || "").trim();
@@ -643,61 +735,79 @@ async function leerPagosProveedorExcel(buffer) {
 
   workbook.worksheets.forEach(worksheet => {
     let empresaActual = "";
+    let headerMap = null;
 
     worksheet.eachRow({ includeEmpty: false }, row => {
-      const textoFila = row.values
+      const valoresNormalizados = row.values
         .slice(1)
-        .map(value => String(value?.text || value?.result || value || "").trim())
-        .filter(Boolean)
-        .join(" ");
+        .map(value => String(value?.text || value?.result || value || "").trim());
+      const textoFila = valoresNormalizados.filter(Boolean).join(" ");
 
       const empresaDetectada = normalizarEmpresaPago(textoFila);
       if (empresaDetectada) {
         empresaActual = empresaDetectada;
+        headerMap = null;
+        if (!textoCeldaExcel(row.getCell(1)).toLowerCase().includes("fecha")) return;
+      }
+
+      const pareceEncabezado = valoresNormalizados.some(value => normalizarTextoBusqueda(value).includes("fecha")) &&
+        valoresNormalizados.some(value => normalizarTextoBusqueda(value).includes("proveedor") || normalizarTextoBusqueda(value).includes("provedor")) &&
+        valoresNormalizados.some(value => normalizarTextoBusqueda(value).includes("factura"));
+
+      if (pareceEncabezado) {
+        headerMap = {};
+        row.eachCell((cell, colNumber) => {
+          const header = normalizarTextoBusqueda(textoCeldaExcel(cell));
+          if (header.includes("fecha") && header.includes("solicitud")) headerMap.fechaSolicitud = colNumber;
+          if (header.includes("proveedor") || header.includes("provedor")) headerMap.proveedor = colNumber;
+          if (header.includes("cuenta") || header.includes("iban")) headerMap.cuentaIban = colNumber;
+          if (header.includes("concepto")) headerMap.concepto = colNumber;
+          if (header.includes("factura")) headerMap.numeroFactura = colNumber;
+          if (header.includes("placa")) headerMap.placa = colNumber;
+          if (header.includes("monto")) headerMap.monto = colNumber;
+          if (header.includes("partida")) headerMap.partida = colNumber;
+          if (header.includes("fecha") && header.includes("pago")) headerMap.fechaPago = colNumber;
+        });
         return;
       }
 
-      const primeraCelda = textoCeldaExcel(row.getCell(1)).toLowerCase();
-      if (!primeraCelda.includes("fecha")) return;
+      if (!headerMap) return;
 
-      const startRow = row.number + 1;
-      for (let r = startRow; r <= worksheet.rowCount; r++) {
-        const dataRow = worksheet.getRow(r);
-        const filaTexto = dataRow.values
-          .slice(1, 10)
-          .map(value => String(value?.text || value?.result || value || "").trim())
-          .filter(Boolean)
-          .join(" ");
-
-        const nuevaEmpresa = normalizarEmpresaPago(filaTexto);
-        if (nuevaEmpresa) break;
-
-        const fechaSolicitudRaw = valorCeldaExcel(dataRow.getCell(1));
-        const proveedor = textoCeldaExcel(dataRow.getCell(2));
-        const cuentaIban = textoCeldaExcel(dataRow.getCell(3));
-        const concepto = textoCeldaExcel(dataRow.getCell(4));
-        const numeroFactura = textoCeldaExcel(dataRow.getCell(5));
-        const placa = normalizarPlaca(textoCeldaExcel(dataRow.getCell(6)));
-        const monto = parseMontoExcel(valorCeldaExcel(dataRow.getCell(7)));
-        const partida = textoCeldaExcel(dataRow.getCell(8));
-        const fechaPagoRaw = valorCeldaExcel(dataRow.getCell(9));
-
-        if (!proveedor && !concepto && !monto) continue;
-        if (!proveedor || monto <= 0) continue;
-
-        pagos.push({
-          empresa: empresaActual || "GAS TOMZA",
-          fecha_solicitud: fechaExcelToSql(fechaSolicitudRaw),
-          proveedor_nombre: proveedor,
-          cuenta_iban: cuentaIban || null,
-          concepto: concepto || null,
-          numero_factura: numeroFactura || null,
-          placa,
-          monto,
-          partida_presupuestaria: partida || null,
-          fecha_pago: fechaExcelToSql(fechaPagoRaw)
-        });
+      const filaNormalizada = normalizarTextoBusqueda(textoFila);
+      if (
+        filaNormalizada.includes("total solicitado") ||
+        filaNormalizada.includes("total general") ||
+        filaNormalizada.startsWith("notas:")
+      ) {
+        return;
       }
+
+      const fechaSolicitudRaw = valorCeldaExcel(row.getCell(headerMap.fechaSolicitud || 1));
+      const proveedor = textoCeldaExcel(row.getCell(headerMap.proveedor || 2));
+      const cuentaIban = textoCeldaExcel(row.getCell(headerMap.cuentaIban || 3));
+      const concepto = textoCeldaExcel(row.getCell(headerMap.concepto || 4));
+      const numeroFactura = textoCeldaExcel(row.getCell(headerMap.numeroFactura || 5));
+      const placa = normalizarPlaca(textoCeldaExcel(row.getCell(headerMap.placa || 6)));
+      const monto = parseMontoExcel(valorCeldaExcel(row.getCell(headerMap.monto || 7)));
+      const partida = textoCeldaExcel(row.getCell(headerMap.partida || 8));
+      const fechaPagoRaw = valorCeldaExcel(row.getCell(headerMap.fechaPago || 9));
+
+      if (!proveedor && !concepto && !monto) return;
+      if (!proveedor || monto <= 0) return;
+      if (normalizarTextoBusqueda(proveedor).includes("total solicitado")) return;
+
+      pagos.push({
+        empresa: empresaActual || "GAS TOMZA",
+        fecha_solicitud: fechaExcelToSql(fechaSolicitudRaw),
+        proveedor_nombre: proveedor,
+        cuenta_iban: cuentaIban || null,
+        concepto: concepto || null,
+        numero_factura: numeroFactura || null,
+        placa,
+        monto,
+        partida_presupuestaria: partida || null,
+        fecha_pago: fechaExcelToSql(fechaPagoRaw)
+      });
     });
   });
 
@@ -718,6 +828,11 @@ function calcularSaldoFactura(monto, notaCredito = 0, abono = 0, pagada = 0) {
     basePagar,
     saldo
   };
+}
+
+function calcularMontoPagadoCierre(saldos, pagada = 0) {
+  if (saldos.abonoMonto > 0) return saldos.abonoMonto;
+  return Number(pagada || 0) ? saldos.basePagar : 0;
 }
 
 function redirectFacturas(req, res) {
@@ -746,8 +861,18 @@ async function obtenerOrdenesDisponiblesFactura() {
   return ordenesDisponibles;
 }
 
-async function obtenerResumenPagosProveedor() {
+async function obtenerResumenPagosProveedor(filtros = {}) {
   await ensurePagosProveedorTable();
+
+  const periodoCierre = normalizarPeriodoCierre(filtros.periodo_cierre);
+  const where = [];
+  const params = [];
+  if (periodoCierre) {
+    where.push("periodo_cierre = ?");
+    params.push(periodoCierre);
+  }
+  const whereSql = where.length ? `WHERE ${where.join(" AND ")}` : "";
+  const whereAndSql = where.length ? `AND ${where.join(" AND ")}` : "";
 
   const [totalesEmpresa] = await queryWithRetry(`
     SELECT
@@ -759,34 +884,38 @@ async function obtenerResumenPagosProveedor() {
       SUM(CASE WHEN COALESCE(pagada, 0) = 1 THEN 1 ELSE 0 END) AS pagos_pagados,
       SUM(CASE WHEN COALESCE(pagada, 0) = 0 THEN 1 ELSE 0 END) AS pagos_pendientes
     FROM pagos_proveedor
+    ${whereSql}
     GROUP BY empresa
     ORDER BY FIELD(empresa, 'GAS TOMZA', 'SUPER GAS'), empresa
-  `);
+  `, params);
 
   const [topProveedores] = await queryWithRetry(`
     SELECT proveedor_nombre, COUNT(*) AS pagos, COALESCE(SUM(monto), 0) AS total
     FROM pagos_proveedor
     WHERE COALESCE(pagada, 0) = 1
+      ${whereAndSql}
     GROUP BY proveedor_nombre
     ORDER BY total DESC
     LIMIT 10
-  `);
+  `, params);
 
   const [pendientes] = await queryWithRetry(`
     SELECT *
     FROM pagos_proveedor
     WHERE COALESCE(pagada, 0) = 0
+      ${whereAndSql}
     ORDER BY COALESCE(fecha_solicitud, DATE(creado_en)) ASC, id ASC
     LIMIT 500
-  `);
+  `, params);
 
   const [pagados] = await queryWithRetry(`
     SELECT *
     FROM pagos_proveedor
     WHERE COALESCE(pagada, 0) = 1
+      ${whereAndSql}
     ORDER BY COALESCE(fecha_pago, fecha_solicitud, DATE(creado_en)) DESC, id DESC
     LIMIT 300
-  `);
+  `, params);
 
   const [[estado]] = await queryWithRetry(`
     SELECT
@@ -797,7 +926,8 @@ async function obtenerResumenPagosProveedor() {
       SUM(CASE WHEN COALESCE(pagada, 0) = 0 THEN 1 ELSE 0 END) AS pendientes,
       COALESCE(SUM(CASE WHEN COALESCE(pagada, 0) = 0 THEN monto ELSE 0 END), 0) AS total_pendiente
     FROM pagos_proveedor
-  `);
+    ${whereSql}
+  `, params);
 
   return {
     totalesEmpresa,
@@ -811,8 +941,114 @@ async function obtenerResumenPagosProveedor() {
     totalPagado: Number(estado?.total_pagado || 0),
     totalPendiente: Number(estado?.total_pendiente || 0),
     pagosPagados: Number(estado?.pagados || 0),
-    pagosPendientes: Number(estado?.pendientes || 0)
+    pagosPendientes: Number(estado?.pendientes || 0),
+    periodo_cierre: periodoCierre
   };
+}
+
+async function obtenerCierrePagosProveedor(periodoCierre) {
+  await ensurePagosProveedorTable();
+
+  const periodo = normalizarPeriodoCierre(periodoCierre);
+  if (!periodo) {
+    return {
+      periodo: "",
+      titulo: "Pagos de cierre",
+      totalGeneral: 0,
+      totalOficial: null,
+      diferencia: 0,
+      movimientos: 0,
+      proveedores: [],
+      detalles: []
+    };
+  }
+
+  const [pagos] = await queryWithRetry(`
+    SELECT
+      pp.id,
+      pp.empresa,
+      pp.fecha_solicitud,
+      pp.fecha_pago,
+      pp.periodo_cierre,
+      pp.proveedor_nombre,
+      pp.numero_factura,
+      pp.concepto,
+      pp.placa,
+      pp.monto,
+      pp.archivo_nombre
+    FROM pagos_proveedor pp
+    WHERE COALESCE(pp.pagada, 0) = 1
+      AND pp.periodo_cierre = ?
+    ORDER BY pp.proveedor_nombre ASC, pp.numero_factura ASC, pp.id ASC
+  `, [periodo]);
+
+  const totalGeneral = pagos.reduce((sum, pago) => sum + parseMonto(pago.monto), 0);
+  const referencias = await obtenerReferenciasFacturasPorPago(pagos);
+  const proveedoresMap = new Map();
+  const detalles = pagos.map(pago => {
+    const proveedor = pago.proveedor_nombre || "Sin proveedor";
+    if (!proveedoresMap.has(proveedor)) {
+      proveedoresMap.set(proveedor, { proveedor, movimientos: 0, total: 0 });
+    }
+
+    const grupo = proveedoresMap.get(proveedor);
+    const monto = parseMonto(pago.monto);
+    grupo.movimientos += 1;
+    grupo.total += monto;
+
+    const referencia = referencias.get(clavePagoFactura(proveedor, pago.numero_factura));
+    return {
+      ...pago,
+      monto_pagado: monto,
+      monto_original: referencia?.monto_original ?? monto,
+      fecha_factura: referencia?.fecha_factura || null,
+      origen_factura: referencia?.origen || "Pago proveedor"
+    };
+  });
+
+  const totalOficial = periodo === "2026-07" ? 62615263.92 : null;
+  return {
+    periodo,
+    titulo: `Pagos ${etiquetaPeriodoCierre(periodo).toUpperCase()}`,
+    totalGeneral,
+    totalOficial,
+    diferencia: totalOficial === null ? 0 : Number((totalGeneral - totalOficial).toFixed(2)),
+    movimientos: pagos.length,
+    proveedores: Array.from(proveedoresMap.values()).sort((a, b) => b.total - a.total || a.proveedor.localeCompare(b.proveedor, "es")),
+    detalles
+  };
+}
+
+function clavePagoFactura(proveedor, factura) {
+  return `${normalizarClaveCierre(proveedor)}|${normalizarClaveCierre(factura)}`;
+}
+
+async function obtenerReferenciasFacturasPorPago(pagos = []) {
+  const facturas = [...new Set(pagos.map(pago => normalizarClaveCierre(pago.numero_factura)).filter(Boolean))];
+  if (!facturas.length) return new Map();
+
+  const [rows] = await queryWithRetry(`
+    SELECT proveedor_nombre, numero_factura, monto AS monto_original, fecha AS fecha_factura, 'Factura manual' AS origen
+    FROM facturas
+    WHERE numero_factura IS NOT NULL
+      AND TRIM(numero_factura) <> ''
+      AND REPLACE(REPLACE(REPLACE(UPPER(numero_factura), '-', ''), ' ', ''), '.', '') IN (?)
+    UNION ALL
+    SELECT p.nombre AS proveedor_nombre, o.factura AS numero_factura, o.total AS monto_original, COALESCE(o.factura_fecha, o.fecha) AS fecha_factura, 'Orden de compra' AS origen
+    FROM ordenes_compra o
+    LEFT JOIN proveedores p ON p.id = o.proveedor_id
+    WHERE o.factura IS NOT NULL
+      AND TRIM(o.factura) <> ''
+      AND REPLACE(REPLACE(REPLACE(UPPER(o.factura), '-', ''), ' ', ''), '.', '') IN (?)
+  `, [facturas, facturas]);
+
+  const referencias = new Map();
+  rows.forEach(row => {
+    const key = clavePagoFactura(row.proveedor_nombre, row.numero_factura);
+    if (!key.endsWith("|")) referencias.set(key, row);
+  });
+
+  return referencias;
 }
 
 async function existePagoProveedor(connection, pago) {
@@ -929,12 +1165,50 @@ function agregarFiltroFecha(sqlParts, params, campoFecha, fechaDesde, fechaHasta
   }
 }
 
+function periodoCierreDesdeRango(fechaDesde, fechaHasta) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(fechaDesde || ""))) return null;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(fechaHasta || ""))) return null;
+
+  const desde = String(fechaDesde).slice(0, 10);
+  const hasta = String(fechaHasta).slice(0, 10);
+  const periodo = desde.slice(0, 7);
+  if (hasta.slice(0, 7) !== periodo || !desde.endsWith("-01")) return null;
+
+  const [year, month] = periodo.split("-").map(Number);
+  const ultimoDia = new Date(year, month, 0).getDate();
+  return hasta.endsWith(`-${String(ultimoDia).padStart(2, "0")}`) ? periodo : null;
+}
+
+function agregarFiltroFechaConPeriodoCierre(sqlParts, params, campoFecha, campoPeriodo, fechaDesde, fechaHasta, periodoCierre) {
+  const periodo = normalizarPeriodoCierre(periodoCierre) || periodoCierreDesdeRango(fechaDesde, fechaHasta);
+
+  if (periodo && fechaDesde && fechaHasta) {
+    sqlParts.push(`(${campoPeriodo} = ? OR (${campoPeriodo} IS NULL AND ${campoFecha} >= ? AND ${campoFecha} <= ?))`);
+    params.push(periodo, fechaDesde, fechaHasta);
+    return periodo;
+  }
+
+  if (periodo) {
+    sqlParts.push(`${campoPeriodo} = ?`);
+    params.push(periodo);
+    return periodo;
+  }
+
+  agregarFiltroFecha(sqlParts, params, campoFecha, fechaDesde, fechaHasta);
+  return null;
+}
+
 async function obtenerDashboardFinancieroFacturas(filtros = {}) {
   await ensurePagosProveedorTable();
+  await ensurePeriodoCierreColumns();
   await ensureCajaChicaTable();
   await ensureReintegroGastosTable();
 
-  const { proveedor_id, fecha_desde, fecha_hasta } = filtros;
+  const { proveedor_id, periodo_cierre } = filtros;
+  const periodoCierre = normalizarPeriodoCierre(periodo_cierre);
+  const rangoPeriodo = rangoFechasDesdePeriodo(periodoCierre);
+  const fecha_desde = filtros.fecha_desde || rangoPeriodo.desde;
+  const fecha_hasta = filtros.fecha_hasta || rangoPeriodo.hasta;
   const whereOrdenes = [];
   const paramsOrdenes = [];
   agregarFiltroFecha(whereOrdenes, paramsOrdenes, "o.fecha", fecha_desde, fecha_hasta);
@@ -947,7 +1221,7 @@ async function obtenerDashboardFinancieroFacturas(filtros = {}) {
   const fechaPagoProveedor = "COALESCE(pp.fecha_pago, pp.fecha_solicitud, DATE(pp.creado_en))";
   const wherePagos = [];
   const paramsPagos = [];
-  agregarFiltroFecha(wherePagos, paramsPagos, fechaPagoProveedor, fecha_desde, fecha_hasta);
+  agregarFiltroFechaConPeriodoCierre(wherePagos, paramsPagos, fechaPagoProveedor, "pp.periodo_cierre", fecha_desde, fecha_hasta, periodoCierre);
   wherePagos.push("COALESCE(pp.pagada, 0) = 1");
   const wherePagosSql = wherePagos.length ? `WHERE ${wherePagos.join(" AND ")}` : "";
 
@@ -993,10 +1267,10 @@ async function obtenerDashboardFinancieroFacturas(filtros = {}) {
   `, paramsOrdenes);
 
   const [pagosMes] = await queryWithRetry(`
-    SELECT DATE_FORMAT(${fechaPagoProveedor}, '%Y-%m') AS mes, COUNT(*) AS registros, COALESCE(SUM(pp.monto), 0) AS total
+    SELECT COALESCE(pp.periodo_cierre, DATE_FORMAT(${fechaPagoProveedor}, '%Y-%m')) AS mes, COUNT(*) AS registros, COALESCE(SUM(pp.monto), 0) AS total
     FROM pagos_proveedor pp
     ${wherePagosSql}
-    GROUP BY DATE_FORMAT(${fechaPagoProveedor}, '%Y-%m')
+    GROUP BY COALESCE(pp.periodo_cierre, DATE_FORMAT(${fechaPagoProveedor}, '%Y-%m'))
   `, paramsPagos);
 
   const [cajaMes] = await queryWithRetry(`
@@ -1069,10 +1343,12 @@ async function obtenerDashboardFinancieroFacturas(filtros = {}) {
 }
 
 async function obtenerFacturasCompras(filtros = {}) {
+  await ensurePeriodoCierreColumns();
+
   const hoy = new Date();
   hoy.setHours(0, 0, 0, 0);
 
-  const { proveedor_id, fecha_desde, fecha_hasta, pagada, vencida } = filtros;
+  const { proveedor_id, fecha_desde, fecha_hasta, pagada, vencida, periodo_cierre } = filtros;
   const orden = filtros.orden === "asc" ? "asc" : "desc";
 
   let sqlOrdenes = `
@@ -1085,6 +1361,7 @@ async function obtenerFacturasCompras(filtros = {}) {
       o.fecha_vencimiento_factura,
       o.pagada,
       o.fecha_pago,
+      o.periodo_cierre,
       o.abono_monto,
       o.abono_fecha,
       o.abono_observacion,
@@ -1117,6 +1394,7 @@ async function obtenerFacturasCompras(filtros = {}) {
       NULL as fecha_vencimiento_factura,
       f.pagada,
       f.fecha_pago,
+      f.periodo_cierre,
       f.abono_monto,
       f.abono_fecha,
       f.abono_observacion,
@@ -1159,6 +1437,13 @@ async function obtenerFacturasCompras(filtros = {}) {
     paramsOrdenes.push(fecha_hasta);
     paramsIndependientes.push(fecha_hasta);
   }
+  const periodoCierre = normalizarPeriodoCierre(periodo_cierre);
+  if (periodoCierre) {
+    sqlOrdenes += ` AND o.periodo_cierre = ?`;
+    sqlIndependientes += ` AND f.periodo_cierre = ?`;
+    paramsOrdenes.push(periodoCierre);
+    paramsIndependientes.push(periodoCierre);
+  }
   if (pagada !== undefined && pagada !== "") {
     const pagadaVal = pagada === "1" ? 1 : 0;
     sqlOrdenes += ` AND COALESCE(o.pagada, 0) = ?`;
@@ -1174,7 +1459,7 @@ async function obtenerFacturasCompras(filtros = {}) {
 
   const facturasConEstado = facturasUnidas.map(f => {
     const saldos = calcularSaldoFactura(f.monto, f.nota_credito_monto, f.abono_monto, f.pagada);
-    const montoPagado = f.pagada ? saldos.basePagar : saldos.abonoMonto;
+    const montoPagado = calcularMontoPagadoCierre(saldos, f.pagada);
     return {
       ...f,
       monto_original: saldos.montoOriginal,
@@ -1207,6 +1492,7 @@ function agruparFacturasPendientesPorProveedor(facturas = []) {
           montoOriginal: 0,
           notasCredito: 0,
           abonos: 0,
+          pagado: 0,
           saldo: 0
         }
       });
@@ -1217,6 +1503,7 @@ function agruparFacturasPendientesPorProveedor(facturas = []) {
     grupo.totales.montoOriginal += parseMonto(factura.monto_original ?? factura.monto);
     grupo.totales.notasCredito += parseMonto(factura.nota_credito_monto);
     grupo.totales.abonos += parseMonto(factura.abono_monto);
+    grupo.totales.pagado += parseMonto(factura.monto_pagado);
     grupo.totales.saldo += parseMonto(factura.saldo);
 
     return map;
@@ -1231,6 +1518,7 @@ function calcularTotalesFacturas(facturas = []) {
     acc.montoOriginal += parseMonto(f.monto_original ?? f.monto);
     acc.notasCredito += parseMonto(f.nota_credito_monto);
     acc.abonos += parseMonto(f.abono_monto);
+    acc.pagado += parseMonto(f.monto_pagado);
     acc.saldo += parseMonto(f.saldo);
     acc.vencidas += f.vencida ? 1 : 0;
     return acc;
@@ -1238,9 +1526,54 @@ function calcularTotalesFacturas(facturas = []) {
     montoOriginal: 0,
     notasCredito: 0,
     abonos: 0,
+    pagado: 0,
     saldo: 0,
     vencidas: 0
   });
+}
+
+function normalizarFiltroPagadaReporte(value) {
+  const limpio = String(value ?? "").trim();
+  return limpio === "0" || limpio === "1" ? limpio : "";
+}
+
+function obtenerMetaReporteFacturas(pagada = "") {
+  if (pagada === "0") {
+    return {
+      titulo: "Facturas pendientes por pagar",
+      descripcion: "pendiente",
+      archivo: "reporte_facturas_pendientes",
+      hoja: "Pendientes",
+      totalEtiqueta: "Total pendiente",
+      columnaResumen: "Saldo",
+      totalClave: "saldo",
+      vacio: "No hay cuentas pendientes por pagar."
+    };
+  }
+
+  if (pagada === "1") {
+    return {
+      titulo: "Facturas pagadas",
+      descripcion: "pagada",
+      archivo: "reporte_facturas_pagadas",
+      hoja: "Pagadas",
+      totalEtiqueta: "Total pagado",
+      columnaResumen: "Pagado",
+      totalClave: "pagado",
+      vacio: "No hay facturas pagadas para los filtros seleccionados."
+    };
+  }
+
+  return {
+    titulo: "Reporte general de facturas",
+    descripcion: "registrada",
+    archivo: "reporte_facturas",
+    hoja: "Facturas",
+    totalEtiqueta: "Total facturado",
+    columnaResumen: "Monto original",
+    totalClave: "montoOriginal",
+    vacio: "No hay facturas para los filtros seleccionados."
+  };
 }
 
 function formatDateCR(value) {
@@ -1266,28 +1599,29 @@ function pdfStreamToBuffer(pdfDoc) {
   });
 }
 
-async function generarPDFFacturasPendientes({ gruposProveedor, facturas, filtros, totales, fechaGeneracion }) {
+async function generarPDFFacturasPendientes({ gruposProveedor, facturas, filtros, totales, fechaGeneracion, metaReporte }) {
+  const meta = metaReporte || obtenerMetaReporteFacturas("0");
   const printer = new PdfPrinter(PDF_FONTS);
   const body = [
     [
       { text: "Proveedor", style: "tableHeader" },
-      { text: "Saldo", style: "tableHeader", alignment: "right" }
+      { text: meta.columnaResumen, style: "tableHeader", alignment: "right" }
     ]
   ];
 
   gruposProveedor.forEach(grupo => {
     body.push([
       { text: grupo.proveedor, bold: true },
-      { text: `CRC ${formatMoneyCR(grupo.totales.saldo)}`, alignment: "right", bold: true }
+      { text: `CRC ${formatMoneyCR(grupo.totales[meta.totalClave])}`, alignment: "right", bold: true }
     ]);
   });
 
   if (!gruposProveedor.length) {
-    body.push([{ text: "No hay cuentas pendientes por pagar.", colSpan: 2, alignment: "center", color: "#64748b", margin: [0, 12, 0, 12] }, {}]);
+    body.push([{ text: meta.vacio, colSpan: 2, alignment: "center", color: "#64748b", margin: [0, 12, 0, 12] }, {}]);
   } else {
     body.push([
       { text: "Total general", bold: true, fillColor: "#dcfce7", color: "#14532d" },
-      { text: `CRC ${formatMoneyCR(totales.saldo)}`, alignment: "right", bold: true, fillColor: "#dcfce7", color: "#14532d" }
+      { text: `CRC ${formatMoneyCR(totales[meta.totalClave])}`, alignment: "right", bold: true, fillColor: "#dcfce7", color: "#14532d" }
     ]);
   }
 
@@ -1307,23 +1641,24 @@ async function generarPDFFacturasPendientes({ gruposProveedor, facturas, filtros
       {
         columns: [
           [
-            { text: "Facturas pendientes por pagar", fontSize: 16, bold: true },
+            { text: meta.titulo, fontSize: 16, bold: true },
             { text: "Gas Tomza - Sistema de compras", color: "#64748b", margin: [0, 2, 0, 0] }
           ],
           [
             { text: `Generado: ${fechaGeneracion}`, alignment: "right", bold: true },
-            { text: `${facturas.length} factura${facturas.length === 1 ? "" : "s"} pendiente${facturas.length === 1 ? "" : "s"}`, alignment: "right", color: "#64748b" }
+            { text: `${facturas.length} factura${facturas.length === 1 ? "" : "s"} ${meta.descripcion}${facturas.length === 1 ? "" : "s"}`, alignment: "right", color: "#64748b" }
           ]
         ],
         margin: [0, 0, 0, 10]
       },
       {
         table: {
-          widths: ["*", "*", "*", "*"],
+          widths: ["*", "*", "*", "*", "*"],
           body: [[
             { text: `Proveedor: ${filtros.proveedor_nombre || "Todos"}`, style: "filterBox" },
             { text: `Desde: ${filtros.fecha_desde || "-"}`, style: "filterBox" },
             { text: `Hasta: ${filtros.fecha_hasta || "-"}`, style: "filterBox" },
+            { text: `Periodo: ${etiquetaPeriodoCierre(filtros.periodo_cierre)}`, style: "filterBox" },
             { text: `Solo vencidas: ${filtros.vencida === "1" ? "Si" : "No"}`, style: "filterBox" }
           ]]
         },
@@ -1347,7 +1682,7 @@ async function generarPDFFacturasPendientes({ gruposProveedor, facturas, filtros
           paddingBottom: () => 3
         }
       },
-      { text: `Total general pendiente: CRC ${formatMoneyCR(totales.saldo)}`, alignment: "right", fontSize: 11, bold: true, color: "#14532d", margin: [0, 10, 0, 0] }
+      { text: `${meta.totalEtiqueta}: CRC ${formatMoneyCR(totales[meta.totalClave])}`, alignment: "right", fontSize: 11, bold: true, color: "#14532d", margin: [0, 10, 0, 0] }
     ],
     styles: {
       tableHeader: { fillColor: "#111827", color: "#ffffff", bold: true, fontSize: 7 },
@@ -2753,6 +3088,7 @@ router.post("/facturas/pagos-proveedor/importar", requireAuth, allowRoles(...ROL
 
     const buffer = parsePagoProveedorDataUrl(req.body.archivo_pago_data);
     const archivoNombre = String(req.body.archivo_pago_nombre || "plantilla_pagos.xlsx").trim().slice(0, 255);
+    const periodoCierreArchivo = normalizarPeriodoCierre(req.body.periodo_cierre);
     const pagos = await leerPagosProveedorExcel(buffer);
 
     if (!pagos.length) {
@@ -2774,8 +3110,8 @@ router.post("/facturas/pagos-proveedor/importar", requireAuth, allowRoles(...ROL
       await connection.query(
         `INSERT INTO pagos_proveedor
          (empresa, fecha_solicitud, proveedor_nombre, cuenta_iban, concepto, numero_factura, placa, monto,
-          partida_presupuestaria, pagada, fecha_pago, archivo_nombre, creado_por)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          partida_presupuestaria, pagada, fecha_pago, periodo_cierre, archivo_nombre, creado_por)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           pago.empresa,
           pago.fecha_solicitud,
@@ -2788,6 +3124,7 @@ router.post("/facturas/pagos-proveedor/importar", requireAuth, allowRoles(...ROL
           pago.partida_presupuestaria,
           pago.fecha_pago ? 1 : 0,
           pago.fecha_pago,
+          periodoCierreArchivo || normalizarPeriodoCierre(null, pago.fecha_pago || pago.fecha_solicitud),
           archivoNombre,
           req.session.user.id || null
         ]
@@ -2816,6 +3153,7 @@ router.post("/facturas/pagos-proveedor/:id/estado", requireAuth, allowRoles(...R
     const id = Number(req.params.id);
     const accion = String(req.body.accion || "").trim();
     const fechaPago = String(req.body.fecha_pago || "").trim();
+    const periodoCierre = normalizarPeriodoCierre(req.body.periodo_cierre, fechaPago);
 
     if (!Number.isInteger(id) || id <= 0) {
       req.session.error = "Pago de proveedor no válido.";
@@ -2828,8 +3166,8 @@ router.post("/facturas/pagos-proveedor/:id/estado", requireAuth, allowRoles(...R
         : new Date().toISOString().slice(0, 10);
 
       const [result] = await queryWithRetry(
-        "UPDATE pagos_proveedor SET pagada = 1, fecha_pago = ? WHERE id = ?",
-        [fechaFinal, id]
+        "UPDATE pagos_proveedor SET pagada = 1, fecha_pago = ?, periodo_cierre = ? WHERE id = ?",
+        [fechaFinal, periodoCierre || fechaFinal.slice(0, 7), id]
       );
 
       req.session[result.affectedRows ? "success" : "error"] = result.affectedRows
@@ -2840,7 +3178,7 @@ router.post("/facturas/pagos-proveedor/:id/estado", requireAuth, allowRoles(...R
 
     if (accion === "pendiente") {
       const [result] = await queryWithRetry(
-        "UPDATE pagos_proveedor SET pagada = 0, fecha_pago = NULL WHERE id = ?",
+        "UPDATE pagos_proveedor SET pagada = 0, fecha_pago = NULL, periodo_cierre = NULL WHERE id = ?",
         [id]
       );
 
@@ -2889,7 +3227,10 @@ router.post("/facturas/pagos-proveedor/:id/eliminar", requireAuth, allowRoles(..
 router.get("/facturas/pagos-proveedor", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER", "CONTABILIDAD"), async (req, res) => {
   try {
     await ensurePagosProveedorTable();
-    const pagosProveedor = await obtenerResumenPagosProveedor();
+    const filtros = {
+      periodo_cierre: normalizarPeriodoCierre(req.query.periodo_cierre)
+    };
+    const pagosProveedor = await obtenerResumenPagosProveedor(filtros);
     const success = req.session.success;
     const error = req.session.error;
     delete req.session.success;
@@ -2898,6 +3239,7 @@ router.get("/facturas/pagos-proveedor", requireAuth, allowRoles("ADMIN", "TALLER
     res.render("compras/pagos_proveedor", {
       user: req.session.user,
       pagosProveedor,
+      filtros,
       success,
       error
     });
@@ -2910,6 +3252,14 @@ router.get("/facturas/pagos-proveedor", requireAuth, allowRoles("ADMIN", "TALLER
 router.get("/facturas/pagos-proveedor/reporte/excel", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER", "CONTABILIDAD"), async (req, res) => {
   try {
     await ensurePagosProveedorTable();
+    const periodoCierre = normalizarPeriodoCierre(req.query.periodo_cierre);
+    const where = [];
+    const params = [];
+    if (periodoCierre) {
+      where.push("pp.periodo_cierre = ?");
+      params.push(periodoCierre);
+    }
+    const whereSql = where.length ? `WHERE ${where.join(" AND ")}` : "";
 
     const [pagos] = await queryWithRetry(`
       SELECT
@@ -2925,13 +3275,15 @@ router.get("/facturas/pagos-proveedor/reporte/excel", requireAuth, allowRoles("A
         pp.partida_presupuestaria,
         pp.pagada,
         pp.fecha_pago,
+        pp.periodo_cierre,
         pp.archivo_nombre,
         pp.creado_en,
         u.usuario AS creado_por_usuario
       FROM pagos_proveedor pp
       LEFT JOIN usuarios u ON u.id = pp.creado_por
+      ${whereSql}
       ORDER BY COALESCE(pp.fecha_pago, pp.fecha_solicitud, DATE(pp.creado_en)) DESC, pp.id DESC
-    `);
+    `, params);
 
     const resumenEmpresa = Array.from(pagos.reduce((map, pago) => {
       const key = pago.empresa || "Sin empresa";
@@ -3001,6 +3353,7 @@ router.get("/facturas/pagos-proveedor/reporte/excel", requireAuth, allowRoles("A
       { header: "Empresa", key: "empresa", width: 18 },
       { header: "Fecha solicitud", key: "fecha_solicitud", width: 16 },
       { header: "Fecha pago", key: "fecha_pago", width: 16 },
+      { header: "Periodo cierre", key: "periodo_cierre", width: 16 },
       { header: "Proveedor", key: "proveedor_nombre", width: 36 },
       { header: "Cuenta IBAN", key: "cuenta_iban", width: 28 },
       { header: "Concepto", key: "concepto", width: 42 },
@@ -3014,7 +3367,7 @@ router.get("/facturas/pagos-proveedor/reporte/excel", requireAuth, allowRoles("A
       { header: "Creado en", key: "creado_en", width: 20 }
     ];
 
-    pintarTitulo(ws, "A1:O1", "Historial completo de pagos de proveedor");
+    pintarTitulo(ws, "A1:P1", periodoCierre ? `Pagos de proveedor - cierre ${etiquetaPeriodoCierre(periodoCierre)}` : "Historial completo de pagos de proveedor");
     ws.getCell("A3").value = "Generado";
     ws.getCell("B3").value = new Date();
     ws.getCell("B3").numFmt = "yyyy-mm-dd hh:mm";
@@ -3044,6 +3397,7 @@ router.get("/facturas/pagos-proveedor/reporte/excel", requireAuth, allowRoles("A
         pago.empresa || "-",
         pago.fecha_solicitud ? new Date(pago.fecha_solicitud) : null,
         pago.fecha_pago ? new Date(pago.fecha_pago) : null,
+        pago.periodo_cierre || "-",
         pago.proveedor_nombre || "-",
         pago.cuenta_iban || "-",
         pago.concepto || "-",
@@ -3057,13 +3411,13 @@ router.get("/facturas/pagos-proveedor/reporte/excel", requireAuth, allowRoles("A
         pago.creado_en ? new Date(pago.creado_en) : null
       ];
       [3, 4].forEach(col => { row.getCell(col).numFmt = "yyyy-mm-dd"; });
-      row.getCell(10).numFmt = '"CRC" #,##0.00';
-      row.getCell(11).font = { bold: true, color: { argb: Number(pago.pagada || 0) ? "FF14532D" : "FF991B1B" } };
-      row.getCell(15).numFmt = "yyyy-mm-dd hh:mm";
-      row.getCell(7).alignment = { wrapText: true, vertical: "top" };
+      row.getCell(11).numFmt = '"CRC" #,##0.00';
+      row.getCell(12).font = { bold: true, color: { argb: Number(pago.pagada || 0) ? "FF14532D" : "FF991B1B" } };
+      row.getCell(16).numFmt = "yyyy-mm-dd hh:mm";
+      row.getCell(8).alignment = { wrapText: true, vertical: "top" };
     });
 
-    ws.autoFilter = { from: "A6", to: "O6" };
+    ws.autoFilter = { from: "A6", to: "P6" };
     aplicarBordes(ws);
 
     const wsProveedor = workbook.addWorksheet("Resumen proveedor", {
@@ -3112,7 +3466,8 @@ router.get("/facturas/pagos-proveedor/reporte/excel", requireAuth, allowRoles("A
 
     const buffer = await workbook.xlsx.writeBuffer();
     res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-    res.setHeader("Content-Disposition", `attachment; filename=historial_pagos_proveedor_${new Date().toISOString().slice(0, 19).replace(/:/g, "-")}.xlsx`);
+    const nombrePeriodo = periodoCierre ? `cierre_${periodoCierre}_` : "";
+    res.setHeader("Content-Disposition", `attachment; filename=${nombrePeriodo}historial_pagos_proveedor_${new Date().toISOString().slice(0, 19).replace(/:/g, "-")}.xlsx`);
     res.send(Buffer.from(buffer));
   } catch (error) {
     console.error("Error descargando Excel de pagos de proveedor:", error);
@@ -3242,14 +3597,16 @@ router.post("/facturas/reintegro-gastos", requireAuth, allowRoles(...ROLES_GESTI
 router.get("/facturas", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER", "CONTABILIDAD"), async (req, res) => {
   try {
     await ensureFacturaRecepcionColumns();
+    await ensurePeriodoCierreColumns();
     const hoy = new Date();
     hoy.setHours(0, 0, 0, 0);
 
     await ensureNotaCreditoColumns();
     await ensureAbonoColumns();
-    const { proveedor_id, fecha_desde, fecha_hasta, pagada, vencida } = req.query;
+    const { proveedor_id, fecha_desde, fecha_hasta, pagada, vencida, periodo_cierre } = req.query;
     const orden = req.query.orden === 'asc' ? 'asc' : 'desc';
-    const facturasFiltradas = await obtenerFacturasCompras({ proveedor_id, fecha_desde, fecha_hasta, pagada, vencida, orden });
+    const periodoCierre = normalizarPeriodoCierre(periodo_cierre);
+    const facturasFiltradas = await obtenerFacturasCompras({ proveedor_id, fecha_desde, fecha_hasta, pagada, vencida, periodo_cierre: periodoCierre, orden });
 
     const [proveedores] = await queryWithRetry("SELECT id, nombre FROM proveedores ORDER BY nombre");
     const ordenesDisponibles = await obtenerOrdenesDisponiblesFactura();
@@ -3263,7 +3620,7 @@ router.get("/facturas", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_
       user: req.session.user,
       proveedores,
       ordenesDisponibles,
-      filtros: { proveedor_id, fecha_desde, fecha_hasta, pagada, vencida, orden },
+      filtros: { proveedor_id, fecha_desde, fecha_hasta, pagada, vencida, periodo_cierre: periodoCierre, orden },
       success,
       error,
       hoy: hoy.toISOString().slice(0, 10)
@@ -3279,12 +3636,14 @@ router.get("/facturas/dashboard", requireAuth, allowRoles("ADMIN", "TALLER", "PR
     await ensureFacturaRecepcionColumns();
     await ensureNotaCreditoColumns();
     await ensureAbonoColumns();
+    await ensurePeriodoCierreColumns();
 
-    const { proveedor_id, fecha_desde, fecha_hasta, pagada, vencida } = req.query;
+    const { proveedor_id, fecha_desde, fecha_hasta, pagada, vencida, periodo_cierre } = req.query;
     const orden = req.query.orden === "asc" ? "asc" : "desc";
-    const filtros = { proveedor_id, fecha_desde, fecha_hasta, pagada, vencida, orden };
+    const filtros = { proveedor_id, fecha_desde, fecha_hasta, pagada, vencida, periodo_cierre: normalizarPeriodoCierre(periodo_cierre), orden };
     const facturas = await obtenerFacturasCompras(filtros);
     const financiero = await obtenerDashboardFinancieroFacturas(filtros);
+    const cierrePagos = await obtenerCierrePagosProveedor(filtros.periodo_cierre);
     const filtrosDeuda = { pagada: "0", orden: "asc" };
     const facturasPendientesTodas = (await obtenerFacturasCompras(filtrosDeuda))
       .filter(factura => parseMonto(factura.saldo) > 0 && !factura.cubierta_por_nc);
@@ -3294,12 +3653,14 @@ router.get("/facturas/dashboard", requireAuth, allowRoles("ADMIN", "TALLER", "PR
       const montoOriginal = parseMonto(factura.monto_original ?? factura.monto);
       const notaCredito = parseMonto(factura.nota_credito_monto);
       const abono = parseMonto(factura.abono_monto);
+      const montoPagado = parseMonto(factura.monto_pagado);
       const saldo = factura.pagada || factura.cubierta_por_nc ? 0 : parseMonto(factura.saldo ?? factura.monto);
 
       acc.totalFacturas += 1;
       acc.montoOriginal += montoOriginal;
       acc.notasCredito += notaCredito;
       acc.abonos += abono;
+      acc.pagado += montoPagado;
       acc.saldo += saldo;
 
       if (factura.pagada || factura.cubierta_por_nc) acc.pagadas += 1;
@@ -3319,6 +3680,7 @@ router.get("/facturas/dashboard", requireAuth, allowRoles("ADMIN", "TALLER", "PR
       montoOriginal: 0,
       notasCredito: 0,
       abonos: 0,
+      pagado: 0,
       saldo: 0
     });
 
@@ -3338,6 +3700,7 @@ router.get("/facturas/dashboard", requireAuth, allowRoles("ADMIN", "TALLER", "PR
       const saldo = factura.pagada || factura.cubierta_por_nc ? 0 : parseMonto(factura.saldo ?? factura.monto);
       const notaCredito = parseMonto(factura.nota_credito_monto);
       const abono = parseMonto(factura.abono_monto);
+      const montoPagado = parseMonto(factura.monto_pagado);
 
       if (!porProveedorMap.has(proveedor)) {
         porProveedorMap.set(proveedor, {
@@ -3372,7 +3735,7 @@ router.get("/facturas/dashboard", requireAuth, allowRoles("ADMIN", "TALLER", "PR
 
       if (factura.pagada || factura.cubierta_por_nc) {
         porEstadoMap.get("Pagadas").cantidad += 1;
-        porEstadoMap.get("Pagadas").monto += montoOriginal;
+        porEstadoMap.get("Pagadas").monto += montoPagado;
       } else {
         porEstadoMap.get("Pendientes").cantidad += 1;
         porEstadoMap.get("Pendientes").monto += saldo;
@@ -3424,7 +3787,8 @@ router.get("/facturas/dashboard", requireAuth, allowRoles("ADMIN", "TALLER", "PR
       facturasRecientes,
       deudaPorProveedor,
       resumenDeuda,
-      financiero
+      financiero,
+      cierrePagos
     });
   } catch (error) {
     console.error("Error en dashboard de facturas:", error);
@@ -3438,16 +3802,20 @@ router.get("/facturas/reporte/pdf", requireAuth, allowRoles("ADMIN", "TALLER", "
     await ensureNotaCreditoColumns();
     await ensureAbonoColumns();
 
-    const { proveedor_id, fecha_desde, fecha_hasta, vencida } = req.query;
+    const { proveedor_id, fecha_desde, fecha_hasta, vencida, periodo_cierre } = req.query;
+    const pagada = normalizarFiltroPagadaReporte(req.query.pagada);
     const orden = req.query.orden === "asc" ? "asc" : "desc";
-    const filtros = { proveedor_id, fecha_desde, fecha_hasta, pagada: "0", vencida, orden };
-    const facturas = (await obtenerFacturasCompras(filtros))
-      .filter(factura => parseMonto(factura.saldo) > 0 && !factura.cubierta_por_nc);
+    const filtros = { proveedor_id, fecha_desde, fecha_hasta, pagada, vencida, periodo_cierre: normalizarPeriodoCierre(periodo_cierre), orden };
+    let facturas = await obtenerFacturasCompras(filtros);
+    if (pagada === "0") {
+      facturas = facturas.filter(factura => parseMonto(factura.saldo) > 0 && !factura.cubierta_por_nc);
+    }
 
     const [[proveedorFiltro]] = proveedor_id
       ? await queryWithRetry("SELECT nombre FROM proveedores WHERE id = ?", [proveedor_id])
       : [[null]];
 
+    const metaReporte = obtenerMetaReporteFacturas(pagada);
     const gruposProveedor = agruparFacturasPendientesPorProveedor(facturas);
 
     gruposProveedor.forEach(grupo => {
@@ -3467,14 +3835,15 @@ router.get("/facturas/reporte/pdf", requireAuth, allowRoles("ADMIN", "TALLER", "
         proveedor_nombre: proveedorFiltro ? proveedorFiltro.nombre : null
       },
       totales,
-      fechaGeneracion: new Date().toLocaleString("es-CR")
+      fechaGeneracion: new Date().toLocaleString("es-CR"),
+      metaReporte
     });
 
     res.setHeader("Content-Type", "application/pdf");
-    res.setHeader("Content-Disposition", `attachment; filename=reporte_facturas_pendientes_${new Date().toISOString().slice(0, 19).replace(/:/g, "-")}.pdf`);
+    res.setHeader("Content-Disposition", `attachment; filename=${metaReporte.archivo}_${new Date().toISOString().slice(0, 19).replace(/:/g, "-")}.pdf`);
     res.send(pdfBuffer);
   } catch (error) {
-    console.error("Error descargando reporte de facturas pendientes:", error);
+    console.error("Error descargando reporte de facturas:", error);
     res.status(500).send("Error descargando reporte");
   }
 });
@@ -3485,39 +3854,22 @@ router.get("/facturas/reporte/excel", requireAuth, allowRoles("ADMIN", "TALLER",
     await ensureNotaCreditoColumns();
     await ensureAbonoColumns();
 
-    const { proveedor_id, fecha_desde, fecha_hasta, vencida } = req.query;
+    const { proveedor_id, fecha_desde, fecha_hasta, vencida, periodo_cierre } = req.query;
+    const pagada = normalizarFiltroPagadaReporte(req.query.pagada);
     const orden = req.query.orden === "asc" ? "asc" : "desc";
-    const filtros = { proveedor_id, fecha_desde, fecha_hasta, pagada: "0", vencida, orden };
-    const facturas = await obtenerFacturasCompras(filtros);
+    const filtros = { proveedor_id, fecha_desde, fecha_hasta, pagada, vencida, periodo_cierre: normalizarPeriodoCierre(periodo_cierre), orden };
+    let facturas = await obtenerFacturasCompras(filtros);
+    if (pagada === "0") {
+      facturas = facturas.filter(factura => parseMonto(factura.saldo) > 0 && !factura.cubierta_por_nc);
+    }
+    const metaReporte = obtenerMetaReporteFacturas(pagada);
 
     const [[proveedorFiltro]] = proveedor_id
       ? await queryWithRetry("SELECT nombre FROM proveedores WHERE id = ?", [proveedor_id])
       : [[null]];
 
-    const gruposProveedor = Array.from(facturas.reduce((map, factura) => {
-      const proveedorNombre = factura.proveedor_nombre || "Sin proveedor";
-      if (!map.has(proveedorNombre)) {
-        map.set(proveedorNombre, {
-          proveedor: proveedorNombre,
-          facturas: [],
-          totales: {
-            montoOriginal: 0,
-            notasCredito: 0,
-            abonos: 0,
-            saldo: 0
-          }
-        });
-      }
-
-      const grupo = map.get(proveedorNombre);
-      grupo.facturas.push(factura);
-      grupo.totales.montoOriginal += parseMonto(factura.monto_original ?? factura.monto);
-      grupo.totales.notasCredito += parseMonto(factura.nota_credito_monto);
-      grupo.totales.abonos += parseMonto(factura.abono_monto);
-      grupo.totales.saldo += parseMonto(factura.saldo);
-
-      return map;
-    }, new Map()).values()).sort((a, b) => a.proveedor.localeCompare(b.proveedor, "es"));
+    const gruposProveedor = agruparFacturasPendientesPorProveedor(facturas)
+      .sort((a, b) => a.proveedor.localeCompare(b.proveedor, "es"));
 
     gruposProveedor.forEach(grupo => {
       grupo.facturas.sort((a, b) => {
@@ -3527,24 +3879,13 @@ router.get("/facturas/reporte/excel", requireAuth, allowRoles("ADMIN", "TALLER",
       });
     });
 
-    const totales = facturas.reduce((acc, f) => {
-      acc.montoOriginal += parseMonto(f.monto_original ?? f.monto);
-      acc.notasCredito += parseMonto(f.nota_credito_monto);
-      acc.abonos += parseMonto(f.abono_monto);
-      acc.saldo += parseMonto(f.saldo);
-      return acc;
-    }, {
-      montoOriginal: 0,
-      notasCredito: 0,
-      abonos: 0,
-      saldo: 0
-    });
+    const totales = calcularTotalesFacturas(facturas);
 
     const ExcelJS = require("exceljs");
     const workbook = new ExcelJS.Workbook();
     workbook.creator = "Gas Tomza";
     workbook.created = new Date();
-    const worksheet = workbook.addWorksheet("Pendientes", {
+    const worksheet = workbook.addWorksheet(metaReporte.hoja, {
       views: [{ state: "frozen", ySplit: 7 }]
     });
 
@@ -3557,13 +3898,15 @@ router.get("/facturas/reporte/excel", requireAuth, allowRoles("ADMIN", "TALLER",
       { header: "Monto original", key: "montoOriginal", width: 15 },
       { header: "NC", key: "notaCredito", width: 13 },
       { header: "Abonos", key: "abonos", width: 13 },
+      { header: "Pagado", key: "pagado", width: 15 },
       { header: "Saldo", key: "saldo", width: 15 },
+      { header: "Periodo cierre", key: "periodo_cierre", width: 16 },
       { header: "Estado", key: "estado", width: 13 },
       { header: "Observación", key: "observacion", width: 42 }
     ];
 
-    worksheet.mergeCells("A1:K1");
-    worksheet.getCell("A1").value = "Facturas pendientes por pagar";
+    worksheet.mergeCells("A1:M1");
+    worksheet.getCell("A1").value = metaReporte.titulo;
     worksheet.getCell("A1").font = { bold: true, size: 16, color: { argb: "FFFFFFFF" } };
     worksheet.getCell("A1").alignment = { vertical: "middle", horizontal: "center" };
     worksheet.getCell("A1").fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF111827" } };
@@ -3583,6 +3926,8 @@ router.get("/facturas/reporte/excel", requireAuth, allowRoles("ADMIN", "TALLER",
     worksheet.getCell("E4").value = fecha_hasta || "-";
     worksheet.getCell("G4").value = "Facturas";
     worksheet.getCell("H4").value = facturas.length;
+    worksheet.getCell("J4").value = "Periodo cierre";
+    worksheet.getCell("K4").value = etiquetaPeriodoCierre(filtros.periodo_cierre);
 
     worksheet.getCell("A5").value = "Monto original";
     worksheet.getCell("B5").value = totales.montoOriginal;
@@ -3590,10 +3935,10 @@ router.get("/facturas/reporte/excel", requireAuth, allowRoles("ADMIN", "TALLER",
     worksheet.getCell("E5").value = totales.notasCredito;
     worksheet.getCell("G5").value = "Abonos";
     worksheet.getCell("H5").value = totales.abonos;
-    worksheet.getCell("J5").value = "Total pendiente";
-    worksheet.getCell("K5").value = totales.saldo;
+    worksheet.getCell("J5").value = metaReporte.totalEtiqueta;
+    worksheet.getCell("K5").value = totales[metaReporte.totalClave];
 
-    ["A3", "D3", "G3", "A4", "D4", "G4", "A5", "D5", "G5", "J5"].forEach(cell => {
+    ["A3", "D3", "G3", "A4", "D4", "G4", "J4", "A5", "D5", "G5", "J5"].forEach(cell => {
       worksheet.getCell(cell).font = { bold: true, color: { argb: "FF475569" } };
     });
     ["B5", "E5", "H5", "K5"].forEach(cell => {
@@ -3613,7 +3958,7 @@ router.get("/facturas/reporte/excel", requireAuth, allowRoles("ADMIN", "TALLER",
     gruposProveedor.forEach(grupo => {
       const providerRow = worksheet.getRow(rowNumber++);
       providerRow.getCell(1).value = `${grupo.proveedor} (${grupo.facturas.length} factura${grupo.facturas.length === 1 ? "" : "s"})`;
-      worksheet.mergeCells(providerRow.number, 1, providerRow.number, 11);
+      worksheet.mergeCells(providerRow.number, 1, providerRow.number, 13);
       providerRow.font = { bold: true, color: { argb: "FF111827" } };
       providerRow.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE5E7EB" } };
 
@@ -3628,17 +3973,20 @@ router.get("/facturas/reporte/excel", requireAuth, allowRoles("ADMIN", "TALLER",
           parseMonto(f.monto_original ?? f.monto),
           parseMonto(f.nota_credito_monto),
           parseMonto(f.abono_monto),
+          parseMonto(f.monto_pagado),
           parseMonto(f.saldo),
-          f.vencida ? "Vencida" : "Pendiente",
+          f.periodo_cierre || "-",
+          f.pagada || f.cubierta_por_nc ? "Pagada" : (f.vencida ? "Vencida" : "Pendiente"),
           f.factura_observacion || f.abono_observacion || f.nota_credito_motivo || f.observacion || "-"
         ];
         row.getCell(3).numFmt = "yyyy-mm-dd";
         row.getCell(5).numFmt = "yyyy-mm-dd";
-        [6, 7, 8, 9].forEach(col => {
+        [6, 7, 8, 9, 10].forEach(col => {
           row.getCell(col).numFmt = '"CRC" #,##0.00';
         });
-        row.getCell(10).font = { bold: true, color: { argb: f.vencida ? "FF991B1B" : "FF92400E" } };
-        row.getCell(11).alignment = { wrapText: true, vertical: "top" };
+        const estadoPagado = f.pagada || f.cubierta_por_nc;
+        row.getCell(12).font = { bold: true, color: { argb: estadoPagado ? "FF14532D" : (f.vencida ? "FF991B1B" : "FF92400E") } };
+        row.getCell(13).alignment = { wrapText: true, vertical: "top" };
       });
 
       const subtotalRow = worksheet.getRow(rowNumber++);
@@ -3648,13 +3996,14 @@ router.get("/facturas/reporte/excel", requireAuth, allowRoles("ADMIN", "TALLER",
         grupo.totales.montoOriginal,
         grupo.totales.notasCredito,
         grupo.totales.abonos,
+        grupo.totales.pagado,
         grupo.totales.saldo,
-        "", ""
+        "", "", ""
       ];
       worksheet.mergeCells(subtotalRow.number, 1, subtotalRow.number, 5);
       subtotalRow.font = { bold: true };
       subtotalRow.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF8FAFC" } };
-      [6, 7, 8, 9].forEach(col => {
+      [6, 7, 8, 9, 10].forEach(col => {
         subtotalRow.getCell(col).numFmt = '"CRC" #,##0.00';
       });
     });
@@ -3666,13 +4015,14 @@ router.get("/facturas/reporte/excel", requireAuth, allowRoles("ADMIN", "TALLER",
       totales.montoOriginal,
       totales.notasCredito,
       totales.abonos,
+      totales.pagado,
       totales.saldo,
-      "", ""
+      "", "", ""
     ];
     worksheet.mergeCells(totalRow.number, 1, totalRow.number, 5);
     totalRow.font = { bold: true, color: { argb: "FF14532D" } };
     totalRow.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFDCFCE7" } };
-    [6, 7, 8, 9].forEach(col => {
+    [6, 7, 8, 9, 10].forEach(col => {
       totalRow.getCell(col).numFmt = '"CRC" #,##0.00';
     });
 
@@ -3690,15 +4040,15 @@ router.get("/facturas/reporte/excel", requireAuth, allowRoles("ADMIN", "TALLER",
 
     worksheet.autoFilter = {
       from: "A7",
-      to: "K7"
+      to: "M7"
     };
 
     const buffer = await workbook.xlsx.writeBuffer();
     res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-    res.setHeader("Content-Disposition", `attachment; filename=reporte_facturas_pendientes_${new Date().toISOString().slice(0, 19).replace(/:/g, "-")}.xlsx`);
+    res.setHeader("Content-Disposition", `attachment; filename=${metaReporte.archivo}_${new Date().toISOString().slice(0, 19).replace(/:/g, "-")}.xlsx`);
     res.send(Buffer.from(buffer));
   } catch (error) {
-    console.error("Error descargando Excel de facturas pendientes:", error);
+    console.error("Error descargando Excel de facturas:", error);
     res.status(500).send("Error descargando Excel");
   }
 });
@@ -3783,6 +4133,7 @@ router.post("/facturas/:id/editar", requireAuth, allowRoles(...ROLES_GESTION_FAC
       proveedor_id,
       pagada,
       fecha_pago,
+      periodo_cierre,
       numero_nc,
       fecha_nc,
       monto_nc,
@@ -3807,6 +4158,7 @@ router.post("/facturas/:id/editar", requireAuth, allowRoles(...ROLES_GESTION_FAC
     const abonoMonto = parseMonto(monto_abono);
     const pagadaValue = pagada === "1" ? 1 : 0;
     const fechaPagoFinal = pagadaValue ? (fecha_pago || new Date().toISOString().slice(0, 10)) : null;
+    const periodoCierreFinal = pagadaValue ? normalizarPeriodoCierre(periodo_cierre, fechaPagoFinal) : null;
     const fechaNcFinal = notaCreditoMonto > 0 ? (fecha_nc || new Date().toISOString().slice(0, 10)) : null;
     const fechaAbonoFinal = abonoMonto > 0 ? (fecha_abono || new Date().toISOString().slice(0, 10)) : null;
     const fotoProductoPath = guardarFotoProducto(foto_producto_data, req.session.user.id);
@@ -3841,6 +4193,7 @@ router.post("/facturas/:id/editar", requireAuth, allowRoles(...ROLES_GESTION_FAC
             total = ?,
             pagada = ?,
             fecha_pago = ?,
+            periodo_cierre = ?,
             nota_credito_numero = ?,
             nota_credito_fecha = ?,
             nota_credito_monto = ?,
@@ -3865,6 +4218,7 @@ router.post("/facturas/:id/editar", requireAuth, allowRoles(...ROLES_GESTION_FAC
         montoFactura,
         pagadaValue,
         fechaPagoFinal,
+        periodoCierreFinal,
         notaCreditoMonto > 0 ? String(numero_nc || "").trim() || null : null,
         fechaNcFinal,
         notaCreditoMonto,
@@ -3915,6 +4269,7 @@ router.post("/facturas/:id/editar", requireAuth, allowRoles(...ROLES_GESTION_FAC
             proveedor_nombre = ?,
             pagada = ?,
             fecha_pago = ?,
+            periodo_cierre = ?,
             nota_credito_numero = ?,
             nota_credito_fecha = ?,
             nota_credito_monto = ?,
@@ -3938,6 +4293,7 @@ router.post("/facturas/:id/editar", requireAuth, allowRoles(...ROLES_GESTION_FAC
         proveedor.nombre,
         pagadaValue,
         fechaPagoFinal,
+        periodoCierreFinal,
         notaCreditoMonto > 0 ? String(numero_nc || "").trim() || null : null,
         fechaNcFinal,
         notaCreditoMonto,
@@ -4001,6 +4357,7 @@ router.post("/facturas/:id/eliminar", requireAuth, allowRoles(...ROLES_GESTION_F
              fecha_vencimiento_factura = NULL,
              pagada = 0,
              fecha_pago = NULL,
+             periodo_cierre = NULL,
              nota_credito_numero = NULL,
              nota_credito_fecha = NULL,
              nota_credito_monto = 0,
@@ -4048,6 +4405,7 @@ router.post("/facturas/:id/nota-credito", requireAuth, allowRoles("ADMIN", "TALL
   try {
     await ensureNotaCreditoColumns();
     await ensureAbonoColumns();
+    await ensurePeriodoCierreColumns();
     const id = req.params.id;
     const { tipo, numero_nc, fecha_nc, monto_nc, motivo_nc } = req.body;
     const montoNC = parseMonto(monto_nc);
@@ -4090,7 +4448,8 @@ router.post("/facturas/:id/nota-credito", requireAuth, allowRoles("ADMIN", "TALL
            nota_credito_monto = ?,
            nota_credito_motivo = ?,
            pagada = CASE WHEN ? THEN 1 ELSE pagada END,
-           fecha_pago = CASE WHEN ? THEN ? ELSE fecha_pago END
+           fecha_pago = CASE WHEN ? THEN ? ELSE fecha_pago END,
+           periodo_cierre = CASE WHEN ? THEN ? ELSE periodo_cierre END
        WHERE id = ?`,
       [
         numero_nc.trim(),
@@ -4100,6 +4459,8 @@ router.post("/facturas/:id/nota-credito", requireAuth, allowRoles("ADMIN", "TALL
         cubiertaPorNC,
         cubiertaPorNC,
         fecha_nc,
+        cubiertaPorNC,
+        normalizarPeriodoCierre(null, fecha_nc),
         id
       ]
     );
@@ -4119,11 +4480,13 @@ router.post("/facturas/:id/abono", requireAuth, allowRoles("ADMIN", "TALLER", "P
   try {
     await ensureNotaCreditoColumns();
     await ensureAbonoColumns();
+    await ensurePeriodoCierreColumns();
 
     const id = req.params.id;
-    const { tipo, monto_abono, fecha_abono, observacion_abono } = req.body;
+    const { tipo, monto_abono, fecha_abono, observacion_abono, periodo_cierre } = req.body;
     const montoAbono = parseMonto(monto_abono);
     const fechaAbono = fecha_abono || new Date().toISOString().slice(0, 10);
+    const periodoCierre = normalizarPeriodoCierre(periodo_cierre, fechaAbono);
 
     if (!["orden", "independiente"].includes(tipo)) {
       req.session.error = "Tipo de factura inválido para abono.";
@@ -4175,7 +4538,8 @@ router.post("/facturas/:id/abono", requireAuth, allowRoles("ADMIN", "TALLER", "P
            abono_fecha = ?,
            abono_observacion = ?,
            pagada = CASE WHEN ? THEN 1 ELSE pagada END,
-           fecha_pago = CASE WHEN ? THEN ? ELSE fecha_pago END
+           fecha_pago = CASE WHEN ? THEN ? ELSE fecha_pago END,
+           periodo_cierre = CASE WHEN ? THEN ? ELSE periodo_cierre END
        WHERE id = ?`,
       [
         nuevoAbono,
@@ -4184,6 +4548,8 @@ router.post("/facturas/:id/abono", requireAuth, allowRoles("ADMIN", "TALLER", "P
         pagadaCompleta,
         pagadaCompleta,
         fechaAbono,
+        pagadaCompleta,
+        periodoCierre,
         id
       ]
     );
@@ -4203,9 +4569,11 @@ router.post("/facturas/:id/pagar", requireAuth, allowRoles("ADMIN", "TALLER", "P
   try {
     await ensureNotaCreditoColumns();
     await ensureAbonoColumns();
+    await ensurePeriodoCierreColumns();
     const id = req.params.id;
     const { tipo } = req.body;
     const fechaPago = String(req.body.fecha_pago || "").trim();
+    const periodoCierre = normalizarPeriodoCierre(req.body.periodo_cierre, fechaPago);
 
     if (!/^\d{4}-\d{2}-\d{2}$/.test(fechaPago)) {
       req.session.error = "Debe indicar una fecha de pago válida.";
@@ -4217,13 +4585,14 @@ router.post("/facturas/:id/pagar", requireAuth, allowRoles("ADMIN", "TALLER", "P
         `UPDATE ordenes_compra
          SET pagada = 1,
              fecha_pago = ?,
+             periodo_cierre = ?,
              abono_monto = GREATEST(total - COALESCE(nota_credito_monto, 0), COALESCE(abono_monto, 0)),
              abono_fecha = ?
          WHERE id = ?
            AND facturada = 1
            AND COALESCE(pagada, 0) = 0
            AND GREATEST(total - COALESCE(nota_credito_monto, 0) - COALESCE(abono_monto, 0), 0) > 0`,
-        [fechaPago, fechaPago, id]
+        [fechaPago, periodoCierre || fechaPago.slice(0, 7), fechaPago, id]
       );
       if (!result.affectedRows) {
         req.session.error = "La factura de orden no existe, ya estaba pagada o no tiene saldo pendiente.";
@@ -4234,12 +4603,13 @@ router.post("/facturas/:id/pagar", requireAuth, allowRoles("ADMIN", "TALLER", "P
         `UPDATE facturas
          SET pagada = 1,
              fecha_pago = ?,
+             periodo_cierre = ?,
              abono_monto = GREATEST(monto - COALESCE(nota_credito_monto, 0), COALESCE(abono_monto, 0)),
              abono_fecha = ?
          WHERE id = ?
            AND COALESCE(pagada, 0) = 0
            AND GREATEST(monto - COALESCE(nota_credito_monto, 0) - COALESCE(abono_monto, 0), 0) > 0`,
-        [fechaPago, fechaPago, id]
+        [fechaPago, periodoCierre || fechaPago.slice(0, 7), fechaPago, id]
       );
       if (!result.affectedRows) {
         req.session.error = "La factura independiente no existe, ya estaba pagada o no tiene saldo pendiente.";
@@ -4318,9 +4688,11 @@ router.post("/facturas/pagar-multiple", requireAuth, allowRoles("ADMIN", "TALLER
   try {
     await ensureNotaCreditoColumns();
     await ensureAbonoColumns();
+    await ensurePeriodoCierreColumns();
     const { facturas_ids } = req.body;
     const seleccionadas = toArray(facturas_ids).map(parseFacturaRef).filter(Boolean);
     const fechaPago = String(req.body.fecha_pago || "").trim();
+    const periodoCierre = normalizarPeriodoCierre(req.body.periodo_cierre, fechaPago);
 
     if (!seleccionadas.length) {
       req.session.error = "No seleccionó ninguna factura.";
@@ -4410,13 +4782,14 @@ router.post("/facturas/pagar-multiple", requireAuth, allowRoles("ADMIN", "TALLER
         `UPDATE ordenes_compra
          SET pagada = 1,
              fecha_pago = ?,
+             periodo_cierre = ?,
              abono_monto = GREATEST(total - COALESCE(nota_credito_monto, 0), COALESCE(abono_monto, 0)),
              abono_fecha = ?
          WHERE id IN (${placeholders})
            AND facturada = 1
            AND COALESCE(pagada, 0) = 0
            AND GREATEST(total - COALESCE(nota_credito_monto, 0) - COALESCE(abono_monto, 0), 0) > 0`,
-        [fechaPago, fechaPago, ...ordenIds]
+        [fechaPago, periodoCierre || fechaPago.slice(0, 7), fechaPago, ...ordenIds]
       );
     }
 
@@ -4426,12 +4799,13 @@ router.post("/facturas/pagar-multiple", requireAuth, allowRoles("ADMIN", "TALLER
         `UPDATE facturas
          SET pagada = 1,
              fecha_pago = ?,
+             periodo_cierre = ?,
              abono_monto = GREATEST(monto - COALESCE(nota_credito_monto, 0), COALESCE(abono_monto, 0)),
              abono_fecha = ?
          WHERE id IN (${placeholders})
            AND COALESCE(pagada, 0) = 0
            AND GREATEST(monto - COALESCE(nota_credito_monto, 0) - COALESCE(abono_monto, 0), 0) > 0`,
-        [fechaPago, fechaPago, ...independientesIds]
+        [fechaPago, periodoCierre || fechaPago.slice(0, 7), fechaPago, ...independientesIds]
       );
     }
 

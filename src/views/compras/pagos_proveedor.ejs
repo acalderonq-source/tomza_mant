@@ -273,6 +273,7 @@
       pagosPagados: 0,
       pagosPendientes: 0
     };
+    const filtrosActuales = filtros || {};
     const puedeImportar = ['ADMIN', 'TALLER', 'PROVEEDURIA_TALLER'].includes(user.rol);
     const fecha = value => {
       if (!value) return '—';
@@ -280,6 +281,11 @@
       return Number.isNaN(date.getTime()) ? '—' : date.toLocaleDateString('es-CR');
     };
     const moneda = value => `₡${Number(value || 0).toLocaleString('es-CR', { maximumFractionDigits: 0 })}`;
+    const hoy = new Date().toISOString().slice(0, 10);
+    const periodoActual = hoy.slice(0, 7);
+    const excelParams = new URLSearchParams();
+    if (filtrosActuales.periodo_cierre) excelParams.set('periodo_cierre', filtrosActuales.periodo_cierre);
+    const excelUrl = '/compras/facturas/pagos-proveedor/reporte/excel' + (excelParams.toString() ? `?${excelParams.toString()}` : '');
     const maxProveedor = Math.max(...pagos.topProveedores.map(item => Number(item.total || 0)), 1);
     const chartColors = [
       'linear-gradient(180deg, #ef233c, #174ea6)',
@@ -302,7 +308,7 @@
         <p>Importa la plantilla, separa pendientes de pagados y registra la fecha real de pago.</p>
       </div>
       <div class="text-end">
-        <div class="small text-white-50">Total pagado</div>
+        <div class="small text-white-50"><%= filtrosActuales.periodo_cierre ? `Cierre ${filtrosActuales.periodo_cierre}` : 'Total pagado' %></div>
         <div class="fs-3 fw-black"><%= moneda(pagos.totalPagado) %></div>
       </div>
     </div>
@@ -320,6 +326,26 @@
       <button class="btn-close" data-bs-dismiss="alert"></button>
     </div>
   <% } %>
+
+  <section class="panel p-3 mb-3">
+    <form method="GET" action="/compras/facturas/pagos-proveedor" class="row g-2 align-items-end">
+      <div class="col-md-4">
+        <label class="form-label fw-bold">Periodo de cierre</label>
+        <input type="month" name="periodo_cierre" class="form-control" value="<%= filtrosActuales.periodo_cierre || '' %>">
+      </div>
+      <div class="col-md-3">
+        <button class="btn btn-primary w-100">Filtrar cierre</button>
+      </div>
+      <div class="col-md-3">
+        <a href="/compras/facturas/pagos-proveedor" class="btn btn-secondary w-100">Limpiar</a>
+      </div>
+      <div class="col-md-2">
+        <a href="<%= excelUrl %>" class="btn btn-success w-100">
+          <i class="bi bi-file-earmark-excel"></i> Excel
+        </a>
+      </div>
+    </form>
+  </section>
 
   <div class="stat-grid">
     <div class="stat-card">
@@ -363,6 +389,9 @@
               <input type="file" class="form-control mb-2" id="archivoPagoProveedor" accept=".xlsx,.xls" required>
               <input type="hidden" name="archivo_pago_data" id="archivoPagoProveedorData">
               <input type="hidden" name="archivo_pago_nombre" id="archivoPagoProveedorNombre">
+              <label class="form-label fw-bold">Periodo de cierre</label>
+              <input type="month" name="periodo_cierre" class="form-control mb-2" value="<%= periodoActual %>">
+              <div class="small text-muted mb-3">Ej: seleccione 2026-07 si la plantilla pertenece al cierre de julio, aunque tenga pagos del 01/08.</div>
               <div class="small text-muted mb-3">Detecta Gas Tomza arriba y Super Gas abajo. Si trae fecha de pago entra como pagado; si no, queda pendiente.</div>
               <button class="btn btn-success w-100">
                 <i class="bi bi-file-earmark-excel"></i> Importar pagos
@@ -422,7 +451,7 @@
             <div class="small text-muted">Registros importados que todavía no tienen fecha de pago.</div>
           </div>
           <div class="d-flex gap-2 flex-wrap">
-            <a href="/compras/facturas/pagos-proveedor/reporte/excel" class="btn btn-sm btn-success">
+            <a href="<%= excelUrl %>" class="btn btn-sm btn-success">
               <i class="bi bi-file-earmark-excel"></i> Descargar Excel
             </a>
             <a href="/compras/facturas" class="btn btn-sm btn-outline-secondary">Volver a facturas</a>
@@ -434,6 +463,7 @@
               <tr>
                 <th>Empresa</th>
                 <th>Fecha solicitud</th>
+                <th>Periodo</th>
                 <th>Proveedor</th>
                 <th>Concepto</th>
                 <th>Factura</th>
@@ -450,6 +480,7 @@
                       <span class="company-pill <%= pago.empresa === 'SUPER GAS' ? 'super' : 'tomza' %>"><%= pago.empresa %></span>
                     </td>
                     <td data-label="Fecha solicitud"><%= fecha(pago.fecha_solicitud) %></td>
+                    <td data-label="Periodo"><%= pago.periodo_cierre || '—' %></td>
                     <td data-label="Proveedor"><strong><%= pago.proveedor_nombre %></strong></td>
                     <td data-label="Concepto"><%= pago.concepto || '—' %></td>
                     <td data-label="Factura"><%= pago.numero_factura || '—' %></td>
@@ -460,7 +491,8 @@
                         <div class="payment-actions">
                           <form method="POST" action="/compras/facturas/pagos-proveedor/<%= pago.id %>/estado" class="action-form">
                             <input type="hidden" name="accion" value="pagado">
-                            <input type="date" name="fecha_pago" class="form-control form-control-sm" value="<%= new Date().toISOString().slice(0, 10) %>">
+                            <input type="date" name="fecha_pago" class="form-control form-control-sm js-fecha-pago" value="<%= hoy %>">
+                            <input type="month" name="periodo_cierre" class="form-control form-control-sm js-periodo-cierre" value="<%= pago.periodo_cierre || periodoActual %>">
                             <button class="btn btn-sm btn-success">Pagado</button>
                           </form>
                           <form method="POST" action="/compras/facturas/pagos-proveedor/<%= pago.id %>/eliminar" onsubmit="return confirm('¿Eliminar este pago de proveedor?');">
@@ -477,7 +509,7 @@
                 <% }) %>
               <% } else { %>
                 <tr>
-                  <td colspan="8" class="text-center text-muted py-4">No hay pagos pendientes.</td>
+                  <td colspan="9" class="text-center text-muted py-4">No hay pagos pendientes.</td>
                 </tr>
               <% } %>
             </tbody>
@@ -499,6 +531,7 @@
               <tr>
                 <th>Empresa</th>
                 <th>Fecha pago</th>
+                <th>Periodo</th>
                 <th>Proveedor</th>
                 <th>Concepto</th>
                 <th>Factura</th>
@@ -515,6 +548,7 @@
                       <span class="company-pill <%= pago.empresa === 'SUPER GAS' ? 'super' : 'tomza' %>"><%= pago.empresa %></span>
                     </td>
                     <td data-label="Fecha pago"><%= fecha(pago.fecha_pago) %></td>
+                    <td data-label="Periodo"><%= pago.periodo_cierre || '—' %></td>
                     <td data-label="Proveedor"><strong><%= pago.proveedor_nombre %></strong></td>
                     <td data-label="Concepto"><%= pago.concepto || '—' %></td>
                     <td data-label="Factura"><%= pago.numero_factura || '—' %></td>
@@ -542,7 +576,7 @@
                 <% }) %>
               <% } else { %>
                 <tr>
-                  <td colspan="8" class="text-center text-muted py-4">Todavía no hay pagos realizados.</td>
+                  <td colspan="9" class="text-center text-muted py-4">Todavía no hay pagos realizados.</td>
                 </tr>
               <% } %>
             </tbody>
@@ -585,6 +619,18 @@
       }
     });
   }
+
+  document.querySelectorAll('.payment-actions').forEach(container => {
+    const fechaInput = container.querySelector('.js-fecha-pago');
+    const periodoInput = container.querySelector('.js-periodo-cierre');
+    if (!fechaInput || !periodoInput) return;
+
+    fechaInput.addEventListener('change', () => {
+      if (!periodoInput.value && /^\d{4}-\d{2}-\d{2}$/.test(fechaInput.value)) {
+        periodoInput.value = fechaInput.value.slice(0, 7);
+      }
+    });
+  });
 </script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>

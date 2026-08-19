@@ -427,6 +427,10 @@
         </select>
       </div>
       <div class="col-md-2">
+        <label class="form-label small fw-semibold">Periodo cierre</label>
+        <input type="month" name="periodo_cierre" class="form-control form-control-sm" value="<%= filtros.periodo_cierre || '' %>">
+      </div>
+      <div class="col-md-2">
         <label class="form-label small fw-semibold">Solo vencidas</label>
         <select name="vencida" class="form-select form-select-sm">
           <option value="">No</option>
@@ -465,10 +469,12 @@
     if (filtros.proveedor_id) reporteParams.set('proveedor_id', filtros.proveedor_id);
     if (filtros.fecha_desde) reporteParams.set('fecha_desde', filtros.fecha_desde);
     if (filtros.fecha_hasta) reporteParams.set('fecha_hasta', filtros.fecha_hasta);
+    if (filtros.pagada) reporteParams.set('pagada', filtros.pagada);
+    if (filtros.periodo_cierre) reporteParams.set('periodo_cierre', filtros.periodo_cierre);
     if (filtros.vencida) reporteParams.set('vencida', filtros.vencida);
     if (filtros.orden) reporteParams.set('orden', filtros.orden);
-    const reportePendientesUrl = '/compras/facturas/reporte/pdf' + (reporteParams.toString() ? `?${reporteParams.toString()}` : '');
-    const reportePendientesExcelUrl = '/compras/facturas/reporte/excel' + (reporteParams.toString() ? `?${reporteParams.toString()}` : '');
+    const reporteFacturasUrl = '/compras/facturas/reporte/pdf' + (reporteParams.toString() ? `?${reporteParams.toString()}` : '');
+    const reporteFacturasExcelUrl = '/compras/facturas/reporte/excel' + (reporteParams.toString() ? `?${reporteParams.toString()}` : '');
     const listaParams = new URLSearchParams(reporteParams);
     if (filtros.pagada) listaParams.set('pagada', filtros.pagada);
     const dashboardFacturasUrl = '/compras/facturas/dashboard' + (listaParams.toString() ? `?${listaParams.toString()}` : '');
@@ -524,11 +530,11 @@
         <a href="/compras/facturas/recibo-preview" target="_blank" class="btn btn-outline-dark btn-sm">
           <i class="bi bi-receipt"></i> Vista recibo
         </a>
-        <a href="<%= reportePendientesUrl %>" class="btn btn-outline-danger btn-sm">
-          <i class="bi bi-file-earmark-pdf"></i> PDF pendientes
+        <a href="<%= reporteFacturasUrl %>" class="btn btn-outline-danger btn-sm">
+          <i class="bi bi-file-earmark-pdf"></i> PDF facturas
         </a>
-        <a href="<%= reportePendientesExcelUrl %>" class="btn btn-outline-success btn-sm">
-          <i class="bi bi-file-earmark-excel"></i> Excel pendientes
+        <a href="<%= reporteFacturasExcelUrl %>" class="btn btn-outline-success btn-sm">
+          <i class="bi bi-file-earmark-excel"></i> Excel facturas
         </a>
       </div>
     </div>
@@ -616,6 +622,9 @@
                     <span class="badge badge-nc">Cubierta por NC</span>
                   <% } else if (f.pagada) { %>
                     <span class="badge badge-pagada">Pagada el <%= new Date(f.fecha_pago).toLocaleDateString('es-CR') %></span>
+                    <% if (f.periodo_cierre) { %>
+                      <div class="small text-muted mt-1">Cierre <%= f.periodo_cierre %></div>
+                    <% } %>
                   <% } else { %>
                     <span class="badge badge-pendiente">Pendiente</span>
                   <% } %>
@@ -648,6 +657,7 @@
                         data-monto="<%= f.monto_original ?? f.monto %>"
                         data-pagada="<%= f.pagada ? '1' : '0' %>"
                         data-fecha-pago="<%= fechaInput(f.fecha_pago) %>"
+                        data-periodo-cierre="<%= f.periodo_cierre || '' %>"
                         data-vencimiento="<%= fechaInput(f.fecha_vencimiento_factura) %>"
                         data-numero-nc="<%= f.nota_credito_numero || '' %>"
                         data-fecha-nc="<%= fechaInput(f.nota_credito_fecha) %>"
@@ -837,6 +847,11 @@
               <label class="form-label">Fecha de pago</label>
               <input type="date" name="fecha_pago" id="editarFechaPagoFactura" class="form-control">
             </div>
+            <div class="col-md-4">
+              <label class="form-label">Periodo de cierre</label>
+              <input type="month" name="periodo_cierre" id="editarPeriodoCierreFactura" class="form-control">
+              <div class="form-text">Ej: 2026-07 para cierre julio.</div>
+            </div>
             <div class="col-md-4" id="editarVencimientoWrap">
               <label class="form-label">Vencimiento</label>
               <input type="date" name="fecha_vencimiento_factura" id="editarVencimientoFactura" class="form-control">
@@ -949,7 +964,11 @@
             <label class="form-label">Fecha en que se pagó</label>
             <input type="date" name="fecha_pago" id="pagarFacturaFecha" class="form-control" value="<%= hoy %>" required>
           </div>
-          <small class="text-muted">Esta fecha quedará guardada como fecha de pago de la factura.</small>
+          <div class="mb-3">
+            <label class="form-label">Periodo de cierre</label>
+            <input type="month" name="periodo_cierre" id="pagarFacturaPeriodo" class="form-control" value="<%= hoy.slice(0, 7) %>">
+          </div>
+          <small class="text-muted">Puede pagar el 01/08 y dejar periodo cierre 2026-07 si pertenece al cierre de julio.</small>
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
@@ -978,7 +997,11 @@
           <label class="form-label">Fecha en que se pagaron</label>
           <input type="date" name="fecha_pago" id="pagarMultipleFecha" class="form-control" value="<%= hoy %>" form="multiplePagoForm" required>
         </div>
-        <small class="text-muted">La misma fecha se aplicará a todas las facturas seleccionadas.</small>
+        <div class="mb-3">
+          <label class="form-label">Periodo de cierre</label>
+          <input type="month" name="periodo_cierre" id="pagarMultiplePeriodo" class="form-control" value="<%= hoy.slice(0, 7) %>" form="multiplePagoForm">
+        </div>
+        <small class="text-muted">La misma fecha y periodo se aplicará a todas las facturas seleccionadas.</small>
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
@@ -1056,6 +1079,10 @@
             <label class="form-label">Monto del abono</label>
             <input type="number" step="0.01" min="0.01" name="monto_abono" id="abonoMonto" class="form-control" required>
             <small class="text-muted">Si el abono cubre todo el saldo, la factura queda pagada.</small>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Periodo de cierre si queda pagada</label>
+            <input type="month" name="periodo_cierre" id="abonoPeriodo" class="form-control" value="<%= hoy.slice(0, 7) %>">
           </div>
           <div class="mb-3">
             <label class="form-label">Observación</label>
@@ -1190,6 +1217,10 @@
     if (element) element.textContent = value || '';
   }
 
+  function periodoDesdeFecha(fecha) {
+    return /^\d{4}-\d{2}-\d{2}$/.test(String(fecha || '')) ? fecha.slice(0, 7) : '<%= hoy.slice(0, 7) %>';
+  }
+
   document.querySelectorAll('.btn-editar-factura').forEach(button => {
     button.addEventListener('click', () => {
       const data = button.dataset;
@@ -1206,6 +1237,7 @@
       setValue('editarMontoFactura', data.monto);
       setValue('editarPagadaFactura', data.pagada);
       setValue('editarFechaPagoFactura', data.fechaPago);
+      setValue('editarPeriodoCierreFactura', data.periodoCierre || periodoDesdeFecha(data.fechaPago || data.fecha));
       setValue('editarVencimientoFactura', data.vencimiento);
       setValue('editarNumeroNc', data.numeroNc);
       setValue('editarFechaNc', data.fechaNc);
@@ -1277,6 +1309,7 @@
       setText('abonoSaldoTexto', formatoColones(data.saldo));
       setText('abonoActualTexto', data.abonado && parseFloat(data.abonado) > 0 ? `Abonado actualmente: ${formatoColones(data.abonado)}` : '');
       setValue('abonoFecha', '<%= hoy %>');
+      setValue('abonoPeriodo', '<%= hoy.slice(0, 7) %>');
       setValue('abonoMonto', '');
       setValue('abonoObservacion', data.observacionAbono);
       const montoInput = document.getElementById('abonoMonto');
@@ -1293,8 +1326,23 @@
       form.action = `/compras/facturas/${data.id}/pagar`;
       setValue('pagarFacturaTipo', data.tipo);
       setValue('pagarFacturaFecha', '<%= hoy %>');
+      setValue('pagarFacturaPeriodo', '<%= hoy.slice(0, 7) %>');
       setText('pagarFacturaSubtitulo', `Factura ${data.numero || '-'} · ${data.proveedorNombre || 'Sin proveedor'}`);
       setText('pagarFacturaSaldoTexto', formatoColones(data.saldo));
+    });
+  });
+
+  [
+    ['pagarFacturaFecha', 'pagarFacturaPeriodo'],
+    ['pagarMultipleFecha', 'pagarMultiplePeriodo'],
+    ['editarFechaPagoFactura', 'editarPeriodoCierreFactura'],
+    ['abonoFecha', 'abonoPeriodo']
+  ].forEach(([fechaId, periodoId]) => {
+    const fechaInput = document.getElementById(fechaId);
+    const periodoInput = document.getElementById(periodoId);
+    if (!fechaInput || !periodoInput) return;
+    fechaInput.addEventListener('change', () => {
+      if (!periodoInput.value) periodoInput.value = periodoDesdeFecha(fechaInput.value);
     });
   });
 

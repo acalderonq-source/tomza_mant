@@ -29,7 +29,7 @@
     .stat-grid {
       display: grid;
       gap: .85rem;
-      grid-template-columns: repeat(5, minmax(0, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(175px, 1fr));
     }
     .stat-card { padding: 1rem; }
     .stat-label {
@@ -99,6 +99,53 @@
       margin-top: .2rem;
       word-break: break-word;
     }
+    .closing-card {
+      background: #ffffff;
+      border: 1px solid #bfdbfe;
+      border-radius: 16px;
+      box-shadow: 0 12px 26px rgba(15, 23, 42, .07);
+      overflow: hidden;
+    }
+    .closing-head {
+      background: linear-gradient(135deg, #0b3b82, #174ea6);
+      color: #ffffff;
+      display: flex;
+      gap: 1rem;
+      justify-content: space-between;
+      padding: 1rem 1.15rem;
+    }
+    .closing-title {
+      font-size: 1.15rem;
+      font-weight: 950;
+      margin: 0;
+      text-transform: uppercase;
+    }
+    .closing-total {
+      font-size: clamp(1.65rem, 4vw, 2.8rem);
+      font-weight: 950;
+      line-height: 1;
+    }
+    .closing-status {
+      border-radius: 999px;
+      display: inline-flex;
+      font-size: .75rem;
+      font-weight: 900;
+      padding: .35rem .7rem;
+    }
+    .closing-status.ok { background: #dcfce7; color: #14532d; }
+    .closing-status.diff { background: #fee2e2; color: #991b1b; }
+    .closing-grid {
+      display: grid;
+      gap: 1rem;
+      grid-template-columns: minmax(260px, .8fr) minmax(0, 1.2fr);
+      padding: 1rem;
+    }
+    .closing-table-wrap {
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      max-height: 360px;
+      overflow: auto;
+    }
     .debt-card {
       background: #fff;
       border: 1px solid #dbe3ef;
@@ -157,6 +204,7 @@
     @media (max-width: 980px) {
       .stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .finance-grid { grid-template-columns: 1fr; }
+      .closing-grid { grid-template-columns: 1fr; }
     }
     @media (max-width: 620px) {
       .stat-grid { grid-template-columns: 1fr; }
@@ -185,10 +233,23 @@
   const safeFinResumen = safeFinanciero.resumen || {};
   const safeFinPorTipo = Array.isArray(safeFinanciero.porTipo) ? safeFinanciero.porTipo : [];
   const safeFinPorMes = Array.isArray(safeFinanciero.porMes) ? safeFinanciero.porMes : [];
+  const safeCierre = cierrePagos || {};
+  const safeCierreProveedores = Array.isArray(safeCierre.proveedores) ? safeCierre.proveedores : [];
+  const safeCierreDetalles = Array.isArray(safeCierre.detalles) ? safeCierre.detalles : [];
   const filtrosActuales = filtros || {};
   const money = (value) => Number(value || 0).toLocaleString('es-CR', { maximumFractionDigits: 0 });
-  const pdfDeudaUrl = '/compras/facturas/reporte/pdf?orden=asc';
+  const money2 = (value) => Number(value || 0).toLocaleString('es-CR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const fecha = value => {
+    if (!value) return '—';
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? '—' : date.toLocaleDateString('es-CR');
+  };
+  const pdfDeudaUrl = '/compras/facturas/reporte/pdf?pagada=0&orden=asc';
   const listaDeudaUrl = '/compras/facturas?pagada=0&orden=asc';
+  const cierreUrlParams = new URLSearchParams();
+  if (safeCierre.periodo) cierreUrlParams.set('periodo_cierre', safeCierre.periodo);
+  const cierreExcelUrl = '/compras/facturas/pagos-proveedor/reporte/excel' + (cierreUrlParams.toString() ? `?${cierreUrlParams.toString()}` : '');
+  const cierreDetalleUrl = '/compras/facturas/pagos-proveedor' + (cierreUrlParams.toString() ? `?${cierreUrlParams.toString()}` : '');
 %>
 
 <nav class="navbar navbar-dark bg-dark px-3 py-2">
@@ -234,6 +295,10 @@
         </select>
       </div>
       <div class="col-md-2">
+        <label class="form-label small fw-bold">Periodo cierre</label>
+        <input type="month" name="periodo_cierre" class="form-control form-control-sm" value="<%= filtrosActuales.periodo_cierre || '' %>">
+      </div>
+      <div class="col-md-2">
         <label class="form-label small fw-bold">Vencidas</label>
         <select name="vencida" class="form-select form-select-sm">
           <option value="">Todas</option>
@@ -245,6 +310,99 @@
       </div>
     </form>
   </section>
+
+  <% if (safeCierre.periodo) { %>
+    <section class="closing-card mb-3">
+      <div class="closing-head flex-wrap">
+        <div>
+          <div class="finance-label">Cierre de pagos</div>
+          <h2 class="closing-title mb-1"><%= safeCierre.titulo %></h2>
+          <div class="small opacity-75">Calculado desde pagos de proveedor con periodo de cierre <%= safeCierre.periodo %>.</div>
+          <div class="d-flex gap-2 flex-wrap mt-3">
+            <a href="<%= cierreExcelUrl %>" class="btn btn-light btn-sm rounded-pill px-3">
+              <i class="bi bi-file-earmark-excel"></i> Descargar Excel del cierre
+            </a>
+            <a href="<%= cierreDetalleUrl %>" class="btn btn-outline-light btn-sm rounded-pill px-3">
+              Ver pagos del cierre
+            </a>
+          </div>
+        </div>
+        <div class="text-end">
+          <div class="finance-label">Total general</div>
+          <div class="closing-total">₡<%= money2(safeCierre.totalGeneral) %></div>
+          <% if (safeCierre.totalOficial !== null && safeCierre.totalOficial !== undefined) { %>
+            <% const diferenciaCierre = Number(safeCierre.diferencia || 0); %>
+            <div class="mt-2">
+              <span class="closing-status <%= Math.abs(diferenciaCierre) < 0.01 ? 'ok' : 'diff' %>">
+                <%= Math.abs(diferenciaCierre) < 0.01 ? 'Cuadra con Emily' : `Diferencia: ₡${money2(diferenciaCierre)}` %>
+              </span>
+            </div>
+            <div class="small opacity-75 mt-1">Oficial Emily: ₡<%= money2(safeCierre.totalOficial) %></div>
+          <% } %>
+        </div>
+      </div>
+      <div class="closing-grid">
+        <div>
+          <h3 class="fs-6 fw-black mb-2">Por proveedor</h3>
+          <div class="closing-table-wrap">
+            <table class="table table-sm align-middle mb-0">
+              <thead>
+                <tr>
+                  <th>Proveedor</th>
+                  <th class="text-center">Mov.</th>
+                  <th class="text-end">Pagado</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% if (!safeCierreProveedores.length) { %>
+                  <tr><td colspan="3" class="text-center text-muted py-4">No hay pagos en este cierre.</td></tr>
+                <% } %>
+                <% safeCierreProveedores.forEach(item => { %>
+                  <tr>
+                    <td class="fw-bold"><%= item.proveedor %></td>
+                    <td class="text-center"><%= item.movimientos %></td>
+                    <td class="text-end fw-bold">₡<%= money2(item.total) %></td>
+                  </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div>
+          <h3 class="fs-6 fw-black mb-2">Detalle para revisar diferencias</h3>
+          <div class="closing-table-wrap">
+            <table class="table table-sm align-middle mb-0">
+              <thead>
+                <tr>
+                  <th>Proveedor</th>
+                  <th>Factura</th>
+                  <th>Fecha factura</th>
+                  <th>Fecha pago</th>
+                  <th class="text-end">Original</th>
+                  <th class="text-end">Pagado</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% if (!safeCierreDetalles.length) { %>
+                  <tr><td colspan="6" class="text-center text-muted py-4">Seleccione un periodo con pagos registrados.</td></tr>
+                <% } %>
+                <% safeCierreDetalles.forEach(item => { %>
+                  <tr>
+                    <td><strong><%= item.proveedor_nombre || 'Sin proveedor' %></strong><div class="small text-muted"><%= item.concepto || '—' %></div></td>
+                    <td><%= item.numero_factura || '—' %></td>
+                    <td><%= fecha(item.fecha_factura) %></td>
+                    <td><%= fecha(item.fecha_pago || item.fecha_solicitud) %></td>
+                    <td class="text-end">₡<%= money2(item.monto_original) %></td>
+                    <td class="text-end fw-bold">₡<%= money2(item.monto_pagado) %></td>
+                  </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+  <% } %>
 
   <section class="finance-hero mb-3">
     <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
@@ -337,6 +495,11 @@
       <div class="stat-label">Abonos</div>
       <div class="stat-value">₡<%= money(safeResumen.abonos) %></div>
       <div class="stat-foot"><%= safeResumen.conAbono || 0 %> facturas abonadas</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Pagado real</div>
+      <div class="stat-value">₡<%= money(safeResumen.pagado) %></div>
+      <div class="stat-foot">Usa abono real cuando existe</div>
     </div>
   </section>
 

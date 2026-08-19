@@ -38,15 +38,84 @@
     .reason-box { min-width: 260px; }
     .sede-form { min-width: 230px; }
     .empty-state { color: #64748b; font-weight: 700; padding: 1.5rem; text-align: center; }
+    .business-grid { display: grid; gap: .75rem; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .business-card {
+      background: #fff;
+      border: 1px solid #dbe3ef;
+      border-left: 5px solid #2563eb;
+      border-radius: 8px;
+      padding: .85rem;
+    }
+    .business-card.negocio-cilindreros { border-left-color: #2563eb; }
+    .business-card.negocio-graneles { border-left-color: #dc2626; }
+    .business-card.negocio-transportadora { border-left-color: #7c3aed; }
+    .business-card.negocio-otros { border-left-color: #64748b; }
+    .business-name { font-size: .9rem; font-weight: 900; letter-spacing: .03em; }
+    .business-total { font-size: 1.45rem; font-weight: 950; line-height: 1.1; }
+    .business-meta { color: #64748b; font-size: .78rem; }
+    .business-section { border: 1px solid #dbe3ef; border-radius: 8px; overflow: hidden; }
+    .business-toggle {
+      align-items: center;
+      background: #f8fafc;
+      border: 0;
+      border-bottom: 1px solid #dbe3ef;
+      display: flex;
+      gap: .75rem;
+      justify-content: space-between;
+      padding: .85rem 1rem;
+      text-align: left;
+      width: 100%;
+    }
+    .business-toggle:hover { background: #eef4ff; }
+    .subgroup-card {
+      background: #fff;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    .subgroup-head {
+      background: #102a56;
+      color: #fff;
+      font-size: .82rem;
+      font-weight: 900;
+      padding: .55rem .7rem;
+    }
+    .plate-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(128px, 1fr));
+    }
+    .plate-cell {
+      border-bottom: 1px solid #edf2f7;
+      border-right: 1px solid #edf2f7;
+      padding: .5rem .55rem;
+      min-height: 58px;
+    }
+    .plate-cell strong { display: block; font-size: .92rem; }
+    .plate-flags { color: #64748b; font-size: .72rem; }
+    .mini-pill {
+      border-radius: 999px;
+      display: inline-block;
+      font-size: .65rem;
+      font-weight: 900;
+      margin-top: .18rem;
+      padding: .12rem .35rem;
+    }
+    .mini-ok { background: #dcfce7; color: #166534; }
+    .mini-off { background: #e2e8f0; color: #475569; }
+    .mini-stop { background: #fee2e2; color: #991b1b; }
     @media (max-width: 1180px) { .kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-    @media (max-width: 680px) { .kpi-grid { grid-template-columns: 1fr; } }
+    @media (max-width: 1180px) { .business-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+    @media (max-width: 680px) { .kpi-grid, .business-grid { grid-template-columns: 1fr; } }
   </style>
 </head>
 <body>
 <%
   const sedes = sedesFormulario || [];
   const sedesCambio = Array.isArray(sedesEditables) ? sedesEditables : sedes;
+  const negociosUnidades = Array.isArray(unidadesPorNegocio) ? unidadesPorNegocio : [];
   const mostrarSede = typeof etiquetaSede === 'function' ? etiquetaSede : (sede) => sede;
+  const negocioClase = nombre => `negocio-${String(nombre || 'otros').toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
+  const collapseId = nombre => `negocio-${String(nombre || 'otros').toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
 %>
 
 <nav class="navbar navbar-dark px-3 py-2">
@@ -93,6 +162,76 @@
       <div class="kpi-label">Inactivas</div>
       <div class="kpi-value"><%= resumen.inactivas %></div>
       <div class="kpi-foot">Fuera del listado activo</div>
+    </div>
+  </section>
+
+  <section class="panel p-3 mb-3">
+    <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
+      <div>
+        <h2 class="h5 fw-bold mb-0">Unidades por negocio</h2>
+        <div class="text-muted small">Vista agrupada por negocio, sede o tipo de unidad con los filtros actuales.</div>
+      </div>
+      <span class="badge text-bg-primary"><%= resumen.total %> unidad<%= resumen.total === 1 ? '' : 'es' %></span>
+    </div>
+
+    <div class="business-grid mb-3">
+      <% negociosUnidades.forEach(negocio => { %>
+        <div class="business-card <%= negocioClase(negocio.nombre) %>">
+          <div class="d-flex justify-content-between gap-2">
+            <div class="business-name"><%= negocio.nombre %></div>
+            <div class="business-total"><%= negocio.total %></div>
+          </div>
+          <div class="business-meta">
+            <%= negocio.activas %> activas · <%= negocio.varadas %> varadas · <%= negocio.inactivas %> inactivas
+          </div>
+        </div>
+      <% }) %>
+    </div>
+
+    <div class="d-grid gap-3">
+      <% negociosUnidades.filter(n => n.total > 0).forEach((negocio, index) => { %>
+        <% const idNegocio = collapseId(negocio.nombre); %>
+        <div class="business-section">
+          <button class="business-toggle" type="button" data-bs-toggle="collapse" data-bs-target="#<%= idNegocio %>" aria-expanded="<%= index === 0 ? 'true' : 'false' %>">
+            <div>
+              <strong><%= negocio.nombre %></strong>
+              <div class="text-muted small"><%= negocio.subgrupos.length %> grupo<%= negocio.subgrupos.length === 1 ? '' : 's' %> · <%= negocio.total %> unidad<%= negocio.total === 1 ? '' : 'es' %></div>
+            </div>
+            <span class="badge text-bg-dark"><%= negocio.activas %> activas</span>
+          </button>
+          <div class="collapse <%= index === 0 ? 'show' : '' %>" id="<%= idNegocio %>">
+            <div class="p-3">
+              <div class="row g-3">
+                <% negocio.subgrupos.forEach(subgrupo => { %>
+                  <div class="col-lg-6 col-xl-4">
+                    <div class="subgroup-card">
+                      <div class="subgroup-head d-flex justify-content-between gap-2">
+                        <span><%= subgrupo.nombre %></span>
+                        <span><%= subgrupo.total %></span>
+                      </div>
+                      <div class="plate-grid">
+                        <% subgrupo.unidades.forEach(unidad => { %>
+                          <div class="plate-cell">
+                            <strong><%= unidad.placa %></strong>
+                            <div class="plate-flags"><%= mostrarSede(unidad.sede) %></div>
+                            <% if (Number(unidad.varada) === 1) { %>
+                              <span class="mini-pill mini-stop">Varada</span>
+                            <% } else if (Number(unidad.activa) === 1) { %>
+                              <span class="mini-pill mini-ok">Activa</span>
+                            <% } else { %>
+                              <span class="mini-pill mini-off">Inactiva</span>
+                            <% } %>
+                          </div>
+                        <% }) %>
+                      </div>
+                    </div>
+                  </div>
+                <% }) %>
+              </div>
+            </div>
+          </div>
+        </div>
+      <% }) %>
     </div>
   </section>
 

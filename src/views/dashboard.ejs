@@ -296,6 +296,7 @@
   const puedeVerRevisionRuta = ['ADMIN', 'TALLER', 'MECANICO', 'SUPERVISOR', 'SUPERVISOR_PESADO'].includes(user.rol);
   const puedeVerGiras = ['ADMIN', 'TALLER', 'MECANICO', 'SUPERVISOR', 'SUPERVISOR_PESADO'].includes(user.rol);
   const puedeVerDashboardTaller = ['ADMIN', 'TALLER', 'MECANICO', 'SUPERVISOR', 'SUPERVISOR_PESADO'].includes(user.rol);
+  const puedeVerKpisMecanicos = ['ADMIN', 'TALLER', 'PROVEEDURIA_TALLER'].includes(user.rol);
   const puedeVerOrdenesMotor = ['ADMIN', 'TALLER', 'PROVEEDURIA_TALLER'].includes(user.rol);
   const puedeVerResumenEjecutivo = ['ADMIN', 'TALLER', 'PROVEEDURIA', 'PROVEEDURIA_TALLER', 'TRAMITES'].includes(user.rol);
   const puedeVerRepuestos = ['ADMIN', 'TALLER', 'PROVEEDURIA_TALLER', 'PROVEEDURIA', 'SUPERVISOR_PESADO', 'MENSAJERO', 'MENSAJERIA', 'MENSAJERO_FACTURAS'].includes(user.rol)
@@ -417,6 +418,12 @@
           <span class="module-icon icon-amber"><i class="bi bi-tools"></i></span>
           <div><div class="module-title">Mantenimientos</div><p class="module-copy">Pendientes, correctivos y cierres.</p></div>
         </a>
+        <% if (puedeVerKpisMecanicos) { %>
+          <a href="/kpis/mecanicos" class="module-card">
+            <span class="module-icon icon-blue"><i class="bi bi-speedometer2"></i></span>
+            <div><div class="module-title">KPIs mecánicos</div><p class="module-copy">Productividad y especialidad por trabajo.</p></div>
+          </a>
+        <% } %>
         <% if (puedeVerReportesSupervisores) { %>
           <a href="/reportes-supervisores" class="module-card">
             <span class="module-icon icon-blue"><i class="bi bi-clipboard-pulse"></i></span>

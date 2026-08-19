@@ -65,9 +65,20 @@ function toSqlDate(value) {
   return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString().slice(0, 10);
 }
 
+function periodoFromDate(value) {
+  const fecha = toSqlDate(value);
+  return fecha ? fecha.slice(0, 7) : null;
+}
+
+function normalizePeriod(value, fallbackDate = null) {
+  const text = String(value || "").trim();
+  if (/^\d{4}-\d{2}$/.test(text)) return text;
+  return periodoFromDate(fallbackDate);
+}
+
 function toMoney(value) {
   if (value == null || value === "") return 0;
-  if (typeof value === "number") return Number(value.toFixed(2));
+  if (typeof value === "number") return Number(value.toFixed(4));
 
   let text = String(value)
     .replace(/[₡$]/g, "")
@@ -88,7 +99,7 @@ function toMoney(value) {
   }
 
   const amount = Number(text);
-  return Number.isFinite(amount) ? Number(amount.toFixed(2)) : 0;
+  return Number.isFinite(amount) ? Number(amount.toFixed(4)) : 0;
 }
 
 function invoiceKey(providerName, invoiceNumber) {
@@ -148,9 +159,17 @@ async function readWorkbook(filePath) {
       const fechaPago = toSqlDate(cellRaw(row.getCell(headerMap.fechaPago))) || fechaSolicitud;
       const partida = cellText(row.getCell(headerMap.partida));
       const cuentaIban = cellText(row.getCell(headerMap.iban));
+      const filaNormalizada = normText(row.values.slice(1).map(value => value?.text || value?.result || value || "").join(" "));
 
       if (!proveedor && !numeroFactura && !monto) return;
       if (!proveedor || !numeroFactura || monto <= 0) return;
+      if (
+        filaNormalizada.includes("TOTAL SOLICITADO") ||
+        filaNormalizada.includes("TOTAL GENERAL") ||
+        filaNormalizada.startsWith("NOTAS:")
+      ) {
+        return;
+      }
 
       rows.push({
         hoja: sheet.name,
@@ -211,9 +230,25 @@ async function getAdminId(connection) {
   return admin?.id || null;
 }
 
+async function ensurePeriodoCierreColumn(connection) {
+  const [rows] = await connection.query(
+    `SELECT COUNT(*) AS total
+     FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE()
+       AND TABLE_NAME = 'facturas'
+       AND COLUMN_NAME = 'periodo_cierre'`
+  );
+
+  if (!Number(rows[0]?.total || 0)) {
+    await connection.query("ALTER TABLE facturas ADD COLUMN periodo_cierre CHAR(7) NULL AFTER fecha_pago");
+  }
+}
+
 async function main() {
   const fileArg = process.argv.find(arg => arg.startsWith("--file="));
+  const periodoArg = process.argv.find(arg => arg.startsWith("--periodo="));
   const filePath = path.resolve(fileArg ? fileArg.slice("--file=".length) : DEFAULT_FILE);
+  const periodoCierre = normalizePeriod(periodoArg ? periodoArg.slice("--periodo=".length) : null, filePath.includes("JULIO") ? "2026-07-01" : null);
   const commit = process.argv.includes("--commit");
 
   const rows = await readWorkbook(filePath);
@@ -221,6 +256,7 @@ async function main() {
 
   try {
     const providers = await loadProviders(connection);
+    await ensurePeriodoCierreColumn(connection);
     const { existing, invoiceOnly } = await loadExistingInvoices(connection);
     const adminId = await getAdminId(connection);
     const seenInFile = new Set();
@@ -299,11 +335,11 @@ async function main() {
 
       await connection.query(
         `INSERT INTO facturas (
-          numero_factura, fecha, monto, proveedor_id, proveedor_nombre, pagada, fecha_pago, creado_por,
+          numero_factura, fecha, monto, proveedor_id, proveedor_nombre, pagada, fecha_pago, periodo_cierre, creado_por,
           factura_fecha_recepcion, factura_tipo_entrega, factura_entregado_por, factura_recibido_por,
           factura_producto_recibido, factura_observacion, factura_placa_producto
         )
-        VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, 1, ?, ?)`,
+        VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`,
         [
           row.numero_factura,
           row.fecha,
@@ -311,6 +347,7 @@ async function main() {
           row.proveedor_id,
           row.proveedor_nombre,
           row.fecha_pago,
+          periodoCierre || normalizePeriod(null, row.fecha_pago || row.fecha),
           adminId,
           row.fecha_pago,
           "Importacion Excel",

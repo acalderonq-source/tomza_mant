@@ -12,6 +12,20 @@ const {
 } = require("../utils/sedes");
 const { agregarFiltroPlacaSql, normalizarPlaca } = require("../utils/placas");
 
+const SEDES_CILINDREROS = [
+  "ALAJUELA",
+  "CARTAGO",
+  "GUAPILES",
+  "LA CRUZ",
+  "NICOYA",
+  "OROTINA",
+  "PEREZ ZELEDON",
+  "RIO CLARO",
+  "SAN CARLOS"
+];
+
+const ORDEN_NEGOCIOS_UNIDADES = ["CILINDREROS", "GRANELES", "TRANSPORTADORA", "OTROS"];
+
 function requireAuth(req, res, next) {
   if (!req.session.user) return res.redirect("/login");
   next();
@@ -158,6 +172,126 @@ function normalizarPlacaUnidad(value) {
   return normalizarPlaca(value) || "";
 }
 
+function normalizarClaveNegocio(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/_/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toUpperCase();
+}
+
+function clasificarNegocioUnidad(unidad) {
+  const sede = normalizarClaveNegocio(unidad.sede);
+  const placa = String(unidad.placa || "").toUpperCase().replace(/\s+/g, "");
+
+  if (sede.includes("GRANEL")) {
+    return {
+      negocio: "GRANELES",
+      subgrupo: etiquetaSede(unidad.sede) || "Granel"
+    };
+  }
+
+  if (sede === "TRANSPORTADORA") {
+    return {
+      negocio: "TRANSPORTADORA",
+      subgrupo: placa.startsWith("S") ? "Cisternas y carretas" : "Cabezales"
+    };
+  }
+
+  if (SEDES_CILINDREROS.includes(sede)) {
+    return {
+      negocio: "CILINDREROS",
+      subgrupo: etiquetaSede(unidad.sede) || unidad.sede || "Sin sede"
+    };
+  }
+
+  return {
+    negocio: "OTROS",
+    subgrupo: etiquetaSede(unidad.sede) || unidad.sede || "Otros"
+  };
+}
+
+function crearResumenGrupoUnidades(nombre, subgrupoBase = []) {
+  const subgrupos = new Map();
+  subgrupoBase.forEach(subgrupo => {
+    subgrupos.set(subgrupo, {
+      nombre: subgrupo,
+      total: 0,
+      activas: 0,
+      inactivas: 0,
+      varadas: 0,
+      unidades: []
+    });
+  });
+
+  return {
+    nombre,
+    total: 0,
+    activas: 0,
+    inactivas: 0,
+    varadas: 0,
+    subgrupos
+  };
+}
+
+function agruparUnidadesPorNegocio(unidades) {
+  const subgruposBase = {
+    CILINDREROS: ["Alajuela", "Cartago", "Guapiles", "La Cruz", "Nicoya", "Orotina", "Perez Zeledon", "Rio Claro", "San Carlos"],
+    GRANELES: ["Granel Cartago", "Granel Alajuela", "Granel La Cruz", "Granel Guapiles", "Granel Perez Zeledon"],
+    TRANSPORTADORA: ["Cabezales", "Cisternas y carretas"],
+    OTROS: ["Taller", "Tecnicos", "Otros"]
+  };
+
+  const grupos = new Map();
+  ORDEN_NEGOCIOS_UNIDADES.forEach(nombre => {
+    grupos.set(nombre, crearResumenGrupoUnidades(nombre, subgruposBase[nombre] || []));
+  });
+
+  unidades.forEach(unidad => {
+    const clasificacion = clasificarNegocioUnidad(unidad);
+    if (!grupos.has(clasificacion.negocio)) {
+      grupos.set(clasificacion.negocio, crearResumenGrupoUnidades(clasificacion.negocio));
+    }
+
+    const grupo = grupos.get(clasificacion.negocio);
+    grupo.total += 1;
+    if (Number(unidad.activa) === 1) grupo.activas += 1;
+    else grupo.inactivas += 1;
+    if (Number(unidad.varada) === 1) grupo.varadas += 1;
+
+    if (!grupo.subgrupos.has(clasificacion.subgrupo)) {
+      grupo.subgrupos.set(clasificacion.subgrupo, {
+        nombre: clasificacion.subgrupo,
+        total: 0,
+        activas: 0,
+        inactivas: 0,
+        varadas: 0,
+        unidades: []
+      });
+    }
+
+    const subgrupo = grupo.subgrupos.get(clasificacion.subgrupo);
+    subgrupo.total += 1;
+    if (Number(unidad.activa) === 1) subgrupo.activas += 1;
+    else subgrupo.inactivas += 1;
+    if (Number(unidad.varada) === 1) subgrupo.varadas += 1;
+    subgrupo.unidades.push(unidad);
+  });
+
+  return [...grupos.values()].map(grupo => ({
+    ...grupo,
+    subgrupos: [...grupo.subgrupos.values()]
+      .map(subgrupo => ({
+        ...subgrupo,
+        unidades: subgrupo.unidades.sort((a, b) => String(a.placa).localeCompare(String(b.placa), "es"))
+      }))
+      .filter(subgrupo => subgrupo.total > 0)
+      .sort((a, b) => a.nombre.localeCompare(b.nombre, "es"))
+  }));
+}
+
 async function obtenerUnidadAutorizada(req, id) {
   const sedesPermitidas = await obtenerSedesPermitidas(req);
   const [[unidad]] = await pool.query(
@@ -225,6 +359,7 @@ router.get("/", async (req, res) => {
     sql += " ORDER BY activa DESC, varada DESC, sede ASC, placa ASC";
 
     const [unidades] = await pool.query(sql, params);
+    const unidadesPorNegocio = agruparUnidadesPorNegocio(unidades);
     const sedesFormulario = await obtenerTodasSedes(pool);
     const sedesEditables = await obtenerSedesEditables(req);
 
@@ -248,6 +383,7 @@ router.get("/", async (req, res) => {
 
     res.render("unidades", {
       unidades,
+      unidadesPorNegocio,
       user,
       sedeSeleccionada: req.session.sedeSeleccionada || "TODAS",
       sedesFormulario,

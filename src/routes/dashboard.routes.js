@@ -84,6 +84,11 @@ function fechaMesKey(value) {
   return Number.isNaN(fecha.getTime()) ? "Sin fecha" : fechaCostaRica(fecha).slice(0, 7);
 }
 
+function montoPagadoFacturaSql(alias, montoColumn) {
+  const base = `GREATEST(COALESCE(${montoColumn}, 0) - COALESCE(${alias}.nota_credito_monto, 0), 0)`;
+  return `CASE WHEN COALESCE(${alias}.abono_monto, 0) > 0 THEN LEAST(COALESCE(${alias}.abono_monto, 0), ${base}) ELSE ${base} END`;
+}
+
 function expandirSedeFiltro(sede) {
   if (!sede) return [];
   return expandirSedesEquivalentes(sede);
@@ -248,6 +253,83 @@ function armarFiltrosFecha(alias, fechaDesde, fechaHasta, params) {
   return partes;
 }
 
+function normalizarPeriodoCierre(value) {
+  const limpio = String(value || "").trim();
+  return /^\d{4}-\d{2}$/.test(limpio) ? limpio : "";
+}
+
+function periodoCierreDesdeRango(fechaDesde, fechaHasta) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(fechaDesde || ""))) return "";
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(fechaHasta || ""))) return "";
+
+  const desde = String(fechaDesde).slice(0, 10);
+  const hasta = String(fechaHasta).slice(0, 10);
+  const periodo = desde.slice(0, 7);
+  if (hasta.slice(0, 7) !== periodo || !desde.endsWith("-01")) return "";
+
+  const [year, month] = periodo.split("-").map(Number);
+  const ultimoDia = new Date(year, month, 0).getDate();
+  return hasta.endsWith(`-${String(ultimoDia).padStart(2, "0")}`) ? periodo : "";
+}
+
+function rangoFechasDesdePeriodo(periodo) {
+  const limpio = normalizarPeriodoCierre(periodo);
+  if (!limpio) return { desde: "", hasta: "" };
+
+  const [year, month] = limpio.split("-").map(Number);
+  const ultimoDia = new Date(year, month, 0).getDate();
+  return {
+    desde: `${limpio}-01`,
+    hasta: `${limpio}-${String(ultimoDia).padStart(2, "0")}`
+  };
+}
+
+function armarFiltrosFechaConPeriodoCierre(aliasFecha, aliasPeriodo, fechaDesde, fechaHasta, params, periodoCierre) {
+  const periodo = normalizarPeriodoCierre(periodoCierre) || periodoCierreDesdeRango(fechaDesde, fechaHasta);
+
+  if (periodo && fechaDesde && fechaHasta) {
+    params.push(periodo, fechaDesde, fechaHasta);
+    return [`(${aliasPeriodo} = ? OR (${aliasPeriodo} IS NULL AND ${aliasFecha} >= ? AND ${aliasFecha} <= ?))`];
+  }
+
+  if (periodo) {
+    params.push(periodo);
+    return [`${aliasPeriodo} = ?`];
+  }
+
+  return armarFiltrosFecha(aliasFecha, fechaDesde, fechaHasta, params);
+}
+
+async function columnExists(table, column) {
+  const [rows] = await pool.query(
+    `SELECT COUNT(*) AS total
+     FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE()
+       AND TABLE_NAME = ?
+       AND COLUMN_NAME = ?`,
+    [table, column]
+  );
+  return Number(rows[0]?.total || 0) > 0;
+}
+
+async function ensurePeriodoCierreColumns() {
+  try {
+    const targets = [
+      ["pagos_proveedor", "fecha_pago"],
+      ["ordenes_compra", "fecha_pago"],
+      ["facturas", "fecha_pago"]
+    ];
+
+    for (const [table, afterColumn] of targets) {
+      if (!(await columnExists(table, "periodo_cierre"))) {
+        await pool.query(`ALTER TABLE ${table} ADD COLUMN periodo_cierre CHAR(7) NULL AFTER ${afterColumn}`);
+      }
+    }
+  } catch (error) {
+    console.warn("No se pudo verificar periodo_cierre:", error.code || error.message);
+  }
+}
+
 async function resolverSedesUsuario(req) {
   const extras = await safeQuery(
     "SELECT sede FROM usuarios_sedes WHERE usuario_id = ?",
@@ -291,7 +373,14 @@ async function resolverSedesUsuario(req) {
   };
 }
 
-async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro }) {
+async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro, periodoCierre }) {
+  await ensurePeriodoCierreColumns();
+
+  const periodoFiltro = normalizarPeriodoCierre(periodoCierre);
+  const rangoPeriodo = rangoFechasDesdePeriodo(periodoFiltro);
+  fechaDesde = fechaDesde || rangoPeriodo.desde;
+  fechaHasta = fechaHasta || rangoPeriodo.hasta;
+
   const paramsOrdenes = [];
   const condicionesOrdenes = armarFiltrosFecha("o.fecha", fechaDesde, fechaHasta, paramsOrdenes);
   const whereOrdenes = condicionesOrdenes.length ? `WHERE ${condicionesOrdenes.join(" AND ")}` : "";
@@ -357,13 +446,14 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro }) 
 
   const pagosParams = [];
   const fechaPago = "COALESCE(pp.fecha_pago, pp.fecha_solicitud, DATE(pp.creado_en))";
-  const condicionesPagos = armarFiltrosFecha(fechaPago, fechaDesde, fechaHasta, pagosParams);
+  const condicionesPagos = armarFiltrosFechaConPeriodoCierre(fechaPago, "pp.periodo_cierre", fechaDesde, fechaHasta, pagosParams, periodoCierre);
   const wherePagos = condicionesPagos.length ? `WHERE ${condicionesPagos.join(" AND ")}` : "";
   const pagosProveedor = await safeQuery(`
     SELECT
       'PAGO_PROVEEDOR' AS fuente,
       pp.id,
       ${fechaPago} AS fecha,
+      pp.periodo_cierre,
       NULL AS po_numero,
       pp.proveedor_nombre AS proveedor,
       u.placa AS placa_registrada,
@@ -403,12 +493,12 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro }) 
   `, cajaParams, []);
 
   const facturasPagadasParams = [];
-  const condicionesFacturasOrdenesPagadas = armarFiltrosFecha("o.fecha_pago", fechaDesde, fechaHasta, facturasPagadasParams);
+  const condicionesFacturasOrdenesPagadas = armarFiltrosFechaConPeriodoCierre("o.fecha_pago", "o.periodo_cierre", fechaDesde, fechaHasta, facturasPagadasParams, periodoCierre);
   const whereFacturasOrdenesPagadas = condicionesFacturasOrdenesPagadas.length
     ? `AND ${condicionesFacturasOrdenesPagadas.join(" AND ")}`
     : "";
   const facturasIndependientesParams = [];
-  const condicionesFacturasIndependientesPagadas = armarFiltrosFecha("f.fecha_pago", fechaDesde, fechaHasta, facturasIndependientesParams);
+  const condicionesFacturasIndependientesPagadas = armarFiltrosFechaConPeriodoCierre("f.fecha_pago", "f.periodo_cierre", fechaDesde, fechaHasta, facturasIndependientesParams, periodoCierre);
   const whereFacturasIndependientesPagadas = condicionesFacturasIndependientesPagadas.length
     ? `AND ${condicionesFacturasIndependientesPagadas.join(" AND ")}`
     : "";
@@ -417,13 +507,13 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro }) 
       COALESCE(SUM(monto_pagado), 0) AS total,
       COUNT(*) AS movimientos
     FROM (
-      SELECT GREATEST(COALESCE(o.total, 0) - COALESCE(o.nota_credito_monto, 0), 0) AS monto_pagado
+      SELECT ${montoPagadoFacturaSql("o", "o.total")} AS monto_pagado
       FROM ordenes_compra o
       WHERE o.facturada = 1
         AND COALESCE(o.pagada, 0) = 1
         ${whereFacturasOrdenesPagadas}
       UNION ALL
-      SELECT GREATEST(COALESCE(f.monto, 0) - COALESCE(f.nota_credito_monto, 0), 0) AS monto_pagado
+      SELECT ${montoPagadoFacturaSql("f", "f.monto")} AS monto_pagado
       FROM facturas f
       WHERE COALESCE(f.pagada, 0) = 1
         ${whereFacturasIndependientesPagadas}
@@ -501,7 +591,9 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro }) 
       placa.registros += 1;
     }
 
-    const mesKey = fechaMesKey(item.fecha);
+    const mesKey = item.fuente === "PAGO_PROVEEDOR" && item.periodo_cierre
+      ? item.periodo_cierre
+      : fechaMesKey(item.fecha);
     const mes = sumarGrupo(porMes, mesKey);
     mes.total += item.monto;
     mes.registros += 1;
@@ -743,10 +835,11 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro }) 
   };
 }
 
-function claveResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro }) {
+function claveResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro, periodoCierre }) {
   return JSON.stringify({
     fechaDesde: fechaDesde || "",
     fechaHasta: fechaHasta || "",
+    periodoCierre: periodoCierre || "",
     sedes: Array.isArray(sedesFiltro) ? [...sedesFiltro].sort() : []
   });
 }
@@ -797,11 +890,13 @@ router.get("/resumen-ejecutivo", requireAuth, async (req, res) => {
 
     const fechaDesde = String(req.query.fecha_desde || "").trim();
     const fechaHasta = String(req.query.fecha_hasta || "").trim();
+    const periodoCierre = normalizarPeriodoCierre(req.query.periodo_cierre);
     const contextoSedes = await resolverSedesUsuario(req);
     const resumen = await obtenerResumenEjecutivoCached({
       fechaDesde,
       fechaHasta,
-      sedesFiltro: contextoSedes.sedesFiltro
+      sedesFiltro: contextoSedes.sedesFiltro,
+      periodoCierre
     });
 
     res.render("dashboard_resumen_ejecutivo", {
@@ -810,6 +905,7 @@ router.get("/resumen-ejecutivo", requireAuth, async (req, res) => {
       filtros: {
         fecha_desde: fechaDesde,
         fecha_hasta: fechaHasta,
+        periodo_cierre: periodoCierre,
         sede: contextoSedes.sedeFiltro || "TODAS"
       },
       sedes: contextoSedes.sedesPermitidas,
