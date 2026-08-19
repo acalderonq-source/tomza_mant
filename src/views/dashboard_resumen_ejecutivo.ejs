@@ -249,6 +249,36 @@
 
     .table-card { overflow: hidden; height: 100%; }
 
+    .table-card.is-collapsible .card-head {
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .table-card.is-collapsible .card-head::after {
+      align-items: center;
+      background: #eaf1ff;
+      border: 1px solid #bfdbfe;
+      border-radius: 999px;
+      color: var(--blue);
+      content: "Abrir";
+      display: inline-flex;
+      flex: 0 0 auto;
+      font-size: .72rem;
+      font-weight: 950;
+      padding: .35rem .75rem;
+    }
+
+    .table-card.is-collapsible:not(.collapsed) .card-head::after {
+      background: #fee2e2;
+      border-color: #fecaca;
+      color: #991b1b;
+      content: "Cerrar";
+    }
+
+    .table-card.is-collapsible.collapsed > :not(.card-head) {
+      display: none !important;
+    }
+
     .table {
       font-size: .86rem;
       margin: 0;
@@ -425,22 +455,27 @@
     return Number.isNaN(date.getTime()) ? String(value).slice(0, 10) : date.toLocaleDateString('es-CR');
   };
   const safe = (arr) => Array.isArray(arr) ? arr : [];
-  const categorias = safe(data.categorias);
+  const contieneCategoriaOculta = (texto) => {
+    const value = String(texto || '').toLowerCase();
+    return value.includes('otros por revisar') || value.includes('cabezales, carretas y cisternas');
+  };
+  const categorias = safe(data.categorias).filter(item => !contieneCategoriaOculta(item.nombre));
+  const totalCategoriasOperativas = categorias.reduce((sum, item) => sum + Number(item.total || 0), 0);
   const fuentes = safe(data.fuentes);
   const detalleGeneralOtros = safe(data.detalleGeneralOtros);
-  const detalleGeneralOtrosTop = detalleGeneralOtros.slice(0, 5);
+  const detalleGeneralOtrosTop = [];
   const resumenGeneralOtros = data.resumenGeneralOtros || {};
   const productosServicios = safe(data.productosServicios);
   const proveedores = safe(data.proveedores);
   const sedesGasto = safe(data.sedes);
   const placasGasto = safe(data.placas);
   const meses = safe(data.meses);
-  const familiasMant = safe(data.familiasMant);
+  const familiasMant = safe(data.familiasMant).filter(item => !contieneCategoriaOculta(item.nombre));
   const sedesMant = safe(data.sedesMant);
   const placasMant = safe(data.placasMant);
   const trabajosPorSede = safe(data.trabajosPorSede);
   const tiposMant = safe(data.tiposMant);
-  const conclusiones = safe(data.conclusiones);
+  const conclusiones = safe(data.conclusiones).filter(item => !contieneCategoriaOculta(item));
   const costoUnidad = data.costoUnidad || {};
   const resumenFinanciero = data.resumenFinanciero || {};
   const horaActualizacion = new Intl.DateTimeFormat('es-CR', {
@@ -469,7 +504,7 @@
     <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
       <div>
         <div class="eyebrow"><i class="bi bi-cash-coin me-1"></i> Dinero · Taller · Conclusiones</div>
-        <h1 class="page-title">Dónde se está gastando el dinero</h1>
+        <h1 class="page-title">Resumen total</h1>
         <p class="hero-subtitle">Cruza órdenes, pagos de proveedor, caja chica, preventivos y correctivos; las tablas por unidad muestran solo placas reales registradas.</p>
       </div>
       <div class="text-white text-end">
@@ -526,7 +561,7 @@
         <div class="metric-label">Total pagado</div>
         <div class="metric-value">₡<%= money(resumenFinanciero.totalPagado || 0) %></div>
         <div class="metric-foot">
-          Facturas, proveedores pagados y caja chica
+          Facturas, órdenes motor pagadas, proveedores pagados y caja chica
         </div>
       </div>
     </div>
@@ -534,7 +569,7 @@
       <div class="metric-card" style="--accent:#ef233c">
         <div class="metric-label">Mayor tipo de gasto</div>
         <div class="metric-value"><%= categorias[0]?.nombre || '-' %></div>
-        <div class="metric-foot">₡<%= money(categorias[0]?.total || 0) %> · <%= pct(categorias[0]?.total, data.totalGastos) %>% del gasto</div>
+        <div class="metric-foot">₡<%= money(categorias[0]?.total || 0) %> · <%= pct(categorias[0]?.total, totalCategoriasOperativas) %>% del gasto operativo</div>
       </div>
     </div>
     <div class="col-xl col-md-6">
@@ -589,6 +624,12 @@
                 <td><span class="pill pill-soft"><%= Number(resumenFinanciero.movimientosFacturasPagadas || 0).toLocaleString('es-CR') %></span></td>
                 <td class="text-end money">₡<%= money(resumenFinanciero.totalFacturasPagadas || 0) %></td>
                 <td class="text-end"><%= pct(resumenFinanciero.totalFacturasPagadas, resumenFinanciero.totalPagado) %>%</td>
+              </tr>
+              <tr>
+                <td><strong>Órdenes motor</strong></td>
+                <td><span class="pill pill-soft"><%= Number(resumenFinanciero.movimientosOrdenesMotorPagadas || 0).toLocaleString('es-CR') %></span></td>
+                <td class="text-end money">₡<%= money(resumenFinanciero.totalOrdenesMotorPagadas || 0) %></td>
+                <td class="text-end"><%= pct(resumenFinanciero.totalOrdenesMotorPagadas, resumenFinanciero.totalPagado) %>%</td>
               </tr>
               <tr>
                 <td><strong>Pago proveedor pagado</strong></td>
@@ -757,7 +798,7 @@
         <div class="card-head">
           <div>
             <h2 class="card-title">Gasto por tipo operativo</h2>
-            <span class="card-subtitle">Monto, movimientos y peso sobre el total. Otros por revisar son compras que no traen suficiente detalle para clasificarlas.</span>
+            <span class="card-subtitle">Monto, movimientos y peso sobre las familias operativas visibles.</span>
           </div>
         </div>
         <div class="table-responsive">
@@ -770,7 +811,7 @@
                   <td><span class="pill" style="background:<%= item.color || '#eef2f7' %>22;color:<%= item.color || '#334155' %>"><%= item.nombre %></span></td>
                   <td><span class="pill pill-soft"><%= Number(item.registros || 0).toLocaleString('es-CR') %></span></td>
                   <td class="text-end money">₡<%= money(item.total) %></td>
-                  <td class="text-end"><%= pct(item.total, data.totalGastos) %>%</td>
+                  <td class="text-end"><%= pct(item.total, totalCategoriasOperativas) %>%</td>
                 </tr>
               <% }) %>
             </tbody>
@@ -1040,6 +1081,28 @@
   }
 
   (() => {
+    document.querySelectorAll('.table-card').forEach((card) => {
+      const head = card.querySelector(':scope > .card-head');
+      if (!head) return;
+
+      card.classList.add('is-collapsible', 'collapsed');
+      head.setAttribute('role', 'button');
+      head.setAttribute('tabindex', '0');
+      head.setAttribute('aria-expanded', 'false');
+
+      const toggle = () => {
+        const isCollapsed = card.classList.toggle('collapsed');
+        head.setAttribute('aria-expanded', String(!isCollapsed));
+      };
+
+      head.addEventListener('click', toggle);
+      head.addEventListener('keydown', (event) => {
+        if (event.key !== 'Enter' && event.key !== ' ') return;
+        event.preventDefault();
+        toggle();
+      });
+    });
+
     const refreshSeconds = 60;
     const counter = document.getElementById('refreshCountdown');
     let remaining = refreshSeconds;

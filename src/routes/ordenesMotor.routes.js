@@ -87,7 +87,11 @@ async function ensureOrdenesMotorTables() {
     ["cotizacion_archivo", "VARCHAR(255) NULL"],
     ["cotizacion_nombre", "VARCHAR(255) NULL"],
     ["cotizacion_tipo", "VARCHAR(100) NULL"],
-    ["empresa_destino", "VARCHAR(80) NOT NULL DEFAULT 'GAS TOMZA'"]
+    ["empresa_destino", "VARCHAR(80) NOT NULL DEFAULT 'GAS TOMZA'"],
+    ["pagada", "TINYINT(1) NOT NULL DEFAULT 0"],
+    ["fecha_pago", "DATE NULL"],
+    ["periodo_cierre", "CHAR(7) NULL"],
+    ["monto_pagado_cierre", "DECIMAL(14,4) NULL"]
   ];
 
   for (const [column, definition] of optionalColumns) {
@@ -434,7 +438,33 @@ router.post("/:id/editar", requireAuth, requireMotor, async (req, res) => {
 router.post("/:id/estado", requireAuth, requireMotor, async (req, res) => {
   try {
     await ensureOrdenesMotorTables();
-    await pool.query("UPDATE ordenes_motor SET estado = ? WHERE id = ?", [req.body.estado, req.params.id]);
+    const estado = String(req.body.estado || "").trim().toUpperCase();
+    const fechaPago = new Date().toISOString().slice(0, 10);
+    const periodoCierre = fechaPago.slice(0, 7);
+
+    if (["RECIBIDA_TOTAL", "PAGADA", "PAGADO", "CERRADA", "CERRADO"].includes(estado)) {
+      await pool.query(
+        `UPDATE ordenes_motor
+         SET estado = ?,
+             pagada = 1,
+             fecha_pago = COALESCE(fecha_pago, ?),
+             periodo_cierre = COALESCE(periodo_cierre, ?),
+             monto_pagado_cierre = COALESCE(monto_pagado_cierre, total)
+         WHERE id = ?`,
+        [estado, fechaPago, periodoCierre, req.params.id]
+      );
+    } else {
+      await pool.query(
+        `UPDATE ordenes_motor
+         SET estado = ?,
+             pagada = 0,
+             fecha_pago = NULL,
+             periodo_cierre = NULL,
+             monto_pagado_cierre = NULL
+         WHERE id = ?`,
+        [estado, req.params.id]
+      );
+    }
     res.redirect("/ordenes-motor");
   } catch (error) {
     console.error("Error actualizando estado motor:", error);

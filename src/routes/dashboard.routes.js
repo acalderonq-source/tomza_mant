@@ -86,7 +86,7 @@ function fechaMesKey(value) {
 
 function montoPagadoFacturaSql(alias, montoColumn) {
   const base = `GREATEST(COALESCE(${montoColumn}, 0) - COALESCE(${alias}.nota_credito_monto, 0), 0)`;
-  return `CASE WHEN COALESCE(${alias}.abono_monto, 0) > 0 THEN LEAST(COALESCE(${alias}.abono_monto, 0), ${base}) ELSE ${base} END`;
+  return `CASE WHEN COALESCE(${alias}.monto_pagado_cierre, 0) > 0 THEN COALESCE(${alias}.monto_pagado_cierre, 0) WHEN COALESCE(${alias}.abono_monto, 0) > 0 THEN LEAST(COALESCE(${alias}.abono_monto, 0), ${base}) ELSE ${base} END`;
 }
 
 function expandirSedeFiltro(sede) {
@@ -287,11 +287,6 @@ function rangoFechasDesdePeriodo(periodo) {
 function armarFiltrosFechaConPeriodoCierre(aliasFecha, aliasPeriodo, fechaDesde, fechaHasta, params, periodoCierre) {
   const periodo = normalizarPeriodoCierre(periodoCierre) || periodoCierreDesdeRango(fechaDesde, fechaHasta);
 
-  if (periodo && fechaDesde && fechaHasta) {
-    params.push(periodo, fechaDesde, fechaHasta);
-    return [`(${aliasPeriodo} = ? OR (${aliasPeriodo} IS NULL AND ${aliasFecha} >= ? AND ${aliasFecha} <= ?))`];
-  }
-
   if (periodo) {
     params.push(periodo);
     return [`${aliasPeriodo} = ?`];
@@ -317,12 +312,24 @@ async function ensurePeriodoCierreColumns() {
     const targets = [
       ["pagos_proveedor", "fecha_pago"],
       ["ordenes_compra", "fecha_pago"],
-      ["facturas", "fecha_pago"]
+      ["facturas", "fecha_pago"],
+      ["ordenes_motor", "fecha_pago"]
     ];
 
     for (const [table, afterColumn] of targets) {
+      if (table === "ordenes_motor") {
+        if (!(await columnExists(table, "pagada"))) {
+          await pool.query("ALTER TABLE ordenes_motor ADD COLUMN pagada TINYINT(1) NOT NULL DEFAULT 0 AFTER estado");
+        }
+        if (!(await columnExists(table, "fecha_pago"))) {
+          await pool.query("ALTER TABLE ordenes_motor ADD COLUMN fecha_pago DATE NULL AFTER pagada");
+        }
+      }
       if (!(await columnExists(table, "periodo_cierre"))) {
         await pool.query(`ALTER TABLE ${table} ADD COLUMN periodo_cierre CHAR(7) NULL AFTER ${afterColumn}`);
+      }
+      if (!(await columnExists(table, "monto_pagado_cierre"))) {
+        await pool.query(`ALTER TABLE ${table} ADD COLUMN monto_pagado_cierre DECIMAL(14,4) NULL AFTER periodo_cierre`);
       }
     }
   } catch (error) {
@@ -444,6 +451,48 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro, pe
     ${whereOrdenes}
   `, paramsOrdenes, []);
 
+  const paramsOrdenesMotor = [];
+  const condicionesOrdenesMotor = armarFiltrosFecha("om.fecha", fechaDesde, fechaHasta, paramsOrdenesMotor);
+  const whereOrdenesMotor = condicionesOrdenesMotor.length ? `WHERE ${condicionesOrdenesMotor.join(" AND ")}` : "";
+  const ordenesMotorLineas = await safeQuery(`
+    SELECT
+      'ORDEN_MOTOR' AS fuente,
+      om.id,
+      om.fecha,
+      om.numero AS po_numero,
+      p.nombre AS proveedor,
+      u.placa AS placa_registrada,
+      UPPER(TRIM(COALESCE(
+        REPLACE(REPLACE(REPLACE(REGEXP_SUBSTR(UPPER(CONCAT_WS(' ', d.codigo, d.descripcion, om.placa_unidad, om.observaciones)), 'CL[[:space:].-]*[0-9]{5,6}|C[[:space:].-]*[0-9]{5,6}|S[[:space:].-]*[0-9]{5,6}'), ' ', ''), '-', ''), '.', ''),
+        REPLACE(NULLIF(UPPER(TRIM(om.placa_unidad)), ''), ' ', ''),
+        NULL
+      ))) AS placa,
+      u.sede AS sede,
+      d.codigo AS codigo,
+      om.placa_unidad,
+      om.observaciones,
+      COALESCE(d.descripcion, om.observaciones, 'Orden motor') AS descripcion,
+      CASE
+        WHEN d.id IS NULL THEN COALESCE(om.total, 0)
+        WHEN COALESCE(detalle_totales.total_detalle, 0) > 0 AND COALESCE(om.total, 0) > 0
+          THEN COALESCE(d.subtotal, d.cantidad * d.precio_unitario, 0) * (COALESCE(om.total, 0) / detalle_totales.total_detalle)
+        ELSE COALESCE(d.subtotal, d.cantidad * d.precio_unitario, 0)
+      END AS monto
+    FROM ordenes_motor om
+    LEFT JOIN proveedores p ON p.id = om.proveedor_id
+    LEFT JOIN (
+      SELECT orden_motor_id, SUM(COALESCE(subtotal, cantidad * precio_unitario, 0)) AS total_detalle
+      FROM ordenes_motor_detalle
+      GROUP BY orden_motor_id
+    ) detalle_totales ON detalle_totales.orden_motor_id = om.id
+    LEFT JOIN ordenes_motor_detalle d ON d.orden_motor_id = om.id
+    LEFT JOIN unidades u ON REPLACE(UPPER(TRIM(u.placa)), ' ', '') = UPPER(TRIM(COALESCE(
+      REPLACE(REPLACE(REPLACE(REGEXP_SUBSTR(UPPER(CONCAT_WS(' ', d.codigo, d.descripcion, om.placa_unidad, om.observaciones)), 'CL[[:space:].-]*[0-9]{5,6}|C[[:space:].-]*[0-9]{5,6}|S[[:space:].-]*[0-9]{5,6}'), ' ', ''), '-', ''), '.', ''),
+      REPLACE(NULLIF(UPPER(TRIM(om.placa_unidad)), ''), ' ', '')
+    )))
+    ${whereOrdenesMotor}
+  `, paramsOrdenesMotor, []);
+
   const pagosParams = [];
   const fechaPago = "COALESCE(pp.fecha_pago, pp.fecha_solicitud, DATE(pp.creado_en))";
   const condicionesPagos = armarFiltrosFechaConPeriodoCierre(fechaPago, "pp.periodo_cierre", fechaDesde, fechaHasta, pagosParams, periodoCierre);
@@ -528,7 +577,7 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro, pe
   const indiceUnidades = crearIndiceUnidades(unidadesReferencia);
 
   const aplicaSede = (item) => !sedesFiltro.length || sedesFiltro.includes(item.sede);
-  const gastos = [...ordenesLineas, ...pagosProveedor, ...cajaChica]
+  const gastos = [...ordenesLineas, ...ordenesMotorLineas, ...pagosProveedor, ...cajaChica]
     .map(item => {
       const unidadResuelta = resolverUnidadGasto(item, indiceUnidades);
       const placaNormalizada = normalizarPlaca(item.placa_registrada || item.placa);
@@ -566,7 +615,13 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro, pe
   const porDescripcion = new Map();
 
   gastos.forEach(item => {
-    const fuenteNombre = item.fuente === "ORDEN" ? "Órdenes de compra" : item.fuente === "PAGO_PROVEEDOR" ? "Pago proveedor" : "Caja chica";
+    const fuenteNombre = item.fuente === "ORDEN"
+      ? "Órdenes de compra"
+      : item.fuente === "ORDEN_MOTOR"
+      ? "Órdenes motor"
+      : item.fuente === "PAGO_PROVEEDOR"
+      ? "Pago proveedor"
+      : "Caja chica";
     const fuente = sumarGrupo(porFuente, fuenteNombre);
     fuente.total += item.monto;
     fuente.registros += 1;
@@ -711,6 +766,7 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro, pe
 
   const totalGastos = gastos.reduce((sum, item) => sum + item.monto, 0);
   const totalOrdenesCompra = gastos.filter(item => item.fuente === "ORDEN").reduce((sum, item) => sum + item.monto, 0);
+  const totalOrdenesMotor = gastos.filter(item => item.fuente === "ORDEN_MOTOR").reduce((sum, item) => sum + item.monto, 0);
   const totalPagosProveedor = gastos.filter(item => item.fuente === "PAGO_PROVEEDOR").reduce((sum, item) => sum + item.monto, 0);
   const pagosProveedorPagados = gastos.filter(item => item.fuente === "PAGO_PROVEEDOR" && Number(item.pagada || 0) === 1);
   const pagosProveedorPendientes = gastos.filter(item => item.fuente === "PAGO_PROVEEDOR" && Number(item.pagada || 0) !== 1);
@@ -718,11 +774,12 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro, pe
   const totalPagosProveedorPendientes = pagosProveedorPendientes.reduce((sum, item) => sum + item.monto, 0);
   const totalCajaChica = gastos.filter(item => item.fuente === "CAJA_CHICA").reduce((sum, item) => sum + item.monto, 0);
   const totalFacturasPagadas = Number(facturasPagadasRow.total || 0);
+  const totalOrdenesMotorPagadas = totalOrdenesMotor;
   const movimientosFacturasPagadas = Number(facturasPagadasRow.movimientos || 0);
-  const totalPagado = totalFacturasPagadas + totalPagosProveedorPagados + totalCajaChica;
-  const movimientosTotalPagado = movimientosFacturasPagadas +
-    pagosProveedorPagados.length +
-    gastos.filter(item => item.fuente === "CAJA_CHICA").length;
+  const movimientosOrdenesMotorPagadas = gastos.filter(item => item.fuente === "ORDEN_MOTOR").length;
+  const movimientosCajaChica = gastos.filter(item => item.fuente === "CAJA_CHICA").length;
+  const totalPagado = totalFacturasPagadas + totalOrdenesMotorPagadas + totalPagosProveedorPagados + totalCajaChica;
+  const movimientosTotalPagado = movimientosFacturasPagadas + movimientosOrdenesMotorPagadas + pagosProveedorPagados.length + movimientosCajaChica;
   const fuentes = ordenarTop(porFuente, 10);
   const categorias = ordenarTop(porCategoria, 12);
   const detalleGeneralOtros = ordenarTop(porDetalleGeneral, 1000);
@@ -786,6 +843,8 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro, pe
     totalMantenimientos: mantenimientos.length,
     resumenFinanciero: {
       totalOrdenesCompra,
+      totalOrdenesMotor,
+      totalOrdenesMotorPagadas,
       totalPagosProveedor,
       totalPagosProveedorPagados,
       totalPagosProveedorPendientes,
@@ -793,10 +852,12 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro, pe
       totalFacturasPagadas,
       totalPagado,
       movimientosOrdenesCompra: gastos.filter(item => item.fuente === "ORDEN").length,
+      movimientosOrdenesMotor: gastos.filter(item => item.fuente === "ORDEN_MOTOR").length,
+      movimientosOrdenesMotorPagadas,
       movimientosPagosProveedor: gastos.filter(item => item.fuente === "PAGO_PROVEEDOR").length,
       movimientosPagosProveedorPagados: pagosProveedorPagados.length,
       movimientosPagosProveedorPendientes: pagosProveedorPendientes.length,
-      movimientosCajaChica: gastos.filter(item => item.fuente === "CAJA_CHICA").length,
+      movimientosCajaChica,
       movimientosFacturasPagadas,
       movimientosTotalPagado
     },

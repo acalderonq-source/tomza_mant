@@ -293,6 +293,17 @@ async function columnExists(tableName, columnName) {
   return Number(row.count) > 0;
 }
 
+async function tableExists(tableName) {
+  const [[row]] = await queryWithRetry(
+    `SELECT COUNT(*) AS count
+     FROM INFORMATION_SCHEMA.TABLES
+     WHERE TABLE_SCHEMA = DATABASE()
+       AND TABLE_NAME = ?`,
+    [tableName]
+  );
+  return Number(row.count) > 0;
+}
+
 async function columnInfo(tableName, columnName) {
   const [[row]] = await queryWithRetry(
     `SELECT DATA_TYPE AS dataType, CHARACTER_MAXIMUM_LENGTH AS maxLength
@@ -461,28 +472,27 @@ async function ensurePeriodoCierreColumns() {
 
   const columns = [
     ["ordenes_compra", "fecha_pago"],
-    ["facturas", "fecha_pago"]
+    ["facturas", "fecha_pago"],
+    ["ordenes_motor", "fecha_pago"]
   ];
 
   for (const [table, afterColumn] of columns) {
+    if (!(await tableExists(table))) continue;
+    if (table === "ordenes_motor") {
+      if (!(await columnExists(table, "pagada"))) {
+        await queryWithRetry("ALTER TABLE ordenes_motor ADD COLUMN pagada TINYINT(1) NOT NULL DEFAULT 0 AFTER estado");
+      }
+      if (!(await columnExists(table, "fecha_pago"))) {
+        await queryWithRetry("ALTER TABLE ordenes_motor ADD COLUMN fecha_pago DATE NULL AFTER pagada");
+      }
+    }
     if (!(await columnExists(table, "periodo_cierre"))) {
       await queryWithRetry(`ALTER TABLE ${table} ADD COLUMN periodo_cierre CHAR(7) NULL AFTER ${afterColumn}`);
     }
+    if (!(await columnExists(table, "monto_pagado_cierre"))) {
+      await queryWithRetry(`ALTER TABLE ${table} ADD COLUMN monto_pagado_cierre DECIMAL(14,4) NULL AFTER periodo_cierre`);
+    }
   }
-
-  await queryWithRetry(`
-    UPDATE ordenes_compra
-    SET periodo_cierre = DATE_FORMAT(fecha_pago, '%Y-%m')
-    WHERE periodo_cierre IS NULL
-      AND fecha_pago IS NOT NULL
-  `);
-
-  await queryWithRetry(`
-    UPDATE facturas
-    SET periodo_cierre = DATE_FORMAT(fecha_pago, '%Y-%m')
-    WHERE periodo_cierre IS NULL
-      AND fecha_pago IS NOT NULL
-  `);
 }
 
 async function ensureCajaChicaTable() {
@@ -830,7 +840,9 @@ function calcularSaldoFactura(monto, notaCredito = 0, abono = 0, pagada = 0) {
   };
 }
 
-function calcularMontoPagadoCierre(saldos, pagada = 0) {
+function calcularMontoPagadoCierre(saldos, pagada = 0, montoPagadoCierre = null) {
+  const montoCierre = parseMonto(montoPagadoCierre);
+  if (montoCierre > 0) return montoCierre;
   if (saldos.abonoMonto > 0) return saldos.abonoMonto;
   return Number(pagada || 0) ? saldos.basePagar : 0;
 }
@@ -947,8 +959,6 @@ async function obtenerResumenPagosProveedor(filtros = {}) {
 }
 
 async function obtenerCierrePagosProveedor(periodoCierre) {
-  await ensurePagosProveedorTable();
-
   const periodo = normalizarPeriodoCierre(periodoCierre);
   if (!periodo) {
     return {
@@ -963,48 +973,40 @@ async function obtenerCierrePagosProveedor(periodoCierre) {
     };
   }
 
-  const [pagos] = await queryWithRetry(`
-    SELECT
-      pp.id,
-      pp.empresa,
-      pp.fecha_solicitud,
-      pp.fecha_pago,
-      pp.periodo_cierre,
-      pp.proveedor_nombre,
-      pp.numero_factura,
-      pp.concepto,
-      pp.placa,
-      pp.monto,
-      pp.archivo_nombre
-    FROM pagos_proveedor pp
-    WHERE COALESCE(pp.pagada, 0) = 1
-      AND pp.periodo_cierre = ?
-    ORDER BY pp.proveedor_nombre ASC, pp.numero_factura ASC, pp.id ASC
-  `, [periodo]);
+  const facturas = await obtenerFacturasCompras({
+    periodo_cierre: periodo,
+    pagada: "1",
+    orden: "asc"
+  });
 
-  const totalGeneral = pagos.reduce((sum, pago) => sum + parseMonto(pago.monto), 0);
-  const referencias = await obtenerReferenciasFacturasPorPago(pagos);
   const proveedoresMap = new Map();
-  const detalles = pagos.map(pago => {
-    const proveedor = pago.proveedor_nombre || "Sin proveedor";
+  const detalles = facturas.map(factura => {
+    const proveedor = factura.proveedor_nombre || "Sin proveedor";
     if (!proveedoresMap.has(proveedor)) {
       proveedoresMap.set(proveedor, { proveedor, movimientos: 0, total: 0 });
     }
 
     const grupo = proveedoresMap.get(proveedor);
-    const monto = parseMonto(pago.monto);
+    const monto = parseMonto(factura.monto_pagado);
     grupo.movimientos += 1;
     grupo.total += monto;
 
-    const referencia = referencias.get(clavePagoFactura(proveedor, pago.numero_factura));
     return {
-      ...pago,
+      id: factura.id,
+      proveedor_nombre: proveedor,
+      numero_factura: factura.numero_factura,
+      concepto: factura.po_numero ? `Orden ${factura.po_numero}` : (factura.factura_observacion || "Factura pagada"),
+      fecha_pago: factura.fecha_pago,
+      fecha_solicitud: factura.fecha,
+      periodo_cierre: factura.periodo_cierre,
+      placa: factura.factura_placa_producto,
       monto_pagado: monto,
-      monto_original: referencia?.monto_original ?? monto,
-      fecha_factura: referencia?.fecha_factura || null,
-      origen_factura: referencia?.origen || "Pago proveedor"
+      monto_original: parseMonto(factura.monto_original),
+      fecha_factura: factura.fecha,
+      origen_factura: factura.tipo === "orden" ? "Orden de compra" : "Factura"
     };
   });
+  const totalGeneral = detalles.reduce((sum, pago) => sum + parseMonto(pago.monto_pagado), 0);
 
   const totalOficial = periodo === "2026-07" ? 62615263.92 : null;
   return {
@@ -1013,7 +1015,7 @@ async function obtenerCierrePagosProveedor(periodoCierre) {
     totalGeneral,
     totalOficial,
     diferencia: totalOficial === null ? 0 : Number((totalGeneral - totalOficial).toFixed(2)),
-    movimientos: pagos.length,
+    movimientos: detalles.length,
     proveedores: Array.from(proveedoresMap.values()).sort((a, b) => b.total - a.total || a.proveedor.localeCompare(b.proveedor, "es")),
     detalles
   };
@@ -1182,12 +1184,6 @@ function periodoCierreDesdeRango(fechaDesde, fechaHasta) {
 function agregarFiltroFechaConPeriodoCierre(sqlParts, params, campoFecha, campoPeriodo, fechaDesde, fechaHasta, periodoCierre) {
   const periodo = normalizarPeriodoCierre(periodoCierre) || periodoCierreDesdeRango(fechaDesde, fechaHasta);
 
-  if (periodo && fechaDesde && fechaHasta) {
-    sqlParts.push(`(${campoPeriodo} = ? OR (${campoPeriodo} IS NULL AND ${campoFecha} >= ? AND ${campoFecha} <= ?))`);
-    params.push(periodo, fechaDesde, fechaHasta);
-    return periodo;
-  }
-
   if (periodo) {
     sqlParts.push(`${campoPeriodo} = ?`);
     params.push(periodo);
@@ -1198,9 +1194,20 @@ function agregarFiltroFechaConPeriodoCierre(sqlParts, params, campoFecha, campoP
   return null;
 }
 
+function montoPagadoFacturaSql(alias, montoColumn) {
+  const base = `GREATEST(COALESCE(${montoColumn}, 0) - COALESCE(${alias}.nota_credito_monto, 0), 0)`;
+  return `CASE
+    WHEN COALESCE(${alias}.monto_pagado_cierre, 0) > 0 THEN COALESCE(${alias}.monto_pagado_cierre, 0)
+    WHEN COALESCE(${alias}.abono_monto, 0) > 0 THEN LEAST(COALESCE(${alias}.abono_monto, 0), ${base})
+    ELSE ${base}
+  END`;
+}
+
 async function obtenerDashboardFinancieroFacturas(filtros = {}) {
   await ensurePagosProveedorTable();
   await ensurePeriodoCierreColumns();
+  await ensureNotaCreditoColumns();
+  await ensureAbonoColumns();
   await ensureCajaChicaTable();
   await ensureReintegroGastosTable();
 
@@ -1218,12 +1225,41 @@ async function obtenerDashboardFinancieroFacturas(filtros = {}) {
   }
   const whereOrdenesSql = whereOrdenes.length ? `WHERE ${whereOrdenes.join(" AND ")}` : "";
 
+  const whereOrdenesMotor = [];
+  const paramsOrdenesMotor = [];
+  agregarFiltroFecha(whereOrdenesMotor, paramsOrdenesMotor, "om.fecha", fecha_desde, fecha_hasta);
+  if (proveedor_id) {
+    whereOrdenesMotor.push("om.proveedor_id = ?");
+    paramsOrdenesMotor.push(proveedor_id);
+  }
+  const whereOrdenesMotorSql = whereOrdenesMotor.length ? `WHERE ${whereOrdenesMotor.join(" AND ")}` : "";
+
+  const whereFacturasOrdenesPagadas = ["o.facturada = 1", "COALESCE(o.pagada, 0) = 1"];
+  const paramsFacturasOrdenesPagadas = [];
+  agregarFiltroFechaConPeriodoCierre(whereFacturasOrdenesPagadas, paramsFacturasOrdenesPagadas, "o.fecha_pago", "o.periodo_cierre", fecha_desde, fecha_hasta, periodoCierre);
+  if (proveedor_id) {
+    whereFacturasOrdenesPagadas.push("o.proveedor_id = ?");
+    paramsFacturasOrdenesPagadas.push(proveedor_id);
+  }
+  const whereFacturasOrdenesPagadasSql = `WHERE ${whereFacturasOrdenesPagadas.join(" AND ")}`;
+
+  const whereFacturasIndependientesPagadas = ["COALESCE(f.pagada, 0) = 1"];
+  const paramsFacturasIndependientesPagadas = [];
+  agregarFiltroFechaConPeriodoCierre(whereFacturasIndependientesPagadas, paramsFacturasIndependientesPagadas, "f.fecha_pago", "f.periodo_cierre", fecha_desde, fecha_hasta, periodoCierre);
+  if (proveedor_id) {
+    whereFacturasIndependientesPagadas.push("f.proveedor_id = ?");
+    paramsFacturasIndependientesPagadas.push(proveedor_id);
+  }
+  const whereFacturasIndependientesPagadasSql = `WHERE ${whereFacturasIndependientesPagadas.join(" AND ")}`;
+
   const fechaPagoProveedor = "COALESCE(pp.fecha_pago, pp.fecha_solicitud, DATE(pp.creado_en))";
   const wherePagos = [];
   const paramsPagos = [];
   agregarFiltroFechaConPeriodoCierre(wherePagos, paramsPagos, fechaPagoProveedor, "pp.periodo_cierre", fecha_desde, fecha_hasta, periodoCierre);
-  wherePagos.push("COALESCE(pp.pagada, 0) = 1");
   const wherePagosSql = wherePagos.length ? `WHERE ${wherePagos.join(" AND ")}` : "";
+  const wherePagosPagadosSql = wherePagos.length
+    ? `WHERE ${wherePagos.join(" AND ")} AND COALESCE(pp.pagada, 0) = 1`
+    : "WHERE COALESCE(pp.pagada, 0) = 1";
 
   const whereCaja = [];
   const paramsCaja = [];
@@ -1241,10 +1277,35 @@ async function obtenerDashboardFinancieroFacturas(filtros = {}) {
     ${whereOrdenesSql}
   `, paramsOrdenes);
 
+  const [[ordenesMotorResumen]] = await queryWithRetry(`
+    SELECT COUNT(*) AS registros, COALESCE(SUM(total), 0) AS total
+    FROM ordenes_motor om
+    ${whereOrdenesMotorSql}
+  `, paramsOrdenesMotor);
+
+  const [[facturasPagadasResumen]] = await queryWithRetry(`
+    SELECT COALESCE(SUM(monto_pagado), 0) AS total, COUNT(*) AS registros
+    FROM (
+      SELECT ${montoPagadoFacturaSql("o", "o.total")} AS monto_pagado
+      FROM ordenes_compra o
+      ${whereFacturasOrdenesPagadasSql}
+      UNION ALL
+      SELECT ${montoPagadoFacturaSql("f", "f.monto")} AS monto_pagado
+      FROM facturas f
+      ${whereFacturasIndependientesPagadasSql}
+    ) facturas_pagadas
+  `, [...paramsFacturasOrdenesPagadas, ...paramsFacturasIndependientesPagadas]);
+
   const [[pagosResumen]] = await queryWithRetry(`
     SELECT COUNT(*) AS registros, COALESCE(SUM(monto), 0) AS total
     FROM pagos_proveedor pp
     ${wherePagosSql}
+  `, paramsPagos);
+
+  const [[pagosPagadosResumen]] = await queryWithRetry(`
+    SELECT COUNT(*) AS registros, COALESCE(SUM(monto), 0) AS total
+    FROM pagos_proveedor pp
+    ${wherePagosPagadosSql}
   `, paramsPagos);
 
   const [[cajaResumen]] = await queryWithRetry(`
@@ -1265,6 +1326,13 @@ async function obtenerDashboardFinancieroFacturas(filtros = {}) {
     ${whereOrdenesSql}
     GROUP BY DATE_FORMAT(o.fecha, '%Y-%m')
   `, paramsOrdenes);
+
+  const [ordenesMotorMes] = await queryWithRetry(`
+    SELECT DATE_FORMAT(om.fecha, '%Y-%m') AS mes, COUNT(*) AS registros, COALESCE(SUM(om.total), 0) AS total
+    FROM ordenes_motor om
+    ${whereOrdenesMotorSql}
+    GROUP BY DATE_FORMAT(om.fecha, '%Y-%m')
+  `, paramsOrdenesMotor);
 
   const [pagosMes] = await queryWithRetry(`
     SELECT COALESCE(pp.periodo_cierre, DATE_FORMAT(${fechaPagoProveedor}, '%Y-%m')) AS mes, COUNT(*) AS registros, COALESCE(SUM(pp.monto), 0) AS total
@@ -1301,6 +1369,11 @@ async function obtenerDashboardFinancieroFacturas(filtros = {}) {
     item.ordenes += Number(row.total || 0);
     item.total += Number(row.total || 0);
   });
+  ordenesMotorMes.forEach(row => {
+    const item = asegurarMes(row.mes);
+    item.ordenesMotor = (item.ordenesMotor || 0) + Number(row.total || 0);
+    item.total += Number(row.total || 0);
+  });
   pagosMes.forEach(row => {
     const item = asegurarMes(row.mes);
     item.pagosProveedor += Number(row.total || 0);
@@ -1318,11 +1391,16 @@ async function obtenerDashboardFinancieroFacturas(filtros = {}) {
   });
 
   const totalOrdenes = Number(ordenesResumen?.total || 0);
+  const totalOrdenesMotor = Number(ordenesMotorResumen?.total || 0);
+  const totalOrdenesMotorPagadas = totalOrdenesMotor;
+  const totalFacturasPagadas = Number(facturasPagadasResumen?.total || 0);
   const totalPagosProveedor = Number(pagosResumen?.total || 0);
+  const totalPagosProveedorPagados = Number(pagosPagadosResumen?.total || 0);
   const totalCajaChica = Number(cajaResumen?.total || 0);
   const totalReintegrosGastos = Number(reintegrosResumen?.total || 0);
   const porTipo = [
     { tipo: "Ordenes de compra", total: totalOrdenes, registros: Number(ordenesResumen?.registros || 0), color: "#0f3b82" },
+    { tipo: "Ordenes motor", total: totalOrdenesMotor, registros: Number(ordenesMotorResumen?.registros || 0), color: "#ea580c" },
     { tipo: "Pago de proveedor", total: totalPagosProveedor, registros: Number(pagosResumen?.registros || 0), color: "#0ea5e9" },
     { tipo: "Caja chica", total: totalCajaChica, registros: Number(cajaResumen?.registros || 0), color: "#f59e0b" },
     { tipo: "Reintegro de gastos", total: totalReintegrosGastos, registros: Number(reintegrosResumen?.registros || 0), color: "#7c3aed" }
@@ -1331,10 +1409,15 @@ async function obtenerDashboardFinancieroFacturas(filtros = {}) {
   return {
     resumen: {
       totalOrdenes,
+      totalOrdenesMotor,
+      totalOrdenesMotorPagadas,
+      totalFacturasPagadas,
       totalPagosProveedor,
+      totalPagosProveedorPagados,
       totalCajaChica,
       totalReintegrosGastos,
-      totalGeneral: totalOrdenes + totalPagosProveedor + totalCajaChica + totalReintegrosGastos,
+      totalPagado: totalFacturasPagadas + totalOrdenesMotor + totalPagosProveedorPagados + totalCajaChica,
+      totalGeneral: totalOrdenes + totalOrdenesMotor + totalPagosProveedor + totalCajaChica + totalReintegrosGastos,
       registros: porTipo.reduce((sum, item) => sum + item.registros, 0)
     },
     porTipo,
@@ -1362,6 +1445,7 @@ async function obtenerFacturasCompras(filtros = {}) {
       o.pagada,
       o.fecha_pago,
       o.periodo_cierre,
+      o.monto_pagado_cierre,
       o.abono_monto,
       o.abono_fecha,
       o.abono_observacion,
@@ -1395,6 +1479,7 @@ async function obtenerFacturasCompras(filtros = {}) {
       f.pagada,
       f.fecha_pago,
       f.periodo_cierre,
+      f.monto_pagado_cierre,
       f.abono_monto,
       f.abono_fecha,
       f.abono_observacion,
@@ -1459,7 +1544,7 @@ async function obtenerFacturasCompras(filtros = {}) {
 
   const facturasConEstado = facturasUnidas.map(f => {
     const saldos = calcularSaldoFactura(f.monto, f.nota_credito_monto, f.abono_monto, f.pagada);
-    const montoPagado = calcularMontoPagadoCierre(saldos, f.pagada);
+    const montoPagado = calcularMontoPagadoCierre(saldos, f.pagada, f.monto_pagado_cierre);
     return {
       ...f,
       monto_original: saldos.montoOriginal,

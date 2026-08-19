@@ -317,7 +317,7 @@
         <div>
           <div class="finance-label">Cierre de pagos</div>
           <h2 class="closing-title mb-1"><%= safeCierre.titulo %></h2>
-          <div class="small opacity-75">Calculado desde pagos de proveedor con periodo de cierre <%= safeCierre.periodo %>.</div>
+          <div class="small opacity-75">Calculado desde facturas pagadas con periodo de cierre <%= safeCierre.periodo %>.</div>
           <div class="d-flex gap-2 flex-wrap mt-3">
             <a href="<%= cierreExcelUrl %>" class="btn btn-light btn-sm rounded-pill px-3">
               <i class="bi bi-file-earmark-excel"></i> Descargar Excel del cierre
@@ -410,7 +410,7 @@
         <div class="finance-label">Dashboard financiero de facturas</div>
         <div class="finance-total">₡<%= money(safeFinResumen.totalGeneral) %></div>
         <div class="small mt-2" style="color: rgba(255,255,255,.78);">
-          Suma de órdenes de compra, pagos de proveedor, caja chica y reintegros de gastos
+          Suma de órdenes de compra, órdenes motor, pagos de proveedor, caja chica y reintegros de gastos
           <% if (filtrosActuales.fecha_desde || filtrosActuales.fecha_hasta) { %>
             · Rango filtrado
           <% } else { %>
@@ -425,8 +425,16 @@
     </div>
     <div class="finance-grid">
       <div class="finance-pill">
+        <div class="finance-label">Total pagado</div>
+        <strong>₡<%= money(safeFinResumen.totalPagado) %></strong>
+      </div>
+      <div class="finance-pill">
         <div class="finance-label">Órdenes de compra</div>
         <strong>₡<%= money(safeFinResumen.totalOrdenes) %></strong>
+      </div>
+      <div class="finance-pill">
+        <div class="finance-label">Órdenes motor</div>
+        <strong>₡<%= money(safeFinResumen.totalOrdenesMotor) %></strong>
       </div>
       <div class="finance-pill">
         <div class="finance-label">Pago proveedor</div>
@@ -712,6 +720,7 @@
         labels: finMes.map(item => item.mes),
         datasets: [
           { label: 'Órdenes', data: finMes.map(item => Number(item.ordenes || 0)), backgroundColor: '#0f3b82', borderRadius: 7 },
+          { label: 'Órdenes motor', data: finMes.map(item => Number(item.ordenesMotor || 0)), backgroundColor: '#ea580c', borderRadius: 7 },
           { label: 'Pago proveedor', data: finMes.map(item => Number(item.pagosProveedor || 0)), backgroundColor: '#0ea5e9', borderRadius: 7 },
           { label: 'Caja chica', data: finMes.map(item => Number(item.cajaChica || 0)), backgroundColor: '#f59e0b', borderRadius: 7 },
           { label: 'Reintegro gastos', data: finMes.map(item => Number(item.reintegrosGastos || 0)), backgroundColor: '#7c3aed', borderRadius: 7 }
