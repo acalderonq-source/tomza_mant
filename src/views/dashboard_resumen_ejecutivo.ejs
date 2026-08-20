@@ -475,6 +475,8 @@
   const placasMant = safe(data.placasMant);
   const trabajosPorSede = safe(data.trabajosPorSede);
   const tiposMant = safe(data.tiposMant);
+  const gastosMantenimientoPorTipo = safe(data.gastosMantenimientoPorTipo);
+  const gastoPorTipo = (tipo) => gastosMantenimientoPorTipo.find(item => item.tipo === tipo) || { total: 0, registros: 0 };
   const conclusiones = safe(data.conclusiones).filter(item => !contieneCategoriaOculta(item));
   const costoUnidad = data.costoUnidad || {};
   const resumenFinanciero = data.resumenFinanciero || {};
@@ -632,6 +634,18 @@
                 <td class="text-end"><%= pct(resumenFinanciero.totalOrdenesMotorPagadas, resumenFinanciero.totalPagado) %>%</td>
               </tr>
               <tr>
+                <td><strong>Gasto correctivo</strong></td>
+                <td><span class="pill pill-soft"><%= Number(resumenFinanciero.movimientosGastoCorrectivo || 0).toLocaleString('es-CR') %></span></td>
+                <td class="text-end money">₡<%= money(resumenFinanciero.totalGastoCorrectivo || 0) %></td>
+                <td class="text-end"><%= pct(resumenFinanciero.totalGastoCorrectivo, data.totalGastos) %>%</td>
+              </tr>
+              <tr>
+                <td><strong>Gasto preventivo</strong></td>
+                <td><span class="pill pill-soft"><%= Number(resumenFinanciero.movimientosGastoPreventivo || 0).toLocaleString('es-CR') %></span></td>
+                <td class="text-end money">₡<%= money(resumenFinanciero.totalGastoPreventivo || 0) %></td>
+                <td class="text-end"><%= pct(resumenFinanciero.totalGastoPreventivo, data.totalGastos) %>%</td>
+              </tr>
+              <tr>
                 <td><strong>Pago proveedor pagado</strong></td>
                 <td><span class="pill pill-blue"><%= Number(resumenFinanciero.movimientosPagosProveedorPagados || 0).toLocaleString('es-CR') %></span></td>
                 <td class="text-end money">₡<%= money(resumenFinanciero.totalPagosProveedorPagados || 0) %></td>
@@ -686,11 +700,23 @@
         </div>
         <div class="table-responsive">
           <table class="table table-hover align-middle">
-            <thead><tr><th>Tipo</th><th class="text-end">Registros</th></tr></thead>
+            <thead><tr><th>Tipo</th><th class="text-end">Registros</th><th class="text-end">Monto órdenes</th></tr></thead>
             <tbody>
-              <% if (!tiposMant.length) { %><tr><td colspan="2" class="empty-state">No hay mantenimientos para este filtro.</td></tr><% } %>
+              <% if (!tiposMant.length) { %><tr><td colspan="3" class="empty-state">No hay mantenimientos para este filtro.</td></tr><% } %>
               <% tiposMant.forEach(item => { %>
-                <tr><td><strong><%= item.nombre %></strong></td><td class="text-end money"><%= Number(item.registros || 0).toLocaleString('es-CR') %></td></tr>
+                <% const montoTipo = gastoPorTipo(String(item.nombre || '').toUpperCase()); %>
+                <tr>
+                  <td><strong><%= item.nombre %></strong></td>
+                  <td class="text-end money"><%= Number(item.registros || 0).toLocaleString('es-CR') %></td>
+                  <td class="text-end money">₡<%= money(montoTipo.total || 0) %></td>
+                </tr>
+              <% }) %>
+              <% gastosMantenimientoPorTipo.filter(item => !tiposMant.some(t => String(t.nombre || '').toUpperCase() === item.tipo)).forEach(item => { %>
+                <tr>
+                  <td><strong><%= item.nombre %></strong></td>
+                  <td class="text-end money">0</td>
+                  <td class="text-end money">₡<%= money(item.total || 0) %></td>
+                </tr>
               <% }) %>
             </tbody>
           </table>

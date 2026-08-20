@@ -812,13 +812,14 @@
           ? lineas.map(linea => `
               <tr>
                 <td>${escapeHtml(linea.codigo || '-')}</td>
+                <td>${escapeHtml(linea.codigo_producto || '-')}</td>
                 <td>${escapeHtml(linea.descripcion || '-')}</td>
                 <td class="text-center">${Number(linea.cantidad || 0).toLocaleString('es-CR')}</td>
                 <td class="text-end">${formatCurrency(linea.precio_unitario || 0)}</td>
                 <td class="text-end">${formatCurrency(linea.subtotal || 0)}</td>
               </tr>
             `).join('')
-          : '<tr><td colspan="5" class="text-center text-muted">Sin líneas registradas</td></tr>';
+          : '<tr><td colspan="6" class="text-center text-muted">Sin líneas registradas</td></tr>';
 
         const observacion = orden.observaciones
           ? `<div class="orden-observacion"><strong>Observación:</strong> ${escapeHtml(orden.observaciones)}</div>`
@@ -840,7 +841,8 @@
               <table class="table table-sm align-middle mb-0">
                 <thead class="table-light">
                   <tr>
-                    <th>Placa/Código</th>
+                    <th>Placa</th>
+                    <th>Código</th>
                     <th>Compra</th>
                     <th class="text-center">Cant.</th>
                     <th class="text-end">Precio</th>

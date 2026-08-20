@@ -81,6 +81,22 @@
       border-radius: 14px;
       padding: .8rem;
     }
+    .facturas-pagination {
+      align-items: center;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 14px;
+      display: flex;
+      gap: .75rem;
+      justify-content: space-between;
+      margin-top: 1rem;
+      padding: .75rem .9rem;
+    }
+    .facturas-pagination .page-info {
+      color: #475569;
+      font-size: .88rem;
+      font-weight: 700;
+    }
     .receipt-modal .modal-content {
       border: 0;
       border-radius: 18px;
@@ -317,6 +333,14 @@
         justify-content: flex-end;
         min-width: 0;
       }
+      .facturas-pagination {
+        align-items: stretch;
+        flex-direction: column;
+      }
+      .facturas-pagination .btn-group {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+      }
     }
   </style>
   <link rel="stylesheet" href="/css/compras.css">
@@ -343,6 +367,9 @@
     const puedeRecibirFacturas = puedeGestionarFacturas || rolesMensajeroFacturas.includes(user.rol);
     const modoMensajero = rolesMensajeroFacturas.includes(user.rol);
     const puedeModificarCompras = puedeGestionarFacturas;
+    const paginacionFacturas = typeof paginacion !== 'undefined' && paginacion
+      ? paginacion
+      : { pagina: 1, porPagina: facturas.length || 100, total: facturas.length, totalPaginas: 1, desde: facturas.length ? 1 : 0, hasta: facturas.length };
     const fechaInput = (value) => {
       if (!value) return '';
       const date = new Date(value);
@@ -444,6 +471,14 @@
           <option value="desc" <%= filtros.orden === 'desc' || !filtros.orden ? 'selected' : '' %>>Más reciente primero</option>
         </select>
       </div>
+      <div class="col-md-2">
+        <label class="form-label small fw-semibold">Por página</label>
+        <select name="por_pagina" class="form-select form-select-sm">
+          <% [50, 100, 150, 300].forEach(size => { %>
+            <option value="<%= size %>" <%= Number(paginacionFacturas.porPagina) === size ? 'selected' : '' %>><%= size %> registros</option>
+          <% }) %>
+        </select>
+      </div>
       <div class="col-md-1 d-flex align-items-end">
         <button type="submit" class="btn btn-primary btn-sm w-100">Filtrar</button>
       </div>
@@ -477,13 +512,22 @@
     const reporteFacturasExcelUrl = '/compras/facturas/reporte/excel' + (reporteParams.toString() ? `?${reporteParams.toString()}` : '');
     const listaParams = new URLSearchParams(reporteParams);
     if (filtros.pagada) listaParams.set('pagada', filtros.pagada);
-    const dashboardFacturasUrl = '/compras/facturas/dashboard' + (listaParams.toString() ? `?${listaParams.toString()}` : '');
+    if (paginacionFacturas.porPagina) listaParams.set('por_pagina', paginacionFacturas.porPagina);
+    if (paginacionFacturas.pagina > 1) listaParams.set('pagina', paginacionFacturas.pagina);
+    const paginaFacturasUrl = (page) => {
+      const params = new URLSearchParams(listaParams);
+      params.set('pagina', page);
+      params.set('por_pagina', paginacionFacturas.porPagina);
+      return '/compras/facturas?' + params.toString();
+    };
+    const dashboardFacturasUrl = '/compras/facturas/dashboard' + (reporteParams.toString() ? `?${reporteParams.toString()}` : '');
     var returnToFacturas = '/compras/facturas' + (listaParams.toString() ? `?${listaParams.toString()}` : '');
   %>
   <div class="summary-grid">
     <div class="summary-card">
-      <div class="summary-label">Facturas</div>
-      <div class="summary-value"><%= facturas.length %></div>
+      <div class="summary-label">Mostrando</div>
+      <div class="summary-value"><%= paginacionFacturas.desde %>-<%= paginacionFacturas.hasta %></div>
+      <div class="small text-muted">de <%= paginacionFacturas.total %> factura(s)</div>
     </div>
     <div class="summary-card">
       <div class="summary-label">Monto original</div>
@@ -512,7 +556,10 @@
     <div class="d-flex justify-content-between align-items-center flex-wrap gap-3 facturas-list-toolbar">
       <div>
         <h3 class="page-title fs-5">Listado de facturas</h3>
-        <p class="page-subtitle">Pagadas/cubiertas: <%= facturasPagadas %> · Pendientes: <%= facturasPendientes %> · Vencidas: <%= facturasVencidas %></p>
+        <p class="page-subtitle">
+          Mostrando <%= paginacionFacturas.desde %>-<%= paginacionFacturas.hasta %> de <%= paginacionFacturas.total %> ·
+          En esta página: <%= facturasPagadas %> pagadas/cubiertas · <%= facturasPendientes %> pendientes · <%= facturasVencidas %> vencidas
+        </p>
       </div>
       <div class="d-flex gap-2 flex-wrap justify-content-end">
         <a href="<%= dashboardFacturasUrl %>" class="btn btn-dark btn-sm">
@@ -748,6 +795,25 @@
           </tbody>
         </table>
       </div>
+      <% if (paginacionFacturas.totalPaginas > 1) { %>
+        <div class="facturas-pagination">
+          <div class="page-info">
+            Página <%= paginacionFacturas.pagina %> de <%= paginacionFacturas.totalPaginas %>
+          </div>
+          <div class="btn-group">
+            <a
+              class="btn btn-sm btn-outline-dark <%= paginacionFacturas.pagina <= 1 ? 'disabled' : '' %>"
+              href="<%= paginacionFacturas.pagina <= 1 ? '#' : paginaFacturasUrl(paginacionFacturas.pagina - 1) %>">
+              Anterior
+            </a>
+            <a
+              class="btn btn-sm btn-outline-dark <%= paginacionFacturas.pagina >= paginacionFacturas.totalPaginas ? 'disabled' : '' %>"
+              href="<%= paginacionFacturas.pagina >= paginacionFacturas.totalPaginas ? '#' : paginaFacturasUrl(paginacionFacturas.pagina + 1) %>">
+              Siguiente
+            </a>
+          </div>
+        </div>
+      <% } %>
       <% if (puedeModificarCompras) { %>
         <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mt-3 bulk-pay-bar">
           <div>

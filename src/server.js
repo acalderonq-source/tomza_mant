@@ -216,6 +216,7 @@ const reportesSupervisoresRoutes = require("./routes/reportesSupervisores.routes
 const revisionRutaRoutes = require("./routes/revisionRuta.routes");
 const girasRoutes = require("./routes/giras.routes");
 const tallerRoutes = require("./routes/taller.routes");
+const logisticaTallerRoutes = require("./routes/logisticaTaller.routes");
 const oficinaRoutes = require("./routes/oficina.routes");
 const ordenesMotorRoutes = require("./routes/ordenesMotor.routes");
 const repuestosRoutes = require("./routes/repuestos.routes");
@@ -243,6 +244,7 @@ app.use("/reportes-supervisores", reportesSupervisoresRoutes);
 app.use("/revision-ruta", revisionRutaRoutes);
 app.use("/giras", girasRoutes);
 app.use("/taller", tallerRoutes);
+app.use("/logistica-taller", logisticaTallerRoutes);
 app.use("/oficina-dia-dia", oficinaRoutes);
 app.use("/ordenes-motor", ordenesMotorRoutes);
 app.use("/repuestos", repuestosRoutes);

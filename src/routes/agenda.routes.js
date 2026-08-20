@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const pool = require("../db");
 const { agregarTallerParaMecanico, esUsuarioTodasSedes, obtenerTodasSedes } = require("../utils/sedes");
+const { ensureNumeroMantenimientoColumn, asignarNumeroMantenimiento } = require("../utils/mantenimientosNumero");
 
 // ================= FUNCIONES AUXILIARES =================
 
@@ -263,12 +264,14 @@ router.post("/nuevo", async (req, res) => {
     const [[unidad]] = await pool.query("SELECT sede FROM unidades WHERE id = ?", [unidad_id]);
     if (!unidad) return res.status(404).send("Unidad no encontrada");
 
-    await pool.query(
+    await ensureNumeroMantenimientoColumn(pool);
+    const [result] = await pool.query(
       `INSERT INTO mantenimientos 
        (unidad_id, sede, tipo, plan, estado, fecha_programada, creado_por)
        VALUES (?, ?, ?, ?, 'PENDIENTE', ?, ?)`,
       [unidad_id, unidad.sede, tipo, plan || null, fecha, req.session.user.id]
     );
+    await asignarNumeroMantenimiento(pool, result.insertId);
 
     res.redirect("/agenda");
   } catch (err) {

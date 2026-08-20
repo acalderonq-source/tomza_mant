@@ -46,7 +46,7 @@
       box-shadow: 0 8px 18px rgba(15,23,42,.04);
       display: grid;
       gap: .75rem;
-      grid-template-columns: minmax(170px, .85fr) minmax(280px, 1.8fr) minmax(95px, .45fr) minmax(140px, .7fr) minmax(140px, .7fr) 46px;
+      grid-template-columns: minmax(150px, .75fr) minmax(130px, .6fr) minmax(280px, 1.8fr) minmax(95px, .45fr) minmax(140px, .7fr) minmax(140px, .7fr) 46px;
       margin-bottom: .8rem;
       padding: .85rem;
     }
@@ -204,7 +204,7 @@
             <option value="USD" <%= safeOrden.moneda === 'USD' ? 'selected' : '' %>>Dólares (USD)</option>
           </select>
         </div>
-        <div class="col-md-4">
+        <div class="col-md-3">
           <label>Empresa destinataria</label>
           <select name="empresa_destino" class="form-select" required>
             <option value="GAS TOMZA" <%= (safeOrden.empresa_destino || 'GAS TOMZA') === 'GAS TOMZA' ? 'selected' : '' %>>Gas Tomza de Costa Rica S.A.</option>
@@ -226,7 +226,14 @@
             data-placa-allow-general="true"
           >
         </div>
-        <div class="col-md-3 d-flex align-items-end">
+        <div class="col-md-2">
+          <label>Tipo mantenimiento</label>
+          <select name="tipo_mantenimiento" class="form-select">
+            <option value="CORRECTIVO" <%= (safeOrden.tipo_mantenimiento || 'CORRECTIVO') === 'CORRECTIVO' ? 'selected' : '' %>>Correctivo</option>
+            <option value="PREVENTIVO" <%= safeOrden.tipo_mantenimiento === 'PREVENTIVO' ? 'selected' : '' %>>Preventivo</option>
+          </select>
+        </div>
+        <div class="col-md-2 d-flex align-items-end">
           <div class="small text-muted">
             Use una placa para compras de unidad, <strong>GENERAL TALLER</strong> para taller, <strong>GENERAL GASTOS</strong> para gastos generales o <strong>ACEITES</strong> para compras de aceites.
           </div>
@@ -239,6 +246,7 @@
         <table class="table table-bordered order-lines-table" id="itemsTable">
           <colgroup>
             <col class="col-placa">
+            <col class="col-codigo">
             <col class="col-descripcion">
             <col class="col-cantidad">
             <col class="col-precio">
@@ -246,7 +254,7 @@
             <col class="col-accion">
           </colgroup>
           <thead>
-            <tr><th>Placa</th><th>Descripción</th><th>Cantidad</th><th>Precio unitario</th><th>Subtotal</th><th></th></tr>
+            <tr><th>Placa</th><th>Código</th><th>Descripción</th><th>Cantidad</th><th>Precio unitario</th><th>Subtotal</th><th></th></tr>
           </thead>
           <tbody>
             <!-- Las filas se agregarán dinámicamente -->
@@ -325,6 +333,7 @@
     const newRow = document.createElement("tr");
     newRow.innerHTML = `
       <td data-label="Placa"><input type="text" name="lineas[${rowIndex}][codigo]" class="form-control text-uppercase" placeholder="Placa, GENERAL o ACEITES" data-placa-autocomplete data-placa-mode="placa" data-placa-allow-free="true" data-placa-allow-general="true"></td>
+      <td data-label="Código"><input type="text" name="lineas[${rowIndex}][codigo_producto]" class="form-control text-uppercase" placeholder="Código"></td>
       <td data-label="Descripción"><textarea name="lineas[${rowIndex}][descripcion]" class="form-control" rows="3" required></textarea></td>
       <td data-label="Cantidad"><input type="number" name="lineas[${rowIndex}][cantidad]" class="form-control cantidad" value="1" step="0.01"></td>
       <td data-label="Precio unitario"><input type="number" name="lineas[${rowIndex}][precio_unitario]" class="form-control precio" step="0.01"></td>
@@ -333,6 +342,7 @@
     `;
     tbody.appendChild(newRow);
     newRow.querySelector(`[name="lineas[${rowIndex}][codigo]"]`).value = linea.codigo || '';
+    newRow.querySelector(`[name="lineas[${rowIndex}][codigo_producto]"]`).value = linea.codigo_producto || '';
     newRow.querySelector(`[name="lineas[${rowIndex}][descripcion]"]`).value = linea.descripcion || '';
     newRow.querySelector(`[name="lineas[${rowIndex}][cantidad]"]`).value = linea.cantidad ?? 1;
     newRow.querySelector(`[name="lineas[${rowIndex}][precio_unitario]"]`).value = linea.precio_unitario ?? '';
@@ -430,6 +440,7 @@
     (orden.lineas || []).forEach(linea => {
       addRow({
         codigo: linea.codigo || orden.placa_unidad || '',
+        codigo_producto: linea.codigo_producto || '',
         descripcion: linea.descripcion || '',
         cantidad: linea.cantidad || 1,
         precio_unitario: linea.precio_unitario || 0,

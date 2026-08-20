@@ -301,6 +301,7 @@
   const puedeVerRevisionRuta = ['ADMIN', 'TALLER', 'MECANICO', 'SUPERVISOR', 'SUPERVISOR_PESADO'].includes(user.rol);
   const puedeVerGiras = ['ADMIN', 'TALLER', 'MECANICO', 'SUPERVISOR', 'SUPERVISOR_PESADO'].includes(user.rol);
   const puedeVerDashboardTaller = ['ADMIN', 'TALLER', 'MECANICO', 'SUPERVISOR', 'SUPERVISOR_PESADO'].includes(user.rol);
+  const puedeVerLogisticaTaller = ['ADMIN', 'TALLER', 'MECANICO', 'PROVEEDURIA_TALLER'].includes(user.rol);
   const puedeVerKpisMecanicos = ['ADMIN', 'TALLER', 'PROVEEDURIA_TALLER'].includes(user.rol);
   const puedeVerOrdenesMotor = ['ADMIN', 'TALLER', 'PROVEEDURIA_TALLER'].includes(user.rol);
   const puedeVerResumenEjecutivo = ['ADMIN', 'TALLER', 'PROVEEDURIA', 'PROVEEDURIA_TALLER', 'TRAMITES'].includes(user.rol);
@@ -463,6 +464,12 @@
             <div><div class="module-title">Dashboard taller</div><p class="module-copy">Unidades en taller y listas para ruta.</p></div>
           </a>
         <% } %>
+        <% if (puedeVerLogisticaTaller) { %>
+          <a href="/logistica-taller" class="module-card">
+            <span class="module-icon icon-blue"><i class="bi bi-diagram-3"></i></span>
+            <div><div class="module-title">Logística Taller</div><p class="module-copy">Prioridades diarias por correctivo y preventivo.</p></div>
+          </a>
+        <% } %>
         <% if (puedeVerRevisionRuta) { %>
           <a href="/revision-ruta" class="module-card">
             <span class="module-icon icon-green"><i class="bi bi-clipboard-check"></i></span>
@@ -563,6 +570,7 @@
           <table class="table table-sm mb-0 align-middle">
             <thead>
               <tr>
+                <th>N°</th>
                 <th>Placa</th>
                 <th>Sede</th>
                 <th>Tipo</th>
@@ -574,6 +582,7 @@
             <tbody>
               <% mantenimientosHoy.forEach(m => { %>
                 <tr>
+                  <td><strong><%= m.numero_mantenimiento || ('MANT-' + m.id) %></strong></td>
                   <td><strong><%= m.placa %></strong></td>
                   <td><%= m.sede %></td>
                   <td><%= m.tipo %></td>

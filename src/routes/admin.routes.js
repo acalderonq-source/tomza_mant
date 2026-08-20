@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const pool = require("../db");
+const { ensureNumeroMantenimientoColumn, asignarNumeroMantenimiento } = require("../utils/mantenimientosNumero");
 
 // devuelve siguiente día hábil (sin sábado ni domingo)
 function siguienteDiaHabil(fecha) {
@@ -72,6 +73,8 @@ const [unidades] = await pool.query(
     let contCartago = 0;
     let contLaCruz  = 0;
 
+    await ensureNumeroMantenimientoColumn(pool);
+
     for (const unidad of unidades) {
       let fechaProgramada;
 
@@ -101,11 +104,12 @@ const [unidades] = await pool.query(
         fechaCartago = siguienteDiaHabil(fechaCartago);
       }
 
-      await pool.query(`
+      const [result] = await pool.query(`
         INSERT INTO mantenimientos
           (unidad_id, tipo, estado, prioridad, fecha_programada)
         VALUES (?, 'PREVENTIVO', 'PROGRAMADO', 'MEDIA', ?)
       `, [unidad.id, fechaProgramada]);
+      await asignarNumeroMantenimiento(pool, result.insertId);
     }
 
     res.redirect("/agenda");

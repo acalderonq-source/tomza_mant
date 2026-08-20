@@ -257,6 +257,7 @@
               <thead>
                 <tr>
                   <th>Placa</th>
+                  <th>Código</th>
                   <th>Descripción</th>
                   <th class="money">Cantidad</th>
                   <th class="money">Precio unitario</th>
@@ -267,6 +268,7 @@
                 <% (orden.lineas || []).forEach(linea => { %>
                   <tr>
                     <td><%= linea.codigo || '—' %></td>
+                    <td><%= linea.codigo_producto || '—' %></td>
                     <td><%= linea.descripcion || '—' %></td>
                     <td class="money"><%= Number(linea.cantidad || 0).toLocaleString('es-CR') %></td>
                     <td class="money"><%= Number(linea.precio_unitario || 0).toLocaleString('es-CR') %></td>
@@ -275,7 +277,7 @@
                 <% }) %>
                 <% if (!(orden.lineas || []).length) { %>
                   <tr>
-                    <td colspan="5" class="muted">Sin productos o servicios registrados.</td>
+                    <td colspan="6" class="muted">Sin productos o servicios registrados.</td>
                   </tr>
                 <% } %>
               </tbody>

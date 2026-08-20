@@ -1,4 +1,5 @@
 const { limpiarTextoReporte, analizarCoincidenciaReporteCorrectivo } = require("./reportesSupervisores");
+const { ensureTipoMantenimientoColumns } = require("./tipoMantenimiento");
 
 async function tableExists(pool, tableName) {
   const [[row]] = await pool.query(
@@ -89,6 +90,8 @@ async function ensureReportesSupervisoresTables(pool) {
       await pool.query(`ALTER TABLE reportes_supervisores ADD COLUMN ${column} ${definition}`);
     }
   }
+
+  await ensureTipoMantenimientoColumns(pool);
 }
 
 async function registrarSugerenciasParaCorrectivo(pool, correctivoId) {

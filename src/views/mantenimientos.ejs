@@ -183,6 +183,7 @@
             <% if (puedeReprogramarLista) { %>
               <th style="width: 42px;"><input type="checkbox" id="seleccionarReprogramar"></th>
             <% } %>
+            <th>N° Mant.</th>
             <th>Placa</th>
             <th>Sede</th>
             <th>Tipo</th>
@@ -197,7 +198,7 @@
         </thead>
         <tbody>
           <% if (mantenimientos.length === 0) { %>
-            <tr><td colspan="<%= puedeReprogramarLista ? 11 : 10 %>" class="empty-state">No hay mantenimientos con los filtros seleccionados.</td></tr>
+            <tr><td colspan="<%= puedeReprogramarLista ? 12 : 11 %>" class="empty-state">No hay mantenimientos con los filtros seleccionados.</td></tr>
           <% } %>
 
           <% mantenimientos.forEach(m => { %>
@@ -215,6 +216,7 @@
                   <% } %>
                 </td>
               <% } %>
+              <td data-label="N° Mant."><strong><%= m.numero_mantenimiento || ('MANT-' + m.id) %></strong></td>
               <td data-label="Placa"><strong><%= m.placa %></strong></td>
               <td data-label="Sede"><%= m.sede %></td>
               <td data-label="Tipo"><%= m.tipo %></td>

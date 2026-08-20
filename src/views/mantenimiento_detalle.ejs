@@ -81,6 +81,10 @@
   <div class="surface-card p-3 mb-3">
     <div class="detail-grid">
       <div class="detail-item">
+        <div class="detail-label">N° mantenimiento</div>
+        <div class="detail-value"><%= mantenimiento.numero_mantenimiento || ('MANT-' + mantenimiento.id) %></div>
+      </div>
+      <div class="detail-item">
         <div class="detail-label">Placa</div>
         <div class="detail-value"><%= mantenimiento.placa %></div>
       </div>

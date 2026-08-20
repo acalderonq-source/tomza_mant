@@ -1,0 +1,21 @@
+CREATE TABLE IF NOT EXISTS logistica_taller (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  fecha DATE NOT NULL,
+  prioridad_id INT NULL,
+  unidad_id INT NULL,
+  placa VARCHAR(50) NOT NULL,
+  sede VARCHAR(100) NULL,
+  detalle_malo TEXT NULL,
+  tipo_mantenimiento VARCHAR(20) NOT NULL DEFAULT 'CORRECTIVO',
+  estado ENUM('PENDIENTE','EN_PROCESO','LISTO','DESCARTADO') NOT NULL DEFAULT 'PENDIENTE',
+  creado_por INT NULL,
+  actualizado_por INT NULL,
+  creado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  actualizado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_logistica_prioridad (prioridad_id),
+  INDEX idx_logistica_fecha (fecha),
+  INDEX idx_logistica_sede (sede),
+  INDEX idx_logistica_placa (placa),
+  INDEX idx_logistica_tipo (tipo_mantenimiento),
+  INDEX idx_logistica_estado (estado)
+);

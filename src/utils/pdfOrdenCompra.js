@@ -123,12 +123,14 @@ async function generarPDFOrden(orden, proveedor = {}, lineas = []) {
   const itemRows = lineas.length
     ? lineas.map(linea => [
         { text: linea.codigo || "-", style: "tableCell" },
+        { text: linea.codigo_producto || "-", style: "tableCell" },
         { text: linea.descripcion || "-", style: "tableCell" },
         { text: formatMoney(linea.cantidad), style: "tableCell", alignment: "center" },
         { text: formatMoney(linea.precio_unitario), style: "tableCell", alignment: "right" },
         { text: formatMoney(linea.subtotal), style: "tableCell", alignment: "right" }
       ])
     : [[
+        { text: "-", style: "tableCell" },
         { text: "-", style: "tableCell" },
         { text: "Sin lineas registradas", style: "tableCell" },
         { text: "-", style: "tableCell" },
@@ -179,16 +181,18 @@ async function generarPDFOrden(orden, proveedor = {}, lineas = []) {
       },
       {
         table: {
-          widths: ["*", "*", "*"],
+          widths: ["*", "*", "*", "*"],
           body: [
             [
               { text: "Cotizacion", style: "miniHeader" },
               { text: "Forma de pago", style: "miniHeader" },
+              { text: "Tipo", style: "miniHeader" },
               { text: "Fecha envio", style: "miniHeader" }
             ],
             [
               { text: orden.cotizacion_nombre || orden.cotizacion || "-", alignment: "center" },
               { text: orden.forma_pago || "Credito", alignment: "center" },
+              { text: orden.tipo_mantenimiento || "CORRECTIVO", alignment: "center" },
               { text: formatDate(orden.fecha_envio), alignment: "center" }
             ]
           ]
@@ -199,10 +203,11 @@ async function generarPDFOrden(orden, proveedor = {}, lineas = []) {
       {
         table: {
           headerRows: 1,
-          widths: [70, "*", 55, 80, 80],
+          widths: [62, 58, "*", 55, 78, 78],
           body: [
             [
               { text: "Placa", style: "tableHeader" },
+              { text: "Codigo", style: "tableHeader" },
               { text: "Descripcion", style: "tableHeader" },
               { text: "Cantidad", style: "tableHeader" },
               { text: "Precio unitario", style: "tableHeader" },

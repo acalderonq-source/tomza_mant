@@ -314,16 +314,18 @@ table{
 
   <table class="items">
     <colgroup>
-      <col style="width:15%">
-      <col style="width:40%">
+      <col style="width:14%">
+      <col style="width:12%">
+      <col style="width:34%">
       <col style="width:10%">
-      <col style="width:17%">
-      <col style="width:18%">
+      <col style="width:15%">
+      <col style="width:15%">
     </colgroup>
 
     <thead>
       <tr>
         <th>Placa</th>
+        <th>Código</th>
         <th>Descripción</th>
         <th>Cantidad</th>
         <th>Precio Unitario</th>
@@ -335,6 +337,7 @@ table{
       <% lineas.forEach(lin => { %>
         <tr>
           <td><%= lin.codigo || '-' %></td>
+          <td><%= lin.codigo_producto || '-' %></td>
           <td><%= lin.descripcion %></td>
           <td class="text-center"><%= lin.cantidad %></td>
           <td class="text-right">
@@ -348,6 +351,7 @@ table{
 
       <% for(let i = lineas.length; i < 6; i++) { %>
         <tr>
+          <td>&nbsp;</td>
           <td>&nbsp;</td>
           <td>&nbsp;</td>
           <td>&nbsp;</td>

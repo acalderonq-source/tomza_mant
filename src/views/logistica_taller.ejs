@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Logística Taller - Gas Tomza</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <style>
+    :root {
+      --bg: #f3f6fa;
+      --ink: #0f172a;
+      --muted: #64748b;
+      --line: #dbe3ef;
+      --blue: #0f2f6e;
+      --red: #dc2626;
+      --green: #15803d;
+      --amber: #d97706;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--ink);
+      font-family: "Segoe UI", Roboto, Arial, sans-serif;
+    }
+
+    .topbar {
+      background: #111827;
+      border-bottom: 3px solid var(--red);
+    }
+
+    .shell {
+      max-width: 1380px;
+    }
+
+    .hero {
+      background: linear-gradient(135deg, #0f2f6e 0%, #123f91 58%, #dc2626 100%);
+      border-radius: 14px;
+      color: #fff;
+      padding: 1.1rem;
+    }
+
+    .hero h1 {
+      font-size: 1.55rem;
+      font-weight: 950;
+      margin: 0;
+      text-transform: uppercase;
+    }
+
+    .hero p {
+      color: rgba(255,255,255,.82);
+      margin: .25rem 0 0;
+    }
+
+    .panel {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    .panel-head {
+      align-items: center;
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      gap: .75rem;
+      justify-content: space-between;
+      padding: .9rem 1rem;
+    }
+
+    .section-title {
+      font-size: 1rem;
+      font-weight: 950;
+      margin: 0;
+    }
+
+    .stats-grid {
+      display: grid;
+      gap: .75rem;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      margin: .9rem 0;
+    }
+
+    .stat-card {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: .9rem;
+    }
+
+    .stat-label {
+      color: var(--muted);
+      font-size: .72rem;
+      font-weight: 900;
+      text-transform: uppercase;
+    }
+
+    .stat-value {
+      font-size: 1.55rem;
+      font-weight: 950;
+      line-height: 1;
+      margin-top: .25rem;
+    }
+
+    .quick-form {
+      display: grid;
+      gap: .7rem;
+      grid-template-columns: 150px minmax(190px, 220px) 1fr 170px 150px auto;
+      padding: 1rem;
+    }
+
+    .quick-form label,
+    .log-table th {
+      color: #334155;
+      font-size: .72rem;
+      font-weight: 950;
+      text-transform: uppercase;
+    }
+
+    .log-table {
+      margin: 0;
+    }
+
+    .log-table th {
+      background: #eef4fb;
+      border-bottom: 1px solid #cbd5e1;
+      color: #102a56;
+      white-space: nowrap;
+    }
+
+    .log-table td {
+      vertical-align: top;
+    }
+
+    .plate {
+      font-size: 1rem;
+      font-weight: 950;
+      white-space: nowrap;
+    }
+
+    .meta {
+      color: var(--muted);
+      font-size: .78rem;
+    }
+
+    .type-pill {
+      border-radius: 999px;
+      display: inline-flex;
+      font-size: .72rem;
+      font-weight: 950;
+      padding: .24rem .55rem;
+      text-transform: uppercase;
+    }
+
+    .type-correctivo { background: #fee2e2; color: #991b1b; }
+    .type-preventivo { background: #dbeafe; color: #1e3a8a; }
+
+    .status-pill {
+      background: #f1f5f9;
+      border-radius: 999px;
+      color: #334155;
+      display: inline-flex;
+      font-size: .72rem;
+      font-weight: 900;
+      padding: .24rem .55rem;
+      text-transform: uppercase;
+    }
+
+    .row-form {
+      display: grid;
+      gap: .55rem;
+      grid-template-columns: minmax(280px, 1fr) 150px 150px auto;
+    }
+
+    textarea.form-control {
+      min-height: 72px;
+    }
+
+    .empty-state {
+      color: var(--muted);
+      font-weight: 800;
+      padding: 2rem;
+      text-align: center;
+    }
+
+    @media (max-width: 992px) {
+      .stats-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .quick-form,
+      .row-form {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+<%
+  const lista = Array.isArray(registros) ? registros : [];
+  const resumenSeguro = resumen || {};
+  const estadosLista = Array.isArray(estados) ? estados : ['PENDIENTE','EN_PROCESO','LISTO','DESCARTADO'];
+  const estadoLabel = (estado) => String(estado || '').replaceAll('_', ' ');
+  const tipoClass = (tipo) => tipo === 'PREVENTIVO' ? 'type-preventivo' : 'type-correctivo';
+  const sedeTexto = (sede) => typeof etiquetaSede === 'function' ? etiquetaSede(sede) : (sede || '-');
+%>
+
+<nav class="navbar navbar-dark topbar px-3 py-2">
+  <span class="navbar-brand fw-semibold"><i class="bi bi-diagram-3 me-2"></i>Logística Taller</span>
+  <div class="text-white d-flex align-items-center gap-2 flex-wrap">
+    <span class="small"><%= user.usuario %> · <%= user.rol %></span>
+    <a href="/dashboard" class="btn btn-outline-light btn-sm rounded-pill px-3">Inicio</a>
+  </div>
+</nav>
+
+<main class="container-fluid shell py-4">
+  <section class="hero">
+    <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
+      <div>
+        <h1>Logística Taller</h1>
+        <p>Prioridades del día clasificadas por unidad, falla y tipo de mantenimiento para separar costos.</p>
+      </div>
+      <form method="GET" action="/logistica-taller" class="d-flex gap-2 flex-wrap align-items-end">
+        <div>
+          <label class="form-label text-white small fw-bold mb-1">Fecha</label>
+          <input type="date" name="fecha" class="form-control form-control-sm" value="<%= fecha %>">
+        </div>
+        <button class="btn btn-light btn-sm fw-bold">Ver</button>
+      </form>
+    </div>
+  </section>
+
+  <% if (success) { %><div class="alert alert-success mt-3"><%= success %></div><% } %>
+  <% if (error) { %><div class="alert alert-danger mt-3"><%= error %></div><% } %>
+
+  <section class="stats-grid">
+    <div class="stat-card"><div class="stat-label">Unidades</div><div class="stat-value"><%= Number(resumenSeguro.total || 0).toLocaleString('es-CR') %></div></div>
+    <div class="stat-card"><div class="stat-label">Correctivos</div><div class="stat-value text-danger"><%= Number(resumenSeguro.correctivos || 0).toLocaleString('es-CR') %></div></div>
+    <div class="stat-card"><div class="stat-label">Preventivos</div><div class="stat-value text-primary"><%= Number(resumenSeguro.preventivos || 0).toLocaleString('es-CR') %></div></div>
+    <div class="stat-card"><div class="stat-label">Pendientes</div><div class="stat-value text-warning"><%= Number(resumenSeguro.pendientes || 0).toLocaleString('es-CR') %></div></div>
+    <div class="stat-card"><div class="stat-label">Listos</div><div class="stat-value text-success"><%= Number(resumenSeguro.listos || 0).toLocaleString('es-CR') %></div></div>
+  </section>
+
+  <section class="panel mb-3">
+    <div class="panel-head">
+      <div>
+        <h2 class="section-title">Agregar unidad manual</h2>
+        <div class="meta">Para casos importantes que no vienen desde prioridades.</div>
+      </div>
+      <div class="d-flex gap-2 flex-wrap">
+        <form method="POST" action="/logistica-taller/sincronizar" class="d-inline">
+          <input type="hidden" name="fecha" value="<%= fecha %>">
+          <button class="btn btn-outline-primary btn-sm"><i class="bi bi-arrow-repeat"></i> Sincronizar prioridades</button>
+        </form>
+        <a href="/logistica-taller/excel?fecha=<%= encodeURIComponent(fecha) %>" class="btn btn-success btn-sm"><i class="bi bi-file-earmark-excel"></i> Excel</a>
+      </div>
+    </div>
+    <form method="POST" action="/logistica-taller" class="quick-form">
+      <div>
+        <label>Fecha</label>
+        <input type="date" name="fecha" class="form-control" value="<%= fecha %>" required>
+      </div>
+      <div>
+        <label>Placa</label>
+        <input type="text" name="placa" class="form-control text-uppercase" data-placa-autocomplete data-placa-mode="placa" data-placa-allow-free="true" placeholder="C172461" required>
+      </div>
+      <div>
+        <label>Qué tiene malo</label>
+        <input type="text" name="detalle_malo" class="form-control" placeholder="Ej: fuga de aceite, frenos, luces..." required>
+      </div>
+      <div>
+        <label>Tipo</label>
+        <select name="tipo_mantenimiento" class="form-select">
+          <option value="CORRECTIVO">Correctivo</option>
+          <option value="PREVENTIVO">Preventivo</option>
+        </select>
+      </div>
+      <div>
+        <label>Estado</label>
+        <select name="estado" class="form-select">
+          <% estadosLista.forEach(estado => { %>
+            <option value="<%= estado %>"><%= estadoLabel(estado) %></option>
+          <% }) %>
+        </select>
+      </div>
+      <div class="d-flex align-items-end">
+        <button class="btn btn-dark w-100">Agregar</button>
+      </div>
+    </form>
+  </section>
+
+  <section class="panel">
+    <div class="panel-head">
+      <div>
+        <h2 class="section-title">Día a día de prioridades</h2>
+        <div class="meta">Clasifique cada placa para que el costo quede asociado a preventivo o correctivo.</div>
+      </div>
+      <span class="status-pill"><%= fecha %></span>
+    </div>
+    <div class="table-responsive">
+      <table class="table log-table align-middle">
+        <thead>
+          <tr>
+            <th style="width: 150px;">Placa</th>
+            <th style="width: 180px;">Sede</th>
+            <th>Qué tiene malo</th>
+            <th style="width: 150px;">Tipo</th>
+            <th style="width: 150px;">Estado</th>
+            <th style="width: 110px;" class="text-end">Acción</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% if (!lista.length) { %>
+            <tr><td colspan="6" class="empty-state">No hay unidades en logística para esta fecha.</td></tr>
+          <% } %>
+          <% lista.forEach(item => { %>
+            <tr>
+              <td>
+                <div class="plate"><%= item.placa %></div>
+                <% if (item.prioridad_id) { %><div class="meta">Desde prioridad #<%= item.prioridad_id %></div><% } %>
+              </td>
+              <td>
+                <strong><%= sedeTexto(item.sede) %></strong>
+                <div class="meta">Actualizado: <%= item.actualizado_por_nombre || '-' %></div>
+              </td>
+              <td colspan="4">
+                <form method="POST" action="/logistica-taller/<%= item.id %>" class="row-form">
+                  <input type="hidden" name="fecha" value="<%= fecha %>">
+                  <div>
+                    <textarea name="detalle_malo" class="form-control" placeholder="Qué tiene malo la unidad"><%= item.detalle_malo || item.prioridad_observacion || '' %></textarea>
+                    <% if (item.prioridad_observacion && item.prioridad_observacion !== item.detalle_malo) { %>
+                      <div class="meta mt-1">Prioridad original: <%= item.prioridad_observacion %></div>
+                    <% } %>
+                  </div>
+                  <div>
+                    <select name="tipo_mantenimiento" class="form-select">
+                      <option value="CORRECTIVO" <%= item.tipo_mantenimiento === 'CORRECTIVO' ? 'selected' : '' %>>Correctivo</option>
+                      <option value="PREVENTIVO" <%= item.tipo_mantenimiento === 'PREVENTIVO' ? 'selected' : '' %>>Preventivo</option>
+                    </select>
+                    <span class="type-pill <%= tipoClass(item.tipo_mantenimiento) %> mt-2"><%= item.tipo_mantenimiento %></span>
+                  </div>
+                  <div>
+                    <select name="estado" class="form-select">
+                      <% estadosLista.forEach(estado => { %>
+                        <option value="<%= estado %>" <%= item.estado === estado ? 'selected' : '' %>><%= estadoLabel(estado) %></option>
+                      <% }) %>
+                    </select>
+                  </div>
+                  <div class="text-end">
+                    <button class="btn btn-primary btn-sm w-100">Guardar</button>
+                  </div>
+                </form>
+              </td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  </section>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

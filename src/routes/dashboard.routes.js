@@ -11,6 +11,8 @@ const {
   sedeGranelDesdeUsuario
 } = require("../utils/sedes");
 const { extraerPlacasTexto, normalizarPlaca } = require("../utils/placas");
+const { ensureNumeroMantenimientoColumn } = require("../utils/mantenimientosNumero");
+const { ensureTipoMantenimientoColumns, normalizarTipoMantenimiento } = require("../utils/tipoMantenimiento");
 
 const DB_CONNECTION_ERRORS = new Set(["ECONNRESET", "PROTOCOL_CONNECTION_LOST", "ETIMEDOUT", "ENOTFOUND", "ECONNREFUSED"]);
 const RESUMEN_EJECUTIVO_CACHE_MS = Number(process.env.RESUMEN_EJECUTIVO_CACHE_MS || 1000 * 60);
@@ -309,6 +311,7 @@ async function columnExists(table, column) {
 
 async function ensurePeriodoCierreColumns() {
   try {
+    await ensureTipoMantenimientoColumns(pool);
     const targets = [
       ["pagos_proveedor", "fecha_pago"],
       ["ordenes_compra", "fecha_pago"],
@@ -399,6 +402,7 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro, pe
       o.fecha,
       o.po_numero,
       p.nombre AS proveedor,
+      COALESCE(o.tipo_mantenimiento, 'CORRECTIVO') AS tipo_mantenimiento,
       u.placa AS placa_registrada,
       UPPER(TRIM(COALESCE(
         CASE WHEN UPPER(TRIM(COALESCE(d.codigo, ''))) IN ('ACEITE', 'ACEITES') THEN 'ACEITES' END,
@@ -461,6 +465,7 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro, pe
       om.fecha,
       om.numero AS po_numero,
       p.nombre AS proveedor,
+      COALESCE(om.tipo_mantenimiento, 'CORRECTIVO') AS tipo_mantenimiento,
       u.placa AS placa_registrada,
       UPPER(TRIM(COALESCE(
         REPLACE(REPLACE(REPLACE(REGEXP_SUBSTR(UPPER(CONCAT_WS(' ', d.codigo, d.descripcion, om.placa_unidad, om.observaciones)), 'CL[[:space:].-]*[0-9]{5,6}|C[[:space:].-]*[0-9]{5,6}|S[[:space:].-]*[0-9]{5,6}'), ' ', ''), '-', ''), '.', ''),
@@ -503,9 +508,10 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro, pe
       pp.id,
       ${fechaPago} AS fecha,
       pp.periodo_cierre,
-      NULL AS po_numero,
-      pp.proveedor_nombre AS proveedor,
-      u.placa AS placa_registrada,
+        NULL AS po_numero,
+        pp.proveedor_nombre AS proveedor,
+        NULL AS tipo_mantenimiento,
+        u.placa AS placa_registrada,
       NULLIF(pp.placa, '') AS placa,
       u.sede AS sede,
       COALESCE(pp.pagada, 0) AS pagada,
@@ -529,6 +535,7 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro, pe
       cc.fecha,
       NULL AS po_numero,
       'Caja chica' AS proveedor,
+      NULL AS tipo_mantenimiento,
       NULL AS placa_registrada,
       NULL AS placa,
       'General' AS sede,
@@ -575,6 +582,49 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro, pe
     []
   );
   const indiceUnidades = crearIndiceUnidades(unidadesReferencia);
+  const condicionesLogistica = ["lt.tipo_mantenimiento IN ('CORRECTIVO','PREVENTIVO')"];
+  const paramsLogistica = [];
+  if (fechaDesde) {
+    condicionesLogistica.push("lt.fecha >= DATE_SUB(?, INTERVAL 45 DAY)");
+    paramsLogistica.push(fechaDesde);
+  }
+  if (fechaHasta) {
+    condicionesLogistica.push("lt.fecha <= ?");
+    paramsLogistica.push(fechaHasta);
+  }
+  if (sedesFiltro.length) {
+    condicionesLogistica.push("(lt.sede IN (?) OR lt.sede IS NULL OR lt.sede = '')");
+    paramsLogistica.push(sedesFiltro);
+  }
+  const logisticaRows = await safeQuery(
+    `SELECT placa, fecha, tipo_mantenimiento
+     FROM logistica_taller lt
+     WHERE ${condicionesLogistica.join(" AND ")}
+     ORDER BY fecha DESC, id DESC`,
+    paramsLogistica,
+    []
+  );
+  const logisticaPorPlaca = new Map();
+  logisticaRows.forEach(row => {
+    const placa = normalizarPlaca(row.placa) || normalizarPlacaLocal(row.placa);
+    if (!esPlacaReal(placa)) return;
+    const key = normalizarPlacaLocal(placa);
+    if (!logisticaPorPlaca.has(key)) logisticaPorPlaca.set(key, []);
+    logisticaPorPlaca.get(key).push({
+      fecha: row.fecha ? new Date(row.fecha) : null,
+      tipo: normalizarTipoMantenimiento(row.tipo_mantenimiento)
+    });
+  });
+
+  const tipoLogisticaPara = (placa, fecha) => {
+    const key = normalizarPlacaLocal(placa);
+    const lista = logisticaPorPlaca.get(key) || [];
+    if (!lista.length) return null;
+    const fechaItem = fecha ? new Date(fecha) : null;
+    if (!fechaItem || Number.isNaN(fechaItem.getTime())) return lista[0].tipo;
+    const antes = lista.find(item => item.fecha && item.fecha <= fechaItem);
+    return (antes || lista[0]).tipo;
+  };
 
   const aplicaSede = (item) => !sedesFiltro.length || sedesFiltro.includes(item.sede);
   const gastos = [...ordenesLineas, ...ordenesMotorLineas, ...pagosProveedor, ...cajaChica]
@@ -594,6 +644,9 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro, pe
         : clasificarTexto(`${item.descripcion} ${item.proveedor}`);
       return {
         ...item,
+        tipo_mantenimiento: ["ORDEN", "ORDEN_MOTOR"].includes(item.fuente)
+          ? (tipoLogisticaPara(placaLimpia, item.fecha) || normalizarTipoMantenimiento(item.tipo_mantenimiento))
+          : null,
         placa: placaReal ? placaLimpia : "",
         sede: sedeReal ? sedeFinal : "",
         tienePlacaReal: placaReal,
@@ -767,6 +820,17 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro, pe
   const totalGastos = gastos.reduce((sum, item) => sum + item.monto, 0);
   const totalOrdenesCompra = gastos.filter(item => item.fuente === "ORDEN").reduce((sum, item) => sum + item.monto, 0);
   const totalOrdenesMotor = gastos.filter(item => item.fuente === "ORDEN_MOTOR").reduce((sum, item) => sum + item.monto, 0);
+  const gastosMantenimientoPorTipo = ["CORRECTIVO", "PREVENTIVO"].map(tipo => {
+    const items = gastos.filter(item => ["ORDEN", "ORDEN_MOTOR"].includes(item.fuente) && item.tipo_mantenimiento === tipo);
+    return {
+      tipo,
+      nombre: tipo === "PREVENTIVO" ? "Preventivo" : "Correctivo",
+      total: items.reduce((sum, item) => sum + item.monto, 0),
+      registros: items.length
+    };
+  });
+  const gastoCorrectivo = gastosMantenimientoPorTipo.find(item => item.tipo === "CORRECTIVO") || { total: 0, registros: 0 };
+  const gastoPreventivo = gastosMantenimientoPorTipo.find(item => item.tipo === "PREVENTIVO") || { total: 0, registros: 0 };
   const totalPagosProveedor = gastos.filter(item => item.fuente === "PAGO_PROVEEDOR").reduce((sum, item) => sum + item.monto, 0);
   const pagosProveedorPagados = gastos.filter(item => item.fuente === "PAGO_PROVEEDOR" && Number(item.pagada || 0) === 1);
   const pagosProveedorPendientes = gastos.filter(item => item.fuente === "PAGO_PROVEEDOR" && Number(item.pagada || 0) !== 1);
@@ -844,6 +908,8 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro, pe
     resumenFinanciero: {
       totalOrdenesCompra,
       totalOrdenesMotor,
+      totalGastoCorrectivo: gastoCorrectivo.total,
+      totalGastoPreventivo: gastoPreventivo.total,
       totalOrdenesMotorPagadas,
       totalPagosProveedor,
       totalPagosProveedorPagados,
@@ -853,6 +919,8 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro, pe
       totalPagado,
       movimientosOrdenesCompra: gastos.filter(item => item.fuente === "ORDEN").length,
       movimientosOrdenesMotor: gastos.filter(item => item.fuente === "ORDEN_MOTOR").length,
+      movimientosGastoCorrectivo: gastoCorrectivo.registros,
+      movimientosGastoPreventivo: gastoPreventivo.registros,
       movimientosOrdenesMotorPagadas,
       movimientosPagosProveedor: gastos.filter(item => item.fuente === "PAGO_PROVEEDOR").length,
       movimientosPagosProveedorPagados: pagosProveedorPagados.length,
@@ -861,6 +929,7 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro, pe
       movimientosFacturasPagadas,
       movimientosTotalPagado
     },
+    gastosMantenimientoPorTipo,
     costoUnidad: {
       totalGastoConUnidad,
       totalUnidadesFlota,
@@ -1068,9 +1137,16 @@ router.get("/", async (req, res) => {
     // =========================
     // MANTENIMIENTOS HOY
     // =========================
+    try {
+      await ensureNumeroMantenimientoColumn(pool);
+    } catch (error) {
+      console.warn("No se pudo verificar numero de mantenimiento:", error.code || error.message);
+    }
+
     const sqlHoy = `
       SELECT 
         m.id,
+        m.numero_mantenimiento,
         u.placa,
         u.sede,
         m.tipo,

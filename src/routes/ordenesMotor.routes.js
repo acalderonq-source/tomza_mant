@@ -5,6 +5,7 @@ const fs = require("fs");
 const path = require("path");
 const { generarPDFOrden } = require("../utils/pdfOrdenCompra");
 const { agregarFiltroPlacaSql, normalizarPlaca } = require("../utils/placas");
+const { normalizarTipoMantenimiento } = require("../utils/tipoMantenimiento");
 
 const ROLES_MOTOR = ["ADMIN", "TALLER", "PROVEEDURIA_TALLER"];
 
@@ -40,6 +41,7 @@ async function ensureOrdenesMotorTables() {
       fecha DATE NOT NULL,
       proveedor_id INT NULL,
       placa_unidad VARCHAR(50) NULL,
+      tipo_mantenimiento VARCHAR(20) NOT NULL DEFAULT 'CORRECTIVO',
       motor VARCHAR(100) NULL,
       forma_pago VARCHAR(100) NULL,
       moneda VARCHAR(10) NOT NULL DEFAULT 'CRC',
@@ -81,6 +83,7 @@ async function ensureOrdenesMotorTables() {
   const optionalColumns = [
     ["motor", "VARCHAR(100) NULL"],
     ["placa_unidad", "VARCHAR(50) NULL"],
+    ["tipo_mantenimiento", "VARCHAR(20) NOT NULL DEFAULT 'CORRECTIVO'"],
     ["forma_pago", "VARCHAR(100) NULL"],
     ["descuento", "DECIMAL(10,2) NOT NULL DEFAULT 0"],
     ["transporte", "DECIMAL(14,2) NOT NULL DEFAULT 0"],
@@ -316,18 +319,20 @@ router.post("/", requireAuth, requireMotor, async (req, res) => {
     const totalesOrden = calcularTotalesOrden(lineas, req.body);
     const numero = await generarNumeroMotor();
     const placaOrden = obtenerPlacaOrden(lineas, req.body.placa_unidad);
+    const tipoMantenimiento = normalizarTipoMantenimiento(req.body.tipo_mantenimiento);
     const cotizacion = guardarCotizacionMotor(req.body.cotizacion_data, req.body.cotizacion_nombre, req.body.cotizacion_tipo, req.session.user.id);
 
     const [result] = await connection.query(
       `INSERT INTO ordenes_motor
-       (numero, fecha, proveedor_id, placa_unidad, motor, forma_pago, moneda, subtotal, descuento, transporte, iva, total, observaciones,
+       (numero, fecha, proveedor_id, placa_unidad, tipo_mantenimiento, motor, forma_pago, moneda, subtotal, descuento, transporte, iva, total, observaciones,
         cotizacion_archivo, cotizacion_nombre, cotizacion_tipo, empresa_destino, estado, creado_por)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'BORRADOR', ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'BORRADOR', ?)`,
       [
         numero,
         new Date().toISOString().slice(0, 10),
         req.body.proveedor_id || null,
         placaOrden,
+        tipoMantenimiento,
         String(req.body.motor || "").trim() || null,
         req.body.forma_pago || null,
         req.body.moneda || "CRC",
@@ -379,16 +384,18 @@ router.post("/:id/editar", requireAuth, requireMotor, async (req, res) => {
 
     const totalesOrden = calcularTotalesOrden(lineas, req.body);
     const placaOrden = obtenerPlacaOrden(lineas, req.body.placa_unidad);
+    const tipoMantenimiento = normalizarTipoMantenimiento(req.body.tipo_mantenimiento);
     const cotizacion = guardarCotizacionMotor(req.body.cotizacion_data, req.body.cotizacion_nombre, req.body.cotizacion_tipo, req.session.user.id);
 
     let updateSql = `UPDATE ordenes_motor
-       SET proveedor_id = ?, placa_unidad = ?, motor = ?, forma_pago = ?, moneda = ?,
+       SET proveedor_id = ?, placa_unidad = ?, tipo_mantenimiento = ?, motor = ?, forma_pago = ?, moneda = ?,
            subtotal = ?, descuento = ?, transporte = ?, iva = ?, total = ?,
            observaciones = ?, empresa_destino = ?
     `;
     const updateParams = [
       req.body.proveedor_id || null,
       placaOrden,
+      tipoMantenimiento,
       String(req.body.motor || "").trim() || null,
       req.body.forma_pago || null,
       req.body.moneda || "CRC",

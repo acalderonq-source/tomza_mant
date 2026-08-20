@@ -7,6 +7,7 @@ const PdfPrinter = require("pdfmake");
 const ExcelJS = require("exceljs");
 const { generarPDFOrden } = require('../utils/pdfOrdenCompra');
 const { agregarFiltroPlacaSql, normalizarPlaca: normalizarPlacaSistema } = require("../utils/placas");
+const { ensureTipoMantenimientoColumns, normalizarTipoMantenimiento } = require("../utils/tipoMantenimiento");
 
 // ===================== MIDDLEWARES =====================
 function requireAuth(req, res, next) {
@@ -70,6 +71,7 @@ function normalizarLineas(lineas) {
       const subtotal = cantidad * precioUnitario;
       return {
         codigo: normalizarPlaca(linea.codigo),
+        codigo_producto: String(linea.codigo_producto || "").trim().toUpperCase(),
         descripcion: String(linea.descripcion || "").trim(),
         cantidad,
         precio_unitario: precioUnitario,
@@ -259,6 +261,7 @@ function sanearAnalisisCotizacion(data, proveedores = []) {
         const subtotal = parseMontoCotizacion(linea.subtotal || (cantidad * precio));
         return {
           codigo: normalizarPlaca(linea.codigo || linea.placa || ""),
+          codigo_producto: String(linea.codigo_producto || linea.codigo_repuesto || linea.cod_producto || "").trim().toUpperCase(),
           descripcion: String(linea.descripcion || linea.detalle || "").trim(),
           cantidad,
           precio_unitario: precio,
@@ -279,6 +282,27 @@ async function queryWithRetry(sql, params = []) {
     }
     throw error;
   }
+}
+
+const ensureFacturasState = {
+  ready: false,
+  promise: null
+};
+
+async function ensureFacturasSchema() {
+  if (ensureFacturasState.ready) return;
+  if (!ensureFacturasState.promise) {
+    ensureFacturasState.promise = (async () => {
+      await ensureFacturaRecepcionColumns();
+      await ensurePeriodoCierreColumns();
+      await ensureNotaCreditoColumns();
+      await ensureAbonoColumns();
+      ensureFacturasState.ready = true;
+    })().finally(() => {
+      ensureFacturasState.promise = null;
+    });
+  }
+  await ensureFacturasState.promise;
 }
 
 async function columnExists(tableName, columnName) {
@@ -530,6 +554,12 @@ async function ensureReintegroGastosTable() {
 async function ensureOrdenPlacaColumn() {
   if (!(await columnExists("ordenes_compra", "placa_unidad"))) {
     await queryWithRetry("ALTER TABLE ordenes_compra ADD COLUMN placa_unidad VARCHAR(50) NULL");
+  }
+}
+
+async function ensureOrdenDetalleCodigoProductoColumn() {
+  if (!(await columnExists("ordenes_compra_detalle", "codigo_producto"))) {
+    await queryWithRetry("ALTER TABLE ordenes_compra_detalle ADD COLUMN codigo_producto VARCHAR(80) NULL AFTER codigo");
   }
 }
 
@@ -1204,10 +1234,7 @@ function montoPagadoFacturaSql(alias, montoColumn) {
 }
 
 async function obtenerDashboardFinancieroFacturas(filtros = {}) {
-  await ensurePagosProveedorTable();
-  await ensurePeriodoCierreColumns();
-  await ensureNotaCreditoColumns();
-  await ensureAbonoColumns();
+  await ensureFacturasSchema();
   await ensureCajaChicaTable();
   await ensureReintegroGastosTable();
 
@@ -1425,17 +1452,11 @@ async function obtenerDashboardFinancieroFacturas(filtros = {}) {
   };
 }
 
-async function obtenerFacturasCompras(filtros = {}) {
-  await ensurePeriodoCierreColumns();
-
-  const hoy = new Date();
-  hoy.setHours(0, 0, 0, 0);
-
+function construirConsultaFacturas(filtros = {}, modo = "full") {
   const { proveedor_id, fecha_desde, fecha_hasta, pagada, vencida, periodo_cierre } = filtros;
-  const orden = filtros.orden === "asc" ? "asc" : "desc";
-
-  let sqlOrdenes = `
-    SELECT
+  const selectOrdenes = modo === "count"
+    ? "o.id, 'orden' as tipo, COALESCE(o.factura_fecha, o.fecha) as fecha"
+    : `
       o.id,
       o.po_numero,
       COALESCE(o.factura_fecha, o.fecha) as fecha,
@@ -1464,12 +1485,10 @@ async function obtenerFacturasCompras(filtros = {}) {
       o.proveedor_id,
       p.nombre as proveedor_nombre,
       'orden' as tipo
-    FROM ordenes_compra o
-    JOIN proveedores p ON p.id = o.proveedor_id
-    WHERE o.facturada = 1
-  `;
-  let sqlIndependientes = `
-    SELECT
+    `;
+  const selectIndependientes = modo === "count"
+    ? "f.id, 'independiente' as tipo, f.fecha"
+    : `
       f.id,
       NULL as po_numero,
       f.fecha,
@@ -1498,6 +1517,16 @@ async function obtenerFacturasCompras(filtros = {}) {
       f.proveedor_id,
       f.proveedor_nombre,
       'independiente' as tipo
+    `;
+
+  let sqlOrdenes = `
+    SELECT ${selectOrdenes}
+    FROM ordenes_compra o
+    JOIN proveedores p ON p.id = o.proveedor_id
+    WHERE o.facturada = 1
+  `;
+  let sqlIndependientes = `
+    SELECT ${selectIndependientes}
     FROM facturas f
     WHERE 1=1
   `;
@@ -1537,10 +1566,55 @@ async function obtenerFacturasCompras(filtros = {}) {
     paramsIndependientes.push(pagadaVal);
   }
 
+  if (vencida === "1") {
+    sqlOrdenes += ` AND COALESCE(o.pagada, 0) = 0 AND o.fecha_vencimiento_factura IS NOT NULL AND o.fecha_vencimiento_factura < CURDATE()`;
+    sqlIndependientes += ` AND 1 = 0`;
+  }
+
+  return {
+    sqlOrdenes,
+    sqlIndependientes,
+    params: [...paramsOrdenes, ...paramsIndependientes]
+  };
+}
+
+function normalizarPaginacionFacturas({ pagina, por_pagina } = {}) {
+  const paginaActual = Math.max(parseInt(pagina || "1", 10) || 1, 1);
+  const porPagina = Math.min(Math.max(parseInt(por_pagina || "100", 10) || 100, 25), 300);
+  return {
+    pagina: paginaActual,
+    porPagina,
+    offset: (paginaActual - 1) * porPagina
+  };
+}
+
+async function contarFacturasCompras(filtros = {}) {
+  const { sqlOrdenes, sqlIndependientes, params } = construirConsultaFacturas(filtros, "count");
+  const [[row]] = await queryWithRetry(
+    `SELECT COUNT(*) AS total FROM ((${sqlOrdenes}) UNION ALL (${sqlIndependientes})) facturas_total`,
+    params
+  );
+  return Number(row?.total || 0);
+}
+
+async function obtenerFacturasCompras(filtros = {}) {
+  const hoy = new Date();
+  hoy.setHours(0, 0, 0, 0);
+
+  const orden = filtros.orden === "asc" ? "asc" : "desc";
+  const { sqlOrdenes, sqlIndependientes, params } = construirConsultaFacturas(filtros);
   const orderDirection = orden === "asc" ? "ASC" : "DESC";
-  const finalSql = `(${sqlOrdenes}) UNION ALL (${sqlIndependientes}) ORDER BY fecha ${orderDirection}, id ${orderDirection}`;
-  const params = [...paramsOrdenes, ...paramsIndependientes];
-  const [facturasUnidas] = await queryWithRetry(finalSql, params);
+  let finalSql = `(${sqlOrdenes}) UNION ALL (${sqlIndependientes}) ORDER BY fecha ${orderDirection}, id ${orderDirection}`;
+  const queryParams = [...params];
+  const limit = parseInt(filtros.limit, 10);
+  const offset = parseInt(filtros.offset, 10);
+
+  if (Number.isFinite(limit) && limit > 0) {
+    finalSql += ` LIMIT ? OFFSET ?`;
+    queryParams.push(Math.min(limit, 500), Number.isFinite(offset) && offset > 0 ? offset : 0);
+  }
+
+  const [facturasUnidas] = await queryWithRetry(finalSql, queryParams);
 
   const facturasConEstado = facturasUnidas.map(f => {
     const saldos = calcularSaldoFactura(f.monto, f.nota_credito_monto, f.abono_monto, f.pagada);
@@ -1558,10 +1632,6 @@ async function obtenerFacturasCompras(filtros = {}) {
       vencida: (f.tipo === "orden" && !f.pagada && saldos.saldo > 0 && f.fecha_vencimiento_factura && new Date(f.fecha_vencimiento_factura) < hoy)
     };
   });
-
-  if (vencida === "1") {
-    return facturasConEstado.filter(f => f.vencida);
-  }
 
   return facturasConEstado;
 }
@@ -1852,7 +1922,7 @@ async function obtenerOrdenesReporteCompleto(filtros = {}) {
   const ordenIds = ordenes.map(orden => orden.id);
   const placeholders = ordenIds.map(() => "?").join(",");
   let [lineas] = await pool.query(
-    `SELECT orden_compra_id, codigo, descripcion, cantidad, precio_unitario, subtotal
+    `SELECT orden_compra_id, codigo, codigo_producto, descripcion, cantidad, precio_unitario, subtotal
      FROM ordenes_compra_detalle
      WHERE orden_compra_id IN (${placeholders})
      ORDER BY orden_compra_id, id`,
@@ -1973,6 +2043,7 @@ function agruparOrdenesPorDescripcion(ordenes = []) {
           categorias: new Set(),
           sedes: new Set(),
           codigos: new Set(),
+          codigosProducto: new Set(),
           proveedores: new Set(),
           ordenes: new Set(),
           cantidadTotal: 0,
@@ -1992,6 +2063,7 @@ function agruparOrdenesPorDescripcion(ordenes = []) {
       grupo.categorias.add(clasificarPlacaCompra(placaLinea, sedeLinea));
       if (sedeLinea) grupo.sedes.add(textoExcelLimpio(sedeLinea));
       grupo.codigos.add(textoExcelLimpio(linea.codigo));
+      grupo.codigosProducto.add(textoExcelLimpio(linea.codigo_producto, ""));
       grupo.proveedores.add(textoExcelLimpio(orden.proveedor_nombre));
       grupo.ordenes.add(textoExcelLimpio(orden.po_numero));
       grupo.cantidadTotal += cantidad;
@@ -2017,6 +2089,7 @@ function agruparOrdenesPorDescripcion(ordenes = []) {
       categoriasTexto: Array.from(grupo.categorias).filter(Boolean).join(", ") || "Otros",
       sedesTexto: Array.from(grupo.sedes).filter(Boolean).join(", ") || "-",
       codigosTexto: Array.from(grupo.codigos).filter(Boolean).join(", ") || "-",
+      codigosProductoTexto: Array.from(grupo.codigosProducto).filter(Boolean).join(", ") || "-",
       proveedoresTexto: Array.from(grupo.proveedores).filter(Boolean).join(", ") || "-",
       ordenesTexto: Array.from(grupo.ordenes).filter(Boolean).join(", ") || "-",
       ordenesCantidad: grupo.ordenes.size,
@@ -2088,7 +2161,9 @@ router.get("/proveedores/eliminar/:id", requireAuth, allowRoles("ADMIN", "PROVEE
 router.get("/ordenes/nueva", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER"), async (req, res) => {
   try {
     await ensureOrdenPlacaColumn();
+    await ensureOrdenDetalleCodigoProductoColumn();
     await ensureOrdenCotizacionColumns();
+    await ensureTipoMantenimientoColumns(pool);
     const [proveedores] = await pool.query("SELECT id, nombre FROM proveedores ORDER BY nombre");
     const siguientePO = await generarNumeroPO();
     res.render("compras/orden_form", {
@@ -2108,7 +2183,9 @@ router.get("/ordenes/nueva", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEED
 router.get("/ordenes/:id/editar", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER"), async (req, res) => {
   try {
     await ensureOrdenPlacaColumn();
+    await ensureOrdenDetalleCodigoProductoColumn();
     await ensureOrdenCotizacionColumns();
+    await ensureTipoMantenimientoColumns(pool);
     const id = req.params.id;
     const [[orden]] = await pool.query("SELECT * FROM ordenes_compra WHERE id = ?", [id]);
     if (!orden) return res.status(404).send("Orden no encontrada");
@@ -2134,13 +2211,16 @@ router.post("/ordenes", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_
   const connection = await pool.getConnection();
   try {
     await ensureOrdenPlacaColumn();
+    await ensureOrdenDetalleCodigoProductoColumn();
     await ensureOrdenCotizacionColumns();
+    await ensureTipoMantenimientoColumns(pool);
     await connection.beginTransaction();
 
     const po_numero = await generarNumeroPO();
     const fecha = new Date().toISOString().slice(0, 10);
 
     const { proveedor_id, forma_pago, moneda, placa_unidad, lineas, observaciones, empresa_destino, cotizacion_data, cotizacion_nombre, cotizacion_tipo } = req.body;
+    const tipoMantenimiento = normalizarTipoMantenimiento(req.body.tipo_mantenimiento);
     const lineasOrden = normalizarLineas(lineas);
     const placaOrden = obtenerPlacaOrden(lineasOrden, placa_unidad);
     const cotizacion = guardarCotizacionOrden(cotizacion_data, cotizacion_nombre, cotizacion_tipo, req.session.user.id);
@@ -2154,8 +2234,8 @@ router.post("/ordenes", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_
 
     const [result] = await connection.query(
       `INSERT INTO ordenes_compra
-       (po_numero, fecha, proveedor_id, forma_pago, moneda, placa_unidad, subtotal, descuento, transporte, iva, total, observaciones, cotizacion_archivo, cotizacion_nombre, cotizacion_tipo, creado_por, estado, empresa_destino)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?, 'BORRADOR', ?)`,
+       (po_numero, fecha, proveedor_id, forma_pago, moneda, placa_unidad, tipo_mantenimiento, subtotal, descuento, transporte, iva, total, observaciones, cotizacion_archivo, cotizacion_nombre, cotizacion_tipo, creado_por, estado, empresa_destino)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?, 'BORRADOR', ?)`,
       [
         po_numero,
         fecha,
@@ -2163,6 +2243,7 @@ router.post("/ordenes", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_
         forma_pago,
         moneda,
         placaOrden,
+        tipoMantenimiento,
         totalesOrden.subtotal,
         totalesOrden.descuento,
         totalesOrden.transporte,
@@ -2181,9 +2262,9 @@ router.post("/ordenes", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_
     for (const linea of lineasOrden) {
       await connection.query(
         `INSERT INTO ordenes_compra_detalle
-         (orden_compra_id, codigo, descripcion, cantidad, precio_unitario, subtotal)
-         VALUES (?,?,?,?,?,?)`,
-        [ordenId, linea.codigo, linea.descripcion, linea.cantidad, linea.precio_unitario, linea.subtotal]
+         (orden_compra_id, codigo, codigo_producto, descripcion, cantidad, precio_unitario, subtotal)
+         VALUES (?,?,?,?,?,?,?)`,
+        [ordenId, linea.codigo, linea.codigo_producto || null, linea.descripcion, linea.cantidad, linea.precio_unitario, linea.subtotal]
       );
     }
     await connection.commit();
@@ -2201,11 +2282,14 @@ router.post("/ordenes/:id/editar", requireAuth, allowRoles("ADMIN", "TALLER", "P
   const connection = await pool.getConnection();
   try {
     await ensureOrdenPlacaColumn();
+    await ensureOrdenDetalleCodigoProductoColumn();
     await ensureOrdenCotizacionColumns();
+    await ensureTipoMantenimientoColumns(pool);
     await connection.beginTransaction();
 
     const id = req.params.id;
     const { proveedor_id, forma_pago, moneda, placa_unidad, lineas, observaciones, empresa_destino, cotizacion_data, cotizacion_nombre, cotizacion_tipo } = req.body;
+    const tipoMantenimiento = normalizarTipoMantenimiento(req.body.tipo_mantenimiento);
     const lineasOrden = normalizarLineas(lineas);
     const placaOrden = obtenerPlacaOrden(lineasOrden, placa_unidad);
     const cotizacion = guardarCotizacionOrden(cotizacion_data, cotizacion_nombre, cotizacion_tipo, req.session.user.id);
@@ -2228,6 +2312,7 @@ router.post("/ordenes/:id/editar", requireAuth, allowRoles("ADMIN", "TALLER", "P
            forma_pago = ?,
            moneda = ?,
            placa_unidad = ?,
+           tipo_mantenimiento = ?,
            subtotal = ?,
            descuento = ?,
            transporte = ?,
@@ -2241,6 +2326,7 @@ router.post("/ordenes/:id/editar", requireAuth, allowRoles("ADMIN", "TALLER", "P
       forma_pago,
       moneda,
       placaOrden,
+      tipoMantenimiento,
       totalesOrden.subtotal,
       totalesOrden.descuento,
       totalesOrden.transporte,
@@ -2269,9 +2355,9 @@ router.post("/ordenes/:id/editar", requireAuth, allowRoles("ADMIN", "TALLER", "P
     for (const linea of lineasOrden) {
       await connection.query(
         `INSERT INTO ordenes_compra_detalle
-         (orden_compra_id, codigo, descripcion, cantidad, precio_unitario, subtotal)
-         VALUES (?,?,?,?,?,?)`,
-        [id, linea.codigo, linea.descripcion, linea.cantidad, linea.precio_unitario, linea.subtotal]
+         (orden_compra_id, codigo, codigo_producto, descripcion, cantidad, precio_unitario, subtotal)
+         VALUES (?,?,?,?,?,?,?)`,
+        [id, linea.codigo, linea.codigo_producto || null, linea.descripcion, linea.cantidad, linea.precio_unitario, linea.subtotal]
       );
     }
 
@@ -2289,6 +2375,7 @@ router.post("/ordenes/:id/editar", requireAuth, allowRoles("ADMIN", "TALLER", "P
 router.get("/ordenes", requireAuth, allowRoles(...ROLES_VER_ORDENES), async (req, res) => {
   try {
     await ensureOrdenPlacaColumn();
+    await ensureOrdenDetalleCodigoProductoColumn();
     await ensureOrdenCotizacionColumns();
     const { proveedor_id, fecha_desde, fecha_hasta, po_numero, placa_unidad, estado, facturada } = req.query;
     const { sql, params } = construirConsultaOrdenes({ proveedor_id, fecha_desde, fecha_hasta, po_numero, placa_unidad, estado, facturada });
@@ -2324,6 +2411,7 @@ router.get("/ordenes", requireAuth, allowRoles(...ROLES_VER_ORDENES), async (req
 router.get("/ordenes/reporte/pdf", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER", "CONTABILIDAD"), async (req, res) => {
   try {
     await ensureOrdenPlacaColumn();
+    await ensureOrdenDetalleCodigoProductoColumn();
     await ensureOrdenCotizacionColumns();
     const { proveedor_id, fecha_desde, fecha_hasta, po_numero, placa_unidad, estado, facturada } = req.query;
     const filtros = { proveedor_id, fecha_desde, fecha_hasta, po_numero, placa_unidad, estado, facturada };
@@ -2334,7 +2422,7 @@ router.get("/ordenes/reporte/pdf", requireAuth, allowRoles("ADMIN", "TALLER", "P
       const ordenIds = ordenes.map(orden => orden.id);
       const placeholders = ordenIds.map(() => "?").join(",");
       const [lineas] = await pool.query(
-        `SELECT orden_compra_id, codigo, descripcion, cantidad, precio_unitario, subtotal
+        `SELECT orden_compra_id, codigo, codigo_producto, descripcion, cantidad, precio_unitario, subtotal
          FROM ordenes_compra_detalle
          WHERE orden_compra_id IN (${placeholders})
          ORDER BY orden_compra_id, id`,
@@ -2393,6 +2481,7 @@ router.get("/ordenes/reporte/pdf", requireAuth, allowRoles("ADMIN", "TALLER", "P
 router.get("/ordenes/reporte/excel", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER", "CONTABILIDAD"), async (req, res) => {
   try {
     await ensureOrdenPlacaColumn();
+    await ensureOrdenDetalleCodigoProductoColumn();
     await ensureOrdenCotizacionColumns();
 
     const { proveedor_id, fecha_desde, fecha_hasta, po_numero, placa_unidad, estado, facturada } = req.query;
@@ -2424,7 +2513,8 @@ router.get("/ordenes/reporte/excel", requireAuth, allowRoles("ADMIN", "TALLER", 
       { header: "Categoria", key: "categoria", width: 18 },
       { header: "Sede", key: "sede", width: 22 },
       { header: "Descripcion", key: "descripcion", width: 48 },
-      { header: "Codigos / placas", key: "codigos", width: 32 },
+      { header: "Placas", key: "codigos", width: 32 },
+      { header: "Codigos producto", key: "codigos_producto", width: 24 },
       { header: "Cantidad total", key: "cantidad_total", width: 16 },
       { header: "Veces comprado", key: "veces_comprado", width: 16 },
       { header: "Ordenes", key: "ordenes_cantidad", width: 12 },
@@ -2446,6 +2536,7 @@ router.get("/ordenes/reporte/excel", requireAuth, allowRoles("ADMIN", "TALLER", 
         sede: producto.sedesTexto,
         descripcion: producto.descripcion,
         codigos: producto.codigosTexto,
+        codigos_producto: producto.codigosProductoTexto,
         cantidad_total: producto.cantidadTotal,
         veces_comprado: producto.vecesComprado,
         ordenes_cantidad: producto.ordenesCantidad,
@@ -2582,14 +2673,14 @@ router.get("/ordenes/reporte/excel", requireAuth, allowRoles("ADMIN", "TALLER", 
       metaRow.getCell(2).numFmt = "yyyy-mm-dd";
 
       const lineHeader = wsCompleto.addRow([
-        "PO", "Fecha", "Proveedor", "Placa", "Estado", "Factura", "Placa / código línea",
+        "PO", "Fecha", "Proveedor", "Placa", "Estado", "Factura", "Placa línea", "Código",
         "Descripción", "Cantidad", "Precio unitario", "Subtotal línea", "Total orden", "Observaciones"
       ]);
       pintarFilaHeader(lineHeader, "FF111827");
 
       const lineas = orden.lineas.length
         ? orden.lineas
-        : [{ codigo: orden.placa_unidad, descripcion: "Orden sin detalle de líneas", cantidad: 1, precio_unitario: orden.total, subtotal: orden.total }];
+        : [{ codigo: orden.placa_unidad, codigo_producto: "", descripcion: "Orden sin detalle de líneas", cantidad: 1, precio_unitario: orden.total, subtotal: orden.total }];
 
       lineas.forEach(linea => {
         const row = wsCompleto.addRow([
@@ -2600,6 +2691,7 @@ router.get("/ordenes/reporte/excel", requireAuth, allowRoles("ADMIN", "TALLER", 
           String(orden.estado || "").replaceAll("_", " "),
           orden.factura || estadoFacturaOrden(orden),
           linea.codigo || "-",
+          linea.codigo_producto || "-",
           linea.descripcion || "-",
           parseMonto(linea.cantidad),
           parseMonto(linea.precio_unitario),
@@ -2608,21 +2700,21 @@ router.get("/ordenes/reporte/excel", requireAuth, allowRoles("ADMIN", "TALLER", 
           orden.observaciones || "-"
         ]);
         row.getCell(2).numFmt = "yyyy-mm-dd";
-        [10, 11, 12].forEach(col => {
+        [11, 12, 13].forEach(col => {
           row.getCell(col).numFmt = '"CRC" #,##0.00';
         });
-        row.getCell(8).alignment = { wrapText: true, vertical: "top" };
-        row.getCell(13).alignment = { wrapText: true, vertical: "top" };
+        row.getCell(9).alignment = { wrapText: true, vertical: "top" };
+        row.getCell(14).alignment = { wrapText: true, vertical: "top" };
       });
 
       const totalRow = wsCompleto.addRow([
-        "", "", "", "", "", "", "", "Total de la orden",
+        "", "", "", "", "", "", "", "", "Total de la orden",
         "", "", "", parseMonto(orden.total), orden.observaciones || "-"
       ]);
       totalRow.font = { bold: true, color: { argb: "FF14532D" } };
       totalRow.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFDCFCE7" } };
-      totalRow.getCell(12).numFmt = '"CRC" #,##0.00';
-      totalRow.getCell(13).alignment = { wrapText: true, vertical: "top" };
+      totalRow.getCell(13).numFmt = '"CRC" #,##0.00';
+      totalRow.getCell(14).alignment = { wrapText: true, vertical: "top" };
       wsCompleto.addRow([]);
     });
 
@@ -2703,7 +2795,8 @@ router.get("/ordenes/reporte/excel", requireAuth, allowRoles("ADMIN", "TALLER", 
       { header: "Estado orden", key: "estado", width: 18 },
       { header: "Factura", key: "factura", width: 18 },
       { header: "Placa orden", key: "placa_orden", width: 17 },
-      { header: "Placa / código línea", key: "codigo", width: 18 },
+      { header: "Placa línea", key: "codigo", width: 18 },
+      { header: "Código", key: "codigo_producto", width: 18 },
       { header: "Descripción", key: "descripcion", width: 45 },
       { header: "Cantidad", key: "cantidad", width: 12 },
       { header: "Precio unitario", key: "precio", width: 16 },
@@ -2714,7 +2807,7 @@ router.get("/ordenes/reporte/excel", requireAuth, allowRoles("ADMIN", "TALLER", 
     pintarFilaHeader(wsDetalle.getRow(1));
 
     ordenes.forEach(orden => {
-      const lineas = orden.lineas.length ? orden.lineas : [{ codigo: orden.placa_unidad, descripcion: "Orden sin detalle de líneas", cantidad: 1, precio_unitario: orden.total, subtotal: orden.total }];
+      const lineas = orden.lineas.length ? orden.lineas : [{ codigo: orden.placa_unidad, codigo_producto: "", descripcion: "Orden sin detalle de líneas", cantidad: 1, precio_unitario: orden.total, subtotal: orden.total }];
       lineas.forEach(linea => {
         const row = wsDetalle.addRow({
           po: orden.po_numero,
@@ -2724,6 +2817,7 @@ router.get("/ordenes/reporte/excel", requireAuth, allowRoles("ADMIN", "TALLER", 
           factura: orden.factura || estadoFacturaOrden(orden),
           placa_orden: orden.placa_unidad || "-",
           codigo: linea.codigo || "-",
+          codigo_producto: linea.codigo_producto || "-",
           descripcion: linea.descripcion || "-",
           cantidad: parseMonto(linea.cantidad),
           precio: parseMonto(linea.precio_unitario),
@@ -2732,14 +2826,14 @@ router.get("/ordenes/reporte/excel", requireAuth, allowRoles("ADMIN", "TALLER", 
           observaciones: orden.observaciones || "-"
         });
         row.getCell(2).numFmt = "yyyy-mm-dd";
-        [10, 11, 12].forEach(col => {
+        [11, 12, 13].forEach(col => {
           row.getCell(col).numFmt = '"CRC" #,##0.00';
         });
-        row.getCell(8).alignment = { wrapText: true, vertical: "top" };
-        row.getCell(13).alignment = { wrapText: true, vertical: "top" };
+        row.getCell(9).alignment = { wrapText: true, vertical: "top" };
+        row.getCell(14).alignment = { wrapText: true, vertical: "top" };
       });
     });
-    wsDetalle.autoFilter = { from: "A1", to: "M1" };
+    wsDetalle.autoFilter = { from: "A1", to: "N1" };
 
     [wsProductos, wsOrdenes, wsCompleto, resumen, wsDetalle].forEach(worksheet => {
       aplicarBordesWorksheet(worksheet);
@@ -2759,6 +2853,7 @@ router.get("/ordenes/reporte/excel", requireAuth, allowRoles("ADMIN", "TALLER", 
 router.get("/ordenes/:id/detalle", requireAuth, allowRoles(...ROLES_VER_ORDENES), async (req, res) => {
   try {
     await ensureOrdenPlacaColumn();
+    await ensureOrdenDetalleCodigoProductoColumn();
     await ensureOrdenCotizacionColumns();
     const id = req.params.id;
     const [[orden]] = await pool.query("SELECT * FROM ordenes_compra WHERE id = ?", [id]);
@@ -2846,7 +2941,7 @@ router.post("/cotizacion/analizar", requireAuth, allowRoles("ADMIN", "TALLER", "
       '  "iva": porcentaje numerico, normalmente 13 si aplica, 0 si indica exento,',
       '  "observaciones": "notas utiles breves",',
       '  "lineas": [',
-      '    {"codigo": "placa o codigo si aparece", "descripcion": "producto/servicio", "cantidad": numero, "precio_unitario": numero, "subtotal": numero}',
+      '    {"codigo": "placa si aparece, GENERAL TALLER/GENERAL GASTOS/ACEITES si aplica", "codigo_producto": "código del producto si aparece", "descripcion": "producto/servicio", "cantidad": numero, "precio_unitario": numero, "subtotal": numero}',
       "  ]",
       "}",
       "Reglas:",
@@ -2954,7 +3049,7 @@ router.post("/ordenes/:id/eliminar", requireAuth, allowRoles("ADMIN", "TALLER", 
 
 router.post("/ordenes/:id/factura", requireAuth, allowRoles(...ROLES_REGISTRAR_FACTURA_ORDEN), async (req, res) => {
   try {
-    await ensureFacturaRecepcionColumns();
+    await ensureFacturasSchema();
     const id = req.params.id;
     const {
       factura,
@@ -3044,7 +3139,7 @@ router.post("/ordenes/:id/factura", requireAuth, allowRoles(...ROLES_REGISTRAR_F
 
 router.post("/facturas/agregar", requireAuth, allowRoles(...ROLES_RECEPCION_FACTURAS), async (req, res) => {
   try {
-    await ensureFacturaRecepcionColumns();
+    await ensureFacturasSchema();
     const {
       orden_id,
       po_numero,
@@ -3681,17 +3776,24 @@ router.post("/facturas/reintegro-gastos", requireAuth, allowRoles(...ROLES_GESTI
 // ===================== LISTADO DE FACTURAS (unificado) =====================
 router.get("/facturas", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER", "CONTABILIDAD"), async (req, res) => {
   try {
-    await ensureFacturaRecepcionColumns();
-    await ensurePeriodoCierreColumns();
+    await ensureFacturasSchema();
     const hoy = new Date();
     hoy.setHours(0, 0, 0, 0);
 
-    await ensureNotaCreditoColumns();
-    await ensureAbonoColumns();
     const { proveedor_id, fecha_desde, fecha_hasta, pagada, vencida, periodo_cierre } = req.query;
     const orden = req.query.orden === 'asc' ? 'asc' : 'desc';
     const periodoCierre = normalizarPeriodoCierre(periodo_cierre);
-    const facturasFiltradas = await obtenerFacturasCompras({ proveedor_id, fecha_desde, fecha_hasta, pagada, vencida, periodo_cierre: periodoCierre, orden });
+    const paginacionBase = normalizarPaginacionFacturas(req.query);
+    const filtrosFacturas = { proveedor_id, fecha_desde, fecha_hasta, pagada, vencida, periodo_cierre: periodoCierre, orden };
+    const totalRegistros = await contarFacturasCompras(filtrosFacturas);
+    const totalPaginas = Math.max(Math.ceil(totalRegistros / paginacionBase.porPagina), 1);
+    const paginaActual = Math.min(paginacionBase.pagina, totalPaginas);
+    const offset = (paginaActual - 1) * paginacionBase.porPagina;
+    const facturasFiltradas = await obtenerFacturasCompras({
+      ...filtrosFacturas,
+      limit: paginacionBase.porPagina,
+      offset
+    });
 
     const [proveedores] = await queryWithRetry("SELECT id, nombre FROM proveedores ORDER BY nombre");
     const ordenesDisponibles = await obtenerOrdenesDisponiblesFactura();
@@ -3706,6 +3808,14 @@ router.get("/facturas", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_
       proveedores,
       ordenesDisponibles,
       filtros: { proveedor_id, fecha_desde, fecha_hasta, pagada, vencida, periodo_cierre: periodoCierre, orden },
+      paginacion: {
+        pagina: paginaActual,
+        porPagina: paginacionBase.porPagina,
+        total: totalRegistros,
+        totalPaginas,
+        desde: totalRegistros ? offset + 1 : 0,
+        hasta: Math.min(offset + facturasFiltradas.length, totalRegistros)
+      },
       success,
       error,
       hoy: hoy.toISOString().slice(0, 10)
@@ -3718,10 +3828,7 @@ router.get("/facturas", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_
 
 router.get("/facturas/dashboard", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER", "CONTABILIDAD"), async (req, res) => {
   try {
-    await ensureFacturaRecepcionColumns();
-    await ensureNotaCreditoColumns();
-    await ensureAbonoColumns();
-    await ensurePeriodoCierreColumns();
+    await ensureFacturasSchema();
 
     const { proveedor_id, fecha_desde, fecha_hasta, pagada, vencida, periodo_cierre } = req.query;
     const orden = req.query.orden === "asc" ? "asc" : "desc";
@@ -3883,9 +3990,7 @@ router.get("/facturas/dashboard", requireAuth, allowRoles("ADMIN", "TALLER", "PR
 
 router.get("/facturas/reporte/pdf", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER", "CONTABILIDAD"), async (req, res) => {
   try {
-    await ensureFacturaRecepcionColumns();
-    await ensureNotaCreditoColumns();
-    await ensureAbonoColumns();
+    await ensureFacturasSchema();
 
     const { proveedor_id, fecha_desde, fecha_hasta, vencida, periodo_cierre } = req.query;
     const pagada = normalizarFiltroPagadaReporte(req.query.pagada);
@@ -3935,9 +4040,7 @@ router.get("/facturas/reporte/pdf", requireAuth, allowRoles("ADMIN", "TALLER", "
 
 router.get("/facturas/reporte/excel", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER", "CONTABILIDAD"), async (req, res) => {
   try {
-    await ensureFacturaRecepcionColumns();
-    await ensureNotaCreditoColumns();
-    await ensureAbonoColumns();
+    await ensureFacturasSchema();
 
     const { proveedor_id, fecha_desde, fecha_hasta, vencida, periodo_cierre } = req.query;
     const pagada = normalizarFiltroPagadaReporte(req.query.pagada);
@@ -4140,7 +4243,7 @@ router.get("/facturas/reporte/excel", requireAuth, allowRoles("ADMIN", "TALLER",
 
 router.post("/facturas/:id/numero", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER"), async (req, res) => {
   try {
-    await ensureFacturaRecepcionColumns();
+    await ensureFacturasSchema();
     const id = req.params.id;
     const { tipo, numero_factura } = req.body;
     const nuevoNumero = String(numero_factura || "").trim();
@@ -4204,9 +4307,7 @@ router.post("/facturas/:id/numero", requireAuth, allowRoles("ADMIN", "TALLER", "
 
 router.post("/facturas/:id/editar", requireAuth, allowRoles(...ROLES_GESTION_FACTURAS), async (req, res) => {
   try {
-    await ensureFacturaRecepcionColumns();
-    await ensureNotaCreditoColumns();
-    await ensureAbonoColumns();
+    await ensureFacturasSchema();
 
     const id = req.params.id;
     const {
@@ -4421,9 +4522,7 @@ router.post("/facturas/:id/editar", requireAuth, allowRoles(...ROLES_GESTION_FAC
 
 router.post("/facturas/:id/eliminar", requireAuth, allowRoles(...ROLES_GESTION_FACTURAS), async (req, res) => {
   try {
-    await ensureFacturaRecepcionColumns();
-    await ensureNotaCreditoColumns();
-    await ensureAbonoColumns();
+    await ensureFacturasSchema();
 
     const id = req.params.id;
     const { tipo } = req.body;
@@ -4488,9 +4587,7 @@ router.post("/facturas/:id/eliminar", requireAuth, allowRoles(...ROLES_GESTION_F
 
 router.post("/facturas/:id/nota-credito", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER"), async (req, res) => {
   try {
-    await ensureNotaCreditoColumns();
-    await ensureAbonoColumns();
-    await ensurePeriodoCierreColumns();
+    await ensureFacturasSchema();
     const id = req.params.id;
     const { tipo, numero_nc, fecha_nc, monto_nc, motivo_nc } = req.body;
     const montoNC = parseMonto(monto_nc);
@@ -4563,9 +4660,7 @@ router.post("/facturas/:id/nota-credito", requireAuth, allowRoles("ADMIN", "TALL
 
 router.post("/facturas/:id/abono", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER"), async (req, res) => {
   try {
-    await ensureNotaCreditoColumns();
-    await ensureAbonoColumns();
-    await ensurePeriodoCierreColumns();
+    await ensureFacturasSchema();
 
     const id = req.params.id;
     const { tipo, monto_abono, fecha_abono, observacion_abono, periodo_cierre } = req.body;
@@ -4652,9 +4747,7 @@ router.post("/facturas/:id/abono", requireAuth, allowRoles("ADMIN", "TALLER", "P
 
 router.post("/facturas/:id/pagar", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER"), async (req, res) => {
   try {
-    await ensureNotaCreditoColumns();
-    await ensureAbonoColumns();
-    await ensurePeriodoCierreColumns();
+    await ensureFacturasSchema();
     const id = req.params.id;
     const { tipo } = req.body;
     const fechaPago = String(req.body.fecha_pago || "").trim();
@@ -4771,9 +4864,7 @@ router.get("/facturas/recibo-preview", requireAuth, allowRoles("ADMIN", "TALLER"
 
 router.post("/facturas/pagar-multiple", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER"), async (req, res) => {
   try {
-    await ensureNotaCreditoColumns();
-    await ensureAbonoColumns();
-    await ensurePeriodoCierreColumns();
+    await ensureFacturasSchema();
     const { facturas_ids } = req.body;
     const seleccionadas = toArray(facturas_ids).map(parseFacturaRef).filter(Boolean);
     const fechaPago = String(req.body.fecha_pago || "").trim();
@@ -4924,6 +5015,7 @@ router.post("/facturas/pagar-multiple", requireAuth, allowRoles("ADMIN", "TALLER
 router.get("/dashboard", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER"), async (req, res) => {
   try {
     await ensureOrdenPlacaColumn();
+    await ensureOrdenDetalleCodigoProductoColumn();
 
     const { proveedor_id, fecha_desde, fecha_hasta, estado } = req.query;
     const condiciones = [];
@@ -5117,6 +5209,7 @@ router.get("/dashboard", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA
           p.nombre AS proveedor,
           d.id AS detalle_id,
           d.codigo,
+          d.codigo_producto,
           d.descripcion,
           d.cantidad,
           d.precio_unitario,
@@ -5208,6 +5301,7 @@ router.get("/dashboard", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA
         if (row.detalle_id) {
           orden.lineas.push({
             codigo: row.codigo,
+            codigo_producto: row.codigo_producto,
             descripcion: row.descripcion,
             cantidad: row.cantidad,
             precio_unitario: row.precio_unitario,

@@ -9,6 +9,8 @@ const {
 } = require("../utils/reportesSupervisoresDb");
 const { SEDES_GRANEL, esUsuarioTodasSedes, etiquetaSede, getSedesPermitidas } = require("../utils/sedes");
 const { agregarFiltroPlacaSql } = require("../utils/placas");
+const { ensureNumeroMantenimientoColumn, asignarNumeroMantenimiento } = require("../utils/mantenimientosNumero");
+const { ensureTipoMantenimientoColumns, normalizarTipoMantenimiento } = require("../utils/tipoMantenimiento");
 
 // =====================================================
 // MIDDLEWARE DE AUTENTICACIÓN
@@ -557,6 +559,7 @@ async function obtenerReportesPendientesSupervisores(sedeFiltro) {
       rs.supervisor_nombre,
       rs.descripcion_original,
       rs.descripcion_limpia,
+      COALESCE(rs.tipo_mantenimiento, 'CORRECTIVO') AS tipo_mantenimiento,
       rs.importante,
       rs.fecha_reporte,
       u.placa
@@ -605,6 +608,7 @@ async function obtenerReporteSupervisorAutorizado(reporteId, sedeFiltro) {
 // =====================================================
 router.get("/correctivos", requireAuth, async (req, res) => {
   try {
+    await ensureTipoMantenimientoColumns(pool);
     const sedeFiltro = obtenerSedeFiltro(req);
     const condiciones = [];
     const params = [];
@@ -617,6 +621,7 @@ router.get("/correctivos", requireAuth, async (req, res) => {
       `
       SELECT
         c.id,
+        COALESCE(c.tipo_mantenimiento, 'CORRECTIVO') AS tipo_mantenimiento,
         DATE_FORMAT(c.fecha, '%d/%m/%Y %H:%i') AS fecha_formato,
         u.placa,
         c.trabajo_realizado,
@@ -627,7 +632,7 @@ router.get("/correctivos", requireAuth, async (req, res) => {
       LEFT JOIN correctivo_trabajos ct ON ct.correctivo_id = c.id
       LEFT JOIN mecanicos m ON m.id = ct.mecanico_id
       ${where}
-      GROUP BY c.id, c.fecha, u.placa, c.trabajo_realizado, c.pendiente
+      GROUP BY c.id, c.tipo_mantenimiento, c.fecha, u.placa, c.trabajo_realizado, c.pendiente
       ORDER BY c.fecha DESC
       `,
       params
@@ -805,6 +810,7 @@ router.get("/dashboard", requireAuth, async (req, res) => {
 // =====================================================
 router.get("/correctivos/nuevo", requireAuth, async (req, res) => {
   try {
+    await ensureTipoMantenimientoColumns(pool);
     if (!["MECANICO", "ADMIN", "TALLER"].includes(req.session.user.rol))
       return res.redirect("/mantenimientos");
     let sedeFiltro = obtenerSedeFiltro(req);
@@ -816,7 +822,13 @@ router.get("/correctivos/nuevo", requireAuth, async (req, res) => {
     const [unidades] = await pool.query("SELECT id, placa FROM unidades WHERE sede = ? ORDER BY placa", [sedeFiltro]);
     const { sql: sqlMecanicos, params: paramsMecanicos } = obtenerFiltroMecanicosPorSede(sedeFiltro);
     const [mecanicos] = await pool.query(sqlMecanicos, paramsMecanicos);
-    res.render("correctivos_nuevo", { unidades, mecanicos, reporteAtendido, user: req.session.user });
+    res.render("correctivos_nuevo", {
+      unidades,
+      mecanicos,
+      reporteAtendido,
+      tipoDefault: normalizarTipoMantenimiento(reporteAtendido?.tipo_mantenimiento),
+      user: req.session.user
+    });
   } catch (error) {
     console.error("❌ ERROR form correctivo:", error);
     res.status(500).send("Error interno");
@@ -832,7 +844,10 @@ router.post("/correctivos", requireAuth, async (req, res) => {
       return res.status(403).send("No autorizado");
     }
     await ensureUnidadEstadoColumns();
+    await ensureTipoMantenimientoColumns(pool);
+    await ensureNumeroMantenimientoColumn(pool);
     const { unidad_id, pendiente, trabajo_general, reporte_id } = req.body;
+    const tipoMantenimiento = normalizarTipoMantenimiento(req.body.tipo_mantenimiento);
     const pendienteTexto = String(pendiente || "").trim();
     if (!unidad_id) return res.status(400).send("Debe seleccionar una unidad.");
     const mecanicosArray = obtenerValoresSeleccionados(req.body);
@@ -859,14 +874,6 @@ router.post("/correctivos", requireAuth, async (req, res) => {
     }
     if (!resumenGeneral.trim()) return res.status(400).send("Debe escribir al menos un trabajo.");
 
-    const puntos = calcularPuntos(resumenGeneral);
-    const [result] = await pool.query(
-      `INSERT INTO correctivos (unidad_id, sede, trabajo_realizado, pendiente, creado_por, puntos)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      [unidad_id, sedeCorrectivo, resumenGeneral, pendienteTexto || null, req.session.user.id, puntos]
-    );
-    const correctivoId = result.insertId;
-
     if (pendienteTexto) {
       await pool.query(
         `UPDATE unidades
@@ -884,6 +891,64 @@ router.post("/correctivos", requireAuth, async (req, res) => {
         [unidad_id]
       );
     }
+
+    if (tipoMantenimiento === "PREVENTIVO") {
+      const [mantenimientoResult] = await pool.query(
+        `INSERT INTO mantenimientos
+         (unidad_id, sede, tipo, plan, ejecucion, pendiente, estado, prioridad, fecha_programada, fecha_cierre, creado_por)
+         VALUES (?, ?, 'PREVENTIVO', ?, ?, ?, 'CERRADO', 'MEDIA', CURDATE(), NOW(), ?)`,
+        [
+          unidad_id,
+          sedeCorrectivo,
+          "Preventivo registrado por mecánico",
+          resumenGeneral,
+          pendienteTexto || null,
+          req.session.user.id
+        ]
+      );
+      const mantenimientoId = mantenimientoResult.insertId;
+      await asignarNumeroMantenimiento(pool, mantenimientoId);
+
+      for (const idMec of mecanicosArray) {
+        await pool.query(
+          `INSERT IGNORE INTO mantenimiento_mecanicos (mantenimiento_id, mecanico_id)
+           VALUES (?, ?)`,
+          [mantenimientoId, idMec]
+        );
+      }
+
+      const reporteAtendido = await obtenerReporteSupervisorAutorizado(reporte_id, sedeFiltro);
+      if (reporteAtendido && String(reporteAtendido.unidad_id) === String(unidad_id)) {
+        await pool.query(
+          `UPDATE reportes_supervisores
+           SET estado = 'HISTORIAL',
+               cerrado_por = ?,
+               fecha_cierre = NOW(),
+               correctivo_id = NULL,
+               mantenimiento_id = ?,
+               cierre_motivo = ?,
+               cierre_confianza = 1,
+               actualizado_en = NOW()
+           WHERE id = ?`,
+          [
+            req.session.user.id,
+            mantenimientoId,
+            "Cerrado por mecánico al completar preventivo desde el reporte.",
+            reporteAtendido.id
+          ]
+        );
+      }
+
+      return res.redirect(`/mantenimientos/${mantenimientoId}`);
+    }
+
+    const puntos = calcularPuntos(resumenGeneral);
+    const [result] = await pool.query(
+      `INSERT INTO correctivos (unidad_id, sede, tipo_mantenimiento, trabajo_realizado, pendiente, creado_por, puntos)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [unidad_id, sedeCorrectivo, tipoMantenimiento, resumenGeneral, pendienteTexto || null, req.session.user.id, puntos]
+    );
+    const correctivoId = result.insertId;
 
     for (const idMec of mecanicosArray) {
       let trabajo = null, repuesto = null;
@@ -907,6 +972,7 @@ router.post("/correctivos", requireAuth, async (req, res) => {
              cerrado_por = ?,
              fecha_cierre = NOW(),
              correctivo_id = ?,
+             mantenimiento_id = NULL,
              cierre_motivo = ?,
              cierre_confianza = 1,
              actualizado_en = NOW()
@@ -993,6 +1059,7 @@ router.post("/correctivos/:id/agregar", requireAuth, async (req, res) => {
 // =====================================================
 router.get("/", requireAuth, async (req, res) => {
   try {
+    await ensureNumeroMantenimientoColumn(pool);
     const { filtro, placa, tipo, prioridad, fecha_desde, fecha_hasta, mecanico_id } = req.query;
     let condiciones = [], params = [];
     if (filtro === "pendientes") condiciones.push("m.estado != 'CERRADO'");
@@ -1039,6 +1106,7 @@ router.get("/", requireAuth, async (req, res) => {
       `
       SELECT
         m.id,
+        m.numero_mantenimiento,
         u.placa,
         u.sede,
         m.tipo,
@@ -1054,7 +1122,7 @@ router.get("/", requireAuth, async (req, res) => {
       LEFT JOIN mantenimiento_mecanicos mm ON mm.mantenimiento_id = m.id
       LEFT JOIN mecanicos mec ON mec.id = mm.mecanico_id
       ${where}
-      GROUP BY m.id, u.placa, u.sede, m.tipo, m.estado, m.prioridad, m.fecha_programada, m.ejecucion, m.pendiente
+      GROUP BY m.id, m.numero_mantenimiento, u.placa, u.sede, m.tipo, m.estado, m.prioridad, m.fecha_programada, m.ejecucion, m.pendiente
       ORDER BY m.fecha_programada DESC, m.id DESC
       `,
       params
@@ -1171,8 +1239,9 @@ router.post("/:id/reprogramar", requireAuth, async (req, res) => {
 
 router.get("/:id", requireAuth, async (req, res) => {
   try {
+    await ensureNumeroMantenimientoColumn(pool);
     const sedeFiltro = obtenerSedeFiltro(req);
-    let sql = `SELECT m.id, m.tipo, m.estado, m.prioridad, m.plan, m.ejecucion, m.pendiente, u.placa, u.sede
+    let sql = `SELECT m.id, m.numero_mantenimiento, m.tipo, m.estado, m.prioridad, m.plan, m.ejecucion, m.pendiente, u.placa, u.sede
                FROM mantenimientos m JOIN unidades u ON u.id = m.unidad_id WHERE m.id = ?`;
     let params = [req.params.id];
     if (sedeFiltro) {
