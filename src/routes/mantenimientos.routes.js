@@ -35,6 +35,35 @@ function puedeReprogramarMantenimientos(user) {
   return ["ADMIN", "TALLER"].includes(user.rol);
 }
 
+function escapeHtml(value) {
+  return String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function sanitizarPlanTaller(value) {
+  const openToken = "__PLAN_RED_OPEN__";
+  const closeToken = "__PLAN_RED_CLOSE__";
+  const texto = String(value || "")
+    .replace(/<span\s+class=["']plan-red["'][^>]*>/gi, openToken)
+    .replace(/<\/span>/gi, closeToken)
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/p>\s*<p[^>]*>/gi, "\n")
+    .replace(/<\/div>\s*<div[^>]*>/gi, "\n")
+    .replace(/<\/?p[^>]*>/gi, "\n")
+    .replace(/<\/?div[^>]*>/gi, "\n")
+    .replace(/<[^>]*>/g, "")
+    .replace(/\u00a0/g, " ")
+    .trim();
+
+  return escapeHtml(texto)
+    .replaceAll(openToken, '<span class="plan-red">')
+    .replaceAll(closeToken, "</span>");
+}
+
 function obtenerFiltroMecanicosPorSede(sedeFiltro, soloIds = false) {
   let sql = soloIds
     ? "SELECT id FROM mecanicos WHERE activo = 1"
@@ -1168,7 +1197,7 @@ router.get("/:id", requireAuth, async (req, res) => {
 router.post("/:id/plan", requireAuth, async (req, res) => {
   try {
     if (!["ADMIN", "TALLER"].includes(req.session.user.rol)) return res.status(403).send("No autorizado");
-    const { plan } = req.body;
+    const plan = sanitizarPlanTaller(req.body.plan);
     await pool.query("UPDATE mantenimientos SET plan = ? WHERE id = ?", [plan, req.params.id]);
     res.redirect(`/mantenimientos/${req.params.id}`);
   } catch (error) {
