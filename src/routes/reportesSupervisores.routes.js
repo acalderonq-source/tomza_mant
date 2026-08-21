@@ -8,7 +8,7 @@ const {
 } = require("../utils/reportesSupervisoresDb");
 const { agregarTallerParaMecanico } = require("../utils/sedes");
 const { agregarFiltroPlacaSql } = require("../utils/placas");
-const { normalizarTipoMantenimiento } = require("../utils/tipoMantenimiento");
+const { normalizarTipoMantenimiento, detectarTipoMantenimiento } = require("../utils/tipoMantenimiento");
 
 const ROLES_VER = ["ADMIN", "TALLER", "MECANICO", "SUPERVISOR", "SUPERVISOR_PESADO"];
 const ROLES_CREAR = ["ADMIN", "TALLER", "SUPERVISOR", "SUPERVISOR_PESADO"];
@@ -611,7 +611,10 @@ router.post("/", allowRoles(...ROLES_CREAR), async (req, res) => {
   try {
     await ensureReportesSupervisoresTables(pool);
     const { unidad_id, descripcion_original } = req.body;
-    const tipoMantenimiento = normalizarTipoMantenimiento(req.body.tipo_mantenimiento);
+    const tipoMantenimiento = normalizarTipoMantenimiento(
+      req.body.tipo_mantenimiento,
+      detectarTipoMantenimiento(req.body.descripcion_original, { origen: "REPORTE" })
+    );
     const semanaReporte = lunesDesdeSemanaInput(req.body.semana_reporte) || lunesDesdeSemanaInput(semanaDefaultReporte());
     if (!unidad_id || !String(descripcion_original || "").trim()) {
       req.session.error = "Debe seleccionar unidad y escribir el reporte.";
@@ -654,7 +657,10 @@ router.post("/:id/editar", allowRoles(...ROLES_EDITAR), async (req, res) => {
   try {
     await ensureReportesSupervisoresTables(pool);
     const { descripcion_limpia, nota_taller, importante, estado } = req.body;
-    const tipoMantenimiento = normalizarTipoMantenimiento(req.body.tipo_mantenimiento);
+    const tipoMantenimiento = normalizarTipoMantenimiento(
+      req.body.tipo_mantenimiento,
+      detectarTipoMantenimiento(req.body.descripcion_limpia || req.body.descripcion_original, { origen: "REPORTE" })
+    );
     const descripcionLimpia = sanitizarReporteHtml(descripcion_limpia) || null;
     const marcadoRojo = tieneRojoReporte(descripcionLimpia);
     await pool.query(

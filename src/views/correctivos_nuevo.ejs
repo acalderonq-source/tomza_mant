@@ -144,6 +144,7 @@
             <option value="CORRECTIVO" <%= selectedTipo === 'CORRECTIVO' ? 'selected' : '' %>>Correctivo</option>
             <option value="PREVENTIVO" <%= selectedTipo === 'PREVENTIVO' ? 'selected' : '' %>>Preventivo</option>
           </select>
+          <div class="form-text" data-tipo-mantenimiento-detectado>Se detecta automáticamente según lo escrito.</div>
         </div>
         <div class="col-lg-5">
           <div class="helper-box h-100">
@@ -192,6 +193,7 @@
   </div>
 </div>
 
+<script src="/js/tipo-mantenimiento.js"></script>
 <script>
   document.addEventListener('DOMContentLoaded', function() {
     const form = document.getElementById('formCorrectivo');

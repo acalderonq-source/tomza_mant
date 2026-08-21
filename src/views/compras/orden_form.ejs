@@ -231,7 +231,9 @@
           <select name="tipo_mantenimiento" class="form-select">
             <option value="CORRECTIVO" <%= (safeOrden.tipo_mantenimiento || 'CORRECTIVO') === 'CORRECTIVO' ? 'selected' : '' %>>Correctivo</option>
             <option value="PREVENTIVO" <%= safeOrden.tipo_mantenimiento === 'PREVENTIVO' ? 'selected' : '' %>>Preventivo</option>
+            <option value="SUMINISTROS" <%= safeOrden.tipo_mantenimiento === 'SUMINISTROS' ? 'selected' : '' %>>Suministros</option>
           </select>
+          <div class="form-text" data-tipo-mantenimiento-detectado>Se detecta por descripción/observación.</div>
         </div>
         <div class="col-md-2 d-flex align-items-end">
           <div class="small text-muted">
@@ -537,6 +539,11 @@
   } else {
     addRow();
   }
+  document.addEventListener("DOMContentLoaded", () => {
+    const script = document.createElement("script");
+    script.src = "/js/tipo-mantenimiento.js";
+    document.body.appendChild(script);
+  });
 </script>
 </body>
 </html>

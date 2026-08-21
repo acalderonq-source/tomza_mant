@@ -63,6 +63,27 @@ body {
   padding: 0.9rem 1rem;
 }
 
+.maintenance-dual-grid {
+  align-items: start;
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+
+.maintenance-panel {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.maintenance-panel .table-responsive {
+  max-height: 72vh;
+  overflow: auto;
+}
+
+.maintenance-panel .text-cell {
+  max-width: 460px;
+}
+
 .summary-label {
   color: #64748b;
   font-size: 0.74rem;
@@ -246,7 +267,8 @@ body {
 
 @media (max-width: 992px) {
   .summary-grid,
-  .detail-grid {
+  .detail-grid,
+  .maintenance-dual-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
@@ -259,7 +281,8 @@ body {
 
   .summary-grid,
   .detail-grid,
-  .mechanic-grid {
+  .mechanic-grid,
+  .maintenance-dual-grid {
     grid-template-columns: 1fr;
   }
 

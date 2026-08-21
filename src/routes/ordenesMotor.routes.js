@@ -5,7 +5,7 @@ const fs = require("fs");
 const path = require("path");
 const { generarPDFOrden } = require("../utils/pdfOrdenCompra");
 const { agregarFiltroPlacaSql, normalizarPlaca } = require("../utils/placas");
-const { normalizarTipoMantenimiento } = require("../utils/tipoMantenimiento");
+const { normalizarTipoMantenimiento, detectarTipoMantenimiento } = require("../utils/tipoMantenimiento");
 
 const ROLES_MOTOR = ["ADMIN", "TALLER", "PROVEEDURIA_TALLER"];
 
@@ -319,7 +319,10 @@ router.post("/", requireAuth, requireMotor, async (req, res) => {
     const totalesOrden = calcularTotalesOrden(lineas, req.body);
     const numero = await generarNumeroMotor();
     const placaOrden = obtenerPlacaOrden(lineas, req.body.placa_unidad);
-    const tipoMantenimiento = normalizarTipoMantenimiento(req.body.tipo_mantenimiento);
+    const tipoMantenimiento = normalizarTipoMantenimiento(
+      req.body.tipo_mantenimiento,
+      detectarTipoMantenimiento([req.body.observaciones, ...lineas.map(linea => linea.descripcion)], { origen: "CORRECTIVO" })
+    );
     const cotizacion = guardarCotizacionMotor(req.body.cotizacion_data, req.body.cotizacion_nombre, req.body.cotizacion_tipo, req.session.user.id);
 
     const [result] = await connection.query(
@@ -384,7 +387,10 @@ router.post("/:id/editar", requireAuth, requireMotor, async (req, res) => {
 
     const totalesOrden = calcularTotalesOrden(lineas, req.body);
     const placaOrden = obtenerPlacaOrden(lineas, req.body.placa_unidad);
-    const tipoMantenimiento = normalizarTipoMantenimiento(req.body.tipo_mantenimiento);
+    const tipoMantenimiento = normalizarTipoMantenimiento(
+      req.body.tipo_mantenimiento,
+      detectarTipoMantenimiento([req.body.observaciones, ...lineas.map(linea => linea.descripcion)], { origen: "CORRECTIVO" })
+    );
     const cotizacion = guardarCotizacionMotor(req.body.cotizacion_data, req.body.cotizacion_nombre, req.body.cotizacion_tipo, req.session.user.id);
 
     let updateSql = `UPDATE ordenes_motor

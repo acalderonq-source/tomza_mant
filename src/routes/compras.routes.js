@@ -7,7 +7,7 @@ const PdfPrinter = require("pdfmake");
 const ExcelJS = require("exceljs");
 const { generarPDFOrden } = require('../utils/pdfOrdenCompra');
 const { agregarFiltroPlacaSql, normalizarPlaca: normalizarPlacaSistema } = require("../utils/placas");
-const { ensureTipoMantenimientoColumns, normalizarTipoMantenimiento } = require("../utils/tipoMantenimiento");
+const { ensureTipoMantenimientoColumns, normalizarTipoMantenimiento, detectarTipoMantenimiento } = require("../utils/tipoMantenimiento");
 
 // ===================== MIDDLEWARES =====================
 function requireAuth(req, res, next) {
@@ -2220,8 +2220,11 @@ router.post("/ordenes", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_
     const fecha = new Date().toISOString().slice(0, 10);
 
     const { proveedor_id, forma_pago, moneda, placa_unidad, lineas, observaciones, empresa_destino, cotizacion_data, cotizacion_nombre, cotizacion_tipo } = req.body;
-    const tipoMantenimiento = normalizarTipoMantenimiento(req.body.tipo_mantenimiento);
     const lineasOrden = normalizarLineas(lineas);
+    const tipoMantenimiento = normalizarTipoMantenimiento(
+      req.body.tipo_mantenimiento,
+      detectarTipoMantenimiento([observaciones, ...lineasOrden.map(linea => linea.descripcion)], { fallback: "CORRECTIVO" })
+    );
     const placaOrden = obtenerPlacaOrden(lineasOrden, placa_unidad);
     const cotizacion = guardarCotizacionOrden(cotizacion_data, cotizacion_nombre, cotizacion_tipo, req.session.user.id);
 
@@ -2289,8 +2292,11 @@ router.post("/ordenes/:id/editar", requireAuth, allowRoles("ADMIN", "TALLER", "P
 
     const id = req.params.id;
     const { proveedor_id, forma_pago, moneda, placa_unidad, lineas, observaciones, empresa_destino, cotizacion_data, cotizacion_nombre, cotizacion_tipo } = req.body;
-    const tipoMantenimiento = normalizarTipoMantenimiento(req.body.tipo_mantenimiento);
     const lineasOrden = normalizarLineas(lineas);
+    const tipoMantenimiento = normalizarTipoMantenimiento(
+      req.body.tipo_mantenimiento,
+      detectarTipoMantenimiento([observaciones, ...lineasOrden.map(linea => linea.descripcion)], { fallback: "CORRECTIVO" })
+    );
     const placaOrden = obtenerPlacaOrden(lineasOrden, placa_unidad);
     const cotizacion = guardarCotizacionOrden(cotizacion_data, cotizacion_nombre, cotizacion_tipo, req.session.user.id);
 

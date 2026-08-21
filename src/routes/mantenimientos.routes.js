@@ -10,7 +10,7 @@ const {
 const { SEDES_GRANEL, esUsuarioTodasSedes, etiquetaSede, getSedesPermitidas } = require("../utils/sedes");
 const { agregarFiltroPlacaSql } = require("../utils/placas");
 const { ensureNumeroMantenimientoColumn, asignarNumeroMantenimiento } = require("../utils/mantenimientosNumero");
-const { ensureTipoMantenimientoColumns, normalizarTipoMantenimiento } = require("../utils/tipoMantenimiento");
+const { ensureTipoMantenimientoColumns, normalizarTipoMantenimiento, detectarTipoMantenimiento } = require("../utils/tipoMantenimiento");
 
 // =====================================================
 // MIDDLEWARE DE AUTENTICACIÓN
@@ -847,7 +847,10 @@ router.post("/correctivos", requireAuth, async (req, res) => {
     await ensureTipoMantenimientoColumns(pool);
     await ensureNumeroMantenimientoColumn(pool);
     const { unidad_id, pendiente, trabajo_general, reporte_id } = req.body;
-    const tipoMantenimiento = normalizarTipoMantenimiento(req.body.tipo_mantenimiento);
+    const tipoMantenimiento = normalizarTipoMantenimiento(
+      req.body.tipo_mantenimiento,
+      detectarTipoMantenimiento([trabajo_general, pendiente], { fallback: "CORRECTIVO" })
+    );
     const pendienteTexto = String(pendiente || "").trim();
     if (!unidad_id) return res.status(400).send("Debe seleccionar una unidad.");
     const mecanicosArray = obtenerValoresSeleccionados(req.body);
@@ -1060,6 +1063,7 @@ router.post("/correctivos/:id/agregar", requireAuth, async (req, res) => {
 router.get("/", requireAuth, async (req, res) => {
   try {
     await ensureNumeroMantenimientoColumn(pool);
+    await ensureTipoMantenimientoColumns(pool);
     const { filtro, placa, tipo, prioridad, fecha_desde, fecha_hasta, mecanico_id } = req.query;
     let condiciones = [], params = [];
     if (filtro === "pendientes") condiciones.push("m.estado != 'CERRADO'");
@@ -1068,7 +1072,9 @@ router.get("/", requireAuth, async (req, res) => {
     if (placa && placa.trim() !== "") {
       agregarFiltroPlacaSql(condiciones, params, "u.placa", placa);
     }
-    if (tipo && tipo !== "") {
+    if (tipo === "CORRECTIVO") {
+      condiciones.push("1 = 0");
+    } else if (tipo && tipo !== "") {
       condiciones.push("m.tipo = ?");
       params.push(tipo);
     }
@@ -1128,6 +1134,66 @@ router.get("/", requireAuth, async (req, res) => {
       params
     );
 
+    let condicionesCorrectivos = [], paramsCorrectivos = [];
+    if (filtro === "pendientes") {
+      condicionesCorrectivos.push("1 = 0");
+    }
+    if (placa && placa.trim() !== "") {
+      agregarFiltroPlacaSql(condicionesCorrectivos, paramsCorrectivos, "u.placa", placa);
+    }
+    if (tipo && tipo !== "" && tipo !== "CORRECTIVO") {
+      condicionesCorrectivos.push("1 = 0");
+    }
+    if (fecha_desde && fecha_desde !== "") {
+      condicionesCorrectivos.push("DATE(c.fecha) >= ?");
+      paramsCorrectivos.push(fecha_desde);
+    }
+    if (fecha_hasta && fecha_hasta !== "") {
+      condicionesCorrectivos.push("DATE(c.fecha) <= ?");
+      paramsCorrectivos.push(fecha_hasta);
+    }
+    if (mecanico_id && mecanico_id !== "") {
+      condicionesCorrectivos.push(`EXISTS (
+        SELECT 1
+        FROM correctivo_trabajos ct2
+        WHERE ct2.correctivo_id = c.id AND ct2.mecanico_id = ?
+      )`);
+      paramsCorrectivos.push(mecanico_id);
+    }
+    if (sedeFiltro) {
+      condicionesCorrectivos.push("COALESCE(c.sede, u.sede) = ?");
+      paramsCorrectivos.push(sedeFiltro);
+    }
+
+    const whereCorrectivos = condicionesCorrectivos.length ? "WHERE " + condicionesCorrectivos.join(" AND ") : "";
+    const [correctivos] = await pool.query(
+      `
+      SELECT
+        c.id,
+        u.placa,
+        COALESCE(c.sede, u.sede) AS sede,
+        COALESCE(c.tipo_mantenimiento, 'CORRECTIVO') AS tipo,
+        'CERRADO' AS estado,
+        'MEDIA' AS prioridad,
+        c.fecha AS fecha_programada,
+        DATE_FORMAT(c.fecha, '%d/%m/%Y') AS fecha_formato,
+        c.trabajo_realizado AS ejecucion,
+        c.pendiente,
+        COALESCE(GROUP_CONCAT(DISTINCT mec.nombre ORDER BY mec.nombre SEPARATOR ', '), '—') AS mecanicos,
+        COALESCE(GROUP_CONCAT(ct.trabajo ORDER BY ct.id SEPARATOR ' | '), '') AS trabajos_detalle,
+        COALESCE(GROUP_CONCAT(ct.repuestos ORDER BY ct.id SEPARATOR ' | '), '') AS repuestos_detalle
+      FROM correctivos c
+      JOIN unidades u ON u.id = c.unidad_id
+      LEFT JOIN correctivo_trabajos ct ON ct.correctivo_id = c.id
+      LEFT JOIN mecanicos mec ON mec.id = ct.mecanico_id
+      ${whereCorrectivos}
+      GROUP BY c.id, u.placa, c.sede, u.sede, c.tipo_mantenimiento, c.fecha, c.trabajo_realizado, c.pendiente
+      ORDER BY c.fecha DESC, c.id DESC
+      LIMIT 1000
+      `,
+      paramsCorrectivos
+    );
+
     const { sql: sqlMecanicos, params: paramsMecanicos } = obtenerFiltroMecanicosPorSede(sedeFiltro);
     const [mecanicos] = await pool.query(sqlMecanicos, paramsMecanicos);
     const success = req.session.success;
@@ -1137,6 +1203,7 @@ router.get("/", requireAuth, async (req, res) => {
 
     res.render("mantenimientos", {
       mantenimientos,
+      correctivos,
       user: req.session.user,
       filtro,
       filtros: { filtro, placa, tipo, prioridad, fecha_desde, fecha_hasta, mecanico_id },

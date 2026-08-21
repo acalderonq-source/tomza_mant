@@ -13,10 +13,10 @@
 
 <%
   const filtrosActuales = filtros || {};
+  const correctivosLista = Array.isArray(correctivos) ? correctivos : [];
   const hoy = new Date();
   hoy.setHours(0, 0, 0, 0);
-  const total = mantenimientos.length;
-  const cerrados = mantenimientos.filter(m => m.estado === 'CERRADO').length;
+  const total = mantenimientos.length + correctivosLista.length;
   const pendientes = mantenimientos.filter(m => m.estado !== 'CERRADO').length;
   const atrasados = mantenimientos.filter(m => {
     const fecha = m.fecha_programada ? new Date(m.fecha_programada) : null;
@@ -30,7 +30,6 @@
     fecha.setHours(0, 0, 0, 0);
     return fecha.getTime() === hoy.getTime();
   }).length;
-  const tipos = [...new Set(mantenimientos.map(m => m.tipo).filter(Boolean))];
   const prioridades = ['ALTA', 'MEDIA', 'BAJA'];
   const puedeReprogramarLista = typeof puedeReprogramar !== 'undefined' ? puedeReprogramar : ['ADMIN','TALLER'].includes(user.rol);
   const paramsRetorno = new URLSearchParams();
@@ -69,8 +68,8 @@
 
   <div class="page-heading">
     <div>
-      <h1 class="page-title">Mantenimientos preventivos</h1>
-      <p class="page-subtitle">Sede: <strong><%= sedeSeleccionada %></strong>. Controla planificación, ejecución y pendientes.</p>
+      <h1 class="page-title">Mantenimientos</h1>
+      <p class="page-subtitle">Sede: <strong><%= sedeSeleccionada %></strong>. Preventivos y correctivos divididos para revisar más rápido.</p>
     </div>
     <div class="d-flex gap-2 flex-wrap">
       <a href="/mantenimientos/dashboard" class="btn btn-primary btn-sm"><i class="bi bi-bar-chart-line"></i> Dashboard IA</a>
@@ -91,16 +90,16 @@
       <div class="summary-value"><%= total %></div>
     </div>
     <div class="summary-card">
-      <div class="summary-label">Pendientes</div>
-      <div class="summary-value"><%= pendientes %></div>
+      <div class="summary-label">Preventivos</div>
+      <div class="summary-value"><%= mantenimientos.length %></div>
     </div>
     <div class="summary-card">
-      <div class="summary-label">Atrasados</div>
-      <div class="summary-value"><%= atrasados %></div>
+      <div class="summary-label">Correctivos</div>
+      <div class="summary-value"><%= correctivosLista.length %></div>
     </div>
     <div class="summary-card">
-      <div class="summary-label">Programados hoy</div>
-      <div class="summary-value"><%= programadosHoy %></div>
+      <div class="summary-label">Pendientes / atrasados</div>
+      <div class="summary-value"><%= pendientes %> / <%= atrasados %></div>
     </div>
   </div>
 
@@ -116,11 +115,15 @@
       </div>
       <div class="col-md-2">
         <label class="form-label small">Placa</label>
-        <input type="text" name="placa" class="form-control form-control-sm" value="<%= filtrosActuales.placa || '' %>" placeholder="Ej: CL1234">
+        <input type="text" name="placa" class="form-control form-control-sm text-uppercase" value="<%= filtrosActuales.placa || '' %>" placeholder="Buscar placa" data-placa-autocomplete data-placa-mode="placa" data-placa-allow-free="true">
       </div>
       <div class="col-md-2">
         <label class="form-label small">Tipo</label>
-        <input type="text" name="tipo" class="form-control form-control-sm" value="<%= filtrosActuales.tipo || '' %>" placeholder="Tipo">
+        <select name="tipo" class="form-select form-select-sm">
+          <option value="" <%= !filtrosActuales.tipo ? 'selected' : '' %>>Todos</option>
+          <option value="PREVENTIVO" <%= filtrosActuales.tipo === 'PREVENTIVO' ? 'selected' : '' %>>Preventivo</option>
+          <option value="CORRECTIVO" <%= filtrosActuales.tipo === 'CORRECTIVO' ? 'selected' : '' %>>Correctivo</option>
+        </select>
       </div>
       <div class="col-md-2">
         <label class="form-label small">Prioridad</label>
@@ -157,11 +160,12 @@
     </form>
   </div>
 
-  <div class="surface-card">
+  <div class="maintenance-dual-grid">
+  <div class="surface-card maintenance-panel">
     <div class="d-flex justify-content-between align-items-center p-3 border-bottom flex-wrap gap-2">
       <div>
-        <h2 class="page-title fs-5">Listado</h2>
-        <p class="page-subtitle"><%= cerrados %> cerrados · <%= pendientes %> pendientes</p>
+        <h2 class="page-title fs-5"><i class="bi bi-calendar-check text-primary"></i> Preventivos</h2>
+        <p class="page-subtitle"><%= mantenimientos.length %> registros · <%= pendientes %> pendientes · <%= programadosHoy %> hoy</p>
       </div>
       <% if (puedeReprogramarLista) { %>
         <form method="POST" action="/mantenimientos/reprogramar" id="formReprogramarMasivo" class="d-flex gap-2 flex-wrap align-items-end">
@@ -183,22 +187,16 @@
             <% if (puedeReprogramarLista) { %>
               <th style="width: 42px;"><input type="checkbox" id="seleccionarReprogramar"></th>
             <% } %>
-            <th>N° Mant.</th>
             <th>Placa</th>
-            <th>Sede</th>
-            <th>Tipo</th>
             <th>Fecha</th>
-            <th>Prioridad</th>
             <th>Estado</th>
-            <th>Mecánicos</th>
-            <th>Ejecución</th>
-            <th>Pendiente</th>
+            <th>Detalle</th>
             <th class="text-end">Acción</th>
           </tr>
         </thead>
         <tbody>
           <% if (mantenimientos.length === 0) { %>
-            <tr><td colspan="<%= puedeReprogramarLista ? 12 : 11 %>" class="empty-state">No hay mantenimientos con los filtros seleccionados.</td></tr>
+            <tr><td colspan="<%= puedeReprogramarLista ? 6 : 5 %>" class="empty-state">No hay preventivos con los filtros seleccionados.</td></tr>
           <% } %>
 
           <% mantenimientos.forEach(m => { %>
@@ -216,22 +214,21 @@
                   <% } %>
                 </td>
               <% } %>
-              <td data-label="N° Mant."><strong><%= m.numero_mantenimiento || ('MANT-' + m.id) %></strong></td>
-              <td data-label="Placa"><strong><%= m.placa %></strong></td>
-              <td data-label="Sede"><%= m.sede %></td>
-              <td data-label="Tipo"><%= m.tipo %></td>
+              <td data-label="Placa"><strong><%= m.placa %></strong><div class="small text-muted"><%= m.sede %> · <%= m.numero_mantenimiento || ('MANT-' + m.id) %></div></td>
               <td data-label="Fecha">
                 <%= m.fecha_formato %>
                 <% if (esAtrasado) { %><span class="badge badge-late ms-1">Atrasado</span><% } %>
                 <% if (esHoy) { %><span class="badge badge-today ms-1">Hoy</span><% } %>
               </td>
-              <td data-label="Prioridad"><span class="badge badge-priority"><%= m.prioridad || 'MEDIA' %></span></td>
               <td data-label="Estado">
                 <span class="badge <%= m.estado === 'CERRADO' ? 'badge-closed' : 'badge-open' %>"><%= m.estado %></span>
+                <div><span class="badge badge-priority mt-1"><%= m.prioridad || 'MEDIA' %></span></div>
               </td>
-              <td data-label="Mecánicos"><%= m.mecanicos || '—' %></td>
-              <td data-label="Ejecución" class="text-cell"><%= m.estado === 'CERRADO' ? (m.ejecucion || '—') : 'Pendiente' %></td>
-              <td data-label="Pendiente" class="text-cell"><%= m.estado === 'CERRADO' ? (m.pendiente || '—') : '—' %></td>
+              <td data-label="Detalle" class="text-cell">
+                <strong><%= m.mecanicos || '—' %></strong>
+                <div class="small text-muted"><%= m.estado === 'CERRADO' ? (m.ejecucion || '—') : 'Pendiente de ejecutar' %></div>
+                <% if (m.pendiente) { %><div class="small text-danger fw-bold"><%= m.pendiente %></div><% } %>
+              </td>
               <td data-label="Acción" class="text-end">
                 <div class="dropdown">
                   <button class="btn btn-sm btn-dark dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">Acciones</button>
@@ -253,6 +250,53 @@
         </tbody>
       </table>
     </div>
+  </div>
+
+  <div class="surface-card maintenance-panel">
+    <div class="d-flex justify-content-between align-items-center p-3 border-bottom flex-wrap gap-2">
+      <div>
+        <h2 class="page-title fs-5"><i class="bi bi-wrench-adjustable text-danger"></i> Correctivos</h2>
+        <p class="page-subtitle"><%= correctivosLista.length %> trabajos realizados o registrados.</p>
+      </div>
+      <% if (['MECANICO','ADMIN','TALLER'].includes(user.rol)) { %>
+        <a href="/mantenimientos/correctivos/nuevo" class="btn btn-danger btn-sm"><i class="bi bi-plus-circle"></i> Nuevo</a>
+      <% } %>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-hover align-middle">
+        <thead>
+          <tr>
+            <th>Placa</th>
+            <th>Fecha</th>
+            <th>Tipo</th>
+            <th>Trabajo</th>
+            <th class="text-end">Acción</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% if (correctivosLista.length === 0) { %>
+            <tr><td colspan="5" class="empty-state">No hay correctivos con los filtros seleccionados.</td></tr>
+          <% } %>
+          <% correctivosLista.forEach(c => { %>
+            <tr>
+              <td data-label="Placa"><strong><%= c.placa %></strong><div class="small text-muted"><%= c.sede || 'Sin sede' %></div></td>
+              <td data-label="Fecha"><%= c.fecha_formato %></td>
+              <td data-label="Tipo"><span class="badge badge-late"><%= c.tipo || 'CORRECTIVO' %></span></td>
+              <td data-label="Trabajo" class="text-cell">
+                <strong><%= c.mecanicos || '—' %></strong>
+                <div><%= c.trabajos_detalle || c.ejecucion || '—' %></div>
+                <% if (c.repuestos_detalle) { %><div class="small text-muted">Repuestos: <%= c.repuestos_detalle %></div><% } %>
+                <% if (c.pendiente) { %><div class="small text-danger fw-bold">Pendiente: <%= c.pendiente %></div><% } %>
+              </td>
+              <td data-label="Acción" class="text-end">
+                <a href="/mantenimientos/correctivos/<%= c.id %>/agregar" class="btn btn-sm btn-dark"><i class="bi bi-plus-circle"></i> Agregar</a>
+              </td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  </div>
   </div>
 
   <% if (puedeReprogramarLista) { %>
