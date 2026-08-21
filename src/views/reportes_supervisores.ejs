@@ -128,41 +128,6 @@
     </section>
   <% } %>
 
-  <% if (puedeEditar && sugerencias.length) { %>
-    <section class="mb-3">
-      <h2 class="page-title fs-5 mb-2">Sugerencias por correctivos</h2>
-      <% sugerencias.forEach(s => { %>
-        <article class="suggestion-card">
-          <div class="d-flex justify-content-between gap-3 flex-wrap">
-            <div>
-              <div class="fw-bold"><%= s.placa %> · <%= s.sede %></div>
-              <div class="meta">Confianza IA: <%= Math.round(Number(s.confianza || 0) * 100) %>% · Correctivo: <%= s.fecha_correctivo ? new Date(s.fecha_correctivo).toLocaleDateString('es-CR') : '—' %></div>
-            </div>
-            <div class="d-flex gap-2">
-              <form method="POST" action="/reportes-supervisores/sugerencias/<%= s.id %>/confirmar">
-                <button class="btn btn-success btn-sm" onclick="return confirm('¿Mover este reporte a historial?')">Confirmar</button>
-              </form>
-              <form method="POST" action="/reportes-supervisores/sugerencias/<%= s.id %>/descartar">
-                <button class="btn btn-outline-secondary btn-sm">Descartar</button>
-              </form>
-            </div>
-          </div>
-          <div class="row g-2 mt-2">
-            <div class="col-md-6">
-              <div class="meta">Reporte</div>
-              <div><%- pintarReporte(s.descripcion_limpia || s.descripcion_original) %></div>
-            </div>
-            <div class="col-md-6">
-              <div class="meta">Correctivo realizado</div>
-              <div><%= s.trabajo_realizado %></div>
-            </div>
-          </div>
-          <div class="meta mt-2"><%= s.motivo %></div>
-        </article>
-      <% }) %>
-    </section>
-  <% } %>
-
   <section class="filters-card">
     <form method="GET" action="/reportes-supervisores" class="row g-3">
       <div class="col-md-2">

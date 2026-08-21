@@ -292,8 +292,9 @@
     : (Array.isArray(sedesMultiples) ? sedesMultiples : []);
   const money = (value) => Number(value || 0).toLocaleString('es-CR', { maximumFractionDigits: 0 });
   const esMensajeroDashboard = ['MENSAJERO', 'MENSAJERIA', 'MENSAJERO_FACTURAS'].includes(user.rol);
+  const esBodegaDashboard = ['BODEGA', 'BODEGUERO'].includes(user.rol);
   const puedeVerCompras = ['ADMIN', 'TALLER', 'PROVEEDURIA_TALLER', 'CONTABILIDAD'].includes(user.rol);
-  const puedeVerOperaciones = user.rol !== 'CONTABILIDAD' && !esMensajeroDashboard;
+  const puedeVerOperaciones = user.rol !== 'CONTABILIDAD' && !esMensajeroDashboard && !esBodegaDashboard;
   const puedeVerReportesSupervisores = ['ADMIN', 'TALLER', 'MECANICO', 'SUPERVISOR', 'SUPERVISOR_PESADO'].includes(user.rol);
   const puedeVerAceite = ['ADMIN', 'MECANICO'].includes(user.rol)
     || String(user.usuario || '').trim().toLowerCase() === 'supervisor_rio_claro';
@@ -307,6 +308,7 @@
   const puedeVerResumenEjecutivo = ['ADMIN', 'TALLER', 'PROVEEDURIA', 'PROVEEDURIA_TALLER', 'TRAMITES'].includes(user.rol);
   const puedeVerRepuestos = ['ADMIN', 'TALLER', 'PROVEEDURIA_TALLER', 'PROVEEDURIA', 'SUPERVISOR_PESADO', 'MENSAJERO', 'MENSAJERIA', 'MENSAJERO_FACTURAS'].includes(user.rol)
     || String(user.usuario || '').trim().toLowerCase() === 'pesados';
+  const puedeVerBodega = ['ADMIN', 'TALLER', 'PROVEEDURIA_TALLER', 'BODEGA', 'BODEGUERO'].includes(user.rol);
   const prioridadesLista = Array.isArray(prioridadesTaller) ? prioridadesTaller : [];
   const llantasEnProceso = Number(exec.llantasSolicitadas || 0) + Number(exec.llantasCotizadas || 0) + Number(exec.llantasCompradas || 0);
   const unidadesActivas = Number(exec.unidadesActivas ?? exec.unidades ?? 0);
@@ -496,6 +498,12 @@
             <div><div class="module-title">Repuestos semanales</div><p class="module-copy">Formato semanal por sede, tipo Excel.</p></div>
           </a>
         <% } %>
+        <% if (puedeVerBodega) { %>
+          <a href="/bodega" class="module-card">
+            <span class="module-icon icon-green"><i class="bi bi-boxes"></i></span>
+            <div><div class="module-title">Bodega taller</div><p class="module-copy">Inventario, entregas, entradas y herramientas.</p></div>
+          </a>
+        <% } %>
         <% if (puedeVerOrdenesMotor) { %>
           <a href="/ordenes-motor" class="module-card">
             <span class="module-icon icon-red"><i class="bi bi-gear-wide-connected"></i></span>
@@ -528,6 +536,12 @@
             <div><div class="module-title">Aires acondicionados</div><p class="module-copy">Reparación, carga y mantenimiento.</p></div>
           </a>
         <% } %>
+      <% } %>
+      <% if (puedeVerBodega && !puedeVerOperaciones) { %>
+        <a href="/bodega" class="module-card">
+          <span class="module-icon icon-green"><i class="bi bi-boxes"></i></span>
+          <div><div class="module-title">Bodega taller</div><p class="module-copy">Inventario, entregas, entradas y herramientas.</p></div>
+        </a>
       <% } %>
       <% if (puedeVerRepuestos && !puedeVerOperaciones) { %>
         <a href="/repuestos" class="module-card">

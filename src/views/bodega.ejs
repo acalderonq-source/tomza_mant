@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Bodega Taller - Gas Tomza</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <style>
+    :root {
+      --navy: #101827;
+      --blue: #0b3b82;
+      --red: #dc2626;
+      --green: #16a34a;
+      --amber: #d97706;
+      --line: #dbe4f0;
+      --bg: #f3f6fa;
+      --muted: #64748b;
+    }
+
+    body {
+      background: var(--bg);
+      color: #0f172a;
+      font-family: "Segoe UI", Roboto, Arial, sans-serif;
+      font-size: .92rem;
+    }
+
+    .topbar {
+      background: var(--navy);
+      border-bottom: 3px solid var(--red);
+    }
+
+    .shell { max-width: 1580px; }
+
+    .hero {
+      background: linear-gradient(135deg, #0b3b82, #101827 72%);
+      border-radius: 16px;
+      color: #fff;
+      overflow: hidden;
+      padding: 1rem;
+      position: relative;
+    }
+
+    .hero::after {
+      background: linear-gradient(135deg, #f4b000, #e4262d);
+      content: "";
+      height: 160%;
+      position: absolute;
+      right: 8%;
+      top: -30%;
+      transform: skewX(-18deg);
+      width: 9rem;
+    }
+
+    .hero > * { position: relative; z-index: 1; }
+    .page-title { font-size: 1.45rem; font-weight: 950; margin: 0; }
+    .page-copy { color: #dbeafe; margin: .15rem 0 0; }
+
+    .kpi-grid {
+      display: grid;
+      gap: .7rem;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+    }
+
+    .kpi-card,
+    .panel {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      box-shadow: 0 12px 28px rgba(15, 23, 42, .06);
+    }
+
+    .kpi-card { padding: .85rem; }
+    .kpi-label { color: #52627a; font-size: .72rem; font-weight: 900; letter-spacing: .04em; text-transform: uppercase; }
+    .kpi-value { color: #061a40; font-size: 1.65rem; font-weight: 950; line-height: 1; margin-top: .25rem; }
+    .panel-head {
+      align-items: center;
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      gap: .75rem;
+      justify-content: space-between;
+      padding: .8rem 1rem;
+    }
+
+    .panel-title { font-size: 1rem; font-weight: 950; margin: 0; }
+    .panel-copy { color: var(--muted); font-size: .8rem; margin: .1rem 0 0; }
+    .panel-body { padding: 1rem; }
+
+    .quick-actions {
+      display: grid;
+      gap: .75rem;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+    }
+
+    .quick-btn {
+      align-items: center;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      color: #061a40;
+      display: flex;
+      font-weight: 950;
+      gap: .7rem;
+      justify-content: center;
+      min-height: 4.2rem;
+      text-decoration: none;
+    }
+
+    .quick-btn i {
+      align-items: center;
+      border-radius: 999px;
+      color: #fff;
+      display: inline-flex;
+      height: 2rem;
+      justify-content: center;
+      width: 2rem;
+    }
+
+    .btn-blue i { background: var(--blue); }
+    .btn-green i { background: var(--green); }
+    .btn-amber i { background: var(--amber); }
+    .btn-red i { background: var(--red); }
+    .btn-darkx i { background: var(--navy); }
+
+    .form-label { color: #334155; font-size: .75rem; font-weight: 900; margin-bottom: .25rem; }
+    .form-control, .form-select {
+      border-color: #cbd8ea;
+      border-radius: 10px;
+      min-height: 2.35rem;
+    }
+
+    .table thead th {
+      background: #0b2d63;
+      color: #fff;
+      font-size: .72rem;
+      letter-spacing: .03em;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+
+    .table td { vertical-align: middle; }
+    .stock-badge {
+      border-radius: 999px;
+      display: inline-flex;
+      font-size: .72rem;
+      font-weight: 950;
+      padding: .22rem .55rem;
+      white-space: nowrap;
+    }
+    .stock-ok { background: #dcfce7; color: #166534; }
+    .stock-low { background: #fef3c7; color: #92400e; }
+    .stock-out { background: #fee2e2; color: #991b1b; }
+    .pill { background: #eef4ff; border-radius: 999px; color: #1e3a8a; font-size: .72rem; font-weight: 900; padding: .2rem .5rem; }
+    .money { font-variant-numeric: tabular-nums; font-weight: 850; }
+    .muted { color: var(--muted); }
+    .line-row {
+      background: #f8fafc;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      margin-bottom: .55rem;
+      padding: .7rem;
+    }
+
+    @media (max-width: 1100px) {
+      .kpi-grid, .quick-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+
+    @media (max-width: 700px) {
+      .kpi-grid, .quick-actions { grid-template-columns: 1fr; }
+      .hero::after { display: none; }
+    }
+  </style>
+</head>
+<body>
+<%
+  const fmt = (value) => Number(value || 0).toLocaleString('es-CR', { minimumFractionDigits: Number(value || 0) % 1 ? 2 : 0, maximumFractionDigits: 2 });
+  const money = (value) => Number(value || 0).toLocaleString('es-CR', { maximumFractionDigits: 0 });
+  const fecha = (value) => {
+    if (!value) return '-';
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? '-' : date.toLocaleString('es-CR', { dateStyle: 'short', timeStyle: 'short' });
+  };
+  const estadoStock = (articulo) => {
+    const stock = Number(articulo.stock_actual || 0);
+    const minimo = Number(articulo.stock_minimo || 0);
+    if (stock <= 0) return { className: 'stock-out', label: 'AGOTADO' };
+    if (minimo > 0 && stock <= minimo) return { className: 'stock-low', label: 'STOCK BAJO' };
+    return { className: 'stock-ok', label: 'DISPONIBLE' };
+  };
+  const articulosDisponibles = (Array.isArray(articulos) ? articulos : []).filter(a => Number(a.stock_actual || 0) > 0);
+%>
+
+<nav class="navbar navbar-dark topbar px-3 py-2">
+  <span class="navbar-brand fw-semibold"><i class="bi bi-boxes me-2"></i>Bodega Taller</span>
+  <div class="d-flex gap-2">
+    <a href="/dashboard" class="btn btn-outline-light btn-sm rounded-pill px-3">Inicio</a>
+  </div>
+</nav>
+
+<main class="container-fluid shell py-3">
+  <section class="hero mb-3">
+    <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
+      <div>
+        <h1 class="page-title">Inventario de bodega del taller</h1>
+        <p class="page-copy">Buscar, entregar, recibir, devolver y controlar herramientas sin atrasar al mecánico.</p>
+      </div>
+      <form method="GET" action="/bodega" class="d-flex gap-2 flex-wrap">
+        <input class="form-control" name="q" value="<%= q || '' %>" placeholder="Buscar por nombre, código, parte, ubicación..." style="min-width: 320px">
+        <button class="btn btn-light fw-bold"><i class="bi bi-search"></i> Buscar</button>
+        <a href="/bodega" class="btn btn-outline-light fw-bold">Limpiar</a>
+      </form>
+    </div>
+  </section>
+
+  <% if (success) { %><div class="alert alert-success fw-bold"><%= success %></div><% } %>
+  <% if (error) { %><div class="alert alert-danger fw-bold"><%= error %></div><% } %>
+
+  <section class="kpi-grid mb-3">
+    <div class="kpi-card"><div class="kpi-label">Artículos</div><div class="kpi-value"><%= stats.articulos %></div></div>
+    <div class="kpi-card"><div class="kpi-label">Stock bajo</div><div class="kpi-value text-warning"><%= stats.stock_bajo %></div></div>
+    <div class="kpi-card"><div class="kpi-label">Agotados</div><div class="kpi-value text-danger"><%= stats.agotados %></div></div>
+    <div class="kpi-card"><div class="kpi-label">Herramientas prestadas</div><div class="kpi-value text-primary"><%= stats.herramientas_prestadas %></div></div>
+    <div class="kpi-card"><div class="kpi-label">Movimientos de hoy</div><div class="kpi-value text-success"><%= stats.movimientos_hoy %></div></div>
+  </section>
+
+  <section class="quick-actions mb-3">
+    <a href="#entregar" class="quick-btn btn-blue"><i class="bi bi-box-arrow-up-right"></i>Entregar</a>
+    <a href="#recibir" class="quick-btn btn-green"><i class="bi bi-box-arrow-in-down"></i>Recibir</a>
+    <a href="#devolver" class="quick-btn btn-amber"><i class="bi bi-arrow-counterclockwise"></i>Devolver</a>
+    <a href="#inventario" class="quick-btn btn-darkx"><i class="bi bi-list-check"></i>Inventario</a>
+    <a href="#herramientas" class="quick-btn btn-red"><i class="bi bi-tools"></i>Herramientas</a>
+  </section>
+
+  <div class="row g-3">
+    <div class="col-xl-7">
+      <section class="panel" id="entregar">
+        <div class="panel-head">
+          <div>
+            <h2 class="panel-title">Entregar repuestos o herramientas</h2>
+            <p class="panel-copy">Una placa, un mecánico y varios artículos en la misma entrega.</p>
+          </div>
+        </div>
+        <div class="panel-body">
+          <form method="POST" action="/bodega/entregar">
+            <div class="row g-2 mb-2">
+              <div class="col-md-3"><label class="form-label">Placa</label><input class="form-control placa-search" name="placa" placeholder="C173517" required></div>
+              <div class="col-md-4"><label class="form-label">Mecánico</label><input class="form-control" name="mecanico" placeholder="Nombre del mecánico" required></div>
+              <div class="col-md-3"><label class="form-label">Tipo de trabajo</label><select class="form-select" name="tipo_trabajo"><% tiposTrabajo.forEach(t => { %><option value="<%= t %>"><%= t %></option><% }) %></select></div>
+              <div class="col-md-2 d-grid align-items-end"><label class="form-label">&nbsp;</label><button class="btn btn-primary fw-bold">Entregar</button></div>
+            </div>
+
+            <div id="lineas-entrega">
+              <div class="line-row">
+                <div class="row g-2 align-items-end">
+                  <div class="col-md-9">
+                    <label class="form-label">Artículo</label>
+                    <select class="form-select" name="articulo_id" required>
+                      <option value="">Seleccione</option>
+                      <% articulosDisponibles.forEach(a => { %>
+                        <option value="<%= a.id %>"><%= a.nombre %> · Stock <%= fmt(a.stock_actual) %> <%= a.unidad_medida %> · <%= a.ubicacion || 'Sin ubicación' %></option>
+                      <% }) %>
+                    </select>
+                  </div>
+                  <div class="col-md-3"><label class="form-label">Cantidad</label><input class="form-control" type="number" step="0.01" min="0.01" name="cantidad" value="1" required></div>
+                </div>
+              </div>
+            </div>
+            <button type="button" class="btn btn-outline-primary btn-sm fw-bold" id="add-linea"><i class="bi bi-plus-circle"></i> Agregar otro artículo</button>
+            <div class="mt-2"><label class="form-label">Observación</label><input class="form-control" name="observacion" placeholder="Opcional"></div>
+          </form>
+        </div>
+      </section>
+    </div>
+
+    <div class="col-xl-5">
+      <section class="panel h-100" id="recibir">
+        <div class="panel-head"><div><h2 class="panel-title">Recibir mercadería</h2><p class="panel-copy">Entrada por factura, proveedor u orden de compra.</p></div></div>
+        <div class="panel-body">
+          <form method="POST" action="/bodega/recibir" class="row g-2">
+            <div class="col-12"><label class="form-label">Artículo</label><select class="form-select" name="articulo_id" required><option value="">Seleccione</option><% articulos.forEach(a => { %><option value="<%= a.id %>"><%= a.nombre %> · <%= a.codigo || 'Sin código' %></option><% }) %></select></div>
+            <div class="col-md-4"><label class="form-label">Cantidad</label><input class="form-control" type="number" step="0.01" min="0.01" name="cantidad" required></div>
+            <div class="col-md-4"><label class="form-label">Precio unitario</label><input class="form-control" type="number" step="0.01" min="0" name="precio_unitario"></div>
+            <div class="col-md-4"><label class="form-label">Fecha</label><input class="form-control" type="date" name="fecha"></div>
+            <div class="col-md-6"><label class="form-label">Proveedor</label><select class="form-select" name="proveedor_id"><option value="">Seleccione</option><% proveedores.forEach(p => { %><option value="<%= p.id %>"><%= p.nombre %></option><% }) %></select></div>
+            <div class="col-md-6"><label class="form-label">Proveedor manual</label><input class="form-control" name="proveedor_nombre" placeholder="Si no está en lista"></div>
+            <div class="col-md-6"><label class="form-label">N° factura</label><input class="form-control" name="numero_factura"></div>
+            <div class="col-md-6"><label class="form-label">N° orden compra</label><input class="form-control" type="number" name="orden_compra_id"></div>
+            <div class="col-12"><label class="form-label">Motivo</label><input class="form-control" name="motivo" placeholder="Entrada de mercadería"></div>
+            <div class="col-12 d-grid"><button class="btn btn-success fw-bold"><i class="bi bi-box-arrow-in-down"></i> Registrar entrada</button></div>
+          </form>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <div class="row g-3 mt-1">
+    <div class="col-xl-4">
+      <section class="panel" id="devolver">
+        <div class="panel-head"><div><h2 class="panel-title">Devolución de repuesto</h2><p class="panel-copy">Para artículos que salieron pero no se utilizaron.</p></div></div>
+        <div class="panel-body">
+          <form method="POST" action="/bodega/devolver" class="row g-2">
+            <div class="col-12"><label class="form-label">Artículo</label><select class="form-select" name="articulo_id" required><option value="">Seleccione</option><% articulos.forEach(a => { %><option value="<%= a.id %>"><%= a.nombre %></option><% }) %></select></div>
+            <div class="col-md-4"><label class="form-label">Cantidad</label><input class="form-control" type="number" step="0.01" min="0.01" name="cantidad" value="1" required></div>
+            <div class="col-md-4"><label class="form-label">Placa</label><input class="form-control placa-search" name="placa"></div>
+            <div class="col-md-4"><label class="form-label">Mecánico</label><input class="form-control" name="mecanico"></div>
+            <div class="col-12"><label class="form-label">Motivo</label><input class="form-control" name="motivo" placeholder="No utilizado"></div>
+            <div class="col-12 d-grid"><button class="btn btn-warning fw-bold">Registrar devolución</button></div>
+          </form>
+        </div>
+      </section>
+    </div>
+
+    <div class="col-xl-8">
+      <section class="panel" id="herramientas">
+        <div class="panel-head"><div><h2 class="panel-title">Herramientas prestadas</h2><p class="panel-copy">Lo que debe regresar a bodega.</p></div></div>
+        <div class="table-responsive">
+          <table class="table table-sm mb-0 align-middle">
+            <thead><tr><th>Herramienta</th><th>Mecánico</th><th>Placa</th><th>Salida</th><th class="text-end">Acción</th></tr></thead>
+            <tbody>
+              <% if (!prestamos.length) { %><tr><td colspan="5" class="text-center text-muted py-3">No hay herramientas prestadas.</td></tr><% } %>
+              <% prestamos.forEach(p => { %>
+                <tr>
+                  <td><strong><%= p.articulo_nombre %></strong><div class="small muted"><%= p.codigo || '-' %> · <%= p.ubicacion || 'Sin ubicación' %></div></td>
+                  <td><%= p.mecanico %></td>
+                  <td><%= p.placa || '-' %></td>
+                  <td><%= fecha(p.salida_en) %></td>
+                  <td class="text-end">
+                    <form method="POST" action="/bodega/prestamos/<%= p.id %>/devolver" class="d-inline-flex gap-1">
+                      <input class="form-control form-control-sm" name="recibido_por" placeholder="Recibió" style="width: 120px">
+                      <button class="btn btn-sm btn-success fw-bold">Devolver</button>
+                    </form>
+                  </td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <section class="panel mt-3" id="inventario">
+    <div class="panel-head">
+      <div><h2 class="panel-title">Inventario general</h2><p class="panel-copy">Existencia actual, ubicación, mínimo y proveedor.</p></div>
+      <button class="btn btn-dark btn-sm fw-bold" data-bs-toggle="collapse" data-bs-target="#crear-articulo"><i class="bi bi-plus-circle"></i> Nuevo artículo</button>
+    </div>
+    <div class="collapse" id="crear-articulo">
+      <div class="panel-body border-bottom">
+        <form method="POST" action="/bodega/articulos" class="row g-2">
+          <div class="col-md-2"><label class="form-label">Código</label><input class="form-control" name="codigo"></div>
+          <div class="col-md-4"><label class="form-label">Nombre</label><input class="form-control" name="nombre" required></div>
+          <div class="col-md-2"><label class="form-label">Tipo</label><select class="form-select" name="tipo_articulo"><% tiposArticulo.forEach(t => { %><option value="<%= t %>"><%= t %></option><% }) %></select></div>
+          <div class="col-md-2"><label class="form-label">Categoría</label><input class="form-control" name="categoria" placeholder="Filtros, frenos..."></div>
+          <div class="col-md-2"><label class="form-label">Marca</label><input class="form-control" name="marca"></div>
+          <div class="col-md-2"><label class="form-label">N° parte</label><input class="form-control" name="numero_parte"></div>
+          <div class="col-md-2"><label class="form-label">Tipo unidad</label><input class="form-control" name="tipo_unidad" placeholder="Hino, Isuzu..."></div>
+          <div class="col-md-1"><label class="form-label">Unidad</label><input class="form-control" name="unidad_medida" value="UND"></div>
+          <div class="col-md-1"><label class="form-label">Stock</label><input class="form-control" type="number" step="0.01" name="stock_actual" value="0"></div>
+          <div class="col-md-1"><label class="form-label">Mín.</label><input class="form-control" type="number" step="0.01" name="stock_minimo" value="0"></div>
+          <div class="col-md-1"><label class="form-label">Máx.</label><input class="form-control" type="number" step="0.01" name="stock_maximo" value="0"></div>
+          <div class="col-md-2"><label class="form-label">Ubicación</label><input class="form-control" name="ubicacion" placeholder="A-03-02"></div>
+          <div class="col-md-2"><label class="form-label">Precio unitario</label><input class="form-control" type="number" step="0.01" name="precio_unitario" value="0"></div>
+          <div class="col-md-3"><label class="form-label">Proveedor</label><select class="form-select" name="proveedor_id"><option value="">Seleccione</option><% proveedores.forEach(p => { %><option value="<%= p.id %>"><%= p.nombre %></option><% }) %></select></div>
+          <div class="col-md-2 d-grid"><label class="form-label">&nbsp;</label><button class="btn btn-primary fw-bold">Guardar artículo</button></div>
+        </form>
+      </div>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-hover table-sm mb-0 align-middle">
+        <thead><tr><th>Código</th><th>Artículo</th><th>Tipo</th><th>Existencia</th><th>Estado</th><th>Ubicación</th><th>Min/Max</th><th>Proveedor</th><th>Precio</th><% if (puedeAjustar) { %><th>Ajuste</th><% } %></tr></thead>
+        <tbody>
+          <% if (!articulos.length) { %><tr><td colspan="<%= puedeAjustar ? 10 : 9 %>" class="text-center text-muted py-4">No hay artículos con ese filtro.</td></tr><% } %>
+          <% articulos.forEach(a => { const estado = estadoStock(a); %>
+            <tr>
+              <td><strong><%= a.codigo || '-' %></strong><div class="small muted"><%= a.numero_parte || '' %></div></td>
+              <td><strong><%= a.nombre %></strong><div class="small muted"><%= a.categoria || '-' %> · <%= a.marca || '-' %> · <%= a.tipo_unidad || '-' %></div></td>
+              <td><span class="pill"><%= a.tipo_articulo %></span></td>
+              <td class="money"><%= fmt(a.stock_actual) %> <%= a.unidad_medida %></td>
+              <td><span class="stock-badge <%= estado.className %>"><%= estado.label %></span></td>
+              <td><%= a.ubicacion || '-' %></td>
+              <td><%= fmt(a.stock_minimo) %> / <%= fmt(a.stock_maximo) %></td>
+              <td><%= a.proveedor_nombre || '-' %></td>
+              <td>₡<%= money(a.precio_unitario) %></td>
+              <% if (puedeAjustar) { %>
+                <td>
+                  <form method="POST" action="/bodega/ajustar" class="d-flex gap-1">
+                    <input type="hidden" name="articulo_id" value="<%= a.id %>">
+                    <input class="form-control form-control-sm" type="number" step="0.01" name="conteo_fisico" placeholder="Conteo" style="width: 85px">
+                    <input class="form-control form-control-sm" name="motivo" placeholder="Motivo" style="width: 120px">
+                    <button class="btn btn-sm btn-outline-dark">OK</button>
+                  </form>
+                </td>
+              <% } %>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <div class="row g-3 mt-1">
+    <div class="col-xl-5">
+      <section class="panel">
+        <div class="panel-head"><div><h2 class="panel-title">Por comprar</h2><p class="panel-copy">Se genera solo cuando llega al mínimo.</p></div></div>
+        <div class="table-responsive">
+          <table class="table table-sm mb-0 align-middle">
+            <thead><tr><th>Artículo</th><th>Actual</th><th>Mín.</th><th>Máx.</th><th>Comprar</th></tr></thead>
+            <tbody>
+              <% if (!porComprar.length) { %><tr><td colspan="5" class="text-center text-muted py-3">No hay productos en stock bajo.</td></tr><% } %>
+              <% porComprar.forEach(a => { %>
+                <tr><td><strong><%= a.nombre %></strong><div class="small muted"><%= a.codigo || '-' %> · <%= a.proveedor_nombre || '-' %></div></td><td><%= fmt(a.stock_actual) %></td><td><%= fmt(a.stock_minimo) %></td><td><%= fmt(a.stock_maximo) %></td><td class="money"><%= fmt(a.cantidad_comprar) %></td></tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+    <div class="col-xl-7">
+      <section class="panel">
+        <div class="panel-head"><div><h2 class="panel-title">Historial de movimientos</h2><p class="panel-copy">Entradas, salidas, devoluciones, ajustes y herramientas.</p></div></div>
+        <div class="table-responsive">
+          <table class="table table-sm mb-0 align-middle">
+            <thead><tr><th>Fecha</th><th>Tipo</th><th>Artículo</th><th>Placa / mecánico</th><th>Cant.</th><th>Stock</th><th>Usuario</th></tr></thead>
+            <tbody>
+              <% if (!movimientos.length) { %><tr><td colspan="7" class="text-center text-muted py-3">Sin movimientos todavía.</td></tr><% } %>
+              <% movimientos.forEach(m => { %>
+                <tr>
+                  <td><%= fecha(m.creado_en) %></td>
+                  <td><span class="pill"><%= m.tipo_movimiento %></span></td>
+                  <td><strong><%= m.articulo_nombre %></strong><div class="small muted"><%= m.codigo || '-' %></div></td>
+                  <td><%= m.placa || '-' %><div class="small muted"><%= m.mecanico || m.proveedor_nombre || '-' %></div></td>
+                  <td class="money"><%= fmt(m.cantidad) %> <%= m.unidad_medida %></td>
+                  <td><%= fmt(m.existencia_anterior) %> → <strong><%= fmt(m.existencia_nueva) %></strong></td>
+                  <td><%= m.usuario_nombre || '-' %></td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  </div>
+</main>
+
+<template id="linea-template">
+  <div class="line-row">
+    <div class="row g-2 align-items-end">
+      <div class="col-md-9">
+        <label class="form-label">Artículo</label>
+        <select class="form-select" name="articulo_id" required>
+          <option value="">Seleccione</option>
+          <% articulosDisponibles.forEach(a => { %>
+            <option value="<%= a.id %>"><%= a.nombre %> · Stock <%= fmt(a.stock_actual) %> <%= a.unidad_medida %> · <%= a.ubicacion || 'Sin ubicación' %></option>
+          <% }) %>
+        </select>
+      </div>
+      <div class="col-md-2"><label class="form-label">Cantidad</label><input class="form-control" type="number" step="0.01" min="0.01" name="cantidad" value="1" required></div>
+      <div class="col-md-1 d-grid"><label class="form-label">&nbsp;</label><button type="button" class="btn btn-outline-danger remove-linea"><i class="bi bi-x"></i></button></div>
+    </div>
+  </div>
+</template>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+  document.getElementById('add-linea')?.addEventListener('click', () => {
+    const template = document.getElementById('linea-template');
+    const target = document.getElementById('lineas-entrega');
+    if (!template || !target) return;
+    target.appendChild(template.content.cloneNode(true));
+  });
+
+  document.addEventListener('click', (event) => {
+    const button = event.target.closest('.remove-linea');
+    if (!button) return;
+    button.closest('.line-row')?.remove();
+  });
+</script>
+</body>
+</html>
