@@ -61,10 +61,11 @@ const FAMILIAS_GASTO = [
   { clave: "insumos", nombre: "Insumos y herramientas", color: "#64748b", palabras: ["suministro", "suministros", "materiales", "almacen de materiales", "almacén de materiales", "capris", "herramienta", "herramientas", "broca", "brocha", "spray", "loctite", "sellador", "pegamento", "cincho", "cinchos", "soldadura", "guante", "tubo", "conector", "union", "unión", "codo", "terminal", "gaza", "abrazadera", "abrasadera", "tornillo", "tuerca", "arandela"] },
   { clave: "proveedor", nombre: "Pago de proveedor", color: "#0891b2", palabras: ["pago proveedor", "proveedor"] },
   { clave: "caja", nombre: "Caja chica", color: "#f59e0b", palabras: ["caja chica", "reintegro"] },
-  { clave: "general", nombre: "Otros por revisar", color: "#475569", palabras: [] }
+  { clave: "general", nombre: "Insumos y herramientas", color: "#64748b", palabras: [] }
 ];
 
-const FAMILIAS_MANTENIMIENTO_RESUMEN = FAMILIAS_GASTO.filter(f => !["proveedor", "caja"].includes(f.clave));
+const FAMILIAS_GASTO_OPERATIVO = FAMILIAS_GASTO.filter(f => f.clave !== "general");
+const FAMILIAS_MANTENIMIENTO_RESUMEN = FAMILIAS_GASTO.filter(f => !["proveedor", "caja", "transportadora", "general"].includes(f.clave));
 
 function fechaCostaRica(date = new Date()) {
   return new Intl.DateTimeFormat("en-CA", {
@@ -194,6 +195,23 @@ function clasificarTexto(texto, familias = FAMILIAS_GASTO, fallbackClave = "gene
   });
 
   return mejor;
+}
+
+function familiaPorClave(clave, familias = FAMILIAS_GASTO) {
+  return familias.find(f => f.clave === clave) || familias[0];
+}
+
+function clasificarGastoOperativo(item) {
+  if (item.placa === "ACEITES") return familiaPorClave("aceites");
+  if (item.fuente === "PAGO_PROVEEDOR") {
+    return clasificarTexto(`${item.descripcion} ${item.proveedor}`, FAMILIAS_GASTO_OPERATIVO, "proveedor");
+  }
+  if (item.fuente === "CAJA_CHICA") return familiaPorClave("caja");
+  if (item.fuente === "ORDEN_MOTOR") {
+    return clasificarTexto(`${item.descripcion} ${item.proveedor}`, FAMILIAS_GASTO_OPERATIVO, "motor");
+  }
+
+  return clasificarTexto(`${item.descripcion} ${item.proveedor}`, FAMILIAS_GASTO_OPERATIVO, "insumos");
 }
 
 function recortarResumen(texto, limite = 150) {
@@ -635,13 +653,7 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro, pe
       const placaReal = esPlacaReal(placaLimpia);
       const sedeFinal = unidadResuelta?.sede || item.sede || "";
       const sedeReal = Boolean(String(sedeFinal || "").trim()) && sedeFinal !== "General";
-      const familia = item.placa === "ACEITES"
-        ? FAMILIAS_GASTO.find(f => f.clave === "aceites")
-        : item.fuente === "PAGO_PROVEEDOR"
-        ? clasificarTexto(`${item.descripcion} ${item.proveedor}`, FAMILIAS_GASTO, "proveedor")
-        : item.fuente === "CAJA_CHICA"
-        ? FAMILIAS_GASTO.find(f => f.clave === "caja")
-        : clasificarTexto(`${item.descripcion} ${item.proveedor}`);
+      const familia = clasificarGastoOperativo(item);
       return {
         ...item,
         tipo_mantenimiento: ["ORDEN", "ORDEN_MOTOR"].includes(item.fuente)
@@ -771,7 +783,7 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro, pe
   `, paramsCorrectivos, []);
 
   const mantenimientos = [...preventivos, ...correctivos].map(item => {
-    const familia = clasificarTexto(item.detalle, FAMILIAS_MANTENIMIENTO_RESUMEN);
+    const familia = clasificarTexto(item.detalle, FAMILIAS_MANTENIMIENTO_RESUMEN, "reparaciones");
     return {
       ...item,
       familia,

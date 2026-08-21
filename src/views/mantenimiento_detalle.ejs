@@ -262,7 +262,14 @@
     const wrapper = document.createElement("div");
     wrapper.innerHTML = html || "";
 
-    wrapper.querySelectorAll("*").forEach((node) => {
+    Array.from(wrapper.querySelectorAll("*")).reverse().forEach((node) => {
+      if (node.classList && node.classList.contains("plan-red")) {
+        node.removeAttribute("style");
+        node.removeAttribute("color");
+        node.className = "plan-red";
+        return;
+      }
+
       const color = String(node.style?.color || "").toLowerCase();
       const colorAttr = String(node.getAttribute("color") || "").toLowerCase();
       const colorTexto = `${color} ${colorAttr}`;
@@ -274,7 +281,8 @@
         span.textContent = node.textContent || "";
         node.replaceWith(span);
       } else if (node.tagName !== "BR") {
-        node.replaceWith(document.createTextNode(node.textContent || ""));
+        while (node.firstChild) node.parentNode.insertBefore(node.firstChild, node);
+        node.remove();
       }
     });
 
