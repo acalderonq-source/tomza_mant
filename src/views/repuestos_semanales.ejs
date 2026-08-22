@@ -699,7 +699,7 @@
           <div class="modal-header">
             <div>
               <h5 class="modal-title fw-bold mb-0"><i class="bi bi-calendar-plus me-1"></i> Agregar repuesto semanal</h5>
-              <div class="small opacity-75">Puede usar placa normal o grupos como GENERALES, MUEBLE, LLANTAS.</div>
+              <div class="small opacity-75">Puede usar placa normal o grupos como GENERALES, MUEBLE, LLANTAS, GENERALES-LIMON y MUEBLE-LIMON.</div>
             </div>
             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
           </div>
@@ -717,18 +717,20 @@
                 <label class="form-label mb-1">Sede automática</label>
                 <input type="hidden" name="sede" id="sedeNuevaSemanal" value="<%= filtros.sede || '' %>">
                 <input type="text" id="sedeNuevaSemanalTexto" class="form-control" value="<%= filtros.sede ? mostrarSede(filtros.sede) : '' %>" placeholder="Se llena al seleccionar la placa" readonly>
-                <div class="form-text">Si usa GENERALES, MUEBLE o LLANTAS, primero filtre la sede arriba y luego agregue.</div>
+                <div class="form-text">GENERALES-LIMON y MUEBLE-LIMON van directo a RECOPE_LIMON. Los otros grupos usan la sede filtrada.</div>
               </div>
               <div>
                 <label class="form-label mb-1">Placa / grupo</label>
-                <input type="text" name="placa" id="placaNuevaSemanal" class="form-control text-uppercase" list="placasSemanalesList" placeholder="C164415, GENERALES, MUEBLE..." required>
+                <input type="text" name="placa" id="placaNuevaSemanal" class="form-control text-uppercase" list="placasSemanalesList" placeholder="C164415, GENERALES-LIMON, MUEBLE-LIMON..." required>
                 <datalist id="placasSemanalesList">
                   <% unidadesLista.forEach(unidad => { %>
                     <option value="<%= unidad.placa %>" data-sede="<%= unidad.sede || '' %>"><%= unidad.placa %> · <%= mostrarSede(unidad.sede) %></option>
                   <% }) %>
                   <option value="GENERALES">GENERALES</option>
                   <option value="GENERAL-TALLER">GENERAL-TALLER</option>
+                  <option value="GENERALES-LIMON">GENERALES-LIMON</option>
                   <option value="MUEBLE">MUEBLE</option>
+                  <option value="MUEBLE-LIMON">MUEBLE-LIMON</option>
                   <option value="LLANTAS">LLANTAS</option>
                   <option value="SUMINISTRO LIMPIEZA">SUMINISTRO LIMPIEZA</option>
                 </datalist>
@@ -889,6 +891,11 @@
     return sedesSemanal[sede] || sede || '';
   }
 
+  function grupoSedeEspecial(value) {
+    const clean = String(value || '').trim().toUpperCase().replace(/[_\s]+/g, '-');
+    return ['GENERALES-LIMON', 'MUEBLE-LIMON'].includes(clean) ? SEDE_RECOPE_LIMON : '';
+  }
+
   function sedeDestinoVista(unidad, sedeDefault = '') {
     if (sedeDefault === SEDE_RECOPE_LIMON && unidad?.sede === SEDE_RECOPE_ORIGEN) {
       return SEDE_RECOPE_LIMON;
@@ -897,6 +904,13 @@
   }
 
   function aplicarSedeAutomatica(placaInput, sedeHidden, sedeTexto, sedeDefault = '') {
+    const sedeGrupo = grupoSedeEspecial(placaInput?.value);
+    if (sedeGrupo) {
+      if (sedeHidden) sedeHidden.value = sedeGrupo;
+      if (sedeTexto) sedeTexto.value = textoSede(sedeGrupo);
+      return;
+    }
+
     const unidad = buscarUnidadPorPlaca(placaInput?.value);
     if (unidad) {
       const sedeDestino = sedeDestinoVista(unidad, sedeDefault);

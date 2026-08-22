@@ -21,6 +21,7 @@ const ROLES_VER = ["ADMIN", "TALLER", "MECANICO", "SUPERVISOR_PESADO", ...ROLES_
 const ROLES_GESTION = ["ADMIN", "TALLER", ...ROLES_PROVEEDURIA];
 const SEDE_RECOPE_LIMON = "RECOPE_LIMON";
 const SEDE_RECOPE_UNIDADES = "Transportadora";
+const GRUPOS_RECOPE_LIMON = new Set(["GENERALES-LIMON", "MUEBLE-LIMON"]);
 
 function requireAuth(req, res, next) {
   if (!req.session.user) return res.redirect("/login");
@@ -188,6 +189,10 @@ function textoComparable(value) {
     .replace(/[_\s]+/g, "-");
 }
 
+function esGrupoRecopeLimon(value) {
+  return GRUPOS_RECOPE_LIMON.has(textoComparable(value));
+}
+
 function excluirDePedidoCedis(item) {
   const placa = textoComparable(item.placa);
   const sede = textoComparable(item.sede);
@@ -256,9 +261,20 @@ async function resolverSedePorPlaca(req, placa, sedeFallback = "") {
   }
 
   const sede = String(sedeFallback || "").trim();
+  if (esGrupoRecopeLimon(placaLimpia)) {
+    if (sedes.length && !sedes.includes(SEDE_RECOPE_LIMON)) {
+      return {
+        error: "Su usuario no tiene acceso a RECOPE_LIMON.",
+        sedes
+      };
+    }
+
+    return { placa: textoComparable(placaLimpia), sede: SEDE_RECOPE_LIMON, sedes };
+  }
+
   if (!sede || (sedes.length && !sedes.includes(sede))) {
     return {
-      error: "Para grupos como GENERALES, MUEBLE o LLANTAS, primero filtre una sede para asignarla automáticamente.",
+      error: "Para grupos como GENERALES, MUEBLE o LLANTAS, primero filtre una sede para asignarla automáticamente. GENERALES-LIMON y MUEBLE-LIMON van directo a RECOPE_LIMON.",
       sedes
     };
   }
