@@ -43,6 +43,7 @@ function tituloSede(sede) {
 
 function destinoEntrega(sede) {
   const sedeTexto = String(sede || "").trim().toLowerCase();
+  if (sedeTexto === "recope_limon" || sedeTexto === "recope limon" || sedeTexto === "recope limón") return "RECOPE LIMON";
   if (sedeTexto.includes("alajuela")) return "ALAJUELA";
   return "CARTAGO";
 }

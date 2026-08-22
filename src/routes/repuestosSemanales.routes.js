@@ -19,6 +19,8 @@ const { generarPdfPedidoCedis, dividirRepuestosSeleccionables } = require("../ut
 const ROLES_PROVEEDURIA = ["PROVEEDURIA_TALLER", "PROVEEDURIA"];
 const ROLES_VER = ["ADMIN", "TALLER", "MECANICO", "SUPERVISOR_PESADO", ...ROLES_PROVEEDURIA];
 const ROLES_GESTION = ["ADMIN", "TALLER", ...ROLES_PROVEEDURIA];
+const SEDE_RECOPE_LIMON = "RECOPE_LIMON";
+const SEDE_RECOPE_UNIDADES = "Transportadora";
 
 function requireAuth(req, res, next) {
   if (!req.session.user) return res.redirect("/login");
@@ -30,6 +32,45 @@ function esUsuarioPesado(user) {
     user.rol === "SUPERVISOR_PESADO" ||
     String(user.usuario || "").trim().toLowerCase() === "pesados"
   );
+}
+
+function unirLista(...listas) {
+  return [...new Set(
+    listas
+      .flat()
+      .map(item => String(item || "").trim())
+      .filter(Boolean)
+  )];
+}
+
+function esSedeRecopeLimon(sede) {
+  return String(sede || "").trim().toUpperCase() === SEDE_RECOPE_LIMON;
+}
+
+function etiquetaSedePedido(sede) {
+  if (esSedeRecopeLimon(sede)) return "RECOPE_LIMON";
+  return etiquetaSede(sede);
+}
+
+function incluirRecopeLimonSiAplica(sedes) {
+  const lista = unirLista(sedes);
+  return lista.includes(SEDE_RECOPE_UNIDADES)
+    ? unirLista(lista, [SEDE_RECOPE_LIMON])
+    : lista;
+}
+
+function sedesParaBuscarUnidades(sedes) {
+  const lista = unirLista(sedes);
+  return lista.includes(SEDE_RECOPE_LIMON)
+    ? unirLista(lista, [SEDE_RECOPE_UNIDADES])
+    : lista;
+}
+
+function sedeDestinoPedido(sedeUnidad, sedeFallback = "") {
+  if (esSedeRecopeLimon(sedeFallback) && sedeUnidad === SEDE_RECOPE_UNIDADES) {
+    return SEDE_RECOPE_LIMON;
+  }
+  return sedeUnidad;
 }
 
 function requireVer(req, res, next) {
@@ -166,15 +207,15 @@ function excluirDePedidoCedis(item) {
 
 async function sedesDisponibles(req) {
   if (["ADMIN", "TALLER"].includes(req.session.user.rol) || ROLES_PROVEEDURIA.includes(req.session.user.rol)) {
-    return obtenerTodasSedes(pool);
+    return incluirRecopeLimonSiAplica(await obtenerTodasSedes(pool));
   }
 
   if (esUsuarioPesado(req.session.user)) {
-    return obtenerSedesTransporte(pool);
+    return incluirRecopeLimonSiAplica(await obtenerSedesTransporte(pool));
   }
 
   const sedes = getSedesPermitidas(req);
-  return [...new Set(sedes.filter(Boolean))];
+  return incluirRecopeLimonSiAplica(sedes);
 }
 
 async function resolverSedePorPlaca(req, placa, sedeFallback = "") {
@@ -188,10 +229,11 @@ async function resolverSedePorPlaca(req, placa, sedeFallback = "") {
   if (/\d/.test(placaLimpia)) {
     const params = [placaLimpia];
     const filtros = ["UPPER(TRIM(placa)) = ?"];
+    const sedesUnidades = sedesParaBuscarUnidades(sedes);
 
-    if (sedes.length) {
+    if (sedesUnidades.length) {
       filtros.push("sede IN (?)");
-      params.push(sedes);
+      params.push(sedesUnidades);
     }
 
     const [unidades] = await pool.query(
@@ -206,7 +248,11 @@ async function resolverSedePorPlaca(req, placa, sedeFallback = "") {
       return { error: "Seleccione una placa válida de la lista para colocar la sede automáticamente.", sedes };
     }
 
-    return { placa: unidades[0].placa, sede: unidades[0].sede, sedes };
+    return {
+      placa: unidades[0].placa,
+      sede: sedeDestinoPedido(unidades[0].sede, sedeFallback),
+      sedes
+    };
   }
 
   const sede = String(sedeFallback || "").trim();
@@ -314,14 +360,15 @@ router.get("/", async (req, res) => {
 
     const { sedes, solicitudes, filtros } = await obtenerSolicitudesFiltradas(req);
 
+    const sedesUnidades = sedesParaBuscarUnidades(sedes);
     const [unidades] = await pool.query(
       `SELECT id, placa, sede
        FROM unidades
        WHERE placa IS NOT NULL
          AND placa <> ''
-         ${sedes.length ? "AND sede IN (?)" : ""}
+         ${sedesUnidades.length ? "AND sede IN (?)" : ""}
        ORDER BY sede, placa`,
-      sedes.length ? [sedes] : []
+      sedesUnidades.length ? [sedesUnidades] : []
     );
 
     const resumen = solicitudes.reduce((acc, item) => {
@@ -348,7 +395,9 @@ router.get("/", async (req, res) => {
       fechaProximaSemana: proximaSemanaCostaRica(),
       puedeGestionar: ROLES_GESTION.includes(req.session.user.rol),
       etiquetaEstadoSemanal,
-      etiquetaSede,
+      etiquetaSede: etiquetaSedePedido,
+      sedeRecopeLimon: SEDE_RECOPE_LIMON,
+      sedeRecopeUnidades: SEDE_RECOPE_UNIDADES,
       dividirRepuestosSeleccionables,
       success,
       error

@@ -402,6 +402,8 @@
   const lista = Array.isArray(solicitudes) ? solicitudes : [];
   const sedesLista = Array.isArray(sedes) ? sedes : [];
   const unidadesLista = Array.isArray(unidades) ? unidades : [];
+  const sedeRecope = typeof sedeRecopeLimon !== 'undefined' ? sedeRecopeLimon : 'RECOPE_LIMON';
+  const sedeRecopeOrigen = typeof sedeRecopeUnidades !== 'undefined' ? sedeRecopeUnidades : 'Transportadora';
   const mostrarSede = typeof etiquetaSede === 'function' ? etiquetaSede : (sede) => sede;
   const estadoTexto = typeof etiquetaEstadoSemanal === 'function' ? etiquetaEstadoSemanal : (estado) => estado;
   const estadoClase = estado => String(estado || '').toLowerCase();
@@ -846,6 +848,8 @@
 <script type="application/json" id="sedesSemanalData"><%- JSON.stringify(Object.fromEntries(sedesLista.map(sede => [sede, mostrarSede(sede)]))) %></script>
 <script type="application/json" id="pedidoCedisData"><%- JSON.stringify(pedidoSeleccionData) %></script>
 <script>
+  const SEDE_RECOPE_LIMON = '<%= sedeRecope %>';
+  const SEDE_RECOPE_ORIGEN = '<%= sedeRecopeOrigen %>';
   const unidadesSemanal = (() => {
     try { return JSON.parse(document.getElementById('unidadesSemanalData')?.textContent || '[]'); }
     catch (_) { return []; }
@@ -885,11 +889,19 @@
     return sedesSemanal[sede] || sede || '';
   }
 
+  function sedeDestinoVista(unidad, sedeDefault = '') {
+    if (sedeDefault === SEDE_RECOPE_LIMON && unidad?.sede === SEDE_RECOPE_ORIGEN) {
+      return SEDE_RECOPE_LIMON;
+    }
+    return unidad?.sede || '';
+  }
+
   function aplicarSedeAutomatica(placaInput, sedeHidden, sedeTexto, sedeDefault = '') {
     const unidad = buscarUnidadPorPlaca(placaInput?.value);
     if (unidad) {
-      if (sedeHidden) sedeHidden.value = unidad.sede || '';
-      if (sedeTexto) sedeTexto.value = textoSede(unidad.sede);
+      const sedeDestino = sedeDestinoVista(unidad, sedeDefault);
+      if (sedeHidden) sedeHidden.value = sedeDestino;
+      if (sedeTexto) sedeTexto.value = textoSede(sedeDestino);
       return;
     }
 
