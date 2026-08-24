@@ -49,7 +49,7 @@ function destinoEntrega(sede) {
 }
 
 function descripcionItem(item) {
-  return String(item.marcado_rojo || item.solicitud || "").trim();
+  return String(item.solicitud || item.marcado_rojo || "").trim();
 }
 
 function cantidadItem(item) {

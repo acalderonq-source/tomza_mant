@@ -136,6 +136,331 @@
       margin-top: .25rem;
     }
 
+    .section-label {
+      align-items: center;
+      color: #172554;
+      display: flex;
+      font-size: .78rem;
+      font-weight: 950;
+      gap: .5rem;
+      letter-spacing: .06em;
+      margin: 1.15rem 0 .65rem;
+      text-transform: uppercase;
+    }
+
+    .section-label::after {
+      background: #dbe4f0;
+      content: "";
+      flex: 1;
+      height: 1px;
+    }
+
+    .decision-strip {
+      display: grid;
+      gap: .8rem;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .decision-card {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-left: 5px solid var(--decision-color, var(--blue));
+      border-radius: 16px;
+      box-shadow: 0 10px 24px rgba(15, 23, 42, .055);
+      padding: .95rem;
+    }
+
+    .decision-label {
+      color: var(--muted);
+      font-size: .68rem;
+      font-weight: 950;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+    }
+
+    .decision-title {
+      color: #0f172a;
+      font-size: 1.05rem;
+      font-weight: 950;
+      line-height: 1.16;
+      margin: .22rem 0 .25rem;
+    }
+
+    .decision-text {
+      color: #475569;
+      font-size: .82rem;
+      font-weight: 750;
+      line-height: 1.3;
+      margin: 0;
+    }
+
+    .business-accordion {
+      display: grid;
+      gap: .65rem;
+      padding: 1rem;
+    }
+
+    .business-node {
+      background: #fff;
+      border: 1px solid #dbe4f0;
+      border-left: 6px solid var(--business-color, var(--blue));
+      border-radius: 16px;
+      overflow: hidden;
+    }
+
+    .business-toggle,
+    .sede-toggle {
+      align-items: center;
+      background: transparent;
+      border: 0;
+      color: #0f172a;
+      cursor: pointer;
+      display: flex;
+      gap: .75rem;
+      justify-content: space-between;
+      padding: .85rem .95rem;
+      text-align: left;
+      width: 100%;
+    }
+
+    .business-toggle:hover,
+    .sede-toggle:hover {
+      background: #f8fafc;
+    }
+
+    .business-toggle::after,
+    .sede-toggle::after {
+      color: var(--muted);
+      content: "Abrir";
+      font-size: .72rem;
+      font-weight: 950;
+      white-space: nowrap;
+    }
+
+    .business-node.open > .business-toggle::after,
+    .sede-node.open > .sede-toggle::after {
+      content: "Cerrar";
+    }
+
+    .business-main,
+    .sede-main,
+    .placa-main {
+      min-width: 0;
+    }
+
+    .business-title,
+    .sede-title,
+    .placa-title {
+      color: #0f172a;
+      font-size: .94rem;
+      font-weight: 950;
+      line-height: 1.18;
+      word-break: break-word;
+    }
+
+    .business-meta,
+    .sede-meta,
+    .placa-meta {
+      color: var(--muted);
+      font-size: .73rem;
+      font-weight: 800;
+      margin-top: .25rem;
+    }
+
+    .business-money,
+    .sede-money,
+    .placa-money {
+      color: #0f172a;
+      font-size: .92rem;
+      font-weight: 950;
+      white-space: nowrap;
+    }
+
+    .business-body {
+      background: #f8fafc;
+      border-top: 1px solid #dbe4f0;
+      display: none;
+      padding: .75rem;
+    }
+
+    .business-node.open > .business-body {
+      display: block;
+    }
+
+    .sede-node {
+      background: #fff;
+      border: 1px solid #dbe4f0;
+      border-radius: 13px;
+      overflow: hidden;
+    }
+
+    .sede-node + .sede-node {
+      margin-top: .55rem;
+    }
+
+    .sede-body {
+      background: #f8fafc;
+      border-top: 1px solid #e6edf6;
+      display: none;
+      max-height: 250px;
+      overflow: auto;
+      padding: .55rem .75rem;
+    }
+
+    .sede-node.open > .sede-body {
+      display: block;
+    }
+
+    .placa-row {
+      align-items: center;
+      background: #fff;
+      border: 1px solid #e6edf6;
+      border-radius: 11px;
+      display: flex;
+      justify-content: space-between;
+      gap: .75rem;
+      padding: .58rem .65rem;
+    }
+
+    .placa-row + .placa-row {
+      margin-top: .45rem;
+    }
+
+    .business-empty {
+      color: var(--muted);
+      font-weight: 850;
+      padding: 1rem;
+      text-align: center;
+    }
+
+    .detail-hub {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      box-shadow: 0 12px 30px rgba(15, 23, 42, .065);
+      overflow: hidden;
+    }
+
+    .detail-hub-head {
+      align-items: center;
+      background: linear-gradient(90deg, var(--navy), var(--blue));
+      color: #fff;
+      display: flex;
+      justify-content: space-between;
+      gap: 1rem;
+      padding: 1rem 1.15rem;
+    }
+
+    .detail-hub-title {
+      font-size: 1rem;
+      font-weight: 950;
+      margin: 0;
+    }
+
+    .detail-hub-subtitle {
+      color: rgba(255,255,255,.74);
+      font-size: .78rem;
+      font-weight: 750;
+      margin-top: .15rem;
+    }
+
+    .detail-tabs {
+      background: #f8fafc;
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      gap: .5rem;
+      overflow-x: auto;
+      padding: .75rem;
+    }
+
+    .detail-tab {
+      background: #fff;
+      border: 1px solid #dbe4f0;
+      border-radius: 999px;
+      color: #334155;
+      cursor: pointer;
+      flex: 0 0 auto;
+      font-size: .76rem;
+      font-weight: 950;
+      padding: .55rem .85rem;
+      white-space: nowrap;
+    }
+
+    .detail-tab.active {
+      background: var(--blue);
+      border-color: var(--blue);
+      color: #fff;
+      box-shadow: 0 8px 18px rgba(11, 59, 130, .18);
+    }
+
+    .detail-panel {
+      display: none;
+      padding: 1rem;
+    }
+
+    .detail-panel.active {
+      display: block;
+    }
+
+    .detail-grid {
+      display: grid;
+      gap: 1rem;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .detail-block {
+      border: 1px solid #dbe4f0;
+      border-radius: 15px;
+      overflow: hidden;
+    }
+
+    .detail-block-head {
+      align-items: center;
+      background: #f8fafc;
+      border-bottom: 1px solid #dbe4f0;
+      display: flex;
+      justify-content: space-between;
+      gap: .75rem;
+      padding: .8rem .9rem;
+    }
+
+    .detail-block-title {
+      color: #0f172a;
+      font-size: .88rem;
+      font-weight: 950;
+      margin: 0;
+    }
+
+    .detail-block-subtitle {
+      color: var(--muted);
+      font-size: .72rem;
+      font-weight: 800;
+      margin-top: .12rem;
+    }
+
+    .detail-table {
+      margin: 0;
+    }
+
+    .detail-table thead th {
+      background: #eef4fb;
+      color: #334155;
+      font-size: .68rem;
+      letter-spacing: .05em;
+      text-transform: uppercase;
+    }
+
+    .detail-table td,
+    .detail-table th {
+      padding: .65rem .75rem;
+      vertical-align: middle;
+    }
+
+    .detail-scroll {
+      max-height: 430px;
+      overflow: auto;
+    }
+
     .chart-card { overflow: hidden; height: 100%; }
 
     .card-head {
@@ -204,36 +529,6 @@
     }
 
     .table-card { overflow: hidden; height: 100%; }
-
-    .table-card.is-collapsible .card-head {
-      cursor: pointer;
-      user-select: none;
-    }
-
-    .table-card.is-collapsible .card-head::after {
-      align-items: center;
-      background: #eaf1ff;
-      border: 1px solid #bfdbfe;
-      border-radius: 999px;
-      color: var(--blue);
-      content: "Abrir";
-      display: inline-flex;
-      flex: 0 0 auto;
-      font-size: .72rem;
-      font-weight: 950;
-      padding: .35rem .75rem;
-    }
-
-    .table-card.is-collapsible:not(.collapsed) .card-head::after {
-      background: #fee2e2;
-      border-color: #fecaca;
-      color: #991b1b;
-      content: "Cerrar";
-    }
-
-    .table-card.is-collapsible.collapsed > :not(.card-head) {
-      display: none !important;
-    }
 
     .table {
       font-size: .86rem;
@@ -396,7 +691,32 @@
       .hero { padding: 1rem; }
       .metric-value { font-size: 1.35rem; }
       .chart-body { min-height: 260px; }
+      .decision-strip { grid-template-columns: 1fr; }
+      .detail-hub-head { align-items: flex-start; flex-direction: column; }
+      .detail-grid { grid-template-columns: 1fr; }
       canvas { max-height: 280px; }
+    }
+
+    @media (min-width: 769px) and (max-width: 1180px) {
+      .decision-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+
+    @media print {
+      body { background: #fff; }
+      .topbar,
+      .panel,
+      .live-badge,
+      #printExecutive { display: none !important; }
+      .shell { max-width: none; padding: 0 !important; }
+      .hero,
+      .metric-card,
+      .chart-card,
+      .table-card,
+      .conclusion-card,
+      .decision-card {
+        box-shadow: none !important;
+        break-inside: avoid;
+      }
     }
   </style>
 </head>
@@ -422,6 +742,7 @@
   const proveedores = safe(data.proveedores);
   const sedesGasto = safe(data.sedes);
   const placasGasto = safe(data.placas);
+  const negociosGasto = safe(data.negociosGasto);
   const meses = safe(data.meses);
   const familiasMant = safe(data.familiasMant).filter(item => !contieneCategoriaOculta(item.nombre));
   const sedesMant = safe(data.sedesMant);
@@ -444,6 +765,17 @@
     minute: '2-digit',
     second: '2-digit'
   }).format(new Date());
+  const topCategoria = categorias[0] || {};
+  const topNegocio = [...negociosGasto].sort((a, b) => Number(b.total || 0) - Number(a.total || 0))[0] || {};
+  const topMantenimiento = familiasMant[0] || {};
+  const totalGastosNumero = Number(data.totalGastos || 0);
+  const totalPagadoNumero = Number(resumenFinanciero.totalPagado || 0);
+  const pagosPendientesNumero = Number(resumenFinanciero.totalPagosProveedorPendientes || 0);
+  const gastoCorrectivoNumero = Number(resumenFinanciero.totalGastoCorrectivo || 0);
+  const gastoPreventivoNumero = Number(resumenFinanciero.totalGastoPreventivo || 0);
+  const balanceMantenimiento = gastoPreventivoNumero
+    ? `${(gastoCorrectivoNumero / gastoPreventivoNumero).toLocaleString('es-CR', { maximumFractionDigits: 1 })}x correctivo vs preventivo`
+    : gastoCorrectivoNumero ? 'Predomina correctivo' : 'Sin gasto de mantenimiento';
 %>
 
 <nav class="navbar navbar-dark topbar px-4 py-3">
@@ -455,6 +787,9 @@
     </span>
     <span class="text-white small">Actualizado <%= horaActualizacion %></span>
     <span class="text-white small"><%= user.usuario %> · <%= user.rol %></span>
+    <button type="button" class="btn btn-sm btn-light rounded-pill px-3 fw-bold" id="printExecutive">
+      <i class="bi bi-printer me-1"></i>Imprimir
+    </button>
     <a href="/dashboard" class="btn btn-sm btn-outline-light rounded-pill px-3">Inicio</a>
   </div>
 </nav>
@@ -465,7 +800,7 @@
       <div>
         <div class="eyebrow"><i class="bi bi-cash-coin me-1"></i> Dinero · Taller · Conclusiones</div>
         <h1 class="page-title">Resumen total</h1>
-        <p class="hero-subtitle">Cruza órdenes, pagos de proveedor, caja chica, preventivos y correctivos; las tablas por unidad muestran solo placas reales registradas.</p>
+        <p class="hero-subtitle">Vista gerencial de gasto, pagos, flota y mantenimiento. Muestra qué se pagó, dónde se concentró el gasto y qué requiere seguimiento.</p>
       </div>
       <div class="text-white text-end">
         <div class="small opacity-75 fw-bold">Sede actual</div>
@@ -558,6 +893,38 @@
     </div>
   </section>
 
+  <div class="section-label"><span>Lectura rápida para gerencia</span></div>
+  <section class="decision-strip mb-4">
+    <article class="decision-card" style="--decision-color:#0b3b82">
+      <div class="decision-label">Dinero</div>
+      <h2 class="decision-title">₡<%= money(totalGastosNumero) %> gastado</h2>
+      <p class="decision-text">Pagado: ₡<%= money(totalPagadoNumero) %>. Pendiente proveedor: ₡<%= money(pagosPendientesNumero) %>.</p>
+    </article>
+    <article class="decision-card" style="--decision-color:#ef233c">
+      <div class="decision-label">Mayor presión</div>
+      <h2 class="decision-title"><%= topNegocio.nombre || '-' %></h2>
+      <p class="decision-text"><%= topCategoria.nombre || 'Sin categoría' %> lidera el gasto operativo con ₡<%= money(topCategoria.total || 0) %>.</p>
+    </article>
+    <article class="decision-card" style="--decision-color:#f59e0b">
+      <div class="decision-label">Taller</div>
+      <h2 class="decision-title"><%= topMantenimiento.nombre || '-' %></h2>
+      <p class="decision-text"><%= Number(data.totalMantenimientos || 0).toLocaleString('es-CR') %> mantenimientos. Balance: <%= balanceMantenimiento %>.</p>
+    </article>
+  </section>
+
+  <div class="section-label"><span>1. Gasto por negocio</span></div>
+  <section class="table-card mb-4">
+    <div class="card-head">
+      <div>
+        <h2 class="card-title"><i class="bi bi-diagram-3-fill me-1"></i>Gasto por negocio, sede y placa</h2>
+        <div class="card-subtitle">Aprete un negocio para ver sedes; luego aprete una sede para ver placas.</div>
+      </div>
+      <span class="pill pill-blue">Acordeón ejecutivo</span>
+    </div>
+    <div class="business-accordion" id="negocioAccordion"></div>
+  </section>
+
+  <div class="section-label"><span>2. Resumen financiero y flota</span></div>
   <section class="row g-3 mb-4">
     <div class="col-lg-4">
       <div class="table-card financial-card">
@@ -683,12 +1050,13 @@
     </div>
   </section>
 
+  <div class="section-label"><span>3. Tendencias y mantenimiento</span></div>
   <section class="row g-3 mb-4">
     <div class="col-lg-8">
       <div class="chart-card">
         <div class="card-head">
           <div>
-            <h2 class="card-title"><i class="bi bi-bar-chart-fill me-1"></i>Gasto por mes</h2>
+            <h2 class="card-title"><i class="bi bi-bar-chart-fill me-1"></i>Tendencia mensual</h2>
             <div class="card-subtitle">Tendencia general del dinero registrado.</div>
           </div>
         </div>
@@ -699,7 +1067,7 @@
       <div class="chart-card">
         <div class="card-head">
           <div>
-            <h2 class="card-title"><i class="bi bi-bar-chart-fill me-1"></i>Gasto por tipo operativo</h2>
+            <h2 class="card-title"><i class="bi bi-bar-chart-fill me-1"></i>Composición del gasto</h2>
             <div class="card-subtitle">Resumen ejecutivo por familia de gasto.</div>
           </div>
         </div>
@@ -711,7 +1079,7 @@
   <section class="row g-3 mb-4">
     <div class="col-lg-5">
       <div class="conclusion-card p-3 h-100">
-        <div class="card-title mb-2"><i class="bi bi-lightbulb-fill text-warning me-1"></i>Conclusiones</div>
+        <div class="card-title mb-2"><i class="bi bi-lightbulb-fill text-warning me-1"></i>Conclusiones automáticas</div>
         <div class="formula-box">
           <strong>Cómo se saca el costo por unidad:</strong><br>
           ₡<%= money(costoUnidad.totalGastoConUnidad || 0) %> en gastos con placa real del periodo ÷
@@ -751,221 +1119,269 @@
     </div>
   </section>
 
-  <section class="row g-3 mb-4">
-    <div class="col-lg-12">
-      <div class="table-card">
-        <div class="card-head">
-          <div>
-            <h2 class="card-title">Gasto por tipo operativo</h2>
-            <span class="card-subtitle">Monto, movimientos y peso sobre las familias operativas visibles.</span>
+  <div class="section-label"><span>4. Panel de respaldo</span></div>
+  <section class="detail-hub mb-4">
+    <div class="detail-hub-head">
+      <div>
+        <h2 class="detail-hub-title"><i class="bi bi-folder2-open me-1"></i>Detalle ejecutivo ordenado</h2>
+        <div class="detail-hub-subtitle">Use las pestañas para revisar dinero, unidades, mantenimiento y movimientos recientes sin llenar la pantalla.</div>
+      </div>
+      <span class="pill pill-blue"><%= Number(categorias.length + proveedores.length + placasGasto.length + familiasMant.length).toLocaleString('es-CR') %> datos</span>
+    </div>
+
+    <div class="detail-tabs" role="tablist" aria-label="Detalle ejecutivo">
+      <button type="button" class="detail-tab active" data-detail-tab="dinero">Dinero</button>
+      <button type="button" class="detail-tab" data-detail-tab="unidades">Unidades</button>
+      <button type="button" class="detail-tab" data-detail-tab="mantenimiento">Mantenimiento</button>
+      <button type="button" class="detail-tab" data-detail-tab="recientes">Recientes</button>
+    </div>
+
+    <div class="detail-panel active" data-detail-panel="dinero">
+      <div class="detail-grid">
+        <div class="detail-block">
+          <div class="detail-block-head">
+            <div>
+              <h3 class="detail-block-title">Gasto por tipo operativo</h3>
+              <div class="detail-block-subtitle">Monto y peso del gasto visible.</div>
+            </div>
+          </div>
+          <div class="table-responsive detail-scroll">
+            <table class="table table-hover align-middle detail-table">
+              <thead><tr><th>Categoría</th><th>Mov.</th><th class="text-end">Monto</th><th class="text-end">%</th></tr></thead>
+              <tbody>
+                <% if (!categorias.length) { %><tr><td colspan="4" class="empty-state">No hay categorías para este filtro.</td></tr><% } %>
+                <% categorias.forEach(item => { %>
+                  <tr>
+                    <td><span class="pill" style="background:<%= item.color || '#eef2f7' %>22;color:<%= item.color || '#334155' %>"><%= item.nombre %></span></td>
+                    <td><span class="pill pill-soft"><%= Number(item.registros || 0).toLocaleString('es-CR') %></span></td>
+                    <td class="text-end money">₡<%= money(item.total) %></td>
+                    <td class="text-end"><%= pct(item.total, totalCategoriasOperativas) %>%</td>
+                  </tr>
+                <% }) %>
+              </tbody>
+            </table>
           </div>
         </div>
-        <div class="table-responsive">
-          <table class="table table-hover align-middle">
-            <thead><tr><th>Categoría</th><th>Mov.</th><th class="text-end">Monto</th><th class="text-end">%</th></tr></thead>
-            <tbody>
-              <% if (!categorias.length) { %><tr><td colspan="4" class="empty-state">No hay categorías para este filtro.</td></tr><% } %>
-              <% categorias.forEach(item => { %>
-                <tr>
-                  <td><span class="pill" style="background:<%= item.color || '#eef2f7' %>22;color:<%= item.color || '#334155' %>"><%= item.nombre %></span></td>
-                  <td><span class="pill pill-soft"><%= Number(item.registros || 0).toLocaleString('es-CR') %></span></td>
-                  <td class="text-end money">₡<%= money(item.total) %></td>
-                  <td class="text-end"><%= pct(item.total, totalCategoriasOperativas) %>%</td>
-                </tr>
-              <% }) %>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  </section>
 
-  <section class="row g-3 mb-4">
-    <div class="col-lg-6">
-      <div class="table-card">
-        <div class="card-head"><h2 class="card-title">Top proveedores</h2><span class="card-subtitle">Mayor a menor monto</span></div>
-        <div class="table-responsive">
-          <table class="table table-hover align-middle">
-            <thead><tr><th>#</th><th>Proveedor</th><th>Mov.</th><th class="text-end">Monto</th></tr></thead>
-            <tbody>
-              <% if (!proveedores.length) { %><tr><td colspan="4" class="empty-state">No hay registros para este filtro.</td></tr><% } %>
-              <% proveedores.forEach((item, i) => { %>
-                <tr><td><span class="rank"><%= i + 1 %></span></td><td><strong><%= item.nombre %></strong></td><td><span class="pill pill-soft"><%= item.registros %></span></td><td class="text-end money">₡<%= money(item.total) %></td></tr>
-              <% }) %>
-            </tbody>
-          </table>
+        <div class="detail-block">
+          <div class="detail-block-head">
+            <div>
+              <h3 class="detail-block-title">Proveedores con mayor gasto</h3>
+              <div class="detail-block-subtitle">Ordenado de mayor a menor monto.</div>
+            </div>
+          </div>
+          <div class="table-responsive detail-scroll">
+            <table class="table table-hover align-middle detail-table">
+              <thead><tr><th>#</th><th>Proveedor</th><th>Mov.</th><th class="text-end">Monto</th></tr></thead>
+              <tbody>
+                <% if (!proveedores.length) { %><tr><td colspan="4" class="empty-state">No hay registros para este filtro.</td></tr><% } %>
+                <% proveedores.forEach((item, i) => { %>
+                  <tr><td><span class="rank"><%= i + 1 %></span></td><td><strong><%= item.nombre %></strong></td><td><span class="pill pill-soft"><%= item.registros %></span></td><td class="text-end money">₡<%= money(item.total) %></td></tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     </div>
-    <div class="col-lg-6">
-      <div class="table-card">
-        <div class="card-head"><h2 class="card-title">Costo por unidad</h2><span class="card-subtitle">Monto acumulado por placa real en el periodo</span></div>
-        <div class="table-responsive">
-          <table class="table table-hover align-middle">
-            <thead><tr><th>#</th><th>Placa</th><th>Sede</th><th>Mov.</th><th class="text-end">Monto</th></tr></thead>
-            <tbody>
-              <% if (!placasGasto.length) { %><tr><td colspan="5" class="empty-state">No hay placas reales con monto en este filtro.</td></tr><% } %>
-              <% placasGasto.forEach((item, i) => { %>
-                <tr><td><span class="rank"><%= i + 1 %></span></td><td><strong><%= item.nombre %></strong></td><td><%= item.sede || '-' %></td><td><span class="pill pill-blue"><%= item.registros %></span></td><td class="text-end money">₡<%= money(item.total) %></td></tr>
-              <% }) %>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  </section>
 
-  <section class="row g-3 mb-4">
-    <div class="col-lg-6">
-      <div class="table-card">
-        <div class="card-head"><h2 class="card-title">Gasto por sede</h2><span class="card-subtitle">Calculado solo desde placas registradas</span></div>
-        <div class="table-responsive">
-          <table class="table table-hover align-middle">
-            <thead><tr><th>Sede</th><th>Mov.</th><th class="text-end">Monto</th></tr></thead>
-            <tbody>
-              <% if (!sedesGasto.length) { %><tr><td colspan="3" class="empty-state">No hay sedes con placas reales en este filtro.</td></tr><% } %>
-              <% sedesGasto.forEach(item => { %>
-                <tr><td><strong><%= item.nombre %></strong></td><td><span class="pill pill-soft"><%= item.registros %></span></td><td class="text-end money">₡<%= money(item.total) %></td></tr>
-              <% }) %>
-            </tbody>
-          </table>
+    <div class="detail-panel" data-detail-panel="unidades">
+      <div class="detail-grid">
+        <div class="detail-block">
+          <div class="detail-block-head">
+            <div>
+              <h3 class="detail-block-title">Costo por unidad</h3>
+              <div class="detail-block-subtitle">Monto acumulado por placa real.</div>
+            </div>
+          </div>
+          <div class="table-responsive detail-scroll">
+            <table class="table table-hover align-middle detail-table">
+              <thead><tr><th>#</th><th>Placa</th><th>Sede</th><th>Mov.</th><th class="text-end">Monto</th></tr></thead>
+              <tbody>
+                <% if (!placasGasto.length) { %><tr><td colspan="5" class="empty-state">No hay placas reales con monto en este filtro.</td></tr><% } %>
+                <% placasGasto.forEach((item, i) => { %>
+                  <tr><td><span class="rank"><%= i + 1 %></span></td><td><strong><%= item.nombre %></strong></td><td><%= item.sede || '-' %></td><td><span class="pill pill-blue"><%= item.registros %></span></td><td class="text-end money">₡<%= money(item.total) %></td></tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
-    </div>
-    <div class="col-lg-6">
-      <div class="table-card">
-        <div class="card-head"><h2 class="card-title">Mantenimientos más repetidos</h2><span class="card-subtitle">Familia de trabajo</span></div>
-        <div class="table-responsive">
-          <table class="table table-hover align-middle">
-            <thead><tr><th>Familia</th><th class="text-end">Registros</th></tr></thead>
-            <tbody>
-              <% if (!familiasMant.length) { %><tr><td colspan="2" class="empty-state">No hay registros para este filtro.</td></tr><% } %>
-              <% familiasMant.forEach(item => { %>
-                <tr><td><span class="pill" style="background:<%= item.color || '#eef2f7' %>22;color:<%= item.color || '#334155' %>"><%= item.nombre %></span></td><td class="text-end money"><%= Number(item.registros || 0).toLocaleString('es-CR') %></td></tr>
-              <% }) %>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  </section>
 
-  <section class="row g-3 mb-4">
-    <div class="col-lg-6">
-      <div class="table-card">
-        <div class="card-head"><h2 class="card-title">Sedes con más mantenimiento</h2><span class="card-subtitle">Movimiento operativo de taller por sede</span></div>
-        <div class="table-responsive">
-          <table class="table table-hover align-middle">
-            <thead><tr><th>#</th><th>Sede</th><th class="text-end">Registros</th></tr></thead>
-            <tbody>
-              <% if (!sedesMant.length) { %><tr><td colspan="3" class="empty-state">No hay registros para este filtro.</td></tr><% } %>
-              <% sedesMant.forEach((item, i) => { %>
-                <tr><td><span class="rank"><%= i + 1 %></span></td><td><strong><%= item.nombre %></strong></td><td class="text-end money"><%= Number(item.registros || 0).toLocaleString('es-CR') %></td></tr>
-              <% }) %>
-            </tbody>
-          </table>
+        <div class="detail-block">
+          <div class="detail-block-head">
+            <div>
+              <h3 class="detail-block-title">Gasto por sede</h3>
+              <div class="detail-block-subtitle">Calculado desde placas registradas.</div>
+            </div>
+          </div>
+          <div class="table-responsive detail-scroll">
+            <table class="table table-hover align-middle detail-table">
+              <thead><tr><th>Sede</th><th>Mov.</th><th class="text-end">Monto</th></tr></thead>
+              <tbody>
+                <% if (!sedesGasto.length) { %><tr><td colspan="3" class="empty-state">No hay sedes con placas reales en este filtro.</td></tr><% } %>
+                <% sedesGasto.forEach(item => { %>
+                  <tr><td><strong><%= item.nombre %></strong></td><td><span class="pill pill-soft"><%= item.registros %></span></td><td class="text-end money">₡<%= money(item.total) %></td></tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     </div>
-    <div class="col-lg-6">
-      <div class="table-card">
-        <div class="card-head"><h2 class="card-title">Placas con más mantenimiento</h2><span class="card-subtitle">Unidades con mayor movimiento operativo</span></div>
-        <div class="table-responsive">
-          <table class="table table-hover align-middle">
-            <thead><tr><th>#</th><th>Placa</th><th>Sede</th><th class="text-end">Registros</th></tr></thead>
-            <tbody>
-              <% if (!placasMant.length) { %><tr><td colspan="4" class="empty-state">No hay placas para este filtro.</td></tr><% } %>
-              <% placasMant.forEach((item, i) => { %>
-                <tr><td><span class="rank"><%= i + 1 %></span></td><td><strong><%= item.nombre %></strong></td><td><%= item.sede || '-' %></td><td class="text-end money"><%= Number(item.registros || 0).toLocaleString('es-CR') %></td></tr>
-              <% }) %>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  </section>
 
-  <section class="mb-4">
-    <div class="table-card">
-      <div class="card-head">
-        <div>
-          <h2 class="card-title"><i class="bi bi-diagram-3-fill me-1"></i>Trabajo más realizado por sede</h2>
-          <span class="card-subtitle">Ranking de familias de mantenimiento dentro de cada sede.</span>
+    <div class="detail-panel" data-detail-panel="mantenimiento">
+      <div class="detail-grid">
+        <div class="detail-block">
+          <div class="detail-block-head">
+            <div>
+              <h3 class="detail-block-title">Familias de mantenimiento</h3>
+              <div class="detail-block-subtitle">Motor, frenos, transmisión, dirección, llantas y eléctrico.</div>
+            </div>
+          </div>
+          <div class="table-responsive detail-scroll">
+            <table class="table table-hover align-middle detail-table">
+              <thead><tr><th>Familia</th><th class="text-end">Registros</th></tr></thead>
+              <tbody>
+                <% if (!familiasMant.length) { %><tr><td colspan="2" class="empty-state">No hay registros para este filtro.</td></tr><% } %>
+                <% familiasMant.forEach(item => { %>
+                  <tr><td><span class="pill" style="background:<%= item.color || '#eef2f7' %>22;color:<%= item.color || '#334155' %>"><%= item.nombre %></span></td><td class="text-end money"><%= Number(item.registros || 0).toLocaleString('es-CR') %></td></tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
-      <div class="p-3">
-        <% if (!trabajosPorSede.length) { %>
-          <div class="empty-state">No hay trabajos por sede para este filtro.</div>
-        <% } else { %>
-          <div class="work-sede-grid">
-            <% trabajosPorSede.forEach(sede => { %>
-              <div class="work-sede-card">
-                <div class="work-sede-head">
-                  <strong><%= sede.nombre %></strong>
-                  <span class="pill pill-soft"><%= Number(sede.registros || 0).toLocaleString('es-CR') %> registros</span>
-                </div>
-                <% safe(sede.trabajos).forEach(trabajo => { %>
-                  <div class="work-row">
-                    <div>
-                      <div class="d-flex justify-content-between gap-2">
-                        <strong><%= trabajo.nombre %></strong>
-                        <span class="small text-muted"><%= Number(trabajo.porcentaje || 0).toLocaleString('es-CR') %>%</span>
-                      </div>
-                      <div class="work-bar">
-                        <div class="work-bar-fill" style="--bar-color:<%= trabajo.color || '#0b3b82' %>;width:<%= Math.min(Number(trabajo.porcentaje || 0), 100) %>%"></div>
-                      </div>
+
+        <div class="detail-block">
+          <div class="detail-block-head">
+            <div>
+              <h3 class="detail-block-title">Trabajo más realizado por sede</h3>
+              <div class="detail-block-subtitle">Ranking interno de cada sede.</div>
+            </div>
+          </div>
+          <div class="p-3 detail-scroll">
+            <% if (!trabajosPorSede.length) { %>
+              <div class="empty-state">No hay trabajos por sede para este filtro.</div>
+            <% } else { %>
+              <div class="work-sede-grid">
+                <% trabajosPorSede.forEach(sede => { %>
+                  <div class="work-sede-card">
+                    <div class="work-sede-head">
+                      <strong><%= sede.nombre %></strong>
+                      <span class="pill pill-soft"><%= Number(sede.registros || 0).toLocaleString('es-CR') %> registros</span>
                     </div>
-                    <div class="text-end money"><%= Number(trabajo.registros || 0).toLocaleString('es-CR') %></div>
+                    <% safe(sede.trabajos).forEach(trabajo => { %>
+                      <div class="work-row">
+                        <div>
+                          <div class="d-flex justify-content-between gap-2">
+                            <strong><%= trabajo.nombre %></strong>
+                            <span class="small text-muted"><%= Number(trabajo.porcentaje || 0).toLocaleString('es-CR') %>%</span>
+                          </div>
+                          <div class="work-bar">
+                            <div class="work-bar-fill" style="--bar-color:<%= trabajo.color || '#0b3b82' %>;width:<%= Math.min(Number(trabajo.porcentaje || 0), 100) %>%"></div>
+                          </div>
+                        </div>
+                        <div class="text-end money"><%= Number(trabajo.registros || 0).toLocaleString('es-CR') %></div>
+                      </div>
+                    <% }) %>
                   </div>
                 <% }) %>
               </div>
-            <% }) %>
+            <% } %>
           </div>
-        <% } %>
-      </div>
-    </div>
-  </section>
+        </div>
 
-  <section class="row g-3">
-    <div class="col-lg-6">
-      <div class="table-card">
-        <div class="card-head"><h2 class="card-title">Últimos movimientos de dinero</h2><span class="card-subtitle">Órdenes, pagos y caja chica</span></div>
-        <div class="table-responsive">
-          <table class="table table-hover align-middle">
-            <thead><tr><th>Fecha</th><th>Fuente</th><th>Detalle</th><th class="text-end">Monto</th></tr></thead>
-            <tbody>
-              <% safe(data.recientesGasto).forEach(item => { %>
-                <tr>
-                  <td><%= fecha(item.fecha) %></td>
-                  <td><span class="pill pill-soft"><%= item.fuente === 'ORDEN' ? 'Orden' : item.fuente === 'PAGO_PROVEEDOR' ? 'Pago proveedor' : 'Caja chica' %></span></td>
-                  <td><strong><%= item.proveedor || '-' %></strong><div class="small text-muted"><%= item.placa %> · <%= item.sede %> · <%= item.descripcion || '-' %></div></td>
-                  <td class="text-end money">₡<%= money(item.monto) %></td>
-                </tr>
-              <% }) %>
-              <% if (!safe(data.recientesGasto).length) { %><tr><td colspan="4" class="empty-state">No hay movimientos con placa registrada para este filtro.</td></tr><% } %>
-            </tbody>
-          </table>
+        <div class="detail-block">
+          <div class="detail-block-head">
+            <div>
+              <h3 class="detail-block-title">Sedes con más mantenimiento</h3>
+              <div class="detail-block-subtitle">Movimiento operativo por sede.</div>
+            </div>
+          </div>
+          <div class="table-responsive detail-scroll">
+            <table class="table table-hover align-middle detail-table">
+              <thead><tr><th>#</th><th>Sede</th><th class="text-end">Registros</th></tr></thead>
+              <tbody>
+                <% if (!sedesMant.length) { %><tr><td colspan="3" class="empty-state">No hay registros para este filtro.</td></tr><% } %>
+                <% sedesMant.forEach((item, i) => { %>
+                  <tr><td><span class="rank"><%= i + 1 %></span></td><td><strong><%= item.nombre %></strong></td><td class="text-end money"><%= Number(item.registros || 0).toLocaleString('es-CR') %></td></tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="detail-block">
+          <div class="detail-block-head">
+            <div>
+              <h3 class="detail-block-title">Placas con más mantenimiento</h3>
+              <div class="detail-block-subtitle">Unidades con más movimiento operativo.</div>
+            </div>
+          </div>
+          <div class="table-responsive detail-scroll">
+            <table class="table table-hover align-middle detail-table">
+              <thead><tr><th>#</th><th>Placa</th><th>Sede</th><th class="text-end">Registros</th></tr></thead>
+              <tbody>
+                <% if (!placasMant.length) { %><tr><td colspan="4" class="empty-state">No hay placas para este filtro.</td></tr><% } %>
+                <% placasMant.forEach((item, i) => { %>
+                  <tr><td><span class="rank"><%= i + 1 %></span></td><td><strong><%= item.nombre %></strong></td><td><%= item.sede || '-' %></td><td class="text-end money"><%= Number(item.registros || 0).toLocaleString('es-CR') %></td></tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     </div>
-    <div class="col-lg-6">
-      <div class="table-card">
-        <div class="card-head"><h2 class="card-title">Últimos mantenimientos</h2><span class="card-subtitle">Preventivos y correctivos</span></div>
-        <div class="table-responsive">
-          <table class="table table-hover align-middle">
-            <thead><tr><th>Fecha</th><th>Placa</th><th>Tipo</th><th>Detalle</th></tr></thead>
-            <tbody>
-              <% safe(data.recientesMantenimiento).forEach(item => { %>
-                <tr>
-                  <td><%= fecha(item.fecha) %></td>
-                  <td><strong><%= item.placa %></strong><div class="small text-muted"><%= item.sede || '-' %></div></td>
-                  <td><span class="pill <%= item.tipo_registro === 'CORRECTIVO' ? 'pill-red' : 'pill-blue' %>"><%= item.tipo_registro %></span></td>
-                  <td><%= item.detalle || '-' %></td>
-                </tr>
-              <% }) %>
-              <% if (!safe(data.recientesMantenimiento).length) { %><tr><td colspan="4" class="empty-state">No hay mantenimientos para este filtro.</td></tr><% } %>
-            </tbody>
-          </table>
+
+    <div class="detail-panel" data-detail-panel="recientes">
+      <div class="detail-grid">
+        <div class="detail-block">
+          <div class="detail-block-head">
+            <div>
+              <h3 class="detail-block-title">Últimos movimientos de dinero</h3>
+              <div class="detail-block-subtitle">Órdenes, pagos y caja chica.</div>
+            </div>
+          </div>
+          <div class="table-responsive detail-scroll">
+            <table class="table table-hover align-middle detail-table">
+              <thead><tr><th>Fecha</th><th>Fuente</th><th>Detalle</th><th class="text-end">Monto</th></tr></thead>
+              <tbody>
+                <% safe(data.recientesGasto).forEach(item => { %>
+                  <tr>
+                    <td><%= fecha(item.fecha) %></td>
+                    <td><span class="pill pill-soft"><%= item.fuente === 'ORDEN' ? 'Orden' : item.fuente === 'PAGO_PROVEEDOR' ? 'Pago proveedor' : 'Caja chica' %></span></td>
+                    <td><strong><%= item.proveedor || '-' %></strong><div class="small text-muted"><%= item.placa %> · <%= item.sede %> · <%= item.descripcion || '-' %></div></td>
+                    <td class="text-end money">₡<%= money(item.monto) %></td>
+                  </tr>
+                <% }) %>
+                <% if (!safe(data.recientesGasto).length) { %><tr><td colspan="4" class="empty-state">No hay movimientos con placa registrada para este filtro.</td></tr><% } %>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="detail-block">
+          <div class="detail-block-head">
+            <div>
+              <h3 class="detail-block-title">Últimos mantenimientos</h3>
+              <div class="detail-block-subtitle">Preventivos y correctivos.</div>
+            </div>
+          </div>
+          <div class="table-responsive detail-scroll">
+            <table class="table table-hover align-middle detail-table">
+              <thead><tr><th>Fecha</th><th>Placa</th><th>Tipo</th><th>Detalle</th></tr></thead>
+              <tbody>
+                <% safe(data.recientesMantenimiento).forEach(item => { %>
+                  <tr>
+                    <td><%= fecha(item.fecha) %></td>
+                    <td><strong><%= item.placa %></strong><div class="small text-muted"><%= item.sede || '-' %></div></td>
+                    <td><span class="pill <%= item.tipo_registro === 'CORRECTIVO' ? 'pill-red' : 'pill-blue' %>"><%= item.tipo_registro %></span></td>
+                    <td><%= item.detalle || '-' %></td>
+                  </tr>
+                <% }) %>
+                <% if (!safe(data.recientesMantenimiento).length) { %><tr><td colspan="4" class="empty-state">No hay mantenimientos para este filtro.</td></tr><% } %>
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     </div>
@@ -975,6 +1391,7 @@
 <script type="application/json" id="json-categorias"><%- JSON.stringify(categorias) %></script>
 <script type="application/json" id="json-meses"><%- JSON.stringify(meses) %></script>
 <script type="application/json" id="json-mantenimientos"><%- JSON.stringify(familiasMant) %></script>
+<script type="application/json" id="json-negocios"><%- JSON.stringify(negociosGasto) %></script>
 <script>
   const readJson = (id) => {
     try { return JSON.parse(document.getElementById(id)?.textContent || '[]'); }
@@ -984,6 +1401,7 @@
   const categoriasData = readJson('json-categorias');
   const mesesData = readJson('json-meses');
   const mantenimientosData = readJson('json-mantenimientos');
+  const negociosData = readJson('json-negocios');
 
   const chartOptions = {
     responsive: true,
@@ -1020,6 +1438,105 @@
     });
   }
 
+  (() => {
+    const accordion = document.getElementById('negocioAccordion');
+    if (!accordion) return;
+
+    let negocioActivo = null;
+    const sedeActivaPorNegocio = {};
+
+    const totalPeriodo = negociosData.reduce((sum, item) => sum + Number(item.total || 0), 0);
+    const porcentaje = (value, total) => total ? Math.round((Number(value || 0) / Number(total || 1)) * 100) : 0;
+    const escapeHtml = (value) => String(value ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+
+    const renderPlacas = (placas = []) => {
+      if (!placas.length) return '<div class="business-empty">No hay placas para esta sede.</div>';
+
+      return placas.map(placa => `
+        <div class="placa-row">
+          <div class="placa-main">
+            <div class="placa-title">${escapeHtml(placa.nombre || '-')}</div>
+            <div class="placa-meta">${Number(placa.registros || 0).toLocaleString('es-CR')} movimiento(s)</div>
+          </div>
+          <div class="placa-money">${formatMoney(placa.total || 0)}</div>
+        </div>
+      `).join('');
+    };
+
+    const renderSedes = (negocio, negocioIndex) => {
+      const sedes = negocio.sedes || [];
+      if (!sedes.length) return '<div class="business-empty">No hay sedes para este negocio.</div>';
+      const sedeActiva = sedeActivaPorNegocio[negocioIndex];
+
+      return sedes.map((sede, sedeIndex) => {
+        const open = sedeActiva === sedeIndex;
+        return `
+          <div class="sede-node ${open ? 'open' : ''}">
+            <button type="button" class="sede-toggle" data-negocio-index="${negocioIndex}" data-sede-index="${sedeIndex}">
+              <div class="sede-main">
+                <div class="sede-title">${escapeHtml(sede.nombre || '-')}</div>
+                <div class="sede-meta">${Number(sede.registros || 0).toLocaleString('es-CR')} movimiento(s) · ${porcentaje(sede.total, negocio.total)}% del negocio</div>
+              </div>
+              <div class="sede-money">${formatMoney(sede.total || 0)}</div>
+            </button>
+            <div class="sede-body">${renderPlacas(sede.placas || [])}</div>
+          </div>
+        `;
+      }).join('');
+    };
+
+    const renderAccordion = () => {
+      if (!negociosData.length) {
+        accordion.innerHTML = '<div class="business-empty">No hay gasto por negocio para este filtro.</div>';
+        return;
+      }
+
+      accordion.innerHTML = negociosData.map((negocio, negocioIndex) => {
+        const open = negocioActivo === negocioIndex;
+        return `
+          <article class="business-node ${open ? 'open' : ''}" style="--business-color:${negocio.color || '#0b3b82'}">
+            <button type="button" class="business-toggle" data-negocio-index="${negocioIndex}">
+              <div class="business-main">
+                <div class="business-title">${escapeHtml(negocio.nombre || '-')}</div>
+                <div class="business-meta">${Number(negocio.registros || 0).toLocaleString('es-CR')} movimiento(s) · ${porcentaje(negocio.total, totalPeriodo)}% del periodo</div>
+              </div>
+              <div class="business-money">${formatMoney(negocio.total || 0)}</div>
+            </button>
+            <div class="business-body">${renderSedes(negocio, negocioIndex)}</div>
+          </article>
+        `;
+      }).join('');
+
+      accordion.querySelectorAll('.business-toggle').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const index = Number(btn.dataset.negocioIndex || 0);
+          negocioActivo = negocioActivo === index ? null : index;
+          if (negocioActivo !== null && sedeActivaPorNegocio[negocioActivo] === undefined) {
+            sedeActivaPorNegocio[negocioActivo] = 0;
+          }
+          renderAccordion();
+        });
+      });
+
+      accordion.querySelectorAll('.sede-toggle').forEach(btn => {
+        btn.addEventListener('click', (event) => {
+          event.stopPropagation();
+          const negocioIndex = Number(btn.dataset.negocioIndex || 0);
+          const sedeIndex = Number(btn.dataset.sedeIndex || 0);
+          sedeActivaPorNegocio[negocioIndex] = sedeActivaPorNegocio[negocioIndex] === sedeIndex ? null : sedeIndex;
+          renderAccordion();
+        });
+      });
+    };
+
+    renderAccordion();
+  })();
+
   if (document.getElementById('chartMantenimientos') && mantenimientosData.length) {
     new Chart(document.getElementById('chartMantenimientos'), {
       type: 'bar',
@@ -1040,27 +1557,21 @@
   }
 
   (() => {
-    document.querySelectorAll('.table-card').forEach((card) => {
-      const head = card.querySelector(':scope > .card-head');
-      if (!head) return;
+    const tabs = Array.from(document.querySelectorAll('[data-detail-tab]'));
+    const panels = Array.from(document.querySelectorAll('[data-detail-panel]'));
+    if (!tabs.length || !panels.length) return;
 
-      card.classList.add('is-collapsible', 'collapsed');
-      head.setAttribute('role', 'button');
-      head.setAttribute('tabindex', '0');
-      head.setAttribute('aria-expanded', 'false');
-
-      const toggle = () => {
-        const isCollapsed = card.classList.toggle('collapsed');
-        head.setAttribute('aria-expanded', String(!isCollapsed));
-      };
-
-      head.addEventListener('click', toggle);
-      head.addEventListener('keydown', (event) => {
-        if (event.key !== 'Enter' && event.key !== ' ') return;
-        event.preventDefault();
-        toggle();
+    tabs.forEach(tab => {
+      tab.addEventListener('click', () => {
+        const target = tab.dataset.detailTab;
+        tabs.forEach(item => item.classList.toggle('active', item === tab));
+        panels.forEach(panel => panel.classList.toggle('active', panel.dataset.detailPanel === target));
       });
     });
+  })();
+
+  (() => {
+    document.getElementById('printExecutive')?.addEventListener('click', () => window.print());
 
     const refreshSeconds = 60;
     const counter = document.getElementById('refreshCountdown');

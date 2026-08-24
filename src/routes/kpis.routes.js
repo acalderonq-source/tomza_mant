@@ -7,39 +7,34 @@ const ROLES_KPIS = ["ADMIN", "TALLER", "PROVEEDURIA_TALLER"];
 
 const FAMILIAS_ESPECIALIDAD = [
   {
-    nombre: "Frenos y seguridad",
+    nombre: "Motor",
+    color: "#ea580c",
+    palabras: ["motor", "turbo", "inyector", "inyectores", "inyeccion", "inyección", "bomba", "compresor", "cabezote", "culata", "radiador", "aceite", "aceites", "filtro", "filtros", "engrase", "fuga", "fugas", "combustible", "diesel"]
+  },
+  {
+    nombre: "Frenos",
     color: "#dc2626",
-    palabras: ["freno", "frenos", "fibra", "fibras", "clutch", "embrague", "direccion", "dirección", "pito", "seguridad", "alarma"]
+    palabras: ["freno", "frenos", "fibra", "fibras", "zapata", "zapatas", "tambor", "tambores", "disco", "discos", "plato", "platos", "pedal", "pedales", "mordaza", "caliper", "aire de freno", "freno de mano"]
   },
   {
-    nombre: "Motor y transmisión",
+    nombre: "Transmisión y tren motriz",
     color: "#7c3aed",
-    palabras: ["motor", "caja", "transmision", "transmisión", "turbo", "inyector", "inyectores", "arrancador", "compresor", "bomba", "culata", "cabezal", "radiador"]
+    palabras: ["transmision", "transmisión", "caja", "clutch", "embrague", "diferencial", "cardan", "cardán", "cruceta", "yugo", "eje", "ejes", "flecha", "corona", "piñon", "piñón", "retenedor", "reten", "retén", "tren motriz", "quinta rueda"]
   },
   {
-    nombre: "Aceites y fluidos",
-    color: "#0f766e",
-    palabras: ["aceite", "engrase", "fuga", "fugas", "hidraulico", "hidráulico", "liquido", "líquido", "agua", "diesel", "filtro"]
-  },
-  {
-    nombre: "Eléctrico y luces",
-    color: "#2563eb",
-    palabras: ["luz", "luces", "electrico", "eléctrico", "bateria", "batería", "alternador", "sensor", "tacometro", "tacómetro", "velocimetro", "velocímetro", "marcha"]
-  },
-  {
-    nombre: "Llantas y suspensión",
-    color: "#d97706",
-    palabras: ["llanta", "llantas", "rotula", "rótula", "resorte", "suspension", "suspensión", "eje", "hoja", "muelle"]
-  },
-  {
-    nombre: "Carrocería y estética",
-    color: "#be123c",
-    palabras: ["cabina", "puerta", "cajon", "cajón", "golpe", "pintar", "pintura", "calcomania", "calcomanía", "rotulacion", "rotulación", "asiento", "bumper", "parabrisas"]
-  },
-  {
-    nombre: "Preventivo general",
+    nombre: "Dirección suspensión",
     color: "#16a34a",
-    palabras: ["revision general", "revisión general", "preventivo", "ajuste", "revisar", "mantenimiento", "pedales"]
+    palabras: ["direccion", "dirección", "suspension", "suspensión", "resorte", "resortes", "hoja de resorte", "hojas de resorte", "muelle", "muelles", "amortiguador", "rotula", "rótula", "barra", "balancin", "balancín", "buje", "bushing", "tensor", "pin", "hidraulico", "hidráulico", "manivela"]
+  },
+  {
+    nombre: "Llantas",
+    color: "#2563eb",
+    palabras: ["llanta", "llantas", "aro", "aros", "rin", "rines", "valvula", "válvula", "trasera", "traseras", "delantera", "delanteras", "balanceo", "alineado", "alineamiento"]
+  },
+  {
+    nombre: "Eléctrico",
+    color: "#f59e0b",
+    palabras: ["luz", "luces", "electrico", "eléctrico", "bateria", "batería", "baterias", "baterías", "alternador", "arrancador", "marcha", "cable", "sensor", "tablero", "tacometro", "tacómetro", "velocimetro", "velocímetro", "selenoide", "solenoide", "relay", "flasher", "halogeno", "halógeno", "bombillo", "switch", "fusible"]
   }
 ];
 
@@ -91,7 +86,7 @@ function clasificarTrabajo(texto) {
   const familia = FAMILIAS_ESPECIALIDAD.find(item =>
     item.palabras.some(palabra => normalizado.includes(normalizarTexto(palabra)))
   );
-  return familia || { nombre: "Otros trabajos", color: "#64748b", palabras: [] };
+  return familia || FAMILIAS_ESPECIALIDAD[0];
 }
 
 function incrementarMapa(map, key, value = 1) {

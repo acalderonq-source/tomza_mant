@@ -71,7 +71,7 @@
     .summary-grid {
       display: grid;
       gap: .65rem;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
+      grid-template-columns: repeat(5, minmax(0, 1fr));
     }
 
     .summary-card {
@@ -278,6 +278,18 @@
 
     .empty-red { color: #94a3b8; font-weight: 700; }
 
+    .no-compra-text {
+      color: #64748b;
+      display: block;
+      font-weight: 900;
+      margin-top: .25rem;
+    }
+
+    .item-row.is-no-compra td {
+      background: #f1f5f9 !important;
+      color: #64748b;
+    }
+
     .estado-badge {
       border-radius: 999px;
       display: inline-block;
@@ -289,6 +301,7 @@
 
     .estado-pendiente { background: #e5e7eb; color: #111827; }
     .estado-llegando { background: #fee2e2; color: #b91c1c; }
+    .estado-no_compra { background: #e2e8f0; color: #475569; }
     .estado-completo { background: #dcfce7; color: #166534; }
 
     .actions-grid {
@@ -321,6 +334,27 @@
     }
 
     .span-2 { grid-column: 1 / -1; }
+
+    .mark-options {
+      display: grid;
+      gap: .65rem;
+      max-height: 48vh;
+      overflow: auto;
+      padding-right: .25rem;
+    }
+
+    .mark-option {
+      background: #fff;
+      border: 1px solid #dbe3ef;
+      border-radius: 12px;
+      padding: .75rem;
+    }
+
+    .mark-option-title {
+      font-weight: 950;
+      line-height: 1.25;
+      margin-bottom: .55rem;
+    }
 
     @media (max-width: 980px) {
       .filters,
@@ -410,6 +444,7 @@
   const fechaSemanaNueva = (typeof fechaProximaSemana !== 'undefined' && fechaProximaSemana) || filtros.fecha || fechaHoy;
   const textoSeguroData = value => String(value || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   const textoComparableVista = value => String(value || '').trim().toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[_\s]+/g, '-');
+  const textoSetVista = value => new Set(String(value || '').split(/\r?\n|,+/g).map(textoComparableVista).filter(Boolean));
   const dividirPedidoVista = item => {
     if (typeof dividirRepuestosSeleccionables === 'function') {
       return dividirRepuestosSeleccionables(item).filter(Boolean);
@@ -422,28 +457,43 @@
     const sede = textoComparableVista(item.sede);
     const solicitud = textoComparableVista(item.solicitud);
     const marcado = textoComparableVista(item.marcado_rojo);
+    const noCompra = textoComparableVista(item.no_compra);
     return ['MUEBLE', 'GENERAL-TALLER', 'GENERALES-TALLER'].includes(placa) ||
       ['MUEBLE', 'GENERAL-TALLER', 'GENERALES-TALLER'].includes(sede) ||
+      item.estado === 'NO_COMPRA' ||
       solicitud.includes('MUEBLE') ||
       solicitud.includes('GENERAL-TALLER') ||
       solicitud.includes('GENERALES-TALLER') ||
       marcado.includes('MUEBLE') ||
       marcado.includes('GENERAL-TALLER') ||
-      marcado.includes('GENERALES-TALLER');
+      marcado.includes('GENERALES-TALLER') ||
+      noCompra.includes('MUEBLE') ||
+      noCompra.includes('GENERAL-TALLER') ||
+      noCompra.includes('GENERALES-TALLER');
   };
   const sedesConPedido = [...new Set(lista.map(item => item.sede).filter(Boolean))];
-  const pedidoSeleccionData = lista.map(item => ({
-    id: item.id,
-    sede: item.sede || '',
-    sedeTexto: mostrarSede(item.sede),
-    placa: item.placa || '',
-    solicitud: item.solicitud || '',
-    marcado_rojo: item.marcado_rojo || '',
-    estado: item.estado || '',
-    fecha: item.fecha_iso || '',
-    partes: dividirPedidoVista(item).map((texto, index) => ({ index, texto })),
-    excluido: esExcluidoPedidoVista(item)
-  }));
+  const pedidoSeleccionData = lista.map(item => {
+    const marcadoSet = textoSetVista(item.marcado_rojo);
+    const noCompraSet = textoSetVista(item.no_compra);
+    return {
+      id: item.id,
+      sede: item.sede || '',
+      sedeTexto: mostrarSede(item.sede),
+      placa: item.placa || '',
+      solicitud: item.solicitud || '',
+      marcado_rojo: item.marcado_rojo || '',
+      no_compra: item.no_compra || '',
+      estado: item.estado || '',
+      fecha: item.fecha_iso || '',
+      partes: dividirPedidoVista(item).map((texto, index) => ({
+        index,
+        texto,
+        marcado: marcadoSet.has(textoComparableVista(texto)),
+        noCompra: noCompraSet.has(textoComparableVista(texto))
+      })),
+      excluido: esExcluidoPedidoVista(item)
+    };
+  });
   const pedidoPdfParams = new URLSearchParams();
   ['fecha', 'sede', 'placa', 'estado'].forEach(key => {
     if (filtros[key]) pedidoPdfParams.set(key, filtros[key]);
@@ -488,6 +538,7 @@
     <div class="summary-card"><div class="summary-label">Total</div><div class="summary-value"><%= resumen.total || 0 %></div></div>
     <div class="summary-card"><div class="summary-label">Pendientes</div><div class="summary-value"><%= resumen.PENDIENTE || 0 %></div></div>
     <div class="summary-card"><div class="summary-label">Marcados rojo</div><div class="summary-value text-danger"><%= resumen.marcados || 0 %></div></div>
+    <div class="summary-card"><div class="summary-label">No se compra</div><div class="summary-value text-secondary"><%= (resumen.NO_COMPRA || 0) + (resumen.noCompraItems || 0) %></div></div>
     <div class="summary-card"><div class="summary-label">Completos</div><div class="summary-value"><%= resumen.COMPLETO || 0 %></div></div>
   </section>
 
@@ -539,7 +590,7 @@
               <th>Placa</th>
               <th>Semana</th>
               <th>Solicitud de repuestos</th>
-              <th>Va llegando</th>
+              <th>Va llegando / no compra</th>
               <th>Estado</th>
               <th>Creado por</th>
               <% if (puedeGestionar) { %><th>Acciones</th><% } %>
@@ -557,15 +608,18 @@
                   <td colspan="<%= columnas %>"><%= item.fecha_formato || '-' %> · <%= mostrarSede(item.sede) %></td>
                 </tr>
               <% } %>
-              <tr class="item-row">
+              <tr class="item-row <%= item.estado === 'NO_COMPRA' ? 'is-no-compra' : '' %>">
                 <td data-label="Placa" class="placa-cell"><%= item.placa %></td>
                 <td data-label="Semana" class="semana-cell"><%= item.fecha_formato || '-' %></td>
                 <td data-label="Solicitud" class="solicitud-cell"><%= item.solicitud %></td>
-                <td data-label="Va llegando" class="rojo-cell">
+                <td data-label="Va llegando / no compra" class="rojo-cell">
                   <% if (item.marcado_rojo) { %>
                     <%= item.marcado_rojo %>
                   <% } else { %>
                     <span class="empty-red">-</span>
+                  <% } %>
+                  <% if (item.no_compra) { %>
+                    <span class="no-compra-text">No se compra: <%= item.no_compra %></span>
                   <% } %>
                 </td>
                 <td data-label="Estado" class="text-center">
@@ -597,8 +651,9 @@
                         data-id="<%= item.id %>"
                         data-placa="<%= item.placa %>"
                         data-solicitud="<%- textoSeguroData(item.solicitud) %>"
-                        data-marcado="<%- textoSeguroData(item.marcado_rojo) %>">
-                        <i class="bi bi-highlighter"></i> Marcar rojo
+                        data-marcado="<%- textoSeguroData(item.marcado_rojo) %>"
+                        data-no-compra="<%- textoSeguroData(item.no_compra) %>">
+                        <i class="bi bi-highlighter"></i> Marcar / no compra
                       </button>
                       <form method="POST" action="/repuestos-semanales/<%= item.id %>/estado">
                         <input type="hidden" name="fecha" value="<%= filtros.fecha || '' %>">
@@ -649,7 +704,10 @@
                 const itemsSede = lista.filter(item => item.sede === sede);
                 const incluidosSede = itemsSede
                   .filter(item => !esExcluidoPedidoVista(item))
-                  .reduce((total, item) => total + dividirPedidoVista(item).length, 0);
+                  .reduce((total, item) => {
+                    const noCompraSet = textoSetVista(item.no_compra);
+                    return total + dividirPedidoVista(item).filter(parte => !noCompraSet.has(textoComparableVista(parte))).length;
+                  }, 0);
                 const activaSede = (filtros.sede || (sedesConPedido.length === 1 ? sedesConPedido[0] : '')) === sede;
               %>
               <button
@@ -747,9 +805,8 @@
                 <label class="form-label mb-1">Solicitud de repuestos</label>
                 <textarea name="solicitud" class="form-control" rows="3" placeholder="Ej: filtros de aceite, diesel, aire" required></textarea>
               </div>
-              <div class="span-2">
-                <label class="form-label mb-1">Va llegando / marcar rojo</label>
-                <textarea name="marcado_rojo" class="form-control" rows="2" placeholder="Opcional. Ej: filtro de aceite, escobillas"></textarea>
+              <div class="span-2 alert alert-info mb-0 py-2">
+                Después de guardar, use <strong>Marcar rojo</strong> para seleccionar literalmente cuáles repuestos van llegando o cuáles no se van a comprar.
               </div>
             </div>
           </div>
@@ -801,9 +858,8 @@
                 <label class="form-label mb-1">Solicitud de repuestos</label>
                 <textarea name="solicitud" id="solicitudEditarSemanal" class="form-control" rows="3" required></textarea>
               </div>
-              <div class="span-2">
-                <label class="form-label mb-1">Va llegando / marcar rojo</label>
-                <textarea name="marcado_rojo" id="marcadoEditarSemanal" class="form-control" rows="2"></textarea>
+              <div class="span-2 alert alert-info mb-0 py-2">
+                Para cambiar lo rojo o lo que no se compra, cierre esta edición y use el botón <strong>Marcar rojo</strong> de la fila.
               </div>
             </div>
           </div>
@@ -817,7 +873,7 @@
   </div>
 
   <div class="modal fade" id="marcadoRojoModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
       <div class="modal-content">
         <form method="POST" id="marcadoRojoForm">
           <input type="hidden" name="fecha" value="<%= filtros.fecha || '' %>">
@@ -826,18 +882,22 @@
           <div class="modal-header">
             <div>
               <h5 class="modal-title fw-bold mb-0"><i class="bi bi-highlighter me-1"></i> Marcar en rojo</h5>
-              <div class="small opacity-75" id="marcadoRojoResumen">Escriba lo que va llegando.</div>
+              <div class="small opacity-75" id="marcadoRojoResumen">Seleccione los repuestos. No hace falta escribirlos.</div>
             </div>
             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
           </div>
           <div class="modal-body">
-            <label class="form-label fw-bold">Texto rojo</label>
-            <textarea name="marcado_rojo" id="marcadoRojoInput" class="form-control" rows="4" placeholder="Ej: escobillas, pintura blanca, filtro de aceite"></textarea>
-            <div class="form-text">Si lo deja en blanco, se quita el marcado rojo.</div>
+            <div class="alert alert-light border mb-3">
+              Marque <strong class="text-danger">Rojo / va llegando</strong> para pintar el repuesto.
+              Marque <strong>No se compra</strong> para dejarlo fuera del pedido.
+            </div>
+            <div id="marcadoRojoOpciones" class="mark-options">
+              <div class="pedido-empty">Seleccione una solicitud.</div>
+            </div>
           </div>
           <div class="modal-footer">
             <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
-            <button class="btn btn-danger"><i class="bi bi-save"></i> Guardar marcado</button>
+            <button class="btn btn-danger"><i class="bi bi-save"></i> Guardar selección</button>
           </div>
         </form>
       </div>
@@ -952,21 +1012,24 @@
       if (sedeEditarTexto) sedeEditarTexto.value = textoSede(button.dataset.sede);
       if (estado) estado.value = button.dataset.estado || 'PENDIENTE';
       const solicitud = document.getElementById('solicitudEditarSemanal');
-      const marcado = document.getElementById('marcadoEditarSemanal');
       if (solicitud) solicitud.value = button.dataset.solicitud || '';
-      if (marcado) marcado.value = button.dataset.marcado || '';
     });
   });
 
   document.querySelectorAll('.js-marcar-rojo').forEach(button => {
     button.addEventListener('click', () => {
       const form = document.getElementById('marcadoRojoForm');
-      const input = document.getElementById('marcadoRojoInput');
       const resumen = document.getElementById('marcadoRojoResumen');
       if (!form) return;
       form.action = `/repuestos-semanales/${button.dataset.id}/marcado`;
-      if (input) input.value = button.dataset.marcado || '';
       if (resumen) resumen.textContent = `${button.dataset.placa || ''} · ${button.dataset.solicitud || 'Solicitud'}`;
+      const item = pedidosCedis.find(pedido => String(pedido.id) === String(button.dataset.id));
+      renderMarcadoRojoOpciones(item || {
+        id: button.dataset.id,
+        placa: button.dataset.placa,
+        solicitud: button.dataset.solicitud,
+        partes: [{ index: 0, texto: button.dataset.solicitud || 'Repuesto', marcado: Boolean(button.dataset.marcado), noCompra: false }]
+      });
     });
   });
 
@@ -985,6 +1048,64 @@
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#39;');
+  }
+
+  function textoComparableCliente(value) {
+    return String(value || '')
+      .trim()
+      .toUpperCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[_\s]+/g, '-');
+  }
+
+  function renderMarcadoRojoOpciones(item) {
+    const contenedor = document.getElementById('marcadoRojoOpciones');
+    if (!contenedor) return;
+
+    const partes = Array.isArray(item?.partes) && item.partes.length
+      ? item.partes
+      : [{ index: 0, texto: item?.solicitud || 'Repuesto', marcado: false, noCompra: item?.estado === 'NO_COMPRA' }];
+
+    contenedor.innerHTML = partes.map((parte, index) => {
+      const texto = parte.texto || 'Repuesto';
+      const value = escapeHtml(texto);
+      const rojoId = `marcadoRojo_${item.id}_${index}`;
+      const noCompraId = `noCompra_${item.id}_${index}`;
+      const noCompraChecked = parte.noCompra || item.estado === 'NO_COMPRA';
+
+      return `
+        <div class="mark-option">
+          <div class="mark-option-title">${escapeHtml(texto)}</div>
+          <div class="d-flex gap-3 flex-wrap">
+            <div class="form-check">
+              <input class="form-check-input js-mark-red-check" type="checkbox" id="${rojoId}" name="marcado_rojo_items" value="${value}" ${parte.marcado && !noCompraChecked ? 'checked' : ''}>
+              <label class="form-check-label fw-bold text-danger" for="${rojoId}">Rojo / va llegando</label>
+            </div>
+            <div class="form-check">
+              <input class="form-check-input js-no-compra-check" type="checkbox" id="${noCompraId}" name="no_compra_items" value="${value}" ${noCompraChecked ? 'checked' : ''}>
+              <label class="form-check-label fw-bold text-secondary" for="${noCompraId}">No se compra</label>
+            </div>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    contenedor.querySelectorAll('.js-no-compra-check').forEach(input => {
+      input.addEventListener('change', () => {
+        if (!input.checked) return;
+        const rojo = input.closest('.mark-option')?.querySelector('.js-mark-red-check');
+        if (rojo) rojo.checked = false;
+      });
+    });
+
+    contenedor.querySelectorAll('.js-mark-red-check').forEach(input => {
+      input.addEventListener('change', () => {
+        if (!input.checked) return;
+        const noCompra = input.closest('.mark-option')?.querySelector('.js-no-compra-check');
+        if (noCompra) noCompra.checked = false;
+      });
+    });
   }
 
   function pedidosVisibles() {
@@ -1029,11 +1150,10 @@
         : [{ index: 0, texto: item.solicitud || item.marcado_rojo || 'Repuesto' }];
       const disabled = item.excluido ? 'disabled' : '';
       const checked = item.excluido ? '' : 'checked';
-      const badge = item.excluido ? 'Fuera del pedido' : (item.estado || 'Pendiente');
 
       return partes.map(parte => `
-        <label class="pedido-item ${item.excluido ? 'is-excluded' : ''}">
-          <input class="form-check-input pedido-check" type="checkbox" name="pedido_items" value="${item.id}:${parte.index}" ${checked} ${disabled}>
+        <label class="pedido-item ${item.excluido || parte.noCompra ? 'is-excluded' : ''}">
+          <input class="form-check-input pedido-check" type="checkbox" name="pedido_items" value="${item.id}:${parte.index}" ${parte.noCompra ? '' : checked} ${parte.noCompra ? 'disabled' : disabled}>
           <div class="pedido-plate">${escapeHtml(item.placa)}</div>
           <div>
             <div class="pedido-text fw-bold">${escapeHtml(parte.texto)}</div>
@@ -1041,7 +1161,7 @@
               ${escapeHtml(item.sedeTexto || item.sede)} · solicitud #${escapeHtml(item.id)}
             </div>
           </div>
-          <span class="pedido-status ${item.excluido ? 'bg-secondary text-white' : 'bg-light text-dark'}">${escapeHtml(badge)}</span>
+          <span class="pedido-status ${item.excluido || parte.noCompra ? 'bg-secondary text-white' : 'bg-light text-dark'}">${escapeHtml(parte.noCompra ? 'No se compra' : item.excluido ? 'Fuera del pedido' : (item.estado || 'Pendiente'))}</span>
         </label>
       `).join('');
     }).join('');

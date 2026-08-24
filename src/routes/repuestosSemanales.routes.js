@@ -127,6 +127,22 @@ function normalizarIds(value) {
     .filter(Number.isInteger);
 }
 
+function textoLista(value) {
+  return normalizarArray(value)
+    .map(item => String(item || "").trim())
+    .filter(Boolean)
+    .join("\n");
+}
+
+function textoGuardadoASet(value) {
+  return new Set(
+    String(value || "")
+      .split(/\r?\n|,+/g)
+      .map(item => textoComparable(item))
+      .filter(Boolean)
+  );
+}
+
 function normalizarPedidoItems(value) {
   return normalizarArray(value)
     .map(raw => {
@@ -140,22 +156,23 @@ function normalizarPedidoItems(value) {
 }
 
 function prepararSolicitudesPedidoPorItems(solicitudes, pedidoItems) {
-  if (!pedidoItems.length) return solicitudes;
-
   const itemsPorSolicitud = new Map();
   pedidoItems.forEach(item => {
     if (!itemsPorSolicitud.has(item.id)) itemsPorSolicitud.set(item.id, new Set());
     itemsPorSolicitud.get(item.id).add(item.index);
   });
 
-  return solicitudes.flatMap(solicitud => {
+  return solicitudes
+    .filter(solicitud => solicitud.estado !== "NO_COMPRA")
+    .flatMap(solicitud => {
     const indices = itemsPorSolicitud.get(Number(solicitud.id));
-    if (!indices) return [];
+    if (pedidoItems.length && !indices) return [];
 
+    const noCompra = textoGuardadoASet(solicitud.no_compra);
     const partes = dividirRepuestosSeleccionables(solicitud);
     return partes
       .map((parte, index) => ({ parte, index }))
-      .filter(({ index }) => indices.has(index))
+      .filter(({ parte, index }) => (!pedidoItems.length || indices.has(index)) && !noCompra.has(textoComparable(parte)))
       .map(({ parte, index }) => ({
         ...solicitud,
         solicitud: parte,
@@ -198,16 +215,21 @@ function excluirDePedidoCedis(item) {
   const sede = textoComparable(item.sede);
   const solicitud = textoComparable(item.solicitud);
   const marcado = textoComparable(item.marcado_rojo);
+  const noCompra = textoComparable(item.no_compra);
   const excluidos = new Set(["MUEBLE", "GENERAL-TALLER", "GENERALES-TALLER"]);
 
-  return excluidos.has(placa) ||
+  return item.estado === "NO_COMPRA" ||
+    excluidos.has(placa) ||
     excluidos.has(sede) ||
     solicitud.includes("GENERAL-TALLER") ||
     solicitud.includes("GENERALES-TALLER") ||
     solicitud.includes("MUEBLE") ||
     marcado.includes("GENERAL-TALLER") ||
     marcado.includes("GENERALES-TALLER") ||
-    marcado.includes("MUEBLE");
+    marcado.includes("MUEBLE") ||
+    noCompra.includes("GENERAL-TALLER") ||
+    noCompra.includes("GENERALES-TALLER") ||
+    noCompra.includes("MUEBLE");
 }
 
 async function sedesDisponibles(req) {
@@ -391,8 +413,9 @@ router.get("/", async (req, res) => {
       acc.total += 1;
       acc[item.estado] = (acc[item.estado] || 0) + 1;
       if (String(item.marcado_rojo || "").trim()) acc.marcados += 1;
+      if (String(item.no_compra || "").trim()) acc.noCompraItems += 1;
       return acc;
-    }, { total: 0, marcados: 0 });
+    }, { total: 0, marcados: 0, noCompraItems: 0 });
 
     const success = req.session.success;
     const error = req.session.error;
@@ -466,7 +489,8 @@ router.post("/", requireGestion, async (req, res) => {
     const sedeResuelta = await resolverSedePorPlaca(req, req.body.placa, sedeFallback);
     const solicitud = String(req.body.solicitud || "").trim();
     const marcadoRojo = String(req.body.marcado_rojo || "").trim();
-    const estado = marcadoRojo ? "LLEGANDO" : normalizarEstadoSemanal(req.body.estado);
+    const noCompra = String(req.body.no_compra || "").trim();
+    const estado = noCompra ? "NO_COMPRA" : marcadoRojo ? "LLEGANDO" : normalizarEstadoSemanal(req.body.estado);
 
     if (sedeResuelta.error || !solicitud) {
       req.session.error = sedeResuelta.error || "Complete la solicitud del repuesto.";
@@ -477,9 +501,9 @@ router.post("/", requireGestion, async (req, res) => {
 
     await pool.query(
       `INSERT INTO repuestos_semanales
-       (fecha, sede, placa, solicitud, marcado_rojo, estado, creado_por)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [fecha, sede, placa, solicitud, marcadoRojo || null, estado, req.session.user.id || null]
+       (fecha, sede, placa, solicitud, marcado_rojo, no_compra, estado, creado_por)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [fecha, sede, placa, solicitud, marcadoRojo || null, noCompra || null, estado, req.session.user.id || null]
     );
 
     req.session.success = `Repuesto semanal guardado para ${placa}.`;
@@ -515,8 +539,13 @@ router.post("/:id/editar", requireGestion, async (req, res) => {
     const sedeFallback = String(req.body.sede || actual.sede || req.query.sede || "").trim();
     const sedeResuelta = await resolverSedePorPlaca(req, req.body.placa, sedeFallback);
     const solicitud = String(req.body.solicitud || "").trim();
-    const marcadoRojo = String(req.body.marcado_rojo || "").trim();
-    const estado = normalizarEstadoSemanal(req.body.estado || actual.estado);
+    const marcadoRojo = req.body.marcado_rojo === undefined
+      ? String(actual.marcado_rojo || "").trim()
+      : String(req.body.marcado_rojo || "").trim();
+    const noCompra = req.body.no_compra === undefined
+      ? String(actual.no_compra || "").trim()
+      : String(req.body.no_compra || "").trim();
+    const estado = noCompra ? "NO_COMPRA" : normalizarEstadoSemanal(req.body.estado || actual.estado);
 
     if (sedeResuelta.error || !solicitud) {
       req.session.error = sedeResuelta.error || "Complete la solicitud del repuesto.";
@@ -530,9 +559,10 @@ router.post("/:id/editar", requireGestion, async (req, res) => {
            placa = ?,
            solicitud = ?,
            marcado_rojo = ?,
+           no_compra = ?,
            estado = ?
        WHERE id = ?`,
-      [fecha, sedeResuelta.sede, sedeResuelta.placa, solicitud, marcadoRojo || null, estado, req.params.id]
+      [fecha, sedeResuelta.sede, sedeResuelta.placa, solicitud, marcadoRojo || null, noCompra || null, estado, req.params.id]
     );
 
     req.session.success = "Repuesto semanal actualizado.";
@@ -549,13 +579,27 @@ router.post("/:id/marcado", requireGestion, async (req, res) => {
     await ensureRepuestosSemanalesTable(pool);
 
     const sedes = await sedesDisponibles(req);
-    const marcadoRojo = String(req.body.marcado_rojo || "").trim();
+    const marcadoRojo = textoLista(req.body.marcado_rojo_items || req.body.marcado_rojo);
+    const noCompra = textoLista(req.body.no_compra_items || req.body.no_compra);
+    const [actuales] = await pool.query(
+      `SELECT solicitud
+       FROM repuestos_semanales
+       WHERE id = ? AND sede IN (?) AND estado <> 'COMPLETO'
+       LIMIT 1`,
+      [req.params.id, sedes]
+    );
+
+    const noCompraSet = textoGuardadoASet(noCompra);
+    const partes = actuales.length ? dividirRepuestosSeleccionables(actuales[0]) : [];
+    const todoNoCompra = partes.length > 0 && partes.every(parte => noCompraSet.has(textoComparable(parte)));
+    const estado = todoNoCompra ? "NO_COMPRA" : marcadoRojo ? "LLEGANDO" : "PENDIENTE";
     const [result] = await pool.query(
       `UPDATE repuestos_semanales
        SET marcado_rojo = ?,
-           estado = CASE WHEN ? <> '' THEN 'LLEGANDO' ELSE estado END
+           no_compra = ?,
+           estado = CASE WHEN estado = 'COMPLETO' THEN estado ELSE ? END
        WHERE id = ? AND sede IN (?) AND estado <> 'COMPLETO'`,
-      [marcadoRojo || null, marcadoRojo, req.params.id, sedes]
+      [marcadoRojo || null, noCompra || null, estado, req.params.id, sedes]
     );
 
     req.session[result.affectedRows ? "success" : "error"] = result.affectedRows

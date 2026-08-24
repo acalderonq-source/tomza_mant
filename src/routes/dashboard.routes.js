@@ -65,7 +65,44 @@ const FAMILIAS_GASTO = [
 ];
 
 const FAMILIAS_GASTO_OPERATIVO = FAMILIAS_GASTO.filter(f => f.clave !== "general");
-const FAMILIAS_MANTENIMIENTO_RESUMEN = FAMILIAS_GASTO.filter(f => !["proveedor", "caja", "transportadora", "general"].includes(f.clave));
+const FAMILIAS_MANTENIMIENTO_RESUMEN = [
+  {
+    clave: "motor",
+    nombre: "Motor",
+    color: "#ea580c",
+    palabras: ["motor", "turbo", "inyector", "inyectores", "inyeccion", "inyección", "bomba", "compresor", "cabezote", "culata", "overh", "overhaul", "isx", "detroit", "s60", "s-60", "manifold", "multiple", "múltiple", "piston", "pistón", "radiador", "enfriamiento", "calentamiento", "aceite", "aceites", "filtro", "filtros", "engrase", "fuga", "fugas", "combustible", "diesel", "coolant", "manguera"]
+  },
+  {
+    clave: "frenos",
+    nombre: "Frenos",
+    color: "#dc2626",
+    palabras: ["freno", "frenos", "fibra", "fibras", "zapata", "zapatas", "tambor", "tambores", "disco", "discos", "plato", "platos", "pedal", "pedales", "mordaza", "caliper", "caliperes", "aire de freno", "freno de mano"]
+  },
+  {
+    clave: "transmision_tren",
+    nombre: "Transmisión y tren motriz",
+    color: "#7c3aed",
+    palabras: ["transmision", "transmisión", "caja", "clutch", "embrague", "diferencial", "cardan", "cardán", "cruceta", "crucetas", "yugo", "eje", "ejes", "flecha", "corona", "piñon", "piñón", "retenedor", "reten", "retén", "tren motriz", "quinta rueda"]
+  },
+  {
+    clave: "direccion_suspension",
+    nombre: "Dirección suspensión",
+    color: "#16a34a",
+    palabras: ["direccion", "dirección", "suspension", "suspensión", "resorte", "resortes", "hoja de resorte", "hojas de resorte", "muelle", "muelles", "amortiguador", "amortiguadores", "rotula", "rótula", "rotulas", "rótulas", "barra", "barras", "balancin", "balancín", "buje", "bujes", "bushing", "tensor", "tensores", "pin", "pines", "hidraulico", "hidráulico", "manivela"]
+  },
+  {
+    clave: "llantas",
+    nombre: "Llantas",
+    color: "#2563eb",
+    palabras: ["llanta", "llantas", "aro", "aros", "rin", "rines", "válvula", "valvula", "trasera", "traseras", "delantera", "delanteras", "reencauche", "balanceo", "alineado", "alineamiento"]
+  },
+  {
+    clave: "electrico",
+    nombre: "Eléctrico",
+    color: "#f59e0b",
+    palabras: ["luz", "luces", "electrico", "eléctrico", "bateria", "batería", "baterias", "baterías", "alternador", "arrancador", "marcha", "cable", "cables", "sensor", "sensores", "tablero", "tacometro", "tacómetro", "velocimetro", "velocímetro", "selenoide", "solenoide", "relay", "flasher", "halogeno", "halógeno", "bombillo", "bombillos", "switch", "fusible", "fusibles", "arnes", "arnés"]
+  }
+];
 
 function fechaCostaRica(date = new Date()) {
   return new Intl.DateTimeFormat("en-CA", {
@@ -212,6 +249,31 @@ function clasificarGastoOperativo(item) {
   }
 
   return clasificarTexto(`${item.descripcion} ${item.proveedor}`, FAMILIAS_GASTO_OPERATIVO, "insumos");
+}
+
+function clasificarNegocioGasto(item) {
+  const sedeNormalizada = normalizarTexto(item.sede);
+  const placa = normalizarPlacaLocal(item.placa);
+
+  if (sedeNormalizada.includes("transportadora") || /^S\d{5,6}$/.test(placa)) {
+    return { clave: "transportadora", nombre: "Transportadora", color: "#0b3b82" };
+  }
+
+  if (sedeNormalizada.includes("granel")) {
+    return { clave: "granel", nombre: "Granel", color: "#0f766e" };
+  }
+
+  if (
+    sedeNormalizada.includes("taller") ||
+    sedeNormalizada.includes("tecnico") ||
+    sedeNormalizada.includes("tecnicos") ||
+    !item.tienePlacaReal ||
+    !item.tieneSedeReal
+  ) {
+    return { clave: "comodines", nombre: "Comodines / taller", color: "#7c3aed" };
+  }
+
+  return { clave: "cilindreros", nombre: "Cilindreros", color: "#ef233c" };
 }
 
 function recortarResumen(texto, limite = 150) {
@@ -678,6 +740,7 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro, pe
   const porMes = new Map();
   const porDetalleGeneral = new Map();
   const porDescripcion = new Map();
+  const porNegocio = new Map();
 
   gastos.forEach(item => {
     const fuenteNombre = item.fuente === "ORDEN"
@@ -724,6 +787,30 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro, pe
     });
     descripcion.total += item.monto;
     descripcion.registros += 1;
+
+    const negocioInfo = clasificarNegocioGasto(item);
+    const negocio = sumarGrupo(porNegocio, negocioInfo.nombre, {
+      clave: negocioInfo.clave,
+      color: negocioInfo.color,
+      sedes: new Map(),
+      placas: new Map()
+    });
+    negocio.total += item.monto;
+    negocio.registros += 1;
+
+    const sedeNegocio = item.tieneSedeReal ? etiquetaSedeTomza(item.sede) : "General / taller";
+    const sedeItem = sumarGrupo(negocio.sedes, sedeNegocio, { placas: new Map() });
+    sedeItem.total += item.monto;
+    sedeItem.registros += 1;
+
+    const placaNegocio = item.tienePlacaReal ? item.placa : "GENERAL";
+    const placaItem = sumarGrupo(negocio.placas, placaNegocio, { sede: sedeNegocio });
+    placaItem.total += item.monto;
+    placaItem.registros += 1;
+
+    const placaSedeItem = sumarGrupo(sedeItem.placas, placaNegocio, { sede: sedeNegocio });
+    placaSedeItem.total += item.monto;
+    placaSedeItem.registros += 1;
 
     if (item.familia?.clave === "general") {
       const detalle = sumarGrupo(porDetalleGeneral, describirGasto(item));
@@ -783,7 +870,7 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro, pe
   `, paramsCorrectivos, []);
 
   const mantenimientos = [...preventivos, ...correctivos].map(item => {
-    const familia = clasificarTexto(item.detalle, FAMILIAS_MANTENIMIENTO_RESUMEN, "reparaciones");
+    const familia = clasificarTexto(item.detalle, FAMILIAS_MANTENIMIENTO_RESUMEN, "frenos");
     return {
       ...item,
       familia,
@@ -868,6 +955,37 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro, pe
   const proveedores = ordenarTop(porProveedor, 20);
   const sedes = ordenarTop(porSede, 20);
   const placas = ordenarTop(porPlaca, 25);
+  const negociosBase = [
+    { clave: "cilindreros", nombre: "Cilindreros", color: "#ef233c" },
+    { clave: "transportadora", nombre: "Transportadora", color: "#0b3b82" },
+    { clave: "granel", nombre: "Granel", color: "#0f766e" },
+    { clave: "comodines", nombre: "Comodines / taller", color: "#7c3aed" }
+  ];
+  const negociosGasto = negociosBase
+    .map(base => {
+      const item = porNegocio.get(base.nombre) || {
+        ...base,
+        total: 0,
+        registros: 0,
+        sedes: new Map(),
+        placas: new Map()
+      };
+      return {
+        nombre: item.nombre,
+        clave: item.clave,
+        color: item.color,
+        total: item.total,
+        registros: item.registros,
+        porcentaje: totalGastos ? Math.round((Number(item.total || 0) / totalGastos) * 100) : 0,
+        sedes: ordenarTop(item.sedes, 12).map(sede => ({
+          nombre: sede.nombre,
+          total: sede.total,
+          registros: sede.registros,
+          placas: ordenarTop(sede.placas || new Map(), 15)
+        })),
+        placas: ordenarTop(item.placas, 8)
+      };
+    });
   const totalGastoConUnidad = Array.from(porPlaca.values()).reduce((sum, item) => sum + Number(item.total || 0), 0);
   const unidadesConGasto = porPlaca.size;
   const [flotaRow] = await safeQuery(
@@ -962,6 +1080,7 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro, pe
     proveedores,
     sedes,
     placas,
+    negociosGasto,
     meses,
     tiposMant,
     familiasMant,
