@@ -691,6 +691,17 @@
                                       <button class="btn btn-sm btn-success" onclick="return confirm('¿Confirmar que la llanta llegó a sede?')"><i class="bi bi-check-circle me-1"></i> Marcar recibida</button>
                                     </form>
                                   <% } %>
+
+                                  <% if (puedeEditarLlanta) { %>
+                                    <form method="POST" action="/llantas/<%= s.id %>/eliminar">
+                                      <input type="hidden" name="sede" value="<%= filtros.sede || '' %>">
+                                      <input type="hidden" name="estado" value="<%= filtros.estado || '' %>">
+                                      <input type="hidden" name="placa" value="<%= filtros.placa || '' %>">
+                                      <button class="btn btn-sm btn-outline-danger" onclick="return confirm('¿Eliminar esta solicitud de llanta? Esta acción no se puede deshacer.')">
+                                        <i class="bi bi-trash me-1"></i> Eliminar
+                                      </button>
+                                    </form>
+                                  <% } %>
                                 </div>
                               </article>
                             <% }) %>

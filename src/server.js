@@ -158,6 +158,7 @@ function injectPageAssets(html, csrfToken) {
   <link rel="icon" href="/img/app-icon.svg" type="image/svg+xml">`;
   const pwaScript = `\n<script src="/js/pwa.js" defer></script>`;
   const placaSearchScript = `\n<script src="/js/placa-search.js?v=20260806-1" defer></script>`;
+  const loadingGuardScript = `\n<script src="/js/loading-guard.js?v=20260824-1" defer></script>`;
 
   if (!output.includes('href="/manifest.webmanifest"') && output.includes("</head>")) {
     output = output.replace("</head>", `${pwaHead}\n</head>`);
@@ -169,6 +170,10 @@ function injectPageAssets(html, csrfToken) {
 
   if (!output.includes("/js/placa-search.js") && output.includes("</body>")) {
     output = output.replace("</body>", `${placaSearchScript}\n</body>`);
+  }
+
+  if (!output.includes("/js/loading-guard.js") && output.includes("</body>")) {
+    output = output.replace("</body>", `${loadingGuardScript}\n</body>`);
   }
 
   output = injectSecurityAssets(output, csrfToken);

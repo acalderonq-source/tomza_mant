@@ -645,6 +645,34 @@ router.post("/:id/recibir", allowRoles(...ROLES_RECIBIR), async (req, res) => {
   }
 });
 
+router.post("/:id/eliminar", allowRoles(...ROLES_EDITAR), async (req, res) => {
+  const connection = await pool.getConnection();
+  try {
+    await ensureTables();
+    const id = req.params.id;
+    const { solicitud, error } = await cargarSolicitudAutorizada(req, id);
+    if (error === "not_found") return res.status(404).send("Solicitud no encontrada");
+    if (error === "forbidden") return res.status(403).send("No autorizado para esta sede");
+
+    await connection.beginTransaction();
+    await connection.query("DELETE FROM solicitudes_llantas_historial WHERE solicitud_id = ?", [id]);
+    const [result] = await connection.query("DELETE FROM solicitudes_llantas WHERE id = ?", [id]);
+    await connection.commit();
+
+    if (!result.affectedRows) {
+      return res.status(404).send("Solicitud no encontrada");
+    }
+
+    res.redirect(redirectConFiltros(req));
+  } catch (error) {
+    await connection.rollback();
+    console.error("Error eliminando solicitud de llanta:", error);
+    res.status(500).send("Error eliminando solicitud");
+  } finally {
+    connection.release();
+  }
+});
+
 router.get("/:id/cotizacion.pdf", allowRoles(...ROLES_VER_COTIZACION), async (req, res) => {
   try {
     await ensureTables();
