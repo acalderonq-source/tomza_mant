@@ -7,7 +7,14 @@ const SEDES_GRANEL = [
   "granel_perez_zeledon"
 ];
 
-const SEDES_TRANSPORTE = ["Transportadora", ...SEDES_GRANEL];
+const SEDES_TRANSPORTADORA_DETALLE = [
+  "Cabezales",
+  "Cisternas",
+  "Carretas",
+  "Tandem"
+];
+
+const SEDES_TRANSPORTE = ["Transportadora", ...SEDES_TRANSPORTADORA_DETALLE, ...SEDES_GRANEL];
 const SEDES_GRANEL_CARTAGO_EQUIVALENTES = ["Granel", "granel_cartago"];
 
 const TODAS_SEDES = [
@@ -15,6 +22,10 @@ const TODAS_SEDES = [
   "Guapiles",
   "La Cruz",
   "Transportadora",
+  "Cabezales",
+  "Cisternas",
+  "Carretas",
+  "Tandem",
   "Granel",
   "granel_cartago",
   "granel_alajuela",
@@ -37,7 +48,8 @@ const ETIQUETAS_SEDES = {
   granel_alajuela: "Granel Alajuela",
   granel_la_cruz: "Granel La Cruz",
   granel_guapiles: "Granel Guapiles",
-  granel_perez_zeledon: "Granel Perez Zeledon"
+  granel_perez_zeledon: "Granel Perez Zeledon",
+  Tandem: "Tándem"
 };
 
 function limpiarSede(sede) {
@@ -74,6 +86,9 @@ function esSedeGranelCartago(sede) {
 function expandirSedeEquivalente(sede) {
   const sedeLimpia = limpiarSede(sede);
   if (!sedeLimpia) return [];
+  const sedeNormalizada = normalizarSede(sedeLimpia);
+  if (sedeNormalizada === "TRANSPORTADORA") return ["Transportadora", ...SEDES_TRANSPORTADORA_DETALLE];
+  if (sedeNormalizada === "TANDEM" || sedeNormalizada === "TAMDEN") return ["Tandem", "Tándem"];
   if (esSedeGranelCartago(sedeLimpia)) return SEDES_GRANEL_CARTAGO_EQUIVALENTES;
   return [sedeLimpia];
 }
@@ -85,7 +100,36 @@ function expandirSedesEquivalentes(sedes) {
 
 function esSedeTransporte(sede) {
   const sedeNormalizada = normalizarSede(sede);
-  return sedeNormalizada === "TRANSPORTADORA" || esSedeGranel(sedeNormalizada);
+  return sedeNormalizada === "TRANSPORTADORA" ||
+    SEDES_TRANSPORTADORA_DETALLE.some(valor => normalizarSede(valor) === sedeNormalizada) ||
+    esSedeGranel(sedeNormalizada);
+}
+
+function clasificarSubgrupoTransportadora({ sede, placa, texto } = {}) {
+  const sedeNormalizada = normalizarSede(sede);
+  const placaNormalizada = String(placa || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+  const textoNormalizado = normalizarSede([sede, placa, texto].filter(Boolean).join(" "));
+
+  if (sedeNormalizada.includes("TANDEM") || sedeNormalizada.includes("TAMDEN") || textoNormalizado.includes("TANDEM") || textoNormalizado.includes("TAMDEN")) {
+    return "Tándem";
+  }
+
+  if (
+    sedeNormalizada.includes("CARRETA") ||
+    textoNormalizado.includes("CARRETA") ||
+    textoNormalizado.includes("TRAILER") ||
+    textoNormalizado.includes("REMOLQUE") ||
+    textoNormalizado.includes("QUINTA RUEDA") ||
+    textoNormalizado.includes("HENDRICKSON")
+  ) {
+    return "Carretas";
+  }
+
+  if (sedeNormalizada.includes("CISTERNA") || placaNormalizada.startsWith("S") || textoNormalizado.includes("CISTERNA")) {
+    return "Cisternas";
+  }
+
+  return "Cabezales";
 }
 
 function unirSedes(...listas) {
@@ -210,11 +254,13 @@ function getSedesPermitidas(req) {
 module.exports = {
   TODAS_SEDES,
   SEDES_GRANEL,
+  SEDES_TRANSPORTADORA_DETALLE,
   SEDES_TRANSPORTE,
   etiquetaSede,
   esSedeGranelCartago,
   esSedeGranel,
   esSedeTransporte,
+  clasificarSubgrupoTransportadora,
   expandirSedeEquivalente,
   expandirSedesEquivalentes,
   esUsuarioMecanico,

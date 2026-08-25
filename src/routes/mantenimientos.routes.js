@@ -7,7 +7,7 @@ const {
   ensureReportesSupervisoresTables,
   registrarSugerenciasParaCorrectivo
 } = require("../utils/reportesSupervisoresDb");
-const { SEDES_GRANEL, esUsuarioTodasSedes, etiquetaSede, getSedesPermitidas } = require("../utils/sedes");
+const { SEDES_GRANEL, clasificarSubgrupoTransportadora, esUsuarioTodasSedes, etiquetaSede, getSedesPermitidas } = require("../utils/sedes");
 const { agregarFiltroPlacaSql } = require("../utils/placas");
 const { ensureNumeroMantenimientoColumn, asignarNumeroMantenimiento } = require("../utils/mantenimientosNumero");
 const { ensureTipoMantenimientoColumns, normalizarTipoMantenimiento, detectarTipoMantenimiento } = require("../utils/tipoMantenimiento");
@@ -150,7 +150,7 @@ const SEDES_CILINDREROS = [
 
 const ORDEN_NEGOCIOS_MANTENIMIENTO = ["TRANSPORTADORA", "CILINDREROS", "GRANELES", "OTROS"];
 const SUBGRUPOS_BASE_MANTENIMIENTO = {
-  TRANSPORTADORA: ["Cabezales", "Cisternas y carretas"],
+  TRANSPORTADORA: ["Cabezales", "Cisternas", "Carretas", "Tándem"],
   CILINDREROS: ["Alajuela", "Cartago", "Guapiles", "La Cruz", "Nicoya", "Orotina", "Perez Zeledon", "Rio Claro", "San Carlos"],
   GRANELES: SEDES_GRANEL.map(sede => etiquetaSede(sede)),
   OTROS: ["Taller", "Tecnicos", "Otros"]
@@ -306,10 +306,10 @@ function obtenerNegocioMantenimiento(item) {
     };
   }
 
-  if (sede === "TRANSPORTADORA") {
+  if (sede === "TRANSPORTADORA" || ["CABEZAL", "CABEZALES", "CISTERNA", "CISTERNAS", "CARRETA", "CARRETAS", "TANDEM", "TAMDEN"].some(valor => sede.includes(valor))) {
     return {
       grupo: "TRANSPORTADORA",
-      subgrupo: placa.startsWith("S") ? "Cisternas y carretas" : "Cabezales"
+      subgrupo: clasificarSubgrupoTransportadora({ sede: item.sede, placa: item.placa, texto: item.detalle })
     };
   }
 

@@ -213,6 +213,35 @@
       border-bottom: 0;
     }
 
+    button.manager-row {
+      background: transparent;
+      border: 0;
+      cursor: pointer;
+      font: inherit;
+      text-align: left;
+      width: 100%;
+    }
+
+    button.manager-row:hover,
+    button.manager-row.active {
+      background: #f8fafc;
+      border-radius: 10px;
+      padding-left: .45rem;
+      padding-right: .45rem;
+    }
+
+    .manager-row-wrap {
+      border-bottom: 1px solid #e6edf6;
+    }
+
+    .manager-row-wrap:last-child {
+      border-bottom: 0;
+    }
+
+    .manager-row-wrap > .manager-row {
+      border-bottom: 0;
+    }
+
     .manager-name {
       color: #0f172a;
       font-size: .86rem;
@@ -498,18 +527,45 @@
     }
 
     .compra-row {
-      align-items: center;
       background: #fff;
       border: 1px solid #e6edf6;
       border-radius: 11px;
-      display: grid;
-      gap: .75rem;
-      grid-template-columns: minmax(0, 1fr) auto;
-      padding: .58rem .65rem;
+      overflow: hidden;
     }
 
     .compra-row + .compra-row {
       margin-top: .45rem;
+    }
+
+    .compra-summary {
+      align-items: center;
+      cursor: pointer;
+      display: grid;
+      gap: .75rem;
+      grid-template-columns: minmax(0, 1fr) auto;
+      list-style: none;
+      padding: .58rem .65rem;
+    }
+
+    .compra-summary::-webkit-details-marker {
+      display: none;
+    }
+
+    .compra-summary::after {
+      color: var(--muted);
+      content: "Ver movimientos";
+      font-size: .68rem;
+      font-weight: 950;
+      grid-column: 1 / -1;
+      justify-self: start;
+    }
+
+    .compra-row[open] .compra-summary {
+      border-bottom: 1px solid #e6edf6;
+    }
+
+    .compra-row[open] .compra-summary::after {
+      content: "Ocultar movimientos";
     }
 
     .compra-title {
@@ -527,11 +583,168 @@
       margin-top: .2rem;
     }
 
+    .compra-details {
+      background: #f8fafc;
+      display: grid;
+      gap: .45rem;
+      max-height: 360px;
+      overflow: auto;
+      padding: .55rem;
+    }
+
+    .movimiento-row {
+      background: #fff;
+      border: 1px solid #e6edf6;
+      border-radius: 10px;
+      display: grid;
+      gap: .55rem;
+      grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.6fr) auto;
+      padding: .55rem;
+    }
+
+    .movimiento-title {
+      color: #0f172a;
+      font-size: .78rem;
+      font-weight: 950;
+      line-height: 1.2;
+    }
+
+    .movimiento-meta,
+    .movimiento-desc {
+      color: #64748b;
+      font-size: .7rem;
+      font-weight: 800;
+      line-height: 1.25;
+    }
+
+    .movimiento-desc {
+      color: #334155;
+    }
+
+    .movimiento-actions {
+      align-items: flex-end;
+      display: flex;
+      flex-direction: column;
+      gap: .35rem;
+    }
+
+    .movimiento-link {
+      background: #071a44;
+      border-radius: 999px;
+      color: #fff;
+      font-size: .68rem;
+      font-weight: 950;
+      padding: .3rem .55rem;
+      text-decoration: none;
+      white-space: nowrap;
+    }
+
+    .movimiento-link:hover {
+      color: #fff;
+      background: #0b3b82;
+    }
+
     .business-empty {
       color: var(--muted);
       font-weight: 850;
       padding: 1rem;
       text-align: center;
+    }
+
+    .spend-tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: .45rem;
+      padding: .9rem 1rem .35rem;
+    }
+
+    .spend-tab {
+      background: #eef2f7;
+      border: 1px solid #dbe4f0;
+      border-radius: 999px;
+      color: #334155;
+      font-size: .76rem;
+      font-weight: 950;
+      padding: .42rem .8rem;
+    }
+
+    .spend-tab.active {
+      background: #071a44;
+      border-color: #071a44;
+      color: #fff;
+    }
+
+    .spend-summary {
+      align-items: center;
+      background: #f8fafc;
+      border: 1px solid #e6edf6;
+      border-radius: 14px;
+      display: flex;
+      gap: .75rem;
+      justify-content: space-between;
+      margin: .5rem 1rem .85rem;
+      padding: .75rem .85rem;
+    }
+
+    .spend-summary-title {
+      color: #0f172a;
+      font-size: .92rem;
+      font-weight: 950;
+      line-height: 1.15;
+    }
+
+    .spend-summary-meta {
+      color: var(--muted);
+      font-size: .73rem;
+      font-weight: 800;
+      margin-top: .15rem;
+    }
+
+    .spend-summary-money {
+      color: #0f172a;
+      font-size: 1.05rem;
+      font-weight: 950;
+      white-space: nowrap;
+    }
+
+    .spend-table-wrap {
+      padding: 0 1rem 1rem;
+    }
+
+    .spend-table {
+      margin: 0;
+    }
+
+    .spend-table th {
+      background: #071a44;
+      color: #fff;
+      font-size: .68rem;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+    }
+
+    .spend-table td {
+      color: #0f172a;
+      font-size: .82rem;
+      vertical-align: middle;
+    }
+
+    .spend-concept {
+      font-weight: 950;
+      line-height: 1.16;
+    }
+
+    .spend-detail {
+      color: #64748b;
+      font-size: .72rem;
+      font-weight: 800;
+      margin-top: .15rem;
+    }
+
+    .spend-total-row td {
+      background: #f8fafc;
+      border-top: 2px solid #dbeafe;
+      font-weight: 950;
     }
 
     .detail-hub {
@@ -895,6 +1108,9 @@
       .manager-grid,
       .manager-matrix { grid-template-columns: 1fr; }
       .manager-card.manager-wide { grid-column: auto; }
+      .movimiento-row { grid-template-columns: 1fr; }
+      .movimiento-actions { align-items: flex-start; flex-direction: row; justify-content: space-between; }
+      .spend-summary { align-items: flex-start; flex-direction: column; }
       .detail-hub-head { align-items: flex-start; flex-direction: column; }
       .detail-grid { grid-template-columns: 1fr; }
       canvas { max-height: 280px; }
@@ -1024,14 +1240,22 @@
     <form method="GET" action="/dashboard/resumen-ejecutivo" class="row g-3 align-items-end">
       <div class="col-lg-3 col-md-6">
         <label class="form-label">Sede</label>
-        <select name="sede" class="form-select form-select-sm">
+        <input
+          type="text"
+          name="sede"
+          class="form-control form-control-sm"
+          list="sedesResumenList"
+          placeholder="Escriba o seleccione sede"
+          value="<%= filtros.sede || '' %>"
+        >
+        <datalist id="sedesResumenList">
           <% if (usuarioTodasSedes) { %>
-            <option value="TODAS" <%= filtros.sede === 'TODAS' ? 'selected' : '' %>>Todas</option>
+            <option value="TODAS">Todas</option>
           <% } %>
           <% safe(sedes).forEach(s => { %>
-            <option value="<%= s %>" <%= filtros.sede === s ? 'selected' : '' %>><%= typeof etiquetaSede === 'function' ? etiquetaSede(s) : s %></option>
+            <option value="<%= s %>"><%= typeof etiquetaSede === 'function' ? etiquetaSede(s) : s %></option>
           <% }) %>
-        </select>
+        </datalist>
       </div>
       <div class="col-lg-2 col-md-6">
         <label class="form-label">Desde</label>
@@ -1225,7 +1449,35 @@
     </article>
   </section>
 
-  <div class="section-label"><span>1. Detalle por negocio, sede y placa</span></div>
+  <div class="section-label"><span>1. Tabla de gasto por negocio</span></div>
+  <section class="table-card mb-4">
+    <div class="card-head">
+      <div>
+        <h2 class="card-title"><i class="bi bi-table me-1"></i>Gasto operativo por negocio</h2>
+        <div class="card-subtitle">Seleccione arriba el negocio para ver el detalle por rubro; en Todos se compara cada negocio completo.</div>
+      </div>
+      <span class="pill pill-blue">Tabla gerencial</span>
+    </div>
+    <div class="spend-tabs" id="spendBusinessTabs"></div>
+    <div class="spend-summary" id="spendBusinessSummary"></div>
+    <div class="table-responsive spend-table-wrap">
+      <table class="table table-hover align-middle spend-table">
+        <thead>
+          <tr>
+            <th>Concepto</th>
+            <th>Detalle</th>
+            <th class="text-end">Mov.</th>
+            <th class="text-end">Monto</th>
+            <th class="text-end">%</th>
+          </tr>
+        </thead>
+        <tbody id="spendBusinessRows"></tbody>
+        <tfoot id="spendBusinessFoot"></tfoot>
+      </table>
+    </div>
+  </section>
+
+  <div class="section-label"><span>2. Detalle por negocio, sede y placa</span></div>
   <section class="table-card mb-4">
     <div class="card-head">
       <div>
@@ -1237,7 +1489,7 @@
     <div class="business-accordion" id="negocioAccordion"></div>
   </section>
 
-  <div class="section-label"><span>2. Resumen financiero y flota</span></div>
+  <div class="section-label"><span>3. Resumen financiero y flota</span></div>
   <section class="row g-3 mb-4">
     <div class="col-lg-4">
       <div class="table-card financial-card">
@@ -1713,6 +1965,11 @@
   };
   const formatMoney = (value) => `₡${Number(value || 0).toLocaleString('es-CR', { maximumFractionDigits: 0 })}`;
   const formatNumber = (value) => Number(value || 0).toLocaleString('es-CR');
+  const formatDate = (value) => {
+    if (!value) return '-';
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? String(value).slice(0, 10) : date.toLocaleDateString('es-CR');
+  };
   const percent = (value, total) => total ? Math.round((Number(value || 0) / Number(total || 1)) * 100) : 0;
   const isHiddenCategory = (name) => {
     const value = String(name || '').toLowerCase();
@@ -1733,8 +1990,11 @@
   let resumenData = readJson('json-resumen');
   const managerState = {
     rubro: {},
-    sede: {}
+    sede: {},
+    rubroGeneral: {},
+    sedeGeneral: {}
   };
+  let spendBusinessActive = 'TODOS';
   let chartMeses = null;
   let chartCategorias = null;
   let chartMantenimientos = null;
@@ -1744,16 +2004,146 @@
     if (element) element.textContent = value;
   };
 
+  const businessDetailLabel = (negocio) => {
+    if (negocio?.clave === 'transportadora') return 'Dividido en cabezales, cisternas, carretas y tándem';
+    if (negocio?.clave === 'cilindreros') return 'Camiones Hino / cilindreros';
+    if (negocio?.clave === 'granel') return 'Unidades graneleras por sede';
+    if (negocio?.clave === 'comodines') return 'Taller, técnicos y comodines';
+    if (negocio?.clave === 'aceites') return 'Aceites, filtros y fluidos';
+    if (negocio?.clave === 'generales') return 'Compras generales sin placa';
+    return 'Gasto operativo';
+  };
+
+  const renderSpendBusinessTable = (data) => {
+    const tabs = document.getElementById('spendBusinessTabs');
+    const summary = document.getElementById('spendBusinessSummary');
+    const rowsBody = document.getElementById('spendBusinessRows');
+    const foot = document.getElementById('spendBusinessFoot');
+    if (!tabs || !summary || !rowsBody || !foot) return;
+
+    const negocioDetalle = new Map((data.negociosGasto || []).map(negocio => [negocio.clave, negocio]));
+    const negocios = (data.rubrosPorNegocio || [])
+      .map(negocio => {
+        const detalle = negocioDetalle.get(negocio.clave) || {};
+        return {
+          ...negocio,
+          subnegocios: detalle.subnegocios || [],
+          compras: detalle.compras || [],
+          sedes: detalle.sedes || negocio.sedes || [],
+          placas: detalle.placas || negocio.placas || [],
+          rubros: (negocio.rubros || []).filter(rubro => !isHiddenCategory(rubro.nombre))
+        };
+      })
+      .filter(negocio => Number(negocio.total || 0) > 0);
+
+    const opciones = [{ clave: 'TODOS', nombre: 'Todos' }, ...negocios.map(negocio => ({ clave: negocio.clave, nombre: negocio.nombre }))];
+    if (!opciones.some(item => item.clave === spendBusinessActive)) spendBusinessActive = 'TODOS';
+
+    tabs.innerHTML = opciones.map(item => `
+      <button type="button" class="spend-tab ${item.clave === spendBusinessActive ? 'active' : ''}" data-spend-business="${escapeHtml(item.clave)}">
+        ${escapeHtml(item.nombre)}
+      </button>
+    `).join('');
+
+    tabs.querySelectorAll('[data-spend-business]').forEach(button => {
+      button.addEventListener('click', () => {
+        spendBusinessActive = button.dataset.spendBusiness || 'TODOS';
+        renderSpendBusinessTable(data);
+      });
+    });
+
+    const totalPeriodo = negocios.reduce((sum, item) => sum + Number(item.total || 0), 0);
+    let titulo = 'Todos los negocios';
+    let meta = 'Comparativo general: cilindreros, transportadora, graneleras, comodines, aceites y generales.';
+    let totalTabla = totalPeriodo;
+    let registrosTabla = negocios.reduce((sum, item) => sum + Number(item.registros || 0), 0);
+    let rows = [];
+
+    if (spendBusinessActive === 'TODOS') {
+      rows = negocios
+        .map(negocio => ({
+          concepto: negocio.nombre,
+          detalle: negocio.clave === 'transportadora' && negocio.subnegocios?.length
+            ? negocio.subnegocios.map(sub => `${sub.nombre}: ${formatMoney(sub.total || 0)}`).join(' · ')
+            : businessDetailLabel(negocio),
+          registros: negocio.registros,
+          total: negocio.total,
+          porcentaje: percent(negocio.total, totalPeriodo)
+        }))
+        .sort((a, b) => Number(b.total || 0) - Number(a.total || 0));
+    } else {
+      const negocio = negocios.find(item => item.clave === spendBusinessActive);
+      titulo = negocio?.nombre || 'Negocio';
+      meta = negocio ? businessDetailLabel(negocio) : 'Sin información para este filtro.';
+      totalTabla = Number(negocio?.total || 0);
+      registrosTabla = Number(negocio?.registros || 0);
+
+      if (negocio?.clave === 'transportadora' && negocio.subnegocios?.length) {
+        rows = negocio.subnegocios
+          .map(subnegocio => ({
+            concepto: subnegocio.nombre,
+            detalle: [
+              ...(subnegocio.sedes || []).slice(0, 3).map(sede => `${sede.nombre}: ${formatMoney(sede.total || 0)}`),
+              ...(subnegocio.rubros || []).slice(0, 3).map(rubro => `${rubro.nombre}: ${formatMoney(rubro.total || 0)}`)
+            ].slice(0, 5).join(' · ') || 'Sin detalle registrado',
+            registros: subnegocio.registros,
+            total: subnegocio.total,
+            porcentaje: percent(subnegocio.total, totalTabla)
+          }))
+          .sort((a, b) => Number(b.total || 0) - Number(a.total || 0));
+      } else {
+        rows = (negocio?.rubros || [])
+          .map(rubro => ({
+            concepto: rubro.nombre,
+            detalle: (rubro.sedes || []).slice(0, 4).map(sede => `${sede.nombre}: ${formatMoney(sede.total || 0)}`).join(' · ') || 'Sin sedes registradas',
+            registros: rubro.registros,
+            total: rubro.total,
+            porcentaje: percent(rubro.total, totalTabla)
+          }))
+          .sort((a, b) => Number(b.total || 0) - Number(a.total || 0));
+      }
+    }
+
+    summary.innerHTML = `
+      <div>
+        <div class="spend-summary-title">${escapeHtml(titulo)}</div>
+        <div class="spend-summary-meta">${formatNumber(registrosTabla)} movimiento(s) · ${escapeHtml(meta)}</div>
+      </div>
+      <div class="spend-summary-money">${formatMoney(totalTabla)}</div>
+    `;
+
+    rowsBody.innerHTML = rows.length ? rows.map(row => `
+      <tr>
+        <td>
+          <div class="spend-concept">${escapeHtml(row.concepto || '-')}</div>
+        </td>
+        <td><div class="spend-detail">${escapeHtml(row.detalle || '-')}</div></td>
+        <td class="text-end"><span class="pill pill-soft">${formatNumber(row.registros || 0)}</span></td>
+        <td class="text-end money">${formatMoney(row.total || 0)}</td>
+        <td class="text-end">${formatNumber(row.porcentaje || 0)}%</td>
+      </tr>
+    `).join('') : '<tr><td colspan="5" class="empty-state">No hay gasto para este negocio con los filtros seleccionados.</td></tr>';
+
+    foot.innerHTML = `
+      <tr class="spend-total-row">
+        <td colspan="2">Total visible</td>
+        <td class="text-end">${formatNumber(registrosTabla)}</td>
+        <td class="text-end money">${formatMoney(totalTabla)}</td>
+        <td class="text-end">100%</td>
+      </tr>
+    `;
+  };
+
   const renderManagerGrid = (data) => {
     const grid = document.getElementById('managerGrid');
     if (!grid) return;
 
     const categorias = (data.categorias || []).filter(item => !isHiddenCategory(item.nombre));
-    const negocios = data.negociosGasto || [];
+    const negocios = (data.negociosGasto || []).filter(item => Number(item.total || 0) > 0);
     const rubrosPorNegocio = (data.rubrosPorNegocio || []).map(negocio => ({
       ...negocio,
       rubros: (negocio.rubros || []).filter(item => !isHiddenCategory(item.nombre))
-    }));
+    })).filter(negocio => Number(negocio.total || 0) > 0 || (negocio.rubros || []).length);
     const negociosPorRubro = (data.negociosPorRubro || [])
       .filter(item => !isHiddenCategory(item.nombre))
       .map(rubro => ({
@@ -1763,6 +2153,100 @@
       .filter(rubro => rubro.negocios.length);
     const totalGastos = Number(data.totalGastos || 0);
     const totalCategorias = categorias.reduce((sum, item) => sum + Number(item.total || 0), 0);
+
+    const keyOf = (value) => String(value || '-').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+    const mergePlacas = (targetMap, placas = []) => {
+      placas.forEach(placa => {
+        const nombre = placa.nombre || '-';
+        const key = keyOf(nombre);
+        const actual = targetMap.get(key) || {
+          nombre,
+          sede: placa.sede || '',
+          total: 0,
+          registros: 0
+        };
+        actual.total += Number(placa.total || 0);
+        actual.registros += Number(placa.registros || 0);
+        if (!actual.sede && placa.sede) actual.sede = placa.sede;
+        targetMap.set(key, actual);
+      });
+    };
+
+    const rubrosConSedesMap = new Map();
+    rubrosPorNegocio.forEach(negocio => {
+      (negocio.rubros || []).forEach(rubro => {
+        const rubroKey = keyOf(rubro.nombre);
+        const actualRubro = rubrosConSedesMap.get(rubroKey) || {
+          nombre: rubro.nombre || '-',
+          color: rubro.color || negocio.color || '#0b3b82',
+          total: 0,
+          registros: 0,
+          sedes: new Map()
+        };
+        actualRubro.total += Number(rubro.total || 0);
+        actualRubro.registros += Number(rubro.registros || 0);
+
+        (rubro.sedes || []).forEach(sede => {
+          const sedeKey = keyOf(sede.nombre);
+          const actualSede = actualRubro.sedes.get(sedeKey) || {
+            nombre: sede.nombre || '-',
+            total: 0,
+            registros: 0,
+            placas: new Map()
+          };
+          actualSede.total += Number(sede.total || 0);
+          actualSede.registros += Number(sede.registros || 0);
+          mergePlacas(actualSede.placas, sede.placas || []);
+          actualRubro.sedes.set(sedeKey, actualSede);
+        });
+
+        if (!(rubro.sedes || []).length && (rubro.placas || []).length) {
+          const sedeGeneral = actualRubro.sedes.get('todas-las-sedes') || {
+            nombre: 'Todas las sedes',
+            total: 0,
+            registros: 0,
+            placas: new Map()
+          };
+          sedeGeneral.total += Number(rubro.total || 0);
+          sedeGeneral.registros += Number(rubro.registros || 0);
+          mergePlacas(sedeGeneral.placas, rubro.placas || []);
+          actualRubro.sedes.set('todas-las-sedes', sedeGeneral);
+        }
+
+        rubrosConSedesMap.set(rubroKey, actualRubro);
+      });
+    });
+
+    const rubrosConSedes = categorias
+      .map(categoria => {
+        const agregado = rubrosConSedesMap.get(keyOf(categoria.nombre));
+        const totalRubro = Number(agregado?.total || categoria.total || 0);
+        const sedes = Array.from((agregado?.sedes || new Map()).values())
+          .map(sede => {
+            const totalSede = Number(sede.total || 0);
+            return {
+              ...sede,
+              porcentaje: totalRubro ? Math.round((totalSede / totalRubro) * 100) : 0,
+              placas: Array.from((sede.placas || new Map()).values())
+                .map(placa => ({
+                  ...placa,
+                  porcentaje: totalSede ? Math.round((Number(placa.total || 0) / totalSede) * 100) : 0
+                }))
+                .sort((a, b) => Number(b.total || 0) - Number(a.total || 0))
+                .slice(0, 15)
+            };
+          })
+          .sort((a, b) => Number(b.total || 0) - Number(a.total || 0))
+          .slice(0, 12);
+        return {
+          ...categoria,
+          total: totalRubro,
+          registros: Number(agregado?.registros || categoria.registros || 0),
+          color: categoria.color || agregado?.color,
+          sedes
+        };
+      })
+      .filter(rubro => Number(rubro.total || 0) > 0);
 
     const managerRow = (item, total, metaLabel = 'movimiento(s)') => `
       <div class="manager-row">
@@ -1774,6 +2258,24 @@
         <div class="manager-amount">${formatMoney(item.total || 0)}</div>
       </div>
     `;
+
+    const managerRubroGeneralRow = (item, index) => {
+      const rubroKey = `${index}:${keyOf(item.nombre)}`;
+      const open = managerState.rubroGeneral[rubroKey];
+      return `
+        <div class="manager-row-wrap">
+          <button type="button" class="manager-row ${open ? 'active' : ''}" data-manager-rubro-general="${escapeHtml(rubroKey)}">
+            <div>
+              <div class="manager-name">${escapeHtml(item.nombre || '-')}</div>
+              <div class="manager-meta">${formatNumber(item.registros || 0)} movimiento(s) · ${percent(item.total, totalCategorias)}% del gasto operativo · tocar para ver sedes</div>
+              <div class="manager-bar" style="--bar-color:${escapeHtml(item.color || '#0b3b82')}"><span style="width:${Math.max(4, percent(item.total, totalCategorias))}%"></span></div>
+            </div>
+            <div class="manager-amount">${formatMoney(item.total || 0)}</div>
+          </button>
+          ${open ? renderSedesRubroGeneral(rubroKey, item.sedes || []) : ''}
+        </div>
+      `;
+    };
 
     const renderPlateRows = (placas = []) => {
       if (!placas.length) return '<div class="empty-state py-2">No hay placas para esta sede.</div>';
@@ -1787,6 +2289,27 @@
               <span class="matrix-line-pct">${formatNumber(placa.porcentaje || 0)}%</span>
             </div>
           `).join('')}
+        </div>
+      `;
+    };
+
+    const renderSedesRubroGeneral = (rubroKey, sedes = []) => {
+      if (!sedes.length) return '<div class="matrix-nested"><div class="empty-state py-2">No hay sedes para este rubro.</div></div>';
+
+      return `
+        <div class="matrix-nested">
+          ${sedes.map((sede, sedeIndex) => {
+            const sedeKey = `${rubroKey}:${sedeIndex}:${keyOf(sede.nombre)}`;
+            const open = managerState.sedeGeneral[sedeKey];
+            return `
+              <button type="button" class="matrix-line matrix-line-sede ${open ? 'active' : ''}" data-manager-sede-general="${escapeHtml(sedeKey)}">
+                <span class="matrix-line-name">${escapeHtml(sede.nombre || '-')}</span>
+                <span class="matrix-line-money">${formatMoney(sede.total || 0)}</span>
+                <span class="matrix-line-pct">${formatNumber(sede.porcentaje || 0)}%</span>
+              </button>
+              ${open ? renderPlateRows(sede.placas || []) : ''}
+            `;
+          }).join('')}
         </div>
       `;
     };
@@ -1875,7 +2398,7 @@
           <span class="pill pill-blue">${formatNumber(categorias.length)} rubros</span>
         </div>
         <div class="manager-body">
-          ${categorias.length ? categorias.slice(0, 8).map(item => managerRow(item, totalCategorias)).join('') : '<div class="empty-state">No hay rubros para este filtro.</div>'}
+          ${rubrosConSedes.length ? rubrosConSedes.slice(0, 8).map((item, index) => managerRubroGeneralRow(item, index)).join('') : '<div class="empty-state">No hay rubros para este filtro.</div>'}
         </div>
       </article>
       <article class="manager-card manager-wide">
@@ -1887,7 +2410,7 @@
           <span class="pill pill-blue">Negocio -> rubro</span>
         </div>
         <div class="manager-body"><div class="manager-matrix">
-          ${rubrosPorNegocio.map((negocio, negocioIndex) => managerRubroBlock(negocio, negocioIndex)).join('')}
+          ${rubrosPorNegocio.length ? rubrosPorNegocio.map((negocio, negocioIndex) => managerRubroBlock(negocio, negocioIndex)).join('') : '<div class="empty-state">No hay datos por negocio para este filtro.</div>'}
         </div></div>
       </article>
       <article class="manager-card manager-wide">
@@ -1912,10 +2435,26 @@
       });
     });
 
+    grid.querySelectorAll('[data-manager-rubro-general]').forEach(button => {
+      button.addEventListener('click', () => {
+        const key = button.dataset.managerRubroGeneral;
+        managerState.rubroGeneral[key] = !managerState.rubroGeneral[key];
+        renderManagerGrid(data);
+      });
+    });
+
     grid.querySelectorAll('[data-manager-sede]').forEach(button => {
       button.addEventListener('click', () => {
         const key = button.dataset.managerSede;
         managerState.sede[key] = !managerState.sede[key];
+        renderManagerGrid(data);
+      });
+    });
+
+    grid.querySelectorAll('[data-manager-sede-general]').forEach(button => {
+      button.addEventListener('click', () => {
+        const key = button.dataset.managerSedeGeneral;
+        managerState.sedeGeneral[key] = !managerState.sedeGeneral[key];
         renderManagerGrid(data);
       });
     });
@@ -1943,6 +2482,7 @@
   };
 
   renderManagerGrid(resumenData || {});
+  renderSpendBusinessTable(resumenData || {});
 
   const chartOptions = {
     responsive: true,
@@ -2005,6 +2545,7 @@
 
     let negocioActivo = null;
     const sedeActivaPorNegocio = {};
+    const subnegocioActivoPorNegocio = {};
 
     const porcentaje = (value, total) => total ? Math.round((Number(value || 0) / Number(total || 1)) * 100) : 0;
     const renderPlacas = (placas = []) => {
@@ -2024,15 +2565,45 @@
     const renderCompras = (compras = []) => {
       if (!compras.length) return '<div class="business-empty">No hay compras generales para este filtro.</div>';
 
-      return compras.map(compra => `
-        <div class="compra-row">
-          <div>
-            <div class="compra-title">${escapeHtml(compra.nombre || '-')}</div>
-            <div class="compra-meta">${formatNumber(compra.registros || 0)} movimiento(s) · ${escapeHtml(compra.categoria || 'Sin categoría')}</div>
-          </div>
-          <div class="placa-money">${formatMoney(compra.total || 0)}</div>
-        </div>
-      `).join('');
+      return compras.map(compra => {
+        const movimientos = Array.isArray(compra.movimientos) ? compra.movimientos : [];
+        return `
+          <details class="compra-row">
+            <summary class="compra-summary">
+              <div>
+                <div class="compra-title">${escapeHtml(compra.nombre || '-')}</div>
+                <div class="compra-meta">
+                  ${formatNumber(compra.registros || 0)} movimiento(s) · ${escapeHtml(compra.categoria || 'Sin categoría')}
+                  ${Number(compra.movimientos_total || 0) > movimientos.length ? ` · mostrando ${formatNumber(movimientos.length)} de ${formatNumber(compra.movimientos_total)}` : ''}
+                </div>
+              </div>
+              <div class="placa-money">${formatMoney(compra.total || 0)}</div>
+            </summary>
+            <div class="compra-details">
+              ${movimientos.length ? movimientos.map(mov => {
+                const referencia = mov.po_numero && mov.po_numero !== '-' ? mov.po_numero : `${mov.fuente_nombre || 'Movimiento'} #${mov.id || '-'}`;
+                return `
+                  <div class="movimiento-row">
+                    <div>
+                      <div class="movimiento-title">${escapeHtml(referencia)}</div>
+                      <div class="movimiento-meta">${escapeHtml(mov.fuente_nombre || 'Movimiento')} · ${formatDate(mov.fecha)}</div>
+                      <div class="movimiento-meta">Placa actual: ${escapeHtml(mov.placa || 'GENERAL')} · ${escapeHtml(mov.sede || 'Sin sede asignada')}</div>
+                    </div>
+                    <div>
+                      <div class="movimiento-title">${escapeHtml(mov.proveedor || 'No registrado')}</div>
+                      <div class="movimiento-desc">${escapeHtml(mov.descripcion || mov.observaciones || '-')}</div>
+                    </div>
+                    <div class="movimiento-actions">
+                      <div class="placa-money">${formatMoney(mov.monto || 0)}</div>
+                      ${mov.url ? `<a class="movimiento-link" href="${escapeHtml(mov.url)}">Editar</a>` : ''}
+                    </div>
+                  </div>
+                `;
+              }).join('') : '<div class="business-empty py-2">No hay movimientos detallados para este grupo.</div>'}
+            </div>
+          </details>
+        `;
+      }).join('');
     };
 
     const renderSedes = (negocio, negocioIndex) => {
@@ -2057,6 +2628,35 @@
       }).join('');
     };
 
+    const renderSubnegociosTransportadora = (negocio, negocioIndex) => {
+      const subnegocios = negocio.subnegocios || [];
+      if (!subnegocios.length) return renderSedes(negocio, negocioIndex);
+      const subActivo = subnegocioActivoPorNegocio[negocioIndex] ?? 0;
+
+      return subnegocios.map((subnegocio, subIndex) => {
+        const open = subActivo === subIndex;
+        const sedeKey = `${negocioIndex}-${subIndex}`;
+        if (open && sedeActivaPorNegocio[sedeKey] === undefined) sedeActivaPorNegocio[sedeKey] = 0;
+        const detalle = (subnegocio.sedes || [])
+          .slice(0, 3)
+          .map(sede => `${sede.nombre}: ${formatMoney(sede.total || 0)}`)
+          .join(' · ');
+
+        return `
+          <div class="sede-node ${open ? 'open' : ''}">
+            <button type="button" class="sede-toggle subnegocio-toggle" data-negocio-index="${negocioIndex}" data-subnegocio-index="${subIndex}">
+              <div class="sede-main">
+                <div class="sede-title">${escapeHtml(subnegocio.nombre || '-')}</div>
+                <div class="sede-meta">${Number(subnegocio.registros || 0).toLocaleString('es-CR')} movimiento(s) · ${porcentaje(subnegocio.total, negocio.total)}% de Transportadora${detalle ? ` · ${escapeHtml(detalle)}` : ''}</div>
+              </div>
+              <div class="sede-money">${formatMoney(subnegocio.total || 0)}</div>
+            </button>
+            <div class="sede-body">${renderSedes({ sedes: subnegocio.sedes || [], total: subnegocio.total || 0 }, sedeKey)}</div>
+          </div>
+        `;
+      }).join('');
+    };
+
     const renderAccordion = () => {
       const totalPeriodo = negociosData.reduce((sum, item) => sum + Number(item.total || 0), 0);
       if (!negociosData.length) {
@@ -2075,7 +2675,13 @@
               </div>
               <div class="business-money">${formatMoney(negocio.total || 0)}</div>
             </button>
-            <div class="business-body">${negocio.clave === 'generales' ? renderCompras(negocio.compras || []) : renderSedes(negocio, negocioIndex)}</div>
+            <div class="business-body">${
+              ['generales', 'aceites'].includes(negocio.clave)
+                ? renderCompras(negocio.compras || [])
+                : negocio.clave === 'transportadora'
+                ? renderSubnegociosTransportadora(negocio, negocioIndex)
+                : renderSedes(negocio, negocioIndex)
+            }</div>
           </article>
         `;
       }).join('');
@@ -2094,9 +2700,23 @@
       accordion.querySelectorAll('.sede-toggle').forEach(btn => {
         btn.addEventListener('click', (event) => {
           event.stopPropagation();
-          const negocioIndex = Number(btn.dataset.negocioIndex || 0);
+          if (btn.classList.contains('subnegocio-toggle')) return;
+          const negocioIndex = btn.dataset.negocioIndex || '0';
           const sedeIndex = Number(btn.dataset.sedeIndex || 0);
           sedeActivaPorNegocio[negocioIndex] = sedeActivaPorNegocio[negocioIndex] === sedeIndex ? null : sedeIndex;
+          renderAccordion();
+        });
+      });
+
+      accordion.querySelectorAll('.subnegocio-toggle').forEach(btn => {
+        btn.addEventListener('click', (event) => {
+          event.stopPropagation();
+          const negocioIndex = Number(btn.dataset.negocioIndex || 0);
+          const subIndex = Number(btn.dataset.subnegocioIndex || 0);
+          subnegocioActivoPorNegocio[negocioIndex] = subnegocioActivoPorNegocio[negocioIndex] === subIndex ? null : subIndex;
+          if (subnegocioActivoPorNegocio[negocioIndex] !== null && sedeActivaPorNegocio[`${negocioIndex}-${subIndex}`] === undefined) {
+            sedeActivaPorNegocio[`${negocioIndex}-${subIndex}`] = 0;
+          }
           renderAccordion();
         });
       });
@@ -2202,6 +2822,7 @@
 
         updateKpis(next);
         renderManagerGrid(next);
+        renderSpendBusinessTable(next);
         if (typeof window.renderNegocioAccordion === 'function') {
           window.renderNegocioAccordion(negociosData);
         }

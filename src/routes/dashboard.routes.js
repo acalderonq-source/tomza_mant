@@ -247,12 +247,58 @@ function clasificarGastoOperativo(item) {
   return clasificarTexto(`${item.descripcion} ${item.proveedor}`, FAMILIAS_GASTO_OPERATIVO, "motor");
 }
 
+function clasificarDetalleTransportadora(item) {
+  const placa = normalizarPlacaLocal(item.placa || item.placa_registrada || item.codigo || item.placa_unidad);
+  const texto = normalizarTexto([
+    item.placa,
+    item.placa_registrada,
+    item.codigo,
+    item.placa_unidad,
+    item.descripcion,
+    item.observaciones,
+    item.proveedor,
+    item.sede
+  ].filter(Boolean).join(" "));
+
+  if (texto.includes("tandem") || texto.includes("tamden")) {
+    return { clave: "transportadora_tandem", nombre: "Tándem", color: "#0891b2" };
+  }
+
+  if (
+    texto.includes("carreta") ||
+    texto.includes("carretas") ||
+    texto.includes("trailer") ||
+    texto.includes("remolque") ||
+    texto.includes("quinta rueda") ||
+    texto.includes("hendrickson")
+  ) {
+    return { clave: "transportadora_carretas", nombre: "Carretas", color: "#2563eb" };
+  }
+
+  if (/^S\d{5,6}$/.test(placa) || texto.includes("cisterna") || texto.includes("cisternas")) {
+    return { clave: "transportadora_cisternas", nombre: "Cisternas", color: "#0f766e" };
+  }
+
+  return { clave: "transportadora_cabezales", nombre: "Cabezales", color: "#0b3b82" };
+}
+
 function clasificarNegocioGasto(item) {
   const sedeNormalizada = normalizarTexto(item.sede);
   const placa = normalizarPlacaLocal(item.placa);
+  const esDetalleTransportadora = ["cabezales", "cisternas", "carretas", "tandem", "tamden"]
+    .some(valor => sedeNormalizada.includes(valor));
 
-  if (sedeNormalizada.includes("transportadora") || /^S\d{5,6}$/.test(placa)) {
-    return { clave: "transportadora", nombre: "Transportadora", color: "#0b3b82" };
+  if (placa === "ACEITES" || item.familia?.clave === "aceites") {
+    return { clave: "aceites", nombre: "Aceites", color: "#0f766e" };
+  }
+
+  if (sedeNormalizada.includes("transportadora") || esDetalleTransportadora || /^S\d{5,6}$/.test(placa)) {
+    return {
+      clave: "transportadora",
+      nombre: "Transportadora",
+      color: "#0b3b82",
+      subnegocio: clasificarDetalleTransportadora(item)
+    };
   }
 
   if (sedeNormalizada.includes("granel")) {
@@ -330,6 +376,41 @@ function describirCompraGerencial(item) {
 
   const proveedor = recortarResumen(item.proveedor, 40);
   return proveedor !== "-" ? proveedor : "Compra general";
+}
+
+function urlMovimientoGasto(item) {
+  if (!item || !item.id) return "";
+  if (item.fuente === "ORDEN") return `/compras/ordenes/${item.id}/editar`;
+  if (item.fuente === "ORDEN_MOTOR") return `/ordenes-motor/${item.id}/editar`;
+  if (item.fuente === "PAGO_PROVEEDOR") return "/compras/pagos-proveedor";
+  if (item.fuente === "CAJA_CHICA") return "/compras/caja-chica";
+  return "";
+}
+
+function etiquetaFuenteGasto(item) {
+  if (item.fuente === "ORDEN") return "Orden de compra";
+  if (item.fuente === "ORDEN_MOTOR") return "Orden motor";
+  if (item.fuente === "PAGO_PROVEEDOR") return "Pago proveedor";
+  if (item.fuente === "CAJA_CHICA") return "Caja chica";
+  return "Movimiento";
+}
+
+function movimientoParaRevisionPlaca(item) {
+  return {
+    id: item.id,
+    fuente: item.fuente,
+    fuente_nombre: etiquetaFuenteGasto(item),
+    url: urlMovimientoGasto(item),
+    po_numero: item.po_numero || "-",
+    fecha: item.fecha || null,
+    proveedor: item.proveedor || "No registrado",
+    placa: item.placa || "GENERAL",
+    sede: item.sede ? etiquetaSedeTomza(item.sede) : "Sin sede asignada",
+    descripcion: recortarResumen(item.descripcion || item.observaciones, 140),
+    observaciones: recortarResumen(item.observaciones, 140),
+    monto: Number(item.monto || 0),
+    categoria: item.familia?.nombre || "Sin rubro"
+  };
 }
 
 function sumarGrupo(map, key, base = {}) {
@@ -829,17 +910,22 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro, pe
       color: negocioInfo.color,
       sedes: new Map(),
       placas: new Map(),
-      compras: new Map()
+      compras: new Map(),
+      subnegocios: new Map()
     });
     negocio.total += item.monto;
     negocio.registros += 1;
 
     const compraNegocio = sumarGrupo(negocio.compras, describirCompraGerencial(item), {
       categoria: item.familia.nombre,
-      color: item.familia.color
+      color: item.familia.color,
+      movimientos: []
     });
     compraNegocio.total += item.monto;
     compraNegocio.registros += 1;
+    if (["generales", "aceites"].includes(negocioInfo.clave)) {
+      compraNegocio.movimientos.push(movimientoParaRevisionPlaca(item));
+    }
 
     const sedeNegocio = item.tieneSedeReal ? etiquetaSedeTomza(item.sede) : "General / taller";
     const sedeItem = sumarGrupo(negocio.sedes, sedeNegocio, { placas: new Map() });
@@ -854,6 +940,34 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro, pe
     const placaSedeItem = sumarGrupo(sedeItem.placas, placaNegocio, { sede: sedeNegocio });
     placaSedeItem.total += item.monto;
     placaSedeItem.registros += 1;
+
+    if (negocioInfo.subnegocio) {
+      const subnegocio = sumarGrupo(negocio.subnegocios, negocioInfo.subnegocio.nombre, {
+        clave: negocioInfo.subnegocio.clave,
+        color: negocioInfo.subnegocio.color,
+        sedes: new Map(),
+        placas: new Map(),
+        rubros: new Map()
+      });
+      subnegocio.total += item.monto;
+      subnegocio.registros += 1;
+
+      const rubroSubnegocio = sumarGrupo(subnegocio.rubros, rubroNombre, { color: rubroColor });
+      rubroSubnegocio.total += item.monto;
+      rubroSubnegocio.registros += 1;
+
+      const sedeSubnegocio = sumarGrupo(subnegocio.sedes, sedeNegocio, { placas: new Map() });
+      sedeSubnegocio.total += item.monto;
+      sedeSubnegocio.registros += 1;
+
+      const placaSubnegocio = sumarGrupo(subnegocio.placas, placaNegocio, { sede: sedeNegocio });
+      placaSubnegocio.total += item.monto;
+      placaSubnegocio.registros += 1;
+
+      const placaSedeSubnegocio = sumarGrupo(sedeSubnegocio.placas, placaNegocio, { sede: sedeNegocio });
+      placaSedeSubnegocio.total += item.monto;
+      placaSedeSubnegocio.registros += 1;
+    }
 
     const negocioRubro = sumarGrupo(porNegocioRubro, negocioInfo.nombre, {
       clave: negocioInfo.clave,
@@ -1045,6 +1159,7 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro, pe
     { clave: "transportadora", nombre: "Transportadora", color: "#0b3b82" },
     { clave: "granel", nombre: "Graneleras", color: "#0f766e" },
     { clave: "comodines", nombre: "Comodines", color: "#7c3aed" },
+    { clave: "aceites", nombre: "Aceites", color: "#0f766e" },
     { clave: "generales", nombre: "Generales", color: "#64748b" }
   ];
   const negociosGasto = negociosBase
@@ -1055,7 +1170,8 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro, pe
         registros: 0,
         sedes: new Map(),
         placas: new Map(),
-        compras: new Map()
+        compras: new Map(),
+        subnegocios: new Map()
       };
       return {
         nombre: item.nombre,
@@ -1071,7 +1187,48 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro, pe
           placas: ordenarTop(sede.placas || new Map(), 15)
         })),
         placas: ordenarTop(item.placas, 8),
+        subnegocios: ordenarTop(item.subnegocios || new Map(), 8).map(subnegocio => {
+          const totalSubnegocio = Number(subnegocio.total || 0);
+          return {
+            nombre: subnegocio.nombre,
+            clave: subnegocio.clave,
+            color: subnegocio.color,
+            total: subnegocio.total,
+            registros: subnegocio.registros,
+            porcentaje: Number(item.total || 0) ? Math.round((totalSubnegocio / Number(item.total || 1)) * 100) : 0,
+            rubros: ordenarTop(subnegocio.rubros || new Map(), 8).map(rubro => ({
+              nombre: rubro.nombre,
+              color: rubro.color,
+              total: rubro.total,
+              registros: rubro.registros,
+              porcentaje: totalSubnegocio ? Math.round((Number(rubro.total || 0) / totalSubnegocio) * 100) : 0
+            })),
+            sedes: ordenarTop(subnegocio.sedes || new Map(), 8).map(sede => ({
+              nombre: sede.nombre,
+              total: sede.total,
+              registros: sede.registros,
+              porcentaje: totalSubnegocio ? Math.round((Number(sede.total || 0) / totalSubnegocio) * 100) : 0,
+              placas: ordenarTop(sede.placas || new Map(), 12).map(placa => ({
+                nombre: placa.nombre,
+                sede: placa.sede,
+                total: placa.total,
+                registros: placa.registros,
+                porcentaje: Number(sede.total || 0) ? Math.round((Number(placa.total || 0) / Number(sede.total || 1)) * 100) : 0
+              }))
+            })),
+            placas: ordenarTop(subnegocio.placas || new Map(), 12)
+          };
+        }),
         compras: ordenarTop(item.compras || new Map(), 12)
+          .map(compra => ({
+            ...compra,
+            movimientos_total: Array.isArray(compra.movimientos) ? compra.movimientos.length : 0,
+            movimientos: Array.isArray(compra.movimientos)
+              ? compra.movimientos
+                .sort((a, b) => Number(b.monto || 0) - Number(a.monto || 0))
+                .slice(0, 80)
+              : []
+          }))
       };
     });
   const rubrosPorNegocio = negociosBase.map(base => {

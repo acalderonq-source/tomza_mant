@@ -3,14 +3,16 @@ const router = express.Router();
 const pool = require("../db");
 const {
   agregarTallerParaMecanico,
+  clasificarSubgrupoTransportadora,
   etiquetaSede,
   esSedeTransporte,
   esUsuarioTodasSedes,
+  expandirSedesEquivalentes,
   obtenerTodasSedes,
   obtenerSedesTransporte,
   sedeGranelDesdeUsuario
 } = require("../utils/sedes");
-const { agregarFiltroPlacaSql, normalizarPlaca } = require("../utils/placas");
+const { agregarFiltroPlacaSql } = require("../utils/placas");
 
 const SEDES_CILINDREROS = [
   "ALAJUELA",
@@ -87,7 +89,7 @@ async function obtenerSedesPermitidas(req) {
 
   if (esUsuarioTodasSedes(user)) {
     if (req.session.sedeSeleccionada && req.session.sedeSeleccionada !== "TODAS") {
-      return [req.session.sedeSeleccionada];
+      return expandirSedesEquivalentes(req.session.sedeSeleccionada);
     }
     return [];
   }
@@ -102,9 +104,9 @@ async function obtenerSedesPermitidas(req) {
       req.session.sedeSeleccionada !== "TODAS" &&
       req.session.sedeSeleccionada === sedeGranelUsuario
     ) {
-      return [req.session.sedeSeleccionada];
+      return expandirSedesEquivalentes(req.session.sedeSeleccionada);
     }
-    return [sedeGranelUsuario];
+    return expandirSedesEquivalentes(sedeGranelUsuario);
   }
 
   if (esUsuarioPesados) {
@@ -113,7 +115,7 @@ async function obtenerSedesPermitidas(req) {
       req.session.sedeSeleccionada !== "TODAS" &&
       esSedeTransporte(req.session.sedeSeleccionada)
     ) {
-      return [req.session.sedeSeleccionada];
+      return expandirSedesEquivalentes(req.session.sedeSeleccionada);
     }
     return obtenerSedesTransporte(pool);
   }
@@ -132,10 +134,10 @@ async function obtenerSedesPermitidas(req) {
     req.session.sedeSeleccionada &&
     todasLasSedes.includes(req.session.sedeSeleccionada)
   ) {
-    return [req.session.sedeSeleccionada];
+    return expandirSedesEquivalentes(req.session.sedeSeleccionada);
   }
 
-  return todasLasSedes;
+  return expandirSedesEquivalentes(todasLasSedes);
 }
 
 async function obtenerSedesEditables(req) {
@@ -146,30 +148,54 @@ async function obtenerSedesEditables(req) {
   return obtenerSedesPermitidas(req);
 }
 
-function redirectUnidades(req, res) {
+function redirectUnidades(req, res, mensajes = {}) {
+  const referer = String(req.get("referer") || "");
+  let pathname = "/unidades";
   const params = new URLSearchParams();
-  ["estado", "varado", "placa"].forEach(key => {
-    const value = String(req.body[key] || req.query[key] || "").trim();
-    if (value) params.set(key, value);
-  });
-  res.redirect(`/unidades${params.toString() ? `?${params.toString()}` : ""}`);
+
+  try {
+    const url = new URL(referer);
+    if (url.pathname === "/unidades") {
+      pathname = url.pathname;
+      url.searchParams.forEach((value, key) => {
+        if (!["success", "error"].includes(key)) params.set(key, value);
+      });
+    }
+  } catch (_) {
+    ["estado", "varado", "placa"].forEach(key => {
+      const value = String(req.body[key] || req.query[key] || "").trim();
+      if (value) params.set(key, value);
+    });
+  }
+
+  if (mensajes.success) params.set("success", mensajes.success);
+  if (mensajes.error) params.set("error", mensajes.error);
+
+  res.redirect(`${pathname}${params.toString() ? `?${params.toString()}` : ""}`);
 }
 
 function puedeVerUnidad(unidad, sedesPermitidas) {
   return sedesPermitidas.length === 0 || sedesPermitidas.includes(unidad.sede);
 }
 
-function actualizarSedeSesionSiPuede(req, sede) {
-  const sedeLimpia = String(sede || "").trim();
-  if (!sedeLimpia) return;
-
-  if (esUsuarioTodasSedes(req.session.user) || req.session.sedeSeleccionada) {
-    req.session.sedeSeleccionada = sedeLimpia;
-  }
+function normalizarPlacaUnidad(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, "")
+    .trim();
 }
 
-function normalizarPlacaUnidad(value) {
-  return normalizarPlaca(value) || "";
+function construirPlacaUnidad({ placa, prefijo, numero } = {}) {
+  const prefijoLimpio = normalizarPlacaUnidad(prefijo);
+  const numeroLimpio = normalizarPlacaUnidad(numero);
+
+  if (numeroLimpio) {
+    return `${prefijoLimpio}${numeroLimpio}`;
+  }
+
+  return normalizarPlacaUnidad(placa);
 }
 
 function normalizarClaveNegocio(value) {
@@ -193,10 +219,10 @@ function clasificarNegocioUnidad(unidad) {
     };
   }
 
-  if (sede === "TRANSPORTADORA") {
+  if (sede === "TRANSPORTADORA" || ["CABEZAL", "CABEZALES", "CISTERNA", "CISTERNAS", "CARRETA", "CARRETAS", "TANDEM", "TAMDEN"].some(valor => sede.includes(valor))) {
     return {
       negocio: "TRANSPORTADORA",
-      subgrupo: placa.startsWith("S") ? "Cisternas y carretas" : "Cabezales"
+      subgrupo: clasificarSubgrupoTransportadora({ sede: unidad.sede, placa: unidad.placa })
     };
   }
 
@@ -240,7 +266,7 @@ function agruparUnidadesPorNegocio(unidades) {
   const subgruposBase = {
     CILINDREROS: ["Alajuela", "Cartago", "Guapiles", "La Cruz", "Nicoya", "Orotina", "Perez Zeledon", "Rio Claro", "San Carlos"],
     GRANELES: ["Granel Cartago", "Granel Alajuela", "Granel La Cruz", "Granel Guapiles", "Granel Perez Zeledon"],
-    TRANSPORTADORA: ["Cabezales", "Cisternas y carretas"],
+    TRANSPORTADORA: ["Cabezales", "Cisternas", "Carretas", "Tándem"],
     OTROS: ["Taller", "Tecnicos", "Otros"]
   };
 
@@ -418,8 +444,12 @@ async function agregarUnidad(req, res) {
       return res.status(403).send("No autorizado");
     }
 
-    const { placa, sede } = req.body;
-    const placaNormalizada = normalizarPlacaUnidad(placa);
+    const { sede } = req.body;
+    const placaNormalizada = construirPlacaUnidad({
+      placa: req.body.placa,
+      prefijo: req.body.placa_prefijo,
+      numero: req.body.placa_numero
+    });
 
     if (!placaNormalizada) {
       return res.status(400).send("La placa es obligatoria");
@@ -445,9 +475,9 @@ async function agregarUnidad(req, res) {
       const sedesPermitidas = await obtenerSedesPermitidas(req);
 
       if (!esUsuarioTodasSedes(req.session.user) && !puedeVerUnidad(existente, sedesPermitidas)) {
-        return res.redirect(
-          `/unidades?error=${encodeURIComponent(`La unidad ${placaNormalizada} ya existe en otra sede.`)}&placa=${encodeURIComponent(placaNormalizada)}&estado=todas`
-        );
+        return redirectUnidades(req, res, {
+          error: `La unidad ${placaNormalizada} ya existe en otra sede.`
+        });
       }
 
       await pool.query(
@@ -458,11 +488,9 @@ async function agregarUnidad(req, res) {
         [sedeAsignada, existente.id]
       );
 
-      actualizarSedeSesionSiPuede(req, sedeAsignada);
-
-      return res.redirect(
-        `/unidades?success=${encodeURIComponent(`La unidad ${placaNormalizada} ya existía. Se actualizó y quedó activa.`)}&placa=${encodeURIComponent(placaNormalizada)}&estado=todas`
-      );
+      return redirectUnidades(req, res, {
+        success: `La unidad ${placaNormalizada} ya existía. Se actualizó y quedó activa.`
+      });
     }
 
     await pool.query(
@@ -470,17 +498,19 @@ async function agregarUnidad(req, res) {
       [placaNormalizada, sedeAsignada]
     );
 
-    actualizarSedeSesionSiPuede(req, sedeAsignada);
-
-    res.redirect(
-      `/unidades?success=${encodeURIComponent(`Unidad ${placaNormalizada} agregada correctamente.`)}&placa=${encodeURIComponent(placaNormalizada)}`
-    );
+    return redirectUnidades(req, res, {
+      success: `Unidad ${placaNormalizada} agregada correctamente.`
+    });
   } catch (error) {
     if (error.code === "ER_DUP_ENTRY") {
-      const placaNormalizada = normalizarPlacaUnidad(req.body.placa);
-      return res.redirect(
-        `/unidades?error=${encodeURIComponent(`La unidad ${placaNormalizada} ya está registrada.`)}&placa=${encodeURIComponent(placaNormalizada)}&estado=todas`
-      );
+      const placaNormalizada = construirPlacaUnidad({
+        placa: req.body.placa,
+        prefijo: req.body.placa_prefijo,
+        numero: req.body.placa_numero
+      });
+      return redirectUnidades(req, res, {
+        error: `La unidad ${placaNormalizada} ya está registrada.`
+      });
     }
 
     console.error("ERROR agregar unidad:", error);
@@ -491,6 +521,160 @@ async function agregarUnidad(req, res) {
 // ===================== AGREGAR UNIDAD =====================
 router.post("/", agregarUnidad);
 router.post("/agregar", agregarUnidad);
+
+// ===================== GUARDAR CAMBIOS DEL LISTADO =====================
+router.post("/guardar-masivo", async (req, res) => {
+  const conn = await pool.getConnection();
+  try {
+    await ensureUnidadEstadoColumns();
+
+    if (!puedeEditarUnidades(req.session.user)) {
+      return res.status(403).send("No autorizado");
+    }
+
+    const cambios = req.body.unidades || {};
+    const ids = Object.keys(cambios)
+      .map(id => parseInt(id, 10))
+      .filter(id => !Number.isNaN(id));
+
+    if (!ids.length) {
+      return redirectUnidades(req, res, {
+        error: "No hay unidades para guardar."
+      });
+    }
+
+    const sedesPermitidas = await obtenerSedesPermitidas(req);
+    const sedesEditables = await obtenerSedesEditables(req);
+    const [actuales] = await pool.query(
+      `SELECT id, placa, sede, activa, varada, razon_varada
+       FROM unidades
+       WHERE id IN (?)`,
+      [ids]
+    );
+
+    await conn.beginTransaction();
+
+    let actualizadas = 0;
+    for (const unidad of actuales) {
+      if (!esUsuarioTodasSedes(req.session.user) && !puedeVerUnidad(unidad, sedesPermitidas)) {
+        continue;
+      }
+
+      const cambio = cambios[String(unidad.id)] || {};
+      const placaNueva = construirPlacaUnidad({
+        placa: cambio.placa || unidad.placa,
+        prefijo: cambio.placa_prefijo,
+        numero: cambio.placa_numero
+      });
+      const sedeNueva = String(cambio.sede || "").trim();
+
+      if (!placaNueva) {
+        await conn.rollback();
+        return redirectUnidades(req, res, {
+          error: `La placa de ${unidad.placa} no puede quedar vacía.`
+        });
+      }
+
+      if (!sedeNueva || !sedesEditables.includes(sedeNueva)) {
+        await conn.rollback();
+        return redirectUnidades(req, res, {
+          error: `Seleccione una sede permitida para ${unidad.placa}.`
+        });
+      }
+
+      let activa = cambio.activa === "0" ? 0 : 1;
+      let varada = cambio.varada === "1" ? 1 : 0;
+      let razon = String(cambio.razon_varada || "").trim();
+
+      if (varada === 0) {
+        razon = "";
+      }
+
+      if (activa === 0) {
+        varada = 0;
+        razon = "";
+      }
+
+      if (varada === 1) {
+        activa = 1;
+        if (!razon) {
+          await conn.rollback();
+          return redirectUnidades(req, res, {
+            error: `Debe indicar la razón de varada para ${unidad.placa}.`
+          });
+        }
+      }
+
+      const cambioPlaca = String(unidad.placa || "") !== placaNueva;
+      const cambioSede = String(unidad.sede || "") !== sedeNueva;
+      const cambioEstado = Number(unidad.activa || 0) !== activa;
+      const cambioVarada = Number(unidad.varada || 0) !== varada;
+      const cambioRazon = String(unidad.razon_varada || "") !== razon;
+
+      if (!cambioPlaca && !cambioSede && !cambioEstado && !cambioVarada && !cambioRazon) {
+        continue;
+      }
+
+      if (cambioPlaca) {
+        const [[duplicada]] = await conn.query(
+          "SELECT id, placa FROM unidades WHERE placa = ? AND id <> ? LIMIT 1",
+          [placaNueva, unidad.id]
+        );
+
+        if (duplicada) {
+          await conn.rollback();
+          return redirectUnidades(req, res, {
+            error: `No se pudo cambiar ${unidad.placa} a ${placaNueva}, porque esa placa ya existe.`
+          });
+        }
+      }
+
+      await conn.query(
+        `UPDATE unidades
+         SET placa = ?,
+             sede = ?,
+             activa = ?,
+             varada = ?,
+             razon_varada = ?
+         WHERE id = ?`,
+        [placaNueva, sedeNueva, activa, varada, razon || null, unidad.id]
+      );
+
+      if (cambioSede) {
+        await conn.query(
+          `INSERT INTO unidades_sede_historial
+           (unidad_id, placa, sede_anterior, sede_nueva, usuario_id, usuario_nombre)
+           VALUES (?, ?, ?, ?, ?, ?)`,
+          [
+            unidad.id,
+            placaNueva,
+            unidad.sede || null,
+            sedeNueva,
+            req.session.user.id || null,
+            req.session.user.usuario || req.session.user.nombre || req.session.user.rol || null
+          ]
+        );
+      }
+
+      actualizadas += 1;
+    }
+
+    await conn.commit();
+    return redirectUnidades(req, res, {
+      success: actualizadas
+        ? `${actualizadas} unidad(es) actualizada(s) correctamente.`
+        : "No había cambios nuevos para guardar."
+    });
+  } catch (error) {
+    try {
+      await conn.rollback();
+    } catch (_) {}
+    console.error("ERROR guardando unidades masivo:", error);
+    res.status(500).send("Error interno");
+  } finally {
+    conn.release();
+  }
+});
 
 // ===================== ACTIVAR / INACTIVAR UNIDAD =====================
 router.post("/:id/estado", async (req, res) => {
@@ -522,7 +706,9 @@ router.post("/:id/estado", async (req, res) => {
       [activa, activa, activa, id]
     );
 
-    res.redirect("/unidades");
+    return redirectUnidades(req, res, {
+      success: "Estado de unidad actualizado."
+    });
   } catch (error) {
     console.error("ERROR actualizando estado unidad:", error);
     res.status(500).send("Error interno");
@@ -552,9 +738,9 @@ router.post("/:id/sede", async (req, res) => {
     const sedesEditables = await obtenerSedesEditables(req);
 
     if (!sedeNueva || !sedesEditables.includes(sedeNueva)) {
-      return res.redirect(
-        `/unidades?error=${encodeURIComponent("Seleccione una sede permitida.")}`
-      );
+      return redirectUnidades(req, res, {
+        error: "Seleccione una sede permitida."
+      });
     }
 
     const unidad = resultado.unidad;
@@ -584,11 +770,9 @@ router.post("/:id/sede", async (req, res) => {
       ]
     );
 
-    actualizarSedeSesionSiPuede(req, sedeNueva);
-
-    return res.redirect(
-      `/unidades?success=${encodeURIComponent(`Sede actualizada para ${unidad.placa}.`)}&placa=${encodeURIComponent(unidad.placa)}&estado=todas`
-    );
+    return redirectUnidades(req, res, {
+      success: `Sede actualizada para ${unidad.placa}.`
+    });
   } catch (error) {
     console.error("ERROR actualizando sede unidad:", error);
     res.status(500).send("Error interno");
@@ -630,7 +814,9 @@ router.post("/:id/varada", async (req, res) => {
       [varada, varada ? razon : null, varada, id]
     );
 
-    res.redirect("/unidades");
+    return redirectUnidades(req, res, {
+      success: varada ? "Unidad marcada como varada." : "Unidad quitada de varada."
+    });
   } catch (error) {
     console.error("ERROR actualizando unidad varada:", error);
     res.status(500).send("Error interno");
