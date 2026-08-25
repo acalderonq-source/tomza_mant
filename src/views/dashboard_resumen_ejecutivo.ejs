@@ -155,43 +155,214 @@
       height: 1px;
     }
 
-    .decision-strip {
+    .manager-grid {
       display: grid;
-      gap: .8rem;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: .9rem;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
-    .decision-card {
+    .manager-card {
       background: #fff;
       border: 1px solid var(--line);
-      border-left: 5px solid var(--decision-color, var(--blue));
-      border-radius: 16px;
-      box-shadow: 0 10px 24px rgba(15, 23, 42, .055);
-      padding: .95rem;
+      border-radius: 18px;
+      box-shadow: 0 12px 30px rgba(15, 23, 42, .065);
+      overflow: hidden;
     }
 
-    .decision-label {
+    .manager-card.manager-wide {
+      grid-column: span 2;
+    }
+
+    .manager-head {
+      align-items: center;
+      background: linear-gradient(90deg, #0b2f6b, #123f91);
+      color: #fff;
+      display: flex;
+      gap: .8rem;
+      justify-content: space-between;
+      padding: .85rem 1rem;
+    }
+
+    .manager-title {
+      font-size: .98rem;
+      font-weight: 950;
+      margin: 0;
+    }
+
+    .manager-subtitle {
+      color: rgba(255,255,255,.76);
+      font-size: .72rem;
+      font-weight: 800;
+      margin-top: .12rem;
+    }
+
+    .manager-body {
+      padding: .85rem 1rem 1rem;
+    }
+
+    .manager-row {
+      align-items: center;
+      border-bottom: 1px solid #e6edf6;
+      display: grid;
+      gap: .7rem;
+      grid-template-columns: minmax(0, 1fr) auto;
+      padding: .64rem 0;
+    }
+
+    .manager-row:last-child {
+      border-bottom: 0;
+    }
+
+    .manager-name {
+      color: #0f172a;
+      font-size: .86rem;
+      font-weight: 950;
+      line-height: 1.15;
+    }
+
+    .manager-meta {
       color: var(--muted);
+      font-size: .72rem;
+      font-weight: 800;
+      margin-top: .18rem;
+    }
+
+    .manager-amount {
+      color: #0f172a;
+      font-size: .92rem;
+      font-weight: 950;
+      white-space: nowrap;
+    }
+
+    .manager-bar {
+      background: #edf2f7;
+      border-radius: 999px;
+      height: 7px;
+      margin-top: .35rem;
+      overflow: hidden;
+      width: 100%;
+    }
+
+    .manager-bar span {
+      background: var(--bar-color, var(--blue));
+      display: block;
+      height: 100%;
+      min-width: 4px;
+    }
+
+    .manager-matrix {
+      display: grid;
+      gap: .8rem;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .matrix-block {
+      border: 1px solid #dbe4f0;
+      border-left: 5px solid var(--matrix-color, var(--blue));
+      border-radius: 14px;
+      padding: .75rem;
+    }
+
+    .matrix-title {
+      color: #0f172a;
+      display: flex;
+      font-size: .88rem;
+      font-weight: 950;
+      gap: .55rem;
+      justify-content: space-between;
+      line-height: 1.2;
+      margin-bottom: .55rem;
+    }
+
+    .matrix-lines {
+      display: grid;
+      gap: .42rem;
+    }
+
+    .matrix-line {
+      align-items: center;
+      display: grid;
+      gap: .55rem;
+      grid-template-columns: minmax(0, 1fr) auto auto;
+    }
+
+    button.matrix-line {
+      background: transparent;
+      border: 0;
+      border-radius: 10px;
+      cursor: pointer;
+      padding: .2rem .25rem;
+      text-align: left;
+      width: 100%;
+    }
+
+    button.matrix-line:hover,
+    button.matrix-line.active {
+      background: #f1f5f9;
+    }
+
+    .matrix-line-sede {
+      margin-left: .65rem;
+    }
+
+    .matrix-nested {
+      border-left: 2px solid #dbe4f0;
+      display: grid;
+      gap: .32rem;
+      margin: .2rem 0 .3rem .35rem;
+      padding-left: .55rem;
+    }
+
+    .matrix-plate-list {
+      background: #f8fafc;
+      border: 1px solid #e6edf6;
+      border-radius: 12px;
+      display: grid;
+      gap: .25rem;
+      margin: .15rem 0 .35rem 1.1rem;
+      padding: .45rem;
+    }
+
+    .matrix-plate-row {
+      align-items: center;
+      display: grid;
+      gap: .5rem;
+      grid-template-columns: minmax(0, 1fr) auto auto;
+      padding: .18rem .1rem;
+    }
+
+    .matrix-plate-name {
+      color: #0f172a;
+      font-size: .76rem;
+      font-weight: 950;
+    }
+
+    .matrix-line-name {
+      color: #334155;
+      font-size: .77rem;
+      font-weight: 850;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .matrix-line-money {
+      color: #0f172a;
+      font-size: .78rem;
+      font-weight: 950;
+      white-space: nowrap;
+    }
+
+    .matrix-line-pct {
+      background: #edf2f7;
+      border-radius: 999px;
+      color: #334155;
       font-size: .68rem;
       font-weight: 950;
-      letter-spacing: .06em;
-      text-transform: uppercase;
-    }
-
-    .decision-title {
-      color: #0f172a;
-      font-size: 1.05rem;
-      font-weight: 950;
-      line-height: 1.16;
-      margin: .22rem 0 .25rem;
-    }
-
-    .decision-text {
-      color: #475569;
-      font-size: .82rem;
-      font-weight: 750;
-      line-height: 1.3;
-      margin: 0;
+      min-width: 38px;
+      padding: .15rem .35rem;
+      text-align: center;
     }
 
     .business-accordion {
@@ -324,6 +495,36 @@
 
     .placa-row + .placa-row {
       margin-top: .45rem;
+    }
+
+    .compra-row {
+      align-items: center;
+      background: #fff;
+      border: 1px solid #e6edf6;
+      border-radius: 11px;
+      display: grid;
+      gap: .75rem;
+      grid-template-columns: minmax(0, 1fr) auto;
+      padding: .58rem .65rem;
+    }
+
+    .compra-row + .compra-row {
+      margin-top: .45rem;
+    }
+
+    .compra-title {
+      color: #0f172a;
+      font-size: .86rem;
+      font-weight: 950;
+      line-height: 1.18;
+      word-break: break-word;
+    }
+
+    .compra-meta {
+      color: var(--muted);
+      font-size: .72rem;
+      font-weight: 800;
+      margin-top: .2rem;
     }
 
     .business-empty {
@@ -691,14 +892,18 @@
       .hero { padding: 1rem; }
       .metric-value { font-size: 1.35rem; }
       .chart-body { min-height: 260px; }
-      .decision-strip { grid-template-columns: 1fr; }
+      .manager-grid,
+      .manager-matrix { grid-template-columns: 1fr; }
+      .manager-card.manager-wide { grid-column: auto; }
       .detail-hub-head { align-items: flex-start; flex-direction: column; }
       .detail-grid { grid-template-columns: 1fr; }
       canvas { max-height: 280px; }
     }
 
     @media (min-width: 769px) and (max-width: 1180px) {
-      .decision-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .manager-grid,
+      .manager-matrix { grid-template-columns: 1fr; }
+      .manager-card.manager-wide { grid-column: auto; }
     }
 
     @media print {
@@ -713,10 +918,12 @@
       .chart-card,
       .table-card,
       .conclusion-card,
-      .decision-card {
+      .manager-card {
         box-shadow: none !important;
         break-inside: avoid;
       }
+      .manager-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .manager-card.manager-wide { grid-column: span 2; }
     }
   </style>
 </head>
@@ -733,7 +940,9 @@
   const safe = (arr) => Array.isArray(arr) ? arr : [];
   const contieneCategoriaOculta = (texto) => {
     const value = String(texto || '').toLowerCase();
-    return value.includes('otros por revisar') || value.includes('cabezales, carretas y cisternas');
+    return value.includes('otros por revisar') ||
+      value.includes('cabezales, carretas y cisternas') ||
+      value.includes('pago de proveedor');
   };
   const categorias = safe(data.categorias).filter(item => !contieneCategoriaOculta(item.nombre));
   const totalCategoriasOperativas = categorias.reduce((sum, item) => sum + Number(item.total || 0), 0);
@@ -743,6 +952,18 @@
   const sedesGasto = safe(data.sedes);
   const placasGasto = safe(data.placas);
   const negociosGasto = safe(data.negociosGasto);
+  const rubrosPorNegocio = safe(data.rubrosPorNegocio)
+    .map(negocio => ({
+      ...negocio,
+      rubros: safe(negocio.rubros).filter(item => !contieneCategoriaOculta(item.nombre))
+    }));
+  const negociosPorRubro = safe(data.negociosPorRubro)
+    .filter(item => !contieneCategoriaOculta(item.nombre))
+    .map(rubro => ({
+      ...rubro,
+      negocios: safe(rubro.negocios).filter(item => !contieneCategoriaOculta(item.nombre))
+    }))
+    .filter(rubro => rubro.negocios.length);
   const meses = safe(data.meses);
   const familiasMant = safe(data.familiasMant).filter(item => !contieneCategoriaOculta(item.nombre));
   const sedesMant = safe(data.sedesMant);
@@ -765,17 +986,7 @@
     minute: '2-digit',
     second: '2-digit'
   }).format(new Date());
-  const topCategoria = categorias[0] || {};
-  const topNegocio = [...negociosGasto].sort((a, b) => Number(b.total || 0) - Number(a.total || 0))[0] || {};
-  const topMantenimiento = familiasMant[0] || {};
   const totalGastosNumero = Number(data.totalGastos || 0);
-  const totalPagadoNumero = Number(resumenFinanciero.totalPagado || 0);
-  const pagosPendientesNumero = Number(resumenFinanciero.totalPagosProveedorPendientes || 0);
-  const gastoCorrectivoNumero = Number(resumenFinanciero.totalGastoCorrectivo || 0);
-  const gastoPreventivoNumero = Number(resumenFinanciero.totalGastoPreventivo || 0);
-  const balanceMantenimiento = gastoPreventivoNumero
-    ? `${(gastoCorrectivoNumero / gastoPreventivoNumero).toLocaleString('es-CR', { maximumFractionDigits: 1 })}x correctivo vs preventivo`
-    : gastoCorrectivoNumero ? 'Predomina correctivo' : 'Sin gasto de mantenimiento';
 %>
 
 <nav class="navbar navbar-dark topbar px-4 py-3">
@@ -785,7 +996,7 @@
       <span class="live-dot"></span>
       En vivo · <span id="refreshCountdown">60</span>s
     </span>
-    <span class="text-white small">Actualizado <%= horaActualizacion %></span>
+    <span class="text-white small">Actualizado <span id="lastUpdated"><%= horaActualizacion %></span></span>
     <span class="text-white small"><%= user.usuario %> · <%= user.rol %></span>
     <button type="button" class="btn btn-sm btn-light rounded-pill px-3 fw-bold" id="printExecutive">
       <i class="bi bi-printer me-1"></i>Imprimir
@@ -847,14 +1058,14 @@
     <div class="col-xl col-md-6">
       <div class="metric-card" style="--accent:#0b3b82">
         <div class="metric-label">Total gastado</div>
-        <div class="metric-value">₡<%= money(data.totalGastos) %></div>
-        <div class="metric-foot"><%= Number(data.totalRegistrosGasto || 0).toLocaleString('es-CR') %> movimientos de dinero</div>
+        <div class="metric-value" id="kpiTotalGastado">₡<%= money(data.totalGastos) %></div>
+        <div class="metric-foot" id="kpiTotalGastadoFoot"><%= Number(data.totalRegistrosGasto || 0).toLocaleString('es-CR') %> movimientos de dinero</div>
       </div>
     </div>
     <div class="col-xl col-md-6">
       <div class="metric-card" style="--accent:#198754">
         <div class="metric-label">Total pagado</div>
-        <div class="metric-value">₡<%= money(resumenFinanciero.totalPagado || 0) %></div>
+        <div class="metric-value" id="kpiTotalPagado">₡<%= money(resumenFinanciero.totalPagado || 0) %></div>
         <div class="metric-foot">
           Facturas, órdenes motor pagadas, proveedores pagados y caja chica
         </div>
@@ -863,15 +1074,15 @@
     <div class="col-xl col-md-6">
       <div class="metric-card" style="--accent:#ef233c">
         <div class="metric-label">Mayor tipo de gasto</div>
-        <div class="metric-value"><%= categorias[0]?.nombre || '-' %></div>
-        <div class="metric-foot">₡<%= money(categorias[0]?.total || 0) %> · <%= pct(categorias[0]?.total, totalCategoriasOperativas) %>% del gasto operativo</div>
+        <div class="metric-value" id="kpiMayorTipo"><%= categorias[0]?.nombre || '-' %></div>
+        <div class="metric-foot" id="kpiMayorTipoFoot">₡<%= money(categorias[0]?.total || 0) %> · <%= pct(categorias[0]?.total, totalCategoriasOperativas) %>% del gasto operativo</div>
       </div>
     </div>
     <div class="col-xl col-md-6">
       <div class="metric-card" style="--accent:#7c3aed">
         <div class="metric-label">Costo promedio por unidad</div>
-        <div class="metric-value">₡<%= money(costoUnidad.costoPromedioPorUnidad || 0) %></div>
-        <div class="metric-foot">
+        <div class="metric-value" id="kpiCostoUnidad">₡<%= money(costoUnidad.costoPromedioPorUnidad || 0) %></div>
+        <div class="metric-foot" id="kpiCostoUnidadFoot">
           <%= Number(costoUnidad.unidadesConGasto || 0).toLocaleString('es-CR') %> placa(s) con gasto ·
           <%= Number(costoUnidad.totalUnidadesFlota || 0).toLocaleString('es-CR') %> en flota
         </div>
@@ -880,39 +1091,141 @@
     <div class="col-xl col-md-6">
       <div class="metric-card" style="--accent:#f8b400">
         <div class="metric-label">Mantenimientos</div>
-        <div class="metric-value"><%= Number(data.totalMantenimientos || 0).toLocaleString('es-CR') %></div>
-        <div class="metric-foot"><%= familiasMant[0]?.nombre || '-' %> es lo más repetido</div>
+        <div class="metric-value" id="kpiMantenimientos"><%= Number(data.totalMantenimientos || 0).toLocaleString('es-CR') %></div>
+        <div class="metric-foot" id="kpiMantenimientosFoot"><%= familiasMant[0]?.nombre || '-' %> es lo más repetido</div>
       </div>
     </div>
     <div class="col-xl col-md-6">
       <div class="metric-card" style="--accent:#0f766e">
         <div class="metric-label">Placa con más gasto</div>
-        <div class="metric-value"><%= placasGasto[0]?.nombre || '-' %></div>
-        <div class="metric-foot">₡<%= money(placasGasto[0]?.total || 0) %> · <%= placasGasto[0]?.sede || '-' %></div>
+        <div class="metric-value" id="kpiPlacaGasto"><%= placasGasto[0]?.nombre || '-' %></div>
+        <div class="metric-foot" id="kpiPlacaGastoFoot">₡<%= money(placasGasto[0]?.total || 0) %> · <%= placasGasto[0]?.sede || '-' %></div>
       </div>
     </div>
   </section>
 
-  <div class="section-label"><span>Lectura rápida para gerencia</span></div>
-  <section class="decision-strip mb-4">
-    <article class="decision-card" style="--decision-color:#0b3b82">
-      <div class="decision-label">Dinero</div>
-      <h2 class="decision-title">₡<%= money(totalGastosNumero) %> gastado</h2>
-      <p class="decision-text">Pagado: ₡<%= money(totalPagadoNumero) %>. Pendiente proveedor: ₡<%= money(pagosPendientesNumero) %>.</p>
+  <div class="section-label"><span>Vista solicitada por gerencia</span></div>
+  <section class="manager-grid mb-4" id="managerGrid">
+    <article class="manager-card">
+      <div class="manager-head">
+        <div>
+          <h2 class="manager-title">General por negocio</h2>
+          <div class="manager-subtitle">Total gasto del mes: crédito, contado, pagos y caja chica.</div>
+        </div>
+        <span class="pill pill-blue">₡<%= money(totalGastosNumero) %></span>
+      </div>
+      <div class="manager-body">
+        <% if (!negociosGasto.length) { %>
+          <div class="empty-state">No hay gasto por negocio para este filtro.</div>
+        <% } %>
+        <% negociosGasto.forEach(item => { %>
+          <div class="manager-row">
+            <div>
+              <div class="manager-name"><%= item.nombre %></div>
+              <div class="manager-meta"><%= Number(item.registros || 0).toLocaleString('es-CR') %> movimiento(s) · <%= pct(item.total, totalGastosNumero) %>% del gasto</div>
+              <div class="manager-bar" style="--bar-color:<%= item.color || '#0b3b82' %>"><span style="width:<%= Math.max(4, pct(item.total, totalGastosNumero)) %>%"></span></div>
+            </div>
+            <div class="manager-amount">₡<%= money(item.total || 0) %></div>
+          </div>
+        <% }) %>
+      </div>
     </article>
-    <article class="decision-card" style="--decision-color:#ef233c">
-      <div class="decision-label">Mayor presión</div>
-      <h2 class="decision-title"><%= topNegocio.nombre || '-' %></h2>
-      <p class="decision-text"><%= topCategoria.nombre || 'Sin categoría' %> lidera el gasto operativo con ₡<%= money(topCategoria.total || 0) %>.</p>
+
+    <article class="manager-card">
+      <div class="manager-head">
+        <div>
+          <h2 class="manager-title">Por rubro del mantenimiento</h2>
+          <div class="manager-subtitle">Familias de gasto del periodo.</div>
+        </div>
+        <span class="pill pill-blue"><%= categorias.length %> rubros</span>
+      </div>
+      <div class="manager-body">
+        <% if (!categorias.length) { %>
+          <div class="empty-state">No hay rubros para este filtro.</div>
+        <% } %>
+        <% categorias.slice(0, 8).forEach(item => { %>
+          <div class="manager-row">
+            <div>
+              <div class="manager-name"><%= item.nombre %></div>
+              <div class="manager-meta"><%= Number(item.registros || 0).toLocaleString('es-CR') %> movimiento(s) · <%= pct(item.total, totalCategoriasOperativas) %>% del rubro operativo</div>
+              <div class="manager-bar" style="--bar-color:<%= item.color || '#0b3b82' %>"><span style="width:<%= Math.max(4, pct(item.total, totalCategoriasOperativas)) %>%"></span></div>
+            </div>
+            <div class="manager-amount">₡<%= money(item.total || 0) %></div>
+          </div>
+        <% }) %>
+      </div>
     </article>
-    <article class="decision-card" style="--decision-color:#f59e0b">
-      <div class="decision-label">Taller</div>
-      <h2 class="decision-title"><%= topMantenimiento.nombre || '-' %></h2>
-      <p class="decision-text"><%= Number(data.totalMantenimientos || 0).toLocaleString('es-CR') %> mantenimientos. Balance: <%= balanceMantenimiento %>.</p>
+
+    <article class="manager-card manager-wide">
+      <div class="manager-head">
+        <div>
+          <h2 class="manager-title">General por rubro del mantenimiento</h2>
+          <div class="manager-subtitle">Cada negocio dividido por frenos, motor, llantas, eléctrico y demás rubros.</div>
+        </div>
+        <span class="pill pill-blue">Negocio -> rubro</span>
+      </div>
+      <div class="manager-body">
+        <div class="manager-matrix">
+          <% rubrosPorNegocio.forEach(negocio => { %>
+            <div class="matrix-block" style="--matrix-color:<%= negocio.color || '#0b3b82' %>">
+              <div class="matrix-title">
+                <span><%= negocio.nombre %></span>
+                <span>₡<%= money(negocio.total || 0) %></span>
+              </div>
+              <div class="matrix-lines">
+                <% if (!safe(negocio.rubros).length) { %>
+                  <div class="empty-state py-2">Sin movimiento.</div>
+                <% } %>
+                <% safe(negocio.rubros).slice(0, 7).forEach(rubro => { %>
+                  <div class="matrix-line">
+                    <span class="matrix-line-name"><%= rubro.nombre %></span>
+                    <span class="matrix-line-money">₡<%= money(rubro.total || 0) %></span>
+                    <span class="matrix-line-pct"><%= rubro.porcentaje || 0 %>%</span>
+                  </div>
+                <% }) %>
+              </div>
+            </div>
+          <% }) %>
+        </div>
+      </div>
+    </article>
+
+    <article class="manager-card manager-wide">
+      <div class="manager-head">
+        <div>
+          <h2 class="manager-title">Rubro dividido por negocio</h2>
+          <div class="manager-subtitle">La misma información al revés: cada rubro separado por negocio.</div>
+        </div>
+        <span class="pill pill-blue">Rubro -> negocio</span>
+      </div>
+      <div class="manager-body">
+        <div class="manager-matrix">
+          <% if (!negociosPorRubro.length) { %>
+            <div class="empty-state">No hay datos cruzados para este filtro.</div>
+          <% } %>
+          <% negociosPorRubro.slice(0, 8).forEach(rubro => { %>
+            <div class="matrix-block" style="--matrix-color:<%= rubro.color || '#0b3b82' %>">
+              <div class="matrix-title">
+                <span><%= rubro.nombre %></span>
+                <span>₡<%= money(rubro.total || 0) %></span>
+              </div>
+              <div class="matrix-lines">
+                <% safe(rubro.negocios).forEach(negocio => { %>
+                  <div class="matrix-line">
+                    <span class="matrix-line-name"><%= negocio.nombre %></span>
+                    <span class="matrix-line-money">₡<%= money(negocio.total || 0) %></span>
+                    <span class="matrix-line-pct"><%= negocio.porcentaje || 0 %>%</span>
+                  </div>
+                <% }) %>
+              </div>
+            </div>
+          <% }) %>
+        </div>
+      </div>
     </article>
   </section>
 
-  <div class="section-label"><span>1. Gasto por negocio</span></div>
+  <div class="section-label"><span>1. Detalle por negocio, sede y placa</span></div>
   <section class="table-card mb-4">
     <div class="card-head">
       <div>
@@ -1392,16 +1705,244 @@
 <script type="application/json" id="json-meses"><%- JSON.stringify(meses) %></script>
 <script type="application/json" id="json-mantenimientos"><%- JSON.stringify(familiasMant) %></script>
 <script type="application/json" id="json-negocios"><%- JSON.stringify(negociosGasto) %></script>
+<script type="application/json" id="json-resumen"><%- JSON.stringify(data) %></script>
 <script>
   const readJson = (id) => {
     try { return JSON.parse(document.getElementById(id)?.textContent || '[]'); }
     catch (_) { return []; }
   };
   const formatMoney = (value) => `₡${Number(value || 0).toLocaleString('es-CR', { maximumFractionDigits: 0 })}`;
-  const categoriasData = readJson('json-categorias');
-  const mesesData = readJson('json-meses');
-  const mantenimientosData = readJson('json-mantenimientos');
-  const negociosData = readJson('json-negocios');
+  const formatNumber = (value) => Number(value || 0).toLocaleString('es-CR');
+  const percent = (value, total) => total ? Math.round((Number(value || 0) / Number(total || 1)) * 100) : 0;
+  const isHiddenCategory = (name) => {
+    const value = String(name || '').toLowerCase();
+    return value.includes('otros por revisar') ||
+      value.includes('cabezales, carretas y cisternas') ||
+      value.includes('pago de proveedor');
+  };
+  const escapeHtml = (value) => String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+  let categoriasData = readJson('json-categorias');
+  let mesesData = readJson('json-meses');
+  let mantenimientosData = readJson('json-mantenimientos');
+  let negociosData = readJson('json-negocios');
+  let resumenData = readJson('json-resumen');
+  const managerState = {
+    rubro: {},
+    sede: {}
+  };
+  let chartMeses = null;
+  let chartCategorias = null;
+  let chartMantenimientos = null;
+
+  const setText = (id, value) => {
+    const element = document.getElementById(id);
+    if (element) element.textContent = value;
+  };
+
+  const renderManagerGrid = (data) => {
+    const grid = document.getElementById('managerGrid');
+    if (!grid) return;
+
+    const categorias = (data.categorias || []).filter(item => !isHiddenCategory(item.nombre));
+    const negocios = data.negociosGasto || [];
+    const rubrosPorNegocio = (data.rubrosPorNegocio || []).map(negocio => ({
+      ...negocio,
+      rubros: (negocio.rubros || []).filter(item => !isHiddenCategory(item.nombre))
+    }));
+    const negociosPorRubro = (data.negociosPorRubro || [])
+      .filter(item => !isHiddenCategory(item.nombre))
+      .map(rubro => ({
+        ...rubro,
+        negocios: (rubro.negocios || []).filter(item => !isHiddenCategory(item.nombre))
+      }))
+      .filter(rubro => rubro.negocios.length);
+    const totalGastos = Number(data.totalGastos || 0);
+    const totalCategorias = categorias.reduce((sum, item) => sum + Number(item.total || 0), 0);
+
+    const managerRow = (item, total, metaLabel = 'movimiento(s)') => `
+      <div class="manager-row">
+        <div>
+          <div class="manager-name">${escapeHtml(item.nombre || '-')}</div>
+          <div class="manager-meta">${formatNumber(item.registros || 0)} ${metaLabel} · ${percent(item.total, total)}% del gasto</div>
+          <div class="manager-bar" style="--bar-color:${escapeHtml(item.color || '#0b3b82')}"><span style="width:${Math.max(4, percent(item.total, total))}%"></span></div>
+        </div>
+        <div class="manager-amount">${formatMoney(item.total || 0)}</div>
+      </div>
+    `;
+
+    const renderPlateRows = (placas = []) => {
+      if (!placas.length) return '<div class="empty-state py-2">No hay placas para esta sede.</div>';
+
+      return `
+        <div class="matrix-plate-list">
+          ${placas.map(placa => `
+            <div class="matrix-plate-row">
+              <span class="matrix-plate-name">${escapeHtml(placa.nombre || '-')}</span>
+              <span class="matrix-line-money">${formatMoney(placa.total || 0)}</span>
+              <span class="matrix-line-pct">${formatNumber(placa.porcentaje || 0)}%</span>
+            </div>
+          `).join('')}
+        </div>
+      `;
+    };
+
+    const renderSedesRubro = (negocioIndex, rubroIndex, sedes = []) => {
+      if (!sedes.length) return '<div class="matrix-nested"><div class="empty-state py-2">No hay sedes para este rubro.</div></div>';
+
+      return `
+        <div class="matrix-nested">
+          ${sedes.map((sede, sedeIndex) => {
+            const sedeKey = `${negocioIndex}:${rubroIndex}:${sedeIndex}`;
+            const open = managerState.sede[sedeKey];
+            return `
+              <button type="button" class="matrix-line matrix-line-sede ${open ? 'active' : ''}" data-manager-sede="${sedeKey}">
+                <span class="matrix-line-name">${escapeHtml(sede.nombre || '-')}</span>
+                <span class="matrix-line-money">${formatMoney(sede.total || 0)}</span>
+                <span class="matrix-line-pct">${formatNumber(sede.porcentaje || 0)}%</span>
+              </button>
+              ${open ? renderPlateRows(sede.placas || []) : ''}
+            `;
+          }).join('')}
+        </div>
+      `;
+    };
+
+    const managerRubroBlock = (negocio, negocioIndex) => `
+      <div class="matrix-block" style="--matrix-color:${escapeHtml(negocio.color || '#0b3b82')}">
+        <div class="matrix-title">
+          <span>${escapeHtml(negocio.nombre || '-')}</span>
+          <span>${formatMoney(negocio.total || 0)}</span>
+        </div>
+        <div class="matrix-lines">
+          ${(negocio.rubros || []).length ? (negocio.rubros || []).slice(0, 7).map((rubro, rubroIndex) => {
+            const rubroKey = `${negocioIndex}:${rubroIndex}`;
+            const open = managerState.rubro[rubroKey];
+            return `
+              <button type="button" class="matrix-line ${open ? 'active' : ''}" data-manager-rubro="${rubroKey}">
+                <span class="matrix-line-name">${escapeHtml(rubro.nombre || '-')}</span>
+                <span class="matrix-line-money">${formatMoney(rubro.total || 0)}</span>
+                <span class="matrix-line-pct">${formatNumber(rubro.porcentaje || 0)}%</span>
+              </button>
+              ${open ? renderSedesRubro(negocioIndex, rubroIndex, rubro.sedes || []) : ''}
+            `;
+          }).join('') : '<div class="empty-state py-2">Sin movimiento.</div>'}
+        </div>
+      </div>
+    `;
+
+    const matrixBlock = (item, lines) => `
+      <div class="matrix-block" style="--matrix-color:${escapeHtml(item.color || '#0b3b82')}">
+        <div class="matrix-title">
+          <span>${escapeHtml(item.nombre || '-')}</span>
+          <span>${formatMoney(item.total || 0)}</span>
+        </div>
+        <div class="matrix-lines">
+          ${lines.length ? lines.map(line => `
+            <div class="matrix-line">
+              <span class="matrix-line-name">${escapeHtml(line.nombre || '-')}</span>
+              <span class="matrix-line-money">${formatMoney(line.total || 0)}</span>
+              <span class="matrix-line-pct">${formatNumber(line.porcentaje || 0)}%</span>
+            </div>
+          `).join('') : '<div class="empty-state py-2">Sin movimiento.</div>'}
+        </div>
+      </div>
+    `;
+
+    grid.innerHTML = `
+      <article class="manager-card">
+        <div class="manager-head">
+          <div>
+            <h2 class="manager-title">General por negocio</h2>
+            <div class="manager-subtitle">Total gasto del mes: crédito, contado, pagos y caja chica.</div>
+          </div>
+          <span class="pill pill-blue">${formatMoney(totalGastos)}</span>
+        </div>
+        <div class="manager-body">
+          ${negocios.length ? negocios.map(item => managerRow(item, totalGastos)).join('') : '<div class="empty-state">No hay gasto por negocio para este filtro.</div>'}
+        </div>
+      </article>
+      <article class="manager-card">
+        <div class="manager-head">
+          <div>
+            <h2 class="manager-title">Por rubro del mantenimiento</h2>
+            <div class="manager-subtitle">Familias de gasto del periodo.</div>
+          </div>
+          <span class="pill pill-blue">${formatNumber(categorias.length)} rubros</span>
+        </div>
+        <div class="manager-body">
+          ${categorias.length ? categorias.slice(0, 8).map(item => managerRow(item, totalCategorias)).join('') : '<div class="empty-state">No hay rubros para este filtro.</div>'}
+        </div>
+      </article>
+      <article class="manager-card manager-wide">
+        <div class="manager-head">
+          <div>
+            <h2 class="manager-title">General por rubro del mantenimiento</h2>
+            <div class="manager-subtitle">Cada negocio dividido por frenos, motor, llantas, eléctrico y demás rubros.</div>
+          </div>
+          <span class="pill pill-blue">Negocio -> rubro</span>
+        </div>
+        <div class="manager-body"><div class="manager-matrix">
+          ${rubrosPorNegocio.map((negocio, negocioIndex) => managerRubroBlock(negocio, negocioIndex)).join('')}
+        </div></div>
+      </article>
+      <article class="manager-card manager-wide">
+        <div class="manager-head">
+          <div>
+            <h2 class="manager-title">Rubro dividido por negocio</h2>
+            <div class="manager-subtitle">La misma información al revés: cada rubro separado por negocio.</div>
+          </div>
+          <span class="pill pill-blue">Rubro -> negocio</span>
+        </div>
+        <div class="manager-body"><div class="manager-matrix">
+          ${negociosPorRubro.length ? negociosPorRubro.slice(0, 8).map(rubro => matrixBlock(rubro, rubro.negocios || [])).join('') : '<div class="empty-state">No hay datos cruzados para este filtro.</div>'}
+        </div></div>
+      </article>
+    `;
+
+    grid.querySelectorAll('[data-manager-rubro]').forEach(button => {
+      button.addEventListener('click', () => {
+        const key = button.dataset.managerRubro;
+        managerState.rubro[key] = !managerState.rubro[key];
+        renderManagerGrid(data);
+      });
+    });
+
+    grid.querySelectorAll('[data-manager-sede]').forEach(button => {
+      button.addEventListener('click', () => {
+        const key = button.dataset.managerSede;
+        managerState.sede[key] = !managerState.sede[key];
+        renderManagerGrid(data);
+      });
+    });
+  };
+
+  const updateKpis = (data) => {
+    const resumenFinanciero = data.resumenFinanciero || {};
+    const costoUnidad = data.costoUnidad || {};
+    const categorias = (data.categorias || []).filter(item => !isHiddenCategory(item.nombre));
+    const totalCategorias = categorias.reduce((sum, item) => sum + Number(item.total || 0), 0);
+    const familiasMant = (data.familiasMant || []).filter(item => !isHiddenCategory(item.nombre));
+    const placas = data.placas || [];
+
+    setText('kpiTotalGastado', formatMoney(data.totalGastos || 0));
+    setText('kpiTotalGastadoFoot', `${formatNumber(data.totalRegistrosGasto || 0)} movimientos de dinero`);
+    setText('kpiTotalPagado', formatMoney(resumenFinanciero.totalPagado || 0));
+    setText('kpiMayorTipo', categorias[0]?.nombre || '-');
+    setText('kpiMayorTipoFoot', `${formatMoney(categorias[0]?.total || 0)} · ${percent(categorias[0]?.total, totalCategorias)}% del gasto operativo`);
+    setText('kpiCostoUnidad', formatMoney(costoUnidad.costoPromedioPorUnidad || 0));
+    setText('kpiCostoUnidadFoot', `${formatNumber(costoUnidad.unidadesConGasto || 0)} placa(s) con gasto · ${formatNumber(costoUnidad.totalUnidadesFlota || 0)} en flota`);
+    setText('kpiMantenimientos', formatNumber(data.totalMantenimientos || 0));
+    setText('kpiMantenimientosFoot', `${familiasMant[0]?.nombre || '-'} es lo más repetido`);
+    setText('kpiPlacaGasto', placas[0]?.nombre || '-');
+    setText('kpiPlacaGastoFoot', `${formatMoney(placas[0]?.total || 0)} · ${placas[0]?.sede || '-'}`);
+  };
+
+  renderManagerGrid(resumenData || {});
 
   const chartOptions = {
     responsive: true,
@@ -1416,8 +1957,16 @@
     }
   };
 
-  if (document.getElementById('chartMeses') && mesesData.length) {
-    new Chart(document.getElementById('chartMeses'), {
+  const renderChartMeses = () => {
+    const canvas = document.getElementById('chartMeses');
+    if (!canvas || !mesesData.length) return;
+    if (chartMeses) {
+      chartMeses.data.labels = mesesData.map(item => item.nombre);
+      chartMeses.data.datasets[0].data = mesesData.map(item => Number(item.total || 0));
+      chartMeses.update();
+      return;
+    }
+    chartMeses = new Chart(canvas, {
       type: 'bar',
       data: {
         labels: mesesData.map(item => item.nombre),
@@ -1425,10 +1974,19 @@
       },
       options: chartOptions
     });
-  }
+  };
 
-  if (document.getElementById('chartCategorias') && categoriasData.length) {
-    new Chart(document.getElementById('chartCategorias'), {
+  const renderChartCategorias = () => {
+    const canvas = document.getElementById('chartCategorias');
+    if (!canvas || !categoriasData.length) return;
+    if (chartCategorias) {
+      chartCategorias.data.labels = categoriasData.map(item => item.nombre);
+      chartCategorias.data.datasets[0].data = categoriasData.map(item => Number(item.total || 0));
+      chartCategorias.data.datasets[0].backgroundColor = categoriasData.map(item => item.color || '#64748b');
+      chartCategorias.update();
+      return;
+    }
+    chartCategorias = new Chart(canvas, {
       type: 'doughnut',
       data: {
         labels: categoriasData.map(item => item.nombre),
@@ -1436,7 +1994,10 @@
       },
       options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { usePointStyle: true, font: { weight: 'bold' } } }, tooltip: { callbacks: { label: ctx => `${ctx.label}: ${formatMoney(ctx.raw)}` } } } }
     });
-  }
+  };
+
+  renderChartMeses();
+  renderChartCategorias();
 
   (() => {
     const accordion = document.getElementById('negocioAccordion');
@@ -1445,15 +2006,7 @@
     let negocioActivo = null;
     const sedeActivaPorNegocio = {};
 
-    const totalPeriodo = negociosData.reduce((sum, item) => sum + Number(item.total || 0), 0);
     const porcentaje = (value, total) => total ? Math.round((Number(value || 0) / Number(total || 1)) * 100) : 0;
-    const escapeHtml = (value) => String(value ?? '')
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#039;');
-
     const renderPlacas = (placas = []) => {
       if (!placas.length) return '<div class="business-empty">No hay placas para esta sede.</div>';
 
@@ -1464,6 +2017,20 @@
             <div class="placa-meta">${Number(placa.registros || 0).toLocaleString('es-CR')} movimiento(s)</div>
           </div>
           <div class="placa-money">${formatMoney(placa.total || 0)}</div>
+        </div>
+      `).join('');
+    };
+
+    const renderCompras = (compras = []) => {
+      if (!compras.length) return '<div class="business-empty">No hay compras generales para este filtro.</div>';
+
+      return compras.map(compra => `
+        <div class="compra-row">
+          <div>
+            <div class="compra-title">${escapeHtml(compra.nombre || '-')}</div>
+            <div class="compra-meta">${formatNumber(compra.registros || 0)} movimiento(s) · ${escapeHtml(compra.categoria || 'Sin categoría')}</div>
+          </div>
+          <div class="placa-money">${formatMoney(compra.total || 0)}</div>
         </div>
       `).join('');
     };
@@ -1491,6 +2058,7 @@
     };
 
     const renderAccordion = () => {
+      const totalPeriodo = negociosData.reduce((sum, item) => sum + Number(item.total || 0), 0);
       if (!negociosData.length) {
         accordion.innerHTML = '<div class="business-empty">No hay gasto por negocio para este filtro.</div>';
         return;
@@ -1507,7 +2075,7 @@
               </div>
               <div class="business-money">${formatMoney(negocio.total || 0)}</div>
             </button>
-            <div class="business-body">${renderSedes(negocio, negocioIndex)}</div>
+            <div class="business-body">${negocio.clave === 'generales' ? renderCompras(negocio.compras || []) : renderSedes(negocio, negocioIndex)}</div>
           </article>
         `;
       }).join('');
@@ -1535,10 +2103,24 @@
     };
 
     renderAccordion();
+    window.renderNegocioAccordion = (nextData) => {
+      negociosData = Array.isArray(nextData) ? nextData : [];
+      if (negocioActivo !== null && !negociosData[negocioActivo]) negocioActivo = null;
+      renderAccordion();
+    };
   })();
 
-  if (document.getElementById('chartMantenimientos') && mantenimientosData.length) {
-    new Chart(document.getElementById('chartMantenimientos'), {
+  const renderChartMantenimientos = () => {
+    const canvas = document.getElementById('chartMantenimientos');
+    if (!canvas || !mantenimientosData.length) return;
+    if (chartMantenimientos) {
+      chartMantenimientos.data.labels = mantenimientosData.map(item => item.nombre);
+      chartMantenimientos.data.datasets[0].data = mantenimientosData.map(item => Number(item.registros || 0));
+      chartMantenimientos.data.datasets[0].backgroundColor = mantenimientosData.map(item => item.color || '#0b3b82');
+      chartMantenimientos.update();
+      return;
+    }
+    chartMantenimientos = new Chart(canvas, {
       type: 'bar',
       data: {
         labels: mantenimientosData.map(item => item.nombre),
@@ -1554,7 +2136,9 @@
         }
       }
     });
-  }
+  };
+
+  renderChartMantenimientos();
 
   (() => {
     const tabs = Array.from(document.querySelectorAll('[data-detail-tab]'));
@@ -1577,6 +2161,7 @@
     const counter = document.getElementById('refreshCountdown');
     let remaining = refreshSeconds;
     let editing = false;
+    let refreshing = false;
 
     const setEditing = (value) => {
       editing = value;
@@ -1590,11 +2175,54 @@
       control.addEventListener('change', () => setEditing(false));
     });
 
+    const buildDataUrl = () => {
+      const url = new URL(window.location.href);
+      url.pathname = '/dashboard/resumen-ejecutivo/datos';
+      return url;
+    };
+
+    const softRefresh = async () => {
+      if (refreshing) return;
+      refreshing = true;
+      try {
+        const response = await fetch(buildDataUrl(), {
+          headers: { Accept: 'application/json' },
+          cache: 'no-store'
+        });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const payload = await response.json();
+        if (!payload.ok || !payload.resumen) throw new Error(payload.message || 'Respuesta inválida');
+
+        const next = payload.resumen;
+        resumenData = next;
+        categoriasData = (next.categorias || []).filter(item => !isHiddenCategory(item.nombre));
+        mesesData = next.meses || [];
+        mantenimientosData = (next.familiasMant || []).filter(item => !isHiddenCategory(item.nombre));
+        negociosData = next.negociosGasto || [];
+
+        updateKpis(next);
+        renderManagerGrid(next);
+        if (typeof window.renderNegocioAccordion === 'function') {
+          window.renderNegocioAccordion(negociosData);
+        }
+        renderChartMeses();
+        renderChartCategorias();
+        renderChartMantenimientos();
+        if (payload.actualizado) setText('lastUpdated', payload.actualizado);
+      } catch (error) {
+        console.warn('No se pudo actualizar resumen ejecutivo sin recargar:', error.message);
+      } finally {
+        refreshing = false;
+        remaining = refreshSeconds;
+        if (counter) counter.textContent = String(remaining);
+      }
+    };
+
     window.setInterval(() => {
       if (document.hidden || editing) return;
       remaining -= 1;
       if (counter) counter.textContent = String(Math.max(remaining, 0));
-      if (remaining <= 0) window.location.reload();
+      if (remaining <= 0) softRefresh();
     }, 1000);
   })();
 </script>

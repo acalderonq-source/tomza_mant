@@ -50,21 +50,17 @@ const ROLES_RESUMEN_EJECUTIVO = ["ADMIN", "TALLER", "PROVEEDURIA", "PROVEEDURIA_
 const FAMILIAS_GASTO = [
   { clave: "llantas", nombre: "Llantas", color: "#2563eb", palabras: ["llanta", "llantas", "aro", "aros", "rin", "rines"] },
   { clave: "frenos", nombre: "Frenos y seguridad", color: "#dc2626", palabras: ["freno", "frenos", "fibra", "fibras", "clutch", "embrague", "seguridad", "pito", "zapata", "tambor", "disco", "plato"] },
-  { clave: "motor", nombre: "Motor y transmisión", color: "#ea580c", palabras: ["motor", "turbo", "inyector", "inyeccion", "inyección", "caja", "transmision", "transmisión", "compresor", "arrancador", "alternador", "bomba", "manguera", "cabezote", "overh", "overhaul", "isx", "detroit", "s60", "s-60", "manifold", "multiple", "múltiple", "piston", "pistón"] },
+  { clave: "motor", nombre: "Motor y transmisión", color: "#ea580c", palabras: ["motor", "turbo", "inyector", "inyeccion", "inyección", "caja", "transmision", "transmisión", "compresor", "arrancador", "alternador", "bomba", "manguera", "cabezote", "overh", "overhaul", "isx", "detroit", "s60", "s-60", "manifold", "multiple", "múltiple", "piston", "pistón", "mano de obra", "reparacion", "reparación", "rectificacion", "rectificación", "rectificar", "limpieza", "calibracion", "calibración", "laboratorio", "romeros", "romero", "prodiesel", "alfonso mora", "jose guillermo", "guillermo campos", "kevin jesus", "leslie thomas", "edal mora", "tubo", "union", "unión", "codo", "abrazadera", "abrasadera"] },
   { clave: "aceites", nombre: "Aceites y fluidos", color: "#0f766e", palabras: ["aceite", "aceites", "mobil", "movil", "pico", "liasa", "pico liasa", "pico & liasa", "pico y liasa", "engrase", "filtro", "filtros", "hidraulico", "hidráulico", "coolant", "agua", "radiador", "liquido", "líquido"] },
   { clave: "suspension", nombre: "Suspensión y dirección", color: "#16a34a", palabras: ["suspension", "suspensión", "resorte", "resortes", "amortiguador", "balancin", "balancín", "rotula", "rótula", "barra", "direccion", "dirección", "tensor", "buje", "bushing", "pin", "muelle"] },
   { clave: "rodamientos", nombre: "Rodamientos y retenes", color: "#0e7490", palabras: ["roll", "rol ", "rodamiento", "cojinete", "reten", "retén", "retenedor", "sello", "camisa", "bocina", "porta roll"] },
   { clave: "transportadora", nombre: "Cabezales, carretas y cisternas", color: "#4338ca", palabras: ["cabezal", "cabezales", "carreta", "carretas", "cisterna", "cisternas", "freightliner", "cascadia", "columbia", "century", "quinta rueda", "peterbilt", "hendrickson", "trailer", "remolque", "transportes ortega", "ortega y rojas", "andrea rv"] },
-  { clave: "reparaciones", nombre: "Reparaciones externas", color: "#be123c", palabras: ["mano de obra", "reparacion", "reparación", "rectificacion", "rectificación", "rectificar", "limpieza", "calibracion", "calibración", "laboratorio", "romeros", "romero", "prodiesel", "alfonso mora", "jose guillermo", "guillermo campos", "kevin jesus", "leslie thomas", "edal mora"] },
-  { clave: "electrico", nombre: "Eléctrico y luces", color: "#7c3aed", palabras: ["luz", "luces", "bateria", "batería", "cable", "electrico", "eléctrico", "sensor", "marcha", "tablero", "velocimetro", "velocímetro", "selenoide", "solenoide", "relay", "flasher", "halogeno", "halógeno", "bombillo", "switch", "fusible"] },
-  { clave: "carroceria", nombre: "Carrocería y estética", color: "#d97706", palabras: ["cabina", "puerta", "bumper", "bumber", "cajon", "cajón", "rotulacion", "rotulación", "calcomania", "calcomanía", "pintura", "pintar", "asiento", "vidrio", "parabrisas", "espejo", "retrovisor", "grada", "estribo"] },
-  { clave: "insumos", nombre: "Insumos y herramientas", color: "#64748b", palabras: ["suministro", "suministros", "materiales", "almacen de materiales", "almacén de materiales", "capris", "herramienta", "herramientas", "broca", "brocha", "spray", "loctite", "sellador", "pegamento", "cincho", "cinchos", "soldadura", "guante", "tubo", "conector", "union", "unión", "codo", "terminal", "gaza", "abrazadera", "abrasadera", "tornillo", "tuerca", "arandela"] },
-  { clave: "proveedor", nombre: "Pago de proveedor", color: "#0891b2", palabras: ["pago proveedor", "proveedor"] },
-  { clave: "caja", nombre: "Caja chica", color: "#f59e0b", palabras: ["caja chica", "reintegro"] },
-  { clave: "general", nombre: "Insumos y herramientas", color: "#64748b", palabras: [] }
+  { clave: "electrico", nombre: "Eléctrico y luces", color: "#7c3aed", palabras: ["luz", "luces", "bateria", "batería", "cable", "electrico", "eléctrico", "sensor", "marcha", "tablero", "velocimetro", "velocímetro", "selenoide", "solenoide", "relay", "flasher", "halogeno", "halógeno", "bombillo", "switch", "fusible", "conector", "terminal"] },
+  { clave: "carroceria", nombre: "Carrocería y estética", color: "#d97706", palabras: ["cabina", "puerta", "bumper", "bumber", "cajon", "cajón", "rotulacion", "rotulación", "calcomania", "calcomanía", "pintura", "pintar", "asiento", "vidrio", "parabrisas", "espejo", "retrovisor", "grada", "estribo", "suministro", "suministros", "materiales", "almacen de materiales", "almacén de materiales", "capris", "herramienta", "herramientas", "broca", "brocha", "spray", "loctite", "sellador", "pegamento", "cincho", "cinchos", "soldadura", "guante", "gaza", "tornillo", "tuerca", "arandela"] },
+  { clave: "caja", nombre: "Caja chica", color: "#f59e0b", palabras: ["caja chica", "reintegro"] }
 ];
 
-const FAMILIAS_GASTO_OPERATIVO = FAMILIAS_GASTO.filter(f => f.clave !== "general");
+const FAMILIAS_GASTO_OPERATIVO = FAMILIAS_GASTO;
 const FAMILIAS_MANTENIMIENTO_RESUMEN = [
   {
     clave: "motor",
@@ -214,9 +210,9 @@ function resolverUnidadGasto(item, indiceUnidades) {
   ], indiceUnidades);
 }
 
-function clasificarTexto(texto, familias = FAMILIAS_GASTO, fallbackClave = "general") {
+function clasificarTexto(texto, familias = FAMILIAS_GASTO, fallbackClave = "motor") {
   const normalizado = normalizarTexto(texto);
-  let mejor = familias.find(f => f.clave === fallbackClave) || familias[familias.length - 1];
+  let mejor = familias.find(f => f.clave === fallbackClave) || familias.find(f => f.clave === "motor") || familias[familias.length - 1];
   let puntajeMejor = 0;
 
   familias.forEach(familia => {
@@ -241,14 +237,14 @@ function familiaPorClave(clave, familias = FAMILIAS_GASTO) {
 function clasificarGastoOperativo(item) {
   if (item.placa === "ACEITES") return familiaPorClave("aceites");
   if (item.fuente === "PAGO_PROVEEDOR") {
-    return clasificarTexto(`${item.descripcion} ${item.proveedor}`, FAMILIAS_GASTO_OPERATIVO, "proveedor");
+    return clasificarTexto(`${item.descripcion} ${item.proveedor}`, FAMILIAS_GASTO_OPERATIVO, "motor");
   }
   if (item.fuente === "CAJA_CHICA") return familiaPorClave("caja");
   if (item.fuente === "ORDEN_MOTOR") {
     return clasificarTexto(`${item.descripcion} ${item.proveedor}`, FAMILIAS_GASTO_OPERATIVO, "motor");
   }
 
-  return clasificarTexto(`${item.descripcion} ${item.proveedor}`, FAMILIAS_GASTO_OPERATIVO, "insumos");
+  return clasificarTexto(`${item.descripcion} ${item.proveedor}`, FAMILIAS_GASTO_OPERATIVO, "motor");
 }
 
 function clasificarNegocioGasto(item) {
@@ -260,20 +256,25 @@ function clasificarNegocioGasto(item) {
   }
 
   if (sedeNormalizada.includes("granel")) {
-    return { clave: "granel", nombre: "Granel", color: "#0f766e" };
+    return { clave: "granel", nombre: "Graneleras", color: "#0f766e" };
   }
 
   if (
     sedeNormalizada.includes("taller") ||
     sedeNormalizada.includes("tecnico") ||
-    sedeNormalizada.includes("tecnicos") ||
+    sedeNormalizada.includes("tecnicos")
+  ) {
+    return { clave: "comodines", nombre: "Comodines", color: "#7c3aed" };
+  }
+
+  if (
     !item.tienePlacaReal ||
     !item.tieneSedeReal
   ) {
-    return { clave: "comodines", nombre: "Comodines / taller", color: "#7c3aed" };
+    return { clave: "generales", nombre: "Generales", color: "#64748b" };
   }
 
-  return { clave: "cilindreros", nombre: "Cilindreros", color: "#ef233c" };
+  return { clave: "cilindreros", nombre: "Hinos / cilindreros", color: "#ef233c" };
 }
 
 function recortarResumen(texto, limite = 150) {
@@ -300,6 +301,35 @@ function describirCompraExacta(item) {
   if (descripcion !== "-") return descripcion;
   if (proveedor !== "-") return `Orden de compra · ${proveedor}`;
   return "Sin detalle";
+}
+
+const GRUPOS_COMPRA_GERENCIAL = [
+  { nombre: "Escobillas", palabras: ["escobilla", "escobillas", "plumilla", "plumillas"] },
+  { nombre: "Aceites y filtros", palabras: ["aceite", "aceites", "mobil", "movil", "pico", "liasa", "filtro", "filtros"] },
+  { nombre: "Llantas y aros", palabras: ["llanta", "llantas", "aro", "aros", "rin", "rines"] },
+  { nombre: "Frenos y fibras", palabras: ["freno", "frenos", "fibra", "fibras", "zapata", "tambor", "disco"] },
+  { nombre: "Baterías", palabras: ["bateria", "batería", "baterias", "baterías"] },
+  { nombre: "Luces y eléctrico", palabras: ["luz", "luces", "bombillo", "halogeno", "halógeno", "cable", "sensor", "fusible", "switch", "relay"] },
+  { nombre: "Mangueras y conexiones", palabras: ["manguera", "mangueras", "conector", "terminal", "codo", "union", "unión", "abrazadera", "abrasadera"] },
+  { nombre: "Motor y bombas", palabras: ["motor", "bomba", "turbo", "inyector", "cabezote", "compresor", "arrancador", "alternador"] },
+  { nombre: "Suspensión y dirección", palabras: ["resorte", "muelle", "rotula", "rótula", "direccion", "dirección", "suspension", "suspensión", "amortiguador"] },
+  { nombre: "Carrocería y pintura", palabras: ["cabina", "puerta", "bumper", "bumber", "cajon", "cajón", "pintura", "pintar", "calcomania", "calcomanía"] },
+  { nombre: "Herramientas y materiales", palabras: ["herramienta", "herramientas", "broca", "brocha", "spray", "sellador", "pegamento", "soldadura", "tornillo", "tuerca", "arandela"] }
+];
+
+function describirCompraGerencial(item) {
+  const texto = normalizarTexto(`${item.descripcion || ""} ${item.codigo || ""} ${item.observaciones || ""} ${item.proveedor || ""}`);
+  const grupo = GRUPOS_COMPRA_GERENCIAL.find(grupo =>
+    grupo.palabras.some(palabra => texto.includes(normalizarTexto(palabra)))
+  );
+
+  if (grupo) return grupo.nombre;
+
+  const descripcion = recortarResumen(item.descripcion, 48);
+  if (descripcion !== "-") return descripcion;
+
+  const proveedor = recortarResumen(item.proveedor, 40);
+  return proveedor !== "-" ? proveedor : "Compra general";
 }
 
 function sumarGrupo(map, key, base = {}) {
@@ -598,7 +628,7 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro, pe
       pp.numero_factura AS codigo,
       NULL AS placa_unidad,
       pp.concepto AS observaciones,
-      COALESCE(pp.concepto, pp.numero_factura, 'Pago de proveedor') AS descripcion,
+      COALESCE(pp.concepto, pp.numero_factura, pp.proveedor_nombre, 'Sin concepto registrado') AS descripcion,
       COALESCE(pp.monto, 0) AS monto
     FROM pagos_proveedor pp
     LEFT JOIN unidades u ON REPLACE(UPPER(TRIM(u.placa)), ' ', '') = REPLACE(UPPER(TRIM(pp.placa)), ' ', '')
@@ -741,6 +771,8 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro, pe
   const porDetalleGeneral = new Map();
   const porDescripcion = new Map();
   const porNegocio = new Map();
+  const porRubroNegocio = new Map();
+  const porNegocioRubro = new Map();
 
   gastos.forEach(item => {
     const fuenteNombre = item.fuente === "ORDEN"
@@ -789,14 +821,25 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro, pe
     descripcion.registros += 1;
 
     const negocioInfo = clasificarNegocioGasto(item);
+    const rubroNombre = item.familia?.nombre || "Sin rubro";
+    const rubroColor = item.familia?.color || "#64748b";
+
     const negocio = sumarGrupo(porNegocio, negocioInfo.nombre, {
       clave: negocioInfo.clave,
       color: negocioInfo.color,
       sedes: new Map(),
-      placas: new Map()
+      placas: new Map(),
+      compras: new Map()
     });
     negocio.total += item.monto;
     negocio.registros += 1;
+
+    const compraNegocio = sumarGrupo(negocio.compras, describirCompraGerencial(item), {
+      categoria: item.familia.nombre,
+      color: item.familia.color
+    });
+    compraNegocio.total += item.monto;
+    compraNegocio.registros += 1;
 
     const sedeNegocio = item.tieneSedeReal ? etiquetaSedeTomza(item.sede) : "General / taller";
     const sedeItem = sumarGrupo(negocio.sedes, sedeNegocio, { placas: new Map() });
@@ -811,6 +854,48 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro, pe
     const placaSedeItem = sumarGrupo(sedeItem.placas, placaNegocio, { sede: sedeNegocio });
     placaSedeItem.total += item.monto;
     placaSedeItem.registros += 1;
+
+    const negocioRubro = sumarGrupo(porNegocioRubro, negocioInfo.nombre, {
+      clave: negocioInfo.clave,
+      color: negocioInfo.color,
+      rubros: new Map()
+    });
+    negocioRubro.total += item.monto;
+    negocioRubro.registros += 1;
+
+    const rubroDelNegocio = sumarGrupo(negocioRubro.rubros, rubroNombre, {
+      color: rubroColor,
+      sedes: new Map(),
+      placas: new Map()
+    });
+    rubroDelNegocio.total += item.monto;
+    rubroDelNegocio.registros += 1;
+
+    const sedeDelRubro = sumarGrupo(rubroDelNegocio.sedes, sedeNegocio, { placas: new Map() });
+    sedeDelRubro.total += item.monto;
+    sedeDelRubro.registros += 1;
+
+    const placaDelRubro = sumarGrupo(rubroDelNegocio.placas, placaNegocio, { sede: sedeNegocio });
+    placaDelRubro.total += item.monto;
+    placaDelRubro.registros += 1;
+
+    const placaSedeDelRubro = sumarGrupo(sedeDelRubro.placas, placaNegocio, { sede: sedeNegocio });
+    placaSedeDelRubro.total += item.monto;
+    placaSedeDelRubro.registros += 1;
+
+    const rubroNegocio = sumarGrupo(porRubroNegocio, rubroNombre, {
+      color: rubroColor,
+      negocios: new Map()
+    });
+    rubroNegocio.total += item.monto;
+    rubroNegocio.registros += 1;
+
+    const negocioDelRubro = sumarGrupo(rubroNegocio.negocios, negocioInfo.nombre, {
+      clave: negocioInfo.clave,
+      color: negocioInfo.color
+    });
+    negocioDelRubro.total += item.monto;
+    negocioDelRubro.registros += 1;
 
     if (item.familia?.clave === "general") {
       const detalle = sumarGrupo(porDetalleGeneral, describirGasto(item));
@@ -956,10 +1041,11 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro, pe
   const sedes = ordenarTop(porSede, 20);
   const placas = ordenarTop(porPlaca, 25);
   const negociosBase = [
-    { clave: "cilindreros", nombre: "Cilindreros", color: "#ef233c" },
+    { clave: "cilindreros", nombre: "Hinos / cilindreros", color: "#ef233c" },
     { clave: "transportadora", nombre: "Transportadora", color: "#0b3b82" },
-    { clave: "granel", nombre: "Granel", color: "#0f766e" },
-    { clave: "comodines", nombre: "Comodines / taller", color: "#7c3aed" }
+    { clave: "granel", nombre: "Graneleras", color: "#0f766e" },
+    { clave: "comodines", nombre: "Comodines", color: "#7c3aed" },
+    { clave: "generales", nombre: "Generales", color: "#64748b" }
   ];
   const negociosGasto = negociosBase
     .map(base => {
@@ -968,7 +1054,8 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro, pe
         total: 0,
         registros: 0,
         sedes: new Map(),
-        placas: new Map()
+        placas: new Map(),
+        compras: new Map()
       };
       return {
         nombre: item.nombre,
@@ -983,9 +1070,75 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro, pe
           registros: sede.registros,
           placas: ordenarTop(sede.placas || new Map(), 15)
         })),
-        placas: ordenarTop(item.placas, 8)
+        placas: ordenarTop(item.placas, 8),
+        compras: ordenarTop(item.compras || new Map(), 12)
       };
     });
+  const rubrosPorNegocio = negociosBase.map(base => {
+    const item = porNegocioRubro.get(base.nombre) || {
+      ...base,
+      total: 0,
+      registros: 0,
+      rubros: new Map()
+    };
+    const totalNegocio = Number(item.total || 0);
+    return {
+      nombre: item.nombre,
+      clave: item.clave,
+      color: item.color,
+      total: item.total,
+      registros: item.registros,
+      rubros: ordenarTop(item.rubros || new Map(), 10).map(rubro => ({
+        nombre: rubro.nombre,
+        color: rubro.color,
+        total: rubro.total,
+        registros: rubro.registros,
+        porcentaje: totalNegocio ? Math.round((Number(rubro.total || 0) / totalNegocio) * 100) : 0,
+        sedes: ordenarTop(rubro.sedes || new Map(), 8).map(sede => ({
+          nombre: sede.nombre,
+          total: sede.total,
+          registros: sede.registros,
+          porcentaje: Number(rubro.total || 0) ? Math.round((Number(sede.total || 0) / Number(rubro.total || 1)) * 100) : 0,
+          placas: ordenarTop(sede.placas || new Map(), 10).map(placa => ({
+            nombre: placa.nombre,
+            sede: placa.sede,
+            total: placa.total,
+            registros: placa.registros,
+            porcentaje: Number(sede.total || 0) ? Math.round((Number(placa.total || 0) / Number(sede.total || 1)) * 100) : 0
+          }))
+        })),
+        placas: ordenarTop(rubro.placas || new Map(), 10)
+      }))
+    };
+  });
+  const negociosPorRubro = ordenarTop(porRubroNegocio, 12).map(rubro => {
+    const totalRubro = Number(rubro.total || 0);
+    return {
+      nombre: rubro.nombre,
+      color: rubro.color,
+      total: rubro.total,
+      registros: rubro.registros,
+      negocios: negociosBase
+        .map(base => {
+          const item = (rubro.negocios || new Map()).get(base.nombre) || {
+            nombre: base.nombre,
+            clave: base.clave,
+            color: base.color,
+            total: 0,
+            registros: 0
+          };
+          return {
+            nombre: item.nombre,
+            clave: item.clave,
+            color: item.color,
+            total: item.total,
+            registros: item.registros,
+            porcentaje: totalRubro ? Math.round((Number(item.total || 0) / totalRubro) * 100) : 0
+          };
+        })
+        .filter(item => Number(item.total || 0) > 0)
+    };
+  });
   const totalGastoConUnidad = Array.from(porPlaca.values()).reduce((sum, item) => sum + Number(item.total || 0), 0);
   const unidadesConGasto = porPlaca.size;
   const [flotaRow] = await safeQuery(
@@ -1081,6 +1234,8 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro, pe
     sedes,
     placas,
     negociosGasto,
+    rubrosPorNegocio,
+    negociosPorRubro,
     meses,
     tiposMant,
     familiasMant,
@@ -1143,35 +1298,70 @@ async function obtenerResumenEjecutivoCached(params) {
 // DASHBOARD PRINCIPAL
 // =========================================================
 
+async function prepararResumenEjecutivoRequest(req) {
+  const fechaDesde = String(req.query.fecha_desde || "").trim();
+  const fechaHasta = String(req.query.fecha_hasta || "").trim();
+  const periodoCierre = normalizarPeriodoCierre(req.query.periodo_cierre);
+  const contextoSedes = await resolverSedesUsuario(req);
+  const resumen = await obtenerResumenEjecutivoCached({
+    fechaDesde,
+    fechaHasta,
+    sedesFiltro: contextoSedes.sedesFiltro,
+    periodoCierre
+  });
+
+  return {
+    resumen,
+    filtros: {
+      fecha_desde: fechaDesde,
+      fecha_hasta: fechaHasta,
+      periodo_cierre: periodoCierre,
+      sede: contextoSedes.sedeFiltro || "TODAS"
+    },
+    sedes: contextoSedes.sedesPermitidas,
+    usuarioTodasSedes: contextoSedes.usuarioTodasSedes,
+    sedeSeleccionada: contextoSedes.sedeSeleccionadaVista
+  };
+}
+
+router.get("/resumen-ejecutivo/datos", requireAuth, async (req, res) => {
+  try {
+    if (!ROLES_RESUMEN_EJECUTIVO.includes(req.session.user.rol)) {
+      return res.status(403).json({ ok: false, message: "No autorizado" });
+    }
+
+    const contexto = await prepararResumenEjecutivoRequest(req);
+    res.json({
+      ok: true,
+      resumen: contexto.resumen,
+      actualizado: new Intl.DateTimeFormat("es-CR", {
+        timeZone: "America/Costa_Rica",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit"
+      }).format(new Date())
+    });
+  } catch (error) {
+    console.error("ERROR resumen ejecutivo datos:", error);
+    res.status(500).json({ ok: false, message: "Error cargando resumen ejecutivo" });
+  }
+});
+
 router.get("/resumen-ejecutivo", requireAuth, async (req, res) => {
   try {
     if (!ROLES_RESUMEN_EJECUTIVO.includes(req.session.user.rol)) {
       return res.status(403).send("No autorizado");
     }
 
-    const fechaDesde = String(req.query.fecha_desde || "").trim();
-    const fechaHasta = String(req.query.fecha_hasta || "").trim();
-    const periodoCierre = normalizarPeriodoCierre(req.query.periodo_cierre);
-    const contextoSedes = await resolverSedesUsuario(req);
-    const resumen = await obtenerResumenEjecutivoCached({
-      fechaDesde,
-      fechaHasta,
-      sedesFiltro: contextoSedes.sedesFiltro,
-      periodoCierre
-    });
+    const contexto = await prepararResumenEjecutivoRequest(req);
 
     res.render("dashboard_resumen_ejecutivo", {
       user: req.session.user,
-      resumen,
-      filtros: {
-        fecha_desde: fechaDesde,
-        fecha_hasta: fechaHasta,
-        periodo_cierre: periodoCierre,
-        sede: contextoSedes.sedeFiltro || "TODAS"
-      },
-      sedes: contextoSedes.sedesPermitidas,
-      usuarioTodasSedes: contextoSedes.usuarioTodasSedes,
-      sedeSeleccionada: contextoSedes.sedeSeleccionadaVista,
+      resumen: contexto.resumen,
+      filtros: contexto.filtros,
+      sedes: contexto.sedes,
+      usuarioTodasSedes: contexto.usuarioTodasSedes,
+      sedeSeleccionada: contexto.sedeSeleccionada,
       etiquetaSede: etiquetaSedeTomza
     });
   } catch (error) {

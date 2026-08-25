@@ -10,10 +10,7 @@ function normalizarPlaca(value) {
   const raw = limpiarTextoPlaca(value);
   if (!raw) return null;
 
-  if (["ACEITE", "ACEITES"].includes(raw)) return "ACEITES";
-
-  const generales = new Set(["GENERAL", "GENERALES", "GENERALTALLER", "GENERALESTALLER"]);
-  if (generales.has(raw)) return "GENERALES TALLER";
+  if (raw.includes("ACEITE")) return "ACEITES";
 
   const generalesGastos = new Set([
     "GENERALGASTOS",
@@ -23,7 +20,20 @@ function normalizarPlaca(value) {
     "GASTOSGENERAL",
     "GASTOSGENERALES"
   ]);
-  if (generalesGastos.has(raw)) return "GENERALES GASTOS";
+  if (
+    generalesGastos.has(raw) ||
+    raw.includes("GENERALGASTOS") ||
+    raw.includes("GENERALESGASTOS") ||
+    raw.includes("GENERALDEGASTOS") ||
+    raw.includes("GENERALESDEGASTOS")
+  ) return "GENERALES GASTOS";
+
+  const generales = new Set(["GENERAL", "GENERALES", "GENERALTALLER", "GENERALESTALLER"]);
+  if (
+    generales.has(raw) ||
+    raw.includes("GENERALTALLER") ||
+    raw.includes("GENERALESTALLER")
+  ) return "GENERALES TALLER";
 
   let match = raw.match(/^CLC(\d{5,6})$/);
   if (match) return `CL${match[1]}`;

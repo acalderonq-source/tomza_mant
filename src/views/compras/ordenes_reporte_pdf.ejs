@@ -214,7 +214,7 @@
           <td><strong><%= orden.po_numero %></strong></td>
           <td><%= new Date(orden.fecha).toLocaleDateString('es-CR') %></td>
           <td><%= orden.proveedor_nombre %></td>
-          <td><%= orden.placa_unidad || '—' %></td>
+          <td><%= orden.placa_visual || orden.placa_unidad || '—' %></td>
           <td><%= orden.empresa_destino || 'GAS TOMZA' %></td>
           <td><%= orden.forma_pago || '—' %></td>
           <td><%= orden.moneda || '—' %></td>

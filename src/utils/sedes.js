@@ -117,7 +117,10 @@ function esUsuarioTodasSedes(user) {
 
 function agregarTallerParaMecanico(user, sedes) {
   const lista = Array.isArray(sedes) ? sedes : [];
-  return esUsuarioMecanico(user) ? unirSedes(lista, ["Taller"]) : unirSedes(lista);
+  const usuario = limpiarSede(user?.usuario).toLowerCase();
+  const sede = limpiarSede(user?.sede);
+  const puedeVerTaller = esUsuarioMecanico(user) && (usuario === "mecanico" || sede === "Taller");
+  return puedeVerTaller ? unirSedes(lista, ["Taller"]) : unirSedes(lista);
 }
 
 async function obtenerSedesRegistradas(pool) {

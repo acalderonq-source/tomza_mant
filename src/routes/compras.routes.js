@@ -104,8 +104,38 @@ function normalizarPlaca(value) {
   return normalizarPlacaSistema(value);
 }
 
-function obtenerPlacaOrden(lineasOrden, placaUnidad = null) {
-  return normalizarPlaca(placaUnidad) || normalizarPlaca((lineasOrden.find(linea => linea.codigo) || {}).codigo);
+function normalizarTextoCompra(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toUpperCase();
+}
+
+function textoEsAceites(...values) {
+  const texto = normalizarTextoCompra(values.filter(Boolean).join(" "));
+  return /\b(ACEITE|ACEITES|MOBIL|MOVIL|PICO|LIASA)\b/.test(texto);
+}
+
+function resolverPlacaOrdenCompra({ placa_unidad = null, lineas = [], proveedor_nombre = "", observaciones = "" } = {}) {
+  const textosLineas = lineas.flatMap(linea => [
+    linea.codigo,
+    linea.codigo_producto,
+    linea.descripcion
+  ]);
+
+  if (textoEsAceites(placa_unidad, proveedor_nombre, observaciones, ...textosLineas)) {
+    return "ACEITES";
+  }
+
+  return normalizarPlaca(placa_unidad) || normalizarPlaca((lineas.find(linea => linea.codigo) || {}).codigo);
+}
+
+function obtenerPlacaOrden(lineasOrden, placaUnidad = null, contexto = {}) {
+  return resolverPlacaOrdenCompra({
+    ...contexto,
+    placa_unidad: placaUnidad,
+    lineas: lineasOrden
+  });
 }
 
 function normalizarTextoBusqueda(value) {
@@ -1897,7 +1927,20 @@ function construirConsultaOrdenes(filtros = {}) {
     const condicionesPlaca = [];
     agregarFiltroPlacaSql(condicionesPlaca, params, "o.placa_unidad", placaFiltro);
     if (condicionesPlaca.length) {
-      sql += ` AND ${condicionesPlaca[0]}`;
+      if (placaFiltro === "ACEITES") {
+        sql += ` AND (
+          ${condicionesPlaca[0]}
+          OR UPPER(CONCAT_WS(' ', o.placa_unidad, o.observaciones, p.nombre)) REGEXP 'ACEITE|ACEITES|MOBIL|MOVIL|PICO|LIASA'
+          OR EXISTS (
+            SELECT 1
+            FROM ordenes_compra_detalle od
+            WHERE od.orden_compra_id = o.id
+              AND UPPER(CONCAT_WS(' ', od.codigo, od.codigo_producto, od.descripcion)) REGEXP 'ACEITE|ACEITES|MOBIL|MOVIL|PICO|LIASA'
+          )
+        )`;
+      } else {
+        sql += ` AND ${condicionesPlaca[0]}`;
+      }
     }
   }
   if (estado && estado !== '') {
@@ -1911,6 +1954,35 @@ function construirConsultaOrdenes(filtros = {}) {
 
   sql += ` ORDER BY o.fecha DESC, o.id DESC`;
   return { sql, params };
+}
+
+async function aplicarPlacaVisualOrdenes(ordenes = []) {
+  if (!ordenes.length) return ordenes;
+
+  const ordenIds = ordenes.map(orden => orden.id);
+  const placeholders = ordenIds.map(() => "?").join(",");
+  const [lineas] = await pool.query(
+    `SELECT orden_compra_id, codigo, codigo_producto, descripcion
+     FROM ordenes_compra_detalle
+     WHERE orden_compra_id IN (${placeholders})`,
+    ordenIds
+  );
+
+  const lineasPorOrden = lineas.reduce((map, linea) => {
+    if (!map.has(linea.orden_compra_id)) map.set(linea.orden_compra_id, []);
+    map.get(linea.orden_compra_id).push(linea);
+    return map;
+  }, new Map());
+
+  return ordenes.map(orden => ({
+    ...orden,
+    placa_visual: resolverPlacaOrdenCompra({
+      placa_unidad: orden.placa_unidad,
+      proveedor_nombre: orden.proveedor_nombre,
+      observaciones: orden.observaciones,
+      lineas: lineasPorOrden.get(orden.id) || []
+    })
+  }));
 }
 
 async function obtenerOrdenesReporteCompleto(filtros = {}) {
@@ -1931,7 +2003,11 @@ async function obtenerOrdenesReporteCompleto(filtros = {}) {
 
   const placasReporte = new Set();
   ordenes.forEach(orden => {
-    const placa = normalizarPlaca(orden.placa_unidad);
+    const placa = resolverPlacaOrdenCompra({
+      placa_unidad: orden.placa_unidad,
+      proveedor_nombre: orden.proveedor_nombre,
+      observaciones: orden.observaciones
+    });
     if (placa && placa !== "GENERALES TALLER") placasReporte.add(placa);
   });
   lineas.forEach(linea => {
@@ -1963,12 +2039,23 @@ async function obtenerOrdenesReporteCompleto(filtros = {}) {
     return map;
   }, new Map());
 
-  ordenes = ordenes.map(orden => ({
-    ...orden,
-    placa_normalizada: normalizarPlaca(orden.placa_unidad),
-    sede_resuelta: sedePorPlaca.get(normalizarPlaca(orden.placa_unidad)) || "",
-    lineas: lineasPorOrden.get(orden.id) || []
-  }));
+  ordenes = ordenes.map(orden => {
+    const lineasOrden = lineasPorOrden.get(orden.id) || [];
+    const placaNormalizada = resolverPlacaOrdenCompra({
+      placa_unidad: orden.placa_unidad,
+      proveedor_nombre: orden.proveedor_nombre,
+      observaciones: orden.observaciones,
+      lineas: lineasOrden
+    });
+
+    return {
+      ...orden,
+      placa_visual: placaNormalizada,
+      placa_normalizada: placaNormalizada,
+      sede_resuelta: sedePorPlaca.get(placaNormalizada) || "",
+      lineas: lineasOrden
+    };
+  });
 
   return ordenes;
 }
@@ -2058,7 +2145,9 @@ function agruparOrdenesPorDescripcion(ordenes = []) {
       }
 
       const grupo = grupos.get(clave);
-      const placaLinea = normalizarPlaca(linea.codigo) || normalizarPlaca(orden.placa_unidad);
+      const placaLinea = orden.placa_normalizada === "ACEITES"
+        ? "ACEITES"
+        : normalizarPlaca(linea.codigo) || orden.placa_normalizada || normalizarPlaca(orden.placa_unidad);
       const sedeLinea = linea.sede_resuelta || orden.sede_resuelta || "";
       grupo.categorias.add(clasificarPlacaCompra(placaLinea, sedeLinea));
       if (sedeLinea) grupo.sedes.add(textoExcelLimpio(sedeLinea));
@@ -2225,7 +2314,11 @@ router.post("/ordenes", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_
       req.body.tipo_mantenimiento,
       detectarTipoMantenimiento([observaciones, ...lineasOrden.map(linea => linea.descripcion)], { fallback: "CORRECTIVO" })
     );
-    const placaOrden = obtenerPlacaOrden(lineasOrden, placa_unidad);
+    const [[proveedorOrden]] = await connection.query("SELECT nombre FROM proveedores WHERE id = ?", [proveedor_id]);
+    const placaOrden = obtenerPlacaOrden(lineasOrden, placa_unidad, {
+      proveedor_nombre: proveedorOrden ? proveedorOrden.nombre : "",
+      observaciones
+    });
     const cotizacion = guardarCotizacionOrden(cotizacion_data, cotizacion_nombre, cotizacion_tipo, req.session.user.id);
 
     if (!lineasOrden.length) {
@@ -2297,7 +2390,11 @@ router.post("/ordenes/:id/editar", requireAuth, allowRoles("ADMIN", "TALLER", "P
       req.body.tipo_mantenimiento,
       detectarTipoMantenimiento([observaciones, ...lineasOrden.map(linea => linea.descripcion)], { fallback: "CORRECTIVO" })
     );
-    const placaOrden = obtenerPlacaOrden(lineasOrden, placa_unidad);
+    const [[proveedorOrden]] = await connection.query("SELECT nombre FROM proveedores WHERE id = ?", [proveedor_id]);
+    const placaOrden = obtenerPlacaOrden(lineasOrden, placa_unidad, {
+      proveedor_nombre: proveedorOrden ? proveedorOrden.nombre : "",
+      observaciones
+    });
     const cotizacion = guardarCotizacionOrden(cotizacion_data, cotizacion_nombre, cotizacion_tipo, req.session.user.id);
 
     if (!lineasOrden.length) {
@@ -2386,7 +2483,8 @@ router.get("/ordenes", requireAuth, allowRoles(...ROLES_VER_ORDENES), async (req
     const { proveedor_id, fecha_desde, fecha_hasta, po_numero, placa_unidad, estado, facturada } = req.query;
     const { sql, params } = construirConsultaOrdenes({ proveedor_id, fecha_desde, fecha_hasta, po_numero, placa_unidad, estado, facturada });
 
-    const [ordenes] = await pool.query(sql, params);
+    let [ordenes] = await pool.query(sql, params);
+    ordenes = await aplicarPlacaVisualOrdenes(ordenes);
     const [proveedores] = await pool.query("SELECT id, nombre FROM proveedores ORDER BY nombre");
     const estados = ['BORRADOR', 'ENVIADA', 'RECIBIDA_PARCIAL', 'RECIBIDA_TOTAL'];
 
@@ -2443,6 +2541,12 @@ router.get("/ordenes/reporte/pdf", requireAuth, allowRoles("ADMIN", "TALLER", "P
 
       ordenes = ordenes.map(orden => ({
         ...orden,
+        placa_visual: resolverPlacaOrdenCompra({
+          placa_unidad: orden.placa_unidad,
+          proveedor_nombre: orden.proveedor_nombre,
+          observaciones: orden.observaciones,
+          lineas: lineasPorOrden.get(orden.id) || []
+        }),
         lineas: lineasPorOrden.get(orden.id) || []
       }));
     }
@@ -2595,7 +2699,7 @@ router.get("/ordenes/reporte/excel", requireAuth, allowRoles("ADMIN", "TALLER", 
         po: orden.po_numero,
         fecha: excelDate(orden.fecha),
         proveedor: orden.proveedor_nombre,
-        placa: orden.placa_unidad || "-",
+        placa: orden.placa_visual || orden.placa_unidad || "-",
         estado: String(orden.estado || "").replaceAll("_", " "),
         factura: orden.factura || estadoFacturaOrden(orden),
         forma_pago: orden.forma_pago || "-",
@@ -2665,7 +2769,7 @@ router.get("/ordenes/reporte/excel", requireAuth, allowRoles("ADMIN", "TALLER", 
       const metaRow = wsCompleto.addRow([
         "Fecha", excelDate(orden.fecha),
         "Proveedor", orden.proveedor_nombre || "-",
-        "Placa / general", orden.placa_unidad || "-",
+        "Placa / general", orden.placa_visual || orden.placa_unidad || "-",
         "Estado", String(orden.estado || "").replaceAll("_", " "),
         "Factura", orden.factura || estadoFacturaOrden(orden),
         "Forma pago", orden.forma_pago || "-"
@@ -2686,14 +2790,14 @@ router.get("/ordenes/reporte/excel", requireAuth, allowRoles("ADMIN", "TALLER", 
 
       const lineas = orden.lineas.length
         ? orden.lineas
-        : [{ codigo: orden.placa_unidad, codigo_producto: "", descripcion: "Orden sin detalle de líneas", cantidad: 1, precio_unitario: orden.total, subtotal: orden.total }];
+        : [{ codigo: orden.placa_visual || orden.placa_unidad, codigo_producto: "", descripcion: "Orden sin detalle de líneas", cantidad: 1, precio_unitario: orden.total, subtotal: orden.total }];
 
       lineas.forEach(linea => {
         const row = wsCompleto.addRow([
           orden.po_numero || "-",
           excelDate(orden.fecha),
           orden.proveedor_nombre || "-",
-          orden.placa_unidad || "-",
+          orden.placa_visual || orden.placa_unidad || "-",
           String(orden.estado || "").replaceAll("_", " "),
           orden.factura || estadoFacturaOrden(orden),
           linea.codigo || "-",
@@ -2783,7 +2887,7 @@ router.get("/ordenes/reporte/excel", requireAuth, allowRoles("ADMIN", "TALLER", 
         orden.po_numero || "-",
         excelDate(orden.fecha),
         orden.proveedor_nombre || "-",
-        orden.placa_unidad || "-",
+        orden.placa_visual || orden.placa_unidad || "-",
         String(orden.estado || "").replaceAll("_", " "),
         parseMonto(orden.total)
       ]);
@@ -2813,7 +2917,7 @@ router.get("/ordenes/reporte/excel", requireAuth, allowRoles("ADMIN", "TALLER", 
     pintarFilaHeader(wsDetalle.getRow(1));
 
     ordenes.forEach(orden => {
-      const lineas = orden.lineas.length ? orden.lineas : [{ codigo: orden.placa_unidad, codigo_producto: "", descripcion: "Orden sin detalle de líneas", cantidad: 1, precio_unitario: orden.total, subtotal: orden.total }];
+      const lineas = orden.lineas.length ? orden.lineas : [{ codigo: orden.placa_visual || orden.placa_unidad, codigo_producto: "", descripcion: "Orden sin detalle de líneas", cantidad: 1, precio_unitario: orden.total, subtotal: orden.total }];
       lineas.forEach(linea => {
         const row = wsDetalle.addRow({
           po: orden.po_numero,
@@ -2821,7 +2925,7 @@ router.get("/ordenes/reporte/excel", requireAuth, allowRoles("ADMIN", "TALLER", 
           proveedor: orden.proveedor_nombre,
           estado: String(orden.estado || "").replaceAll("_", " "),
           factura: orden.factura || estadoFacturaOrden(orden),
-          placa_orden: orden.placa_unidad || "-",
+          placa_orden: orden.placa_visual || orden.placa_unidad || "-",
           codigo: linea.codigo || "-",
           codigo_producto: linea.codigo_producto || "-",
           descripcion: linea.descripcion || "-",

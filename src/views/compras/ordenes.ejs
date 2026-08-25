@@ -354,7 +354,7 @@
               <td data-label="PO Número"><strong><%= orden.po_numero %></strong></td>
               <td data-label="Fecha"><%= new Date(orden.fecha).toLocaleDateString('es-CR') %></td>
               <td data-label="Proveedor"><%= orden.proveedor_nombre %></td>
-              <td data-label="Placa"><%= orden.placa_unidad || '—' %></td>
+              <td data-label="Placa"><%= orden.placa_visual || orden.placa_unidad || '—' %></td>
               <td data-label="Moneda"><%= orden.moneda %></td>
               <td data-label="Total" class="money"><%= parseFloat(orden.total).toLocaleString('es-CR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %></td>
               <td data-label="Cotización">
