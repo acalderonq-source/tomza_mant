@@ -1,0 +1,4 @@
+ALTER TABLE unidades
+  ADD COLUMN marca VARCHAR(100) NULL AFTER sede,
+  ADD COLUMN modelo VARCHAR(120) NULL AFTER marca,
+  ADD COLUMN anio INT NULL AFTER modelo;

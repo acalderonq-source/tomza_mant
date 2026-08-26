@@ -63,6 +63,9 @@
     }
     .bulk-sede { min-width: 210px; }
     .bulk-reason { min-width: 240px; }
+    .bulk-brand { min-width: 130px; }
+    .bulk-model { min-width: 150px; }
+    .bulk-year { min-width: 90px; }
     .dirty-row { --bs-table-bg: #fff7ed; }
     .empty-state { color: #64748b; font-weight: 700; padding: 1.5rem; text-align: center; }
     .business-grid { display: grid; gap: .75rem; grid-template-columns: repeat(4, minmax(0, 1fr)); }
@@ -249,6 +252,9 @@
                           <div class="plate-cell">
                             <strong><%= unidad.placa %></strong>
                             <div class="plate-flags"><%= mostrarSede(unidad.sede) %></div>
+                            <% if (unidad.marca || unidad.modelo || unidad.anio) { %>
+                              <div class="plate-flags"><%= [unidad.marca, unidad.modelo, unidad.anio].filter(Boolean).join(' · ') %></div>
+                            <% } %>
                             <% if (Number(unidad.varada) === 1) { %>
                               <span class="mini-pill mini-stop">Varada</span>
                             <% } else if (Number(unidad.activa) === 1) { %>
@@ -310,7 +316,7 @@
         </div>
       </div>
       <form method="POST" action="/unidades/agregar" class="row g-3 align-items-end">
-        <div class="col-md-4">
+        <div class="col-md-3">
           <label class="filter-label">Placa</label>
           <div class="plate-edit">
             <select name="placa_prefijo" class="form-select plate-prefix">
@@ -322,8 +328,20 @@
             <input type="text" name="placa_numero" class="form-control" placeholder="Ej: 173136" required>
           </div>
         </div>
+        <div class="col-md-2">
+          <label class="filter-label">Marca</label>
+          <input type="text" name="marca" class="form-control" placeholder="Ej: Hino">
+        </div>
+        <div class="col-md-2">
+          <label class="filter-label">Modelo</label>
+          <input type="text" name="modelo" class="form-control" placeholder="Ej: Hino 500">
+        </div>
+        <div class="col-md-1">
+          <label class="filter-label">Año</label>
+          <input type="number" name="anio" class="form-control" min="1980" max="2100" placeholder="2024">
+        </div>
         <% if (['ADMIN', 'TALLER', 'TRAMITES', 'PROVEEDURIA', 'PROVEEDURIA_TALLER'].includes(user.rol)) { %>
-          <div class="col-md-4">
+          <div class="col-md-2">
             <label class="filter-label">Sede</label>
             <select name="sede" class="form-select" required>
               <option value="">Seleccione sede</option>
@@ -333,7 +351,7 @@
             </select>
           </div>
         <% } %>
-        <div class="col-md-4">
+        <div class="col-md-2">
           <button type="submit" class="btn btn-primary w-100">
             <i class="bi bi-plus-circle me-1"></i>Agregar unidad
           </button>
@@ -367,6 +385,9 @@
             <tr>
               <th>Placa</th>
               <th>Sede</th>
+              <th>Marca</th>
+              <th>Modelo</th>
+              <th>Año</th>
               <th>Estado</th>
               <th>Condición</th>
               <th>Razón varada</th>
@@ -375,7 +396,7 @@
           <tbody>
             <% if (unidades.length === 0) { %>
               <tr>
-                <td colspan="5" class="empty-state">No hay unidades con los filtros seleccionados.</td>
+                <td colspan="8" class="empty-state">No hay unidades con los filtros seleccionados.</td>
               </tr>
             <% } %>
 
@@ -384,6 +405,7 @@
               <tr>
                 <td>
                   <% if (puedeEditar) { %>
+                    <input type="hidden" name="unidades[<%= u.id %>][id]" value="<%= u.id %>">
                     <div class="plate-edit">
                       <select name="unidades[<%= u.id %>][placa_prefijo]" class="form-select form-select-sm plate-prefix" aria-label="Inicial de placa">
                         <option value="" <%= placaPartes.prefijo === '' ? 'selected' : '' %>>Sin</option>
@@ -416,6 +438,47 @@
                     </select>
                   <% } else { %>
                     <%= mostrarSede(u.sede) %>
+                  <% } %>
+                </td>
+                <td>
+                  <% if (puedeEditar) { %>
+                    <input
+                      type="text"
+                      name="unidades[<%= u.id %>][marca]"
+                      class="form-control form-control-sm bulk-brand"
+                      value="<%= u.marca || '' %>"
+                      placeholder="Marca"
+                    >
+                  <% } else { %>
+                    <%= u.marca || '-' %>
+                  <% } %>
+                </td>
+                <td>
+                  <% if (puedeEditar) { %>
+                    <input
+                      type="text"
+                      name="unidades[<%= u.id %>][modelo]"
+                      class="form-control form-control-sm bulk-model"
+                      value="<%= u.modelo || '' %>"
+                      placeholder="Modelo"
+                    >
+                  <% } else { %>
+                    <%= u.modelo || '-' %>
+                  <% } %>
+                </td>
+                <td>
+                  <% if (puedeEditar) { %>
+                    <input
+                      type="number"
+                      name="unidades[<%= u.id %>][anio]"
+                      class="form-control form-control-sm bulk-year"
+                      value="<%= u.anio || '' %>"
+                      min="1980"
+                      max="2100"
+                      placeholder="Año"
+                    >
+                  <% } else { %>
+                    <%= u.anio || '-' %>
                   <% } %>
                 </td>
                 <td>

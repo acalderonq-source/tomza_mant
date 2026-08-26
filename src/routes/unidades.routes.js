@@ -56,6 +56,9 @@ async function ensureUnidadEstadoColumns() {
     ["activa", "TINYINT(1) NOT NULL DEFAULT 1"],
     ["varada", "TINYINT(1) NOT NULL DEFAULT 0"],
     ["razon_varada", "TEXT NULL"],
+    ["marca", "VARCHAR(100) NULL"],
+    ["modelo", "VARCHAR(120) NULL"],
+    ["anio", "INT NULL"],
   ];
 
   for (const [column, definition] of columns) {
@@ -262,6 +265,21 @@ function crearResumenGrupoUnidades(nombre, subgrupoBase = []) {
   };
 }
 
+function obtenerCambiosUnidadesDesdeBody(body = {}) {
+  const cambios = body.unidades && typeof body.unidades === "object" ? { ...body.unidades } : {};
+
+  Object.entries(body || {}).forEach(([key, value]) => {
+    const match = key.match(/^unidades\[(\d+)\]\[([^\]]+)\]$/);
+    if (!match) return;
+
+    const [, id, field] = match;
+    cambios[id] = cambios[id] || {};
+    cambios[id][field] = value;
+  });
+
+  return cambios;
+}
+
 function agruparUnidadesPorNegocio(unidades) {
   const subgruposBase = {
     CILINDREROS: ["Alajuela", "Cartago", "Guapiles", "La Cruz", "Nicoya", "Orotina", "Perez Zeledon", "Rio Claro", "San Carlos"],
@@ -321,7 +339,7 @@ function agruparUnidadesPorNegocio(unidades) {
 async function obtenerUnidadAutorizada(req, id) {
   const sedesPermitidas = await obtenerSedesPermitidas(req);
   const [[unidad]] = await pool.query(
-    `SELECT id, placa, sede, activa, varada, razon_varada
+    `SELECT id, placa, sede, activa, varada, razon_varada, marca, modelo, anio
      FROM unidades
      WHERE id = ?
      LIMIT 1`,
@@ -351,7 +369,7 @@ router.get("/", async (req, res) => {
     const placaFiltro = String(req.query.placa || "").trim();
 
     let sql = `
-      SELECT id, placa, sede, activa, varada, razon_varada
+      SELECT id, placa, sede, activa, varada, razon_varada, marca, modelo, anio
       FROM unidades
       WHERE 1=1
     `;
@@ -445,6 +463,9 @@ async function agregarUnidad(req, res) {
     }
 
     const { sede } = req.body;
+    const marca = String(req.body.marca || "").trim() || null;
+    const modelo = String(req.body.modelo || "").trim() || null;
+    const anio = req.body.anio ? parseInt(req.body.anio, 10) : null;
     const placaNormalizada = construirPlacaUnidad({
       placa: req.body.placa,
       prefijo: req.body.placa_prefijo,
@@ -466,6 +487,12 @@ async function agregarUnidad(req, res) {
       return res.status(400).send("No se pudo determinar la sede de la unidad");
     }
 
+    if (anio !== null && (Number.isNaN(anio) || anio < 1980 || anio > 2100)) {
+      return redirectUnidades(req, res, {
+        error: "El año de la unidad no es válido."
+      });
+    }
+
     const [[existente]] = await pool.query(
       "SELECT id, placa, sede, activa FROM unidades WHERE placa = ? LIMIT 1",
       [placaNormalizada]
@@ -483,9 +510,12 @@ async function agregarUnidad(req, res) {
       await pool.query(
         `UPDATE unidades
          SET sede = ?,
-             activa = 1
+             activa = 1,
+             marca = COALESCE(?, marca),
+             modelo = COALESCE(?, modelo),
+             anio = COALESCE(?, anio)
          WHERE id = ?`,
-        [sedeAsignada, existente.id]
+        [sedeAsignada, marca, modelo, anio, existente.id]
       );
 
       return redirectUnidades(req, res, {
@@ -494,8 +524,10 @@ async function agregarUnidad(req, res) {
     }
 
     await pool.query(
-      "INSERT INTO unidades (placa, sede, activa, varada, razon_varada) VALUES (?, ?, 1, 0, NULL)",
-      [placaNormalizada, sedeAsignada]
+      `INSERT INTO unidades
+       (placa, sede, marca, modelo, anio, activa, varada, razon_varada)
+       VALUES (?, ?, ?, ?, ?, 1, 0, NULL)`,
+      [placaNormalizada, sedeAsignada, marca, modelo, anio]
     );
 
     return redirectUnidades(req, res, {
@@ -532,7 +564,7 @@ router.post("/guardar-masivo", async (req, res) => {
       return res.status(403).send("No autorizado");
     }
 
-    const cambios = req.body.unidades || {};
+    const cambios = obtenerCambiosUnidadesDesdeBody(req.body);
     const ids = Object.keys(cambios)
       .map(id => parseInt(id, 10))
       .filter(id => !Number.isNaN(id));
@@ -546,7 +578,7 @@ router.post("/guardar-masivo", async (req, res) => {
     const sedesPermitidas = await obtenerSedesPermitidas(req);
     const sedesEditables = await obtenerSedesEditables(req);
     const [actuales] = await pool.query(
-      `SELECT id, placa, sede, activa, varada, razon_varada
+      `SELECT id, placa, sede, activa, varada, razon_varada, marca, modelo, anio
        FROM unidades
        WHERE id IN (?)`,
       [ids]
@@ -567,6 +599,10 @@ router.post("/guardar-masivo", async (req, res) => {
         numero: cambio.placa_numero
       });
       const sedeNueva = String(cambio.sede || "").trim();
+      const marcaNueva = String(cambio.marca || "").trim();
+      const modeloNueva = String(cambio.modelo || "").trim();
+      const anioTexto = String(cambio.anio || "").trim();
+      const anioNuevo = anioTexto ? parseInt(anioTexto, 10) : null;
 
       if (!placaNueva) {
         await conn.rollback();
@@ -579,6 +615,13 @@ router.post("/guardar-masivo", async (req, res) => {
         await conn.rollback();
         return redirectUnidades(req, res, {
           error: `Seleccione una sede permitida para ${unidad.placa}.`
+        });
+      }
+
+      if (anioTexto && (Number.isNaN(anioNuevo) || anioNuevo < 1980 || anioNuevo > 2100)) {
+        await conn.rollback();
+        return redirectUnidades(req, res, {
+          error: `El año de ${unidad.placa} no es válido.`
         });
       }
 
@@ -610,8 +653,11 @@ router.post("/guardar-masivo", async (req, res) => {
       const cambioEstado = Number(unidad.activa || 0) !== activa;
       const cambioVarada = Number(unidad.varada || 0) !== varada;
       const cambioRazon = String(unidad.razon_varada || "") !== razon;
+      const cambioMarca = String(unidad.marca || "") !== marcaNueva;
+      const cambioModelo = String(unidad.modelo || "") !== modeloNueva;
+      const cambioAnio = (unidad.anio === null || unidad.anio === undefined ? null : Number(unidad.anio)) !== anioNuevo;
 
-      if (!cambioPlaca && !cambioSede && !cambioEstado && !cambioVarada && !cambioRazon) {
+      if (!cambioPlaca && !cambioSede && !cambioEstado && !cambioVarada && !cambioRazon && !cambioMarca && !cambioModelo && !cambioAnio) {
         continue;
       }
 
@@ -633,11 +679,14 @@ router.post("/guardar-masivo", async (req, res) => {
         `UPDATE unidades
          SET placa = ?,
              sede = ?,
+             marca = ?,
+             modelo = ?,
+             anio = ?,
              activa = ?,
              varada = ?,
              razon_varada = ?
          WHERE id = ?`,
-        [placaNueva, sedeNueva, activa, varada, razon || null, unidad.id]
+        [placaNueva, sedeNueva, marcaNueva || null, modeloNueva || null, anioNuevo, activa, varada, razon || null, unidad.id]
       );
 
       if (cambioSede) {
