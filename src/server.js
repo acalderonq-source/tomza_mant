@@ -227,6 +227,7 @@ const ordenesMotorRoutes = require("./routes/ordenesMotor.routes");
 const repuestosRoutes = require("./routes/repuestos.routes");
 const repuestosSemanalesRoutes = require("./routes/repuestosSemanales.routes");
 const bodegaRoutes = require("./routes/bodega.routes");
+const lavadoUnidadesRoutes = require("./routes/lavadoUnidades.routes");
 const apiRoutes = require("./routes/api.routes");
 
 // ===================== USAR RUTAS =====================
@@ -256,6 +257,7 @@ app.use("/ordenes-motor", ordenesMotorRoutes);
 app.use("/repuestos", repuestosRoutes);
 app.use("/repuestos-semanales", repuestosSemanalesRoutes);
 app.use("/bodega", bodegaRoutes);
+app.use("/lavado-unidades", lavadoUnidadesRoutes);
 app.use("/api", apiRoutes);
 
 // ===================== CRON JOBS =====================

@@ -140,6 +140,29 @@ function unirSedes(...listas) {
   return [...new Set(sedes)];
 }
 
+function sedeCanonicaVisible(sede) {
+  const sedeLimpia = limpiarSede(sede);
+  if (!sedeLimpia) return "";
+  if (esSedeGranelCartago(sedeLimpia)) return "granel_cartago";
+
+  const sedeNormalizada = normalizarSede(sedeLimpia);
+  if (sedeNormalizada === "TÁNDEM" || sedeNormalizada === "TANDEM" || sedeNormalizada === "TAMDEN") {
+    return "Tandem";
+  }
+
+  return sedeLimpia;
+}
+
+function unirSedesVisibles(...listas) {
+  return unirSedes(...listas)
+    .map(sedeCanonicaVisible)
+    .filter(Boolean)
+    .filter((sede, index, lista) => {
+      const etiqueta = normalizarSede(etiquetaSede(sede));
+      return lista.findIndex(item => normalizarSede(etiquetaSede(item)) === etiqueta) === index;
+    });
+}
+
 function esUsuarioMecanico(user) {
   return user?.rol === "MECANICO" ||
     limpiarSede(user?.usuario).toLowerCase() === "mecanico";
@@ -182,12 +205,12 @@ async function obtenerSedesRegistradas(pool) {
 }
 
 async function obtenerTodasSedes(pool) {
-  return unirSedes(TODAS_SEDES, await obtenerSedesRegistradas(pool));
+  return unirSedesVisibles(TODAS_SEDES, await obtenerSedesRegistradas(pool));
 }
 
 async function obtenerSedesTransporte(pool) {
   const registradas = await obtenerSedesRegistradas(pool);
-  return unirSedes(SEDES_TRANSPORTE, registradas.filter(esSedeTransporte));
+  return unirSedesVisibles(SEDES_TRANSPORTE, registradas.filter(esSedeTransporte));
 }
 
 function getSedesPermitidas(req) {

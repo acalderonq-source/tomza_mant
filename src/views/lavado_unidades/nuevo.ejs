@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Nuevo lavado de unidad</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <style>
+    body { background:#eef2f7; color:#0f172a; font-family:"Segoe UI", Roboto, Arial, sans-serif; }
+    .topbar { background:#101827; border-bottom:3px solid #0ea5e9; }
+    .shell { max-width:1040px; }
+    .hero, .panel, .photo-card { background:#fff; border:1px solid #dbe3ef; border-radius:10px; }
+    .hero { padding:1rem; }
+    .page-title { font-size:1.45rem; font-weight:900; margin:0; }
+    .small-muted { color:#64748b; }
+    .form-label, .photo-title { color:#334155; font-size:.84rem; font-weight:850; }
+    .photo-grid { display:grid; gap:.85rem; grid-template-columns:repeat(auto-fit, minmax(230px, 1fr)); }
+    .photo-card { padding:.85rem; }
+    .photo-preview { border:1px solid #dbe3ef; border-radius:10px; display:none; height:190px; margin-top:.65rem; object-fit:cover; width:100%; }
+    .required-pill { background:#e0f2fe; border-radius:999px; color:#075985; font-size:.7rem; font-weight:900; padding:.25rem .55rem; }
+    .sticky-actions { background:rgba(238,242,247,.95); border-top:1px solid #dbe3ef; bottom:0; padding:.85rem 0; position:sticky; }
+    @media (max-width:680px) { .action-btn { width:100%; } }
+  </style>
+</head>
+<body>
+<nav class="navbar navbar-dark topbar px-3 py-2">
+  <span class="navbar-brand fw-semibold"><i class="bi bi-droplet-half me-2"></i>Nuevo lavado</span>
+  <div class="text-white d-flex align-items-center gap-2 flex-wrap">
+    <span class="small"><%= user.usuario %> · <%= user.rol %></span>
+    <a href="/lavado-unidades" class="btn btn-secondary btn-sm rounded-pill px-3">Volver</a>
+  </div>
+</nav>
+
+<main class="container-fluid shell py-4">
+  <section class="hero mb-3">
+    <h1 class="page-title">Registrar lavado de unidad</h1>
+    <div class="small-muted">Cada orden necesita fotos nuevas. El sistema bloquea fotos repetidas de lavados anteriores.</div>
+  </section>
+
+  <% if (error) { %>
+    <div class="alert alert-danger"><i class="bi bi-exclamation-triangle me-1"></i><%= error %></div>
+  <% } %>
+
+  <form method="POST" action="/lavado-unidades" id="lavadoForm">
+    <section class="panel p-3 mb-3">
+      <div class="row g-3">
+        <div class="col-12 col-md-6">
+          <label class="form-label">Unidad / placa</label>
+          <div data-placa-search data-placa-mode="unidad" data-placa-target="#unidadLavadoId">
+            <input type="text" class="form-control" data-placa-input data-placa-autocomplete placeholder="Escriba la placa" required>
+            <input type="hidden" name="unidad_id" id="unidadLavadoId" required>
+            <div data-placa-results></div>
+            <div data-placa-selected></div>
+          </div>
+        </div>
+        <div class="col-12 col-md-3">
+          <label class="form-label">Fecha</label>
+          <input type="date" name="fecha" class="form-control" value="<%= hoy %>" required>
+        </div>
+        <div class="col-12">
+          <label class="form-label">Observaciones</label>
+          <textarea name="observaciones" class="form-control" rows="2" placeholder="Opcional: detalle del lavado, condición de la unidad, encargado..."></textarea>
+        </div>
+      </div>
+    </section>
+
+    <section class="photo-grid">
+      <% fotos.forEach(foto => { %>
+        <article class="photo-card">
+          <div class="d-flex justify-content-between align-items-center gap-2 mb-2">
+            <div class="photo-title"><%= foto.nombre %></div>
+            <span class="required-pill">Obligatoria</span>
+          </div>
+          <input type="file" class="form-control lavado-photo-input" accept="image/*" capture="environment" data-clave="<%= foto.clave %>" required>
+          <input type="hidden" name="fotos_base64[<%= foto.clave %>]" id="foto_base64_<%= foto.clave %>">
+          <input type="hidden" name="fotos_nombre[<%= foto.clave %>]" id="foto_nombre_<%= foto.clave %>">
+          <input type="hidden" name="fotos_tipo[<%= foto.clave %>]" id="foto_tipo_<%= foto.clave %>">
+          <img id="foto_preview_<%= foto.clave %>" class="photo-preview" alt="Vista previa de <%= foto.nombre %>">
+        </article>
+      <% }) %>
+    </section>
+
+    <div class="sticky-actions mt-4">
+      <div class="d-flex gap-2 justify-content-end flex-wrap">
+        <a href="/lavado-unidades" class="btn btn-outline-secondary action-btn">Cancelar</a>
+        <button class="btn btn-primary action-btn"><i class="bi bi-save me-1"></i>Guardar orden de lavado</button>
+      </div>
+    </div>
+  </form>
+</main>
+
+<script>
+  const form = document.getElementById("lavadoForm");
+
+  function limpiarFoto(clave) {
+    document.getElementById(`foto_base64_${clave}`).value = "";
+    document.getElementById(`foto_nombre_${clave}`).value = "";
+    document.getElementById(`foto_tipo_${clave}`).value = "";
+    const preview = document.getElementById(`foto_preview_${clave}`);
+    preview.removeAttribute("src");
+    preview.style.display = "none";
+  }
+
+  function cargarFoto(input) {
+    const clave = input.dataset.clave;
+    const file = input.files && input.files[0];
+    if (!file) {
+      limpiarFoto(clave);
+      return;
+    }
+
+    if (!file.type.startsWith("image/")) {
+      alert("Seleccione una imagen válida.");
+      input.value = "";
+      limpiarFoto(clave);
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = event => {
+      const img = new Image();
+      img.onload = () => {
+        const maxSize = 1200;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height && width > maxSize) {
+          height = Math.round((height * maxSize) / width);
+          width = maxSize;
+        } else if (height > maxSize) {
+          width = Math.round((width * maxSize) / height);
+          height = maxSize;
+        }
+
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, width, height);
+
+        const dataUrl = canvas.toDataURL("image/jpeg", 0.72);
+        document.getElementById(`foto_base64_${clave}`).value = dataUrl;
+        document.getElementById(`foto_nombre_${clave}`).value = file.name || `lavado_${clave}.jpg`;
+        document.getElementById(`foto_tipo_${clave}`).value = "image/jpeg";
+        const preview = document.getElementById(`foto_preview_${clave}`);
+        preview.src = dataUrl;
+        preview.style.display = "block";
+      };
+      img.src = event.target.result;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  document.querySelectorAll(".lavado-photo-input").forEach(input => {
+    input.addEventListener("change", () => cargarFoto(input));
+  });
+
+  form.addEventListener("submit", event => {
+    const faltantes = [...document.querySelectorAll("[id^='foto_base64_']")]
+      .filter(input => !input.value)
+      .map(input => input.id.replace("foto_base64_", "").replaceAll("_", " "));
+
+    if (faltantes.length) {
+      event.preventDefault();
+      alert("Debe subir todas las fotos antes de guardar.");
+    }
+  });
+</script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

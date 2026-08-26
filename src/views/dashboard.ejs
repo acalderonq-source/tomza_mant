@@ -303,6 +303,7 @@
   const puedeVerGiras = ['ADMIN', 'TALLER', 'MECANICO', 'SUPERVISOR', 'SUPERVISOR_PESADO'].includes(user.rol);
   const puedeVerDashboardTaller = ['ADMIN', 'TALLER', 'MECANICO', 'SUPERVISOR', 'SUPERVISOR_PESADO'].includes(user.rol);
   const puedeVerLogisticaTaller = ['ADMIN', 'TALLER', 'MECANICO', 'PROVEEDURIA_TALLER'].includes(user.rol);
+  const puedeVerLavadoUnidades = ['ADMIN', 'TALLER', 'MECANICO'].includes(user.rol);
   const puedeVerKpisMecanicos = ['ADMIN', 'TALLER', 'PROVEEDURIA_TALLER'].includes(user.rol);
   const puedeVerOrdenesMotor = ['ADMIN', 'TALLER', 'PROVEEDURIA_TALLER'].includes(user.rol);
   const puedeVerResumenEjecutivo = ['ADMIN', 'TALLER', 'PROVEEDURIA', 'PROVEEDURIA_TALLER', 'TRAMITES'].includes(user.rol);
@@ -470,6 +471,12 @@
           <a href="/logistica-taller" class="module-card">
             <span class="module-icon icon-blue"><i class="bi bi-diagram-3"></i></span>
             <div><div class="module-title">Logística Taller</div><p class="module-copy">Prioridades diarias por correctivo y preventivo.</p></div>
+          </a>
+        <% } %>
+        <% if (puedeVerLavadoUnidades) { %>
+          <a href="/lavado-unidades" class="module-card">
+            <span class="module-icon icon-blue"><i class="bi bi-droplet"></i></span>
+            <div><div class="module-title">Lavado de unidades</div><p class="module-copy">Orden de lavado con fotos por ángulo.</p></div>
           </a>
         <% } %>
         <% if (puedeVerRevisionRuta) { %>
