@@ -1236,12 +1236,12 @@
       ...negocio,
       rubros: safe(negocio.rubros).filter(item => !contieneCategoriaOculta(item.nombre))
     }));
-  const mantenimientosPorSedeRubro = safe(data.mantenimientosPorSedeRubro)
-    .map(sede => ({
-      ...sede,
-      rubros: safe(sede.rubros).filter(item => !contieneCategoriaOculta(item.nombre))
+  const placasPorTipoUnidad = safe(data.placasPorTipoUnidad)
+    .map(tipo => ({
+      ...tipo,
+      placas: safe(tipo.placas)
     }))
-    .filter(sede => sede.rubros.length);
+    .filter(tipo => tipo.placas.length);
   const meses = safe(data.meses);
   const familiasMant = safe(data.familiasMant).filter(item => !contieneCategoriaOculta(item.nombre));
   const sedesMant = safe(data.sedesMant);
@@ -1458,18 +1458,20 @@
                 <span><%= negocio.nombre %></span>
                 <span>₡<%= money(negocio.total || 0) %></span>
               </div>
-              <div class="matrix-lines">
-                <% if (!safe(negocio.rubros).length) { %>
-                  <div class="empty-state py-2">Sin movimiento.</div>
-                <% } %>
-                <% safe(negocio.rubros).slice(0, 7).forEach(rubro => { %>
-                  <div class="matrix-line">
-                    <span class="matrix-line-name"><%= rubro.nombre %></span>
-                    <span class="matrix-line-money">₡<%= money(rubro.total || 0) %></span>
-                    <span class="matrix-line-pct"><%= rubro.porcentaje || 0 %>%</span>
-                  </div>
-                <% }) %>
-              </div>
+              <% if (negocio.clave !== 'generales') { %>
+                <div class="matrix-lines">
+                  <% if (!safe(negocio.rubros).length) { %>
+                    <div class="empty-state py-2">Sin movimiento.</div>
+                  <% } %>
+                  <% safe(negocio.rubros).slice(0, 7).forEach(rubro => { %>
+                    <div class="matrix-line">
+                      <span class="matrix-line-name"><%= rubro.nombre %></span>
+                      <span class="matrix-line-money">₡<%= money(rubro.total || 0) %></span>
+                      <span class="matrix-line-pct"><%= rubro.porcentaje || 0 %>%</span>
+                    </div>
+                  <% }) %>
+                </div>
+              <% } %>
             </div>
           <% }) %>
         </div>
@@ -1479,46 +1481,47 @@
     <article class="manager-card manager-wide">
       <div class="manager-head">
         <div>
-          <h2 class="manager-title">Mantenimientos realizados por sede</h2>
-          <div class="manager-subtitle">Abra una sede, luego un rubro; al tocar la placa verá de dónde salió el gasto.</div>
+          <h2 class="manager-title">Placas por tipo de unidad</h2>
+          <div class="manager-subtitle">Abra un grupo para ver las placas; al tocar una placa verá rubros, proveedores, fechas y montos.</div>
         </div>
-        <span class="pill pill-blue">Sede -> rubro -> placa</span>
+        <span class="pill pill-blue">Tipo -> placa -> rubro</span>
       </div>
       <div class="manager-body">
         <div class="manager-matrix">
-          <% if (!mantenimientosPorSedeRubro.length) { %>
-            <div class="empty-state">No hay sedes con gasto para este filtro.</div>
+          <% if (!placasPorTipoUnidad.length) { %>
+            <div class="empty-state">No hay placas con gasto para este filtro.</div>
           <% } %>
-          <% mantenimientosPorSedeRubro.forEach(sede => { %>
-            <div class="matrix-block" style="--matrix-color:#0b3b82">
+          <% placasPorTipoUnidad.forEach(tipo => { %>
+            <div class="matrix-block" style="--matrix-color:<%= tipo.color || '#0b3b82' %>">
               <div class="matrix-title">
-                <span><%= sede.nombre %></span>
-                <span>₡<%= money(sede.total || 0) %></span>
+                <span><%= tipo.nombre %></span>
+                <span>₡<%= money(tipo.total || 0) %></span>
               </div>
-              <div class="matrix-lines">
-                <% safe(sede.rubros).forEach(rubro => { %>
+              <% if (tipo.clave !== 'generales') { %>
+                <div class="matrix-lines">
+                <% safe(tipo.placas).forEach(placa => { %>
                   <details class="matrix-detail">
                     <summary class="matrix-line">
-                      <span class="matrix-line-name"><%= rubro.nombre %></span>
-                      <span class="matrix-line-money">₡<%= money(rubro.total || 0) %></span>
-                      <span class="matrix-line-pct"><%= rubro.porcentaje || 0 %>%</span>
+                      <span class="matrix-line-name"><%= placa.nombre %></span>
+                      <span class="matrix-line-money">₡<%= money(placa.total || 0) %></span>
+                      <span class="matrix-line-pct"><%= placa.porcentaje || 0 %>%</span>
                     </summary>
                     <div class="matrix-plate-list">
-                      <% if (!safe(rubro.placas).length) { %>
-                        <div class="empty-state py-2">No hay placas para este rubro.</div>
+                      <% if (!safe(placa.rubros).length) { %>
+                        <div class="empty-state py-2">No hay rubros para esta placa.</div>
                       <% } %>
-                      <% safe(rubro.placas).forEach(placa => { %>
+                      <% safe(placa.rubros).forEach(rubro => { %>
                         <details class="matrix-plate-detail">
                           <summary class="matrix-plate-row">
                             <span class="matrix-plate-name">
-                              <%= placa.nombre || '-' %>
-                              <span class="matrix-plate-meta"><%= placa.sede || '-' %> · <%= Number(placa.registros || 0).toLocaleString('es-CR') %> mov.</span>
+                              <%= rubro.nombre || '-' %>
+                              <span class="matrix-plate-meta"><%= Number(rubro.registros || 0).toLocaleString('es-CR') %> mov.</span>
                             </span>
-                            <span class="matrix-line-money">₡<%= money(placa.total || 0) %></span>
-                            <span class="matrix-line-pct"><%= placa.porcentaje || 0 %>%</span>
+                            <span class="matrix-line-money">₡<%= money(rubro.total || 0) %></span>
+                            <span class="matrix-line-pct"><%= rubro.porcentaje || 0 %>%</span>
                           </summary>
                           <div class="matrix-movement-list">
-                            <% safe(placa.movimientos).forEach(mov => { %>
+                            <% safe(rubro.movimientos).forEach(mov => { %>
                               <div class="movimiento-row">
                                 <div>
                                   <div class="movimiento-title"><%= mov.fuente_nombre || 'Movimiento' %> <%= mov.po_numero && mov.po_numero !== '-' ? `· ${mov.po_numero}` : '' %></div>
@@ -1537,7 +1540,8 @@
                     </div>
                   </details>
                 <% }) %>
-              </div>
+                </div>
+              <% } %>
             </div>
           <% }) %>
         </div>
@@ -2240,10 +2244,10 @@
       ...negocio,
       rubros: (negocio.rubros || []).filter(item => !isHiddenCategory(item.nombre))
     })).filter(negocio => Number(negocio.total || 0) > 0 || (negocio.rubros || []).length);
-    const mantenimientosPorSedeRubro = (data.mantenimientosPorSedeRubro || []).map(sede => ({
-      ...sede,
-      rubros: (sede.rubros || []).filter(item => !isHiddenCategory(item.nombre))
-    })).filter(sede => Number(sede.total || 0) > 0 && (sede.rubros || []).length);
+    const placasPorTipoUnidad = (data.placasPorTipoUnidad || []).map(tipo => ({
+      ...tipo,
+      placas: tipo.placas || []
+    })).filter(tipo => Number(tipo.total || 0) > 0 && (tipo.placas || []).length);
     const totalGastos = Number(data.totalGastos || 0);
     const totalCategorias = categorias.reduce((sum, item) => sum + Number(item.total || 0), 0);
 
@@ -2434,7 +2438,7 @@
           <span>${escapeHtml(negocio.nombre || '-')}</span>
           <span>${formatMoney(negocio.total || 0)}</span>
         </div>
-        <div class="matrix-lines">
+        ${negocio.clave === 'generales' ? '' : `<div class="matrix-lines">
           ${(negocio.rubros || []).length ? (negocio.rubros || []).slice(0, 7).map((rubro, rubroIndex) => {
             const rubroKey = `${negocioIndex}:${rubroIndex}`;
             const open = managerState.rubro[rubroKey];
@@ -2447,7 +2451,7 @@
               ${open ? renderSedesRubro(negocioIndex, rubroIndex, rubro.sedes || []) : ''}
             `;
           }).join('') : '<div class="empty-state py-2">Sin movimiento.</div>'}
-        </div>
+        </div>`}
       </div>
     `;
 
@@ -2469,38 +2473,38 @@
       `).join('');
     };
 
-    const renderSedeMantenimientoBlock = (sede) => `
-      <div class="matrix-block" style="--matrix-color:#0b3b82">
+    const renderTipoUnidadPlacaBlock = (tipo) => `
+      <div class="matrix-block" style="--matrix-color:${escapeHtml(tipo.color || '#0b3b82')}">
         <div class="matrix-title">
-          <span>${escapeHtml(sede.nombre || '-')}</span>
-          <span>${formatMoney(sede.total || 0)}</span>
+          <span>${escapeHtml(tipo.nombre || '-')}</span>
+          <span>${formatMoney(tipo.total || 0)}</span>
         </div>
-        <div class="matrix-lines">
-          ${(sede.rubros || []).length ? (sede.rubros || []).map(rubro => `
+        ${tipo.clave === 'generales' ? '' : `<div class="matrix-lines">
+          ${(tipo.placas || []).length ? (tipo.placas || []).map(placa => `
             <details class="matrix-detail">
               <summary class="matrix-line">
-                <span class="matrix-line-name">${escapeHtml(rubro.nombre || '-')}</span>
-                <span class="matrix-line-money">${formatMoney(rubro.total || 0)}</span>
-                <span class="matrix-line-pct">${formatNumber(rubro.porcentaje || 0)}%</span>
+                <span class="matrix-line-name">${escapeHtml(placa.nombre || '-')}</span>
+                <span class="matrix-line-money">${formatMoney(placa.total || 0)}</span>
+                <span class="matrix-line-pct">${formatNumber(placa.porcentaje || 0)}%</span>
               </summary>
               <div class="matrix-plate-list">
-                ${(rubro.placas || []).length ? (rubro.placas || []).map(placa => `
+                ${(placa.rubros || []).length ? (placa.rubros || []).map(rubro => `
                   <details class="matrix-plate-detail">
                     <summary class="matrix-plate-row">
                       <span class="matrix-plate-name">
-                        ${escapeHtml(placa.nombre || '-')}
-                        <span class="matrix-plate-meta">${escapeHtml(placa.sede || '-')} · ${formatNumber(placa.registros || 0)} mov.</span>
+                        ${escapeHtml(rubro.nombre || '-')}
+                        <span class="matrix-plate-meta">${formatNumber(rubro.registros || 0)} mov.</span>
                       </span>
-                      <span class="matrix-line-money">${formatMoney(placa.total || 0)}</span>
-                      <span class="matrix-line-pct">${formatNumber(placa.porcentaje || 0)}%</span>
+                      <span class="matrix-line-money">${formatMoney(rubro.total || 0)}</span>
+                      <span class="matrix-line-pct">${formatNumber(rubro.porcentaje || 0)}%</span>
                     </summary>
-                    <div class="matrix-movement-list">${renderMovimientoRows(placa.movimientos || [])}</div>
+                    <div class="matrix-movement-list">${renderMovimientoRows(rubro.movimientos || [])}</div>
                   </details>
-                `).join('') : '<div class="empty-state py-2">No hay placas para este rubro.</div>'}
+                `).join('') : '<div class="empty-state py-2">No hay rubros para esta placa.</div>'}
               </div>
             </details>
           `).join('') : '<div class="empty-state py-2">Sin movimiento.</div>'}
-        </div>
+        </div>`}
       </div>
     `;
 
@@ -2544,13 +2548,13 @@
       <article class="manager-card manager-wide">
         <div class="manager-head">
           <div>
-            <h2 class="manager-title">Mantenimientos realizados por sede</h2>
-            <div class="manager-subtitle">Abra una sede, luego un rubro; al tocar la placa verá de dónde salió el gasto.</div>
+            <h2 class="manager-title">Placas por tipo de unidad</h2>
+            <div class="manager-subtitle">Abra un grupo para ver las placas; al tocar una placa verá rubros, proveedores, fechas y montos.</div>
           </div>
-          <span class="pill pill-blue">Sede -> rubro -> placa</span>
+          <span class="pill pill-blue">Tipo -> placa -> rubro</span>
         </div>
         <div class="manager-body"><div class="manager-matrix">
-          ${mantenimientosPorSedeRubro.length ? mantenimientosPorSedeRubro.map(renderSedeMantenimientoBlock).join('') : '<div class="empty-state">No hay sedes con gasto para este filtro.</div>'}
+          ${placasPorTipoUnidad.length ? placasPorTipoUnidad.map(renderTipoUnidadPlacaBlock).join('') : '<div class="empty-state">No hay placas con gasto para este filtro.</div>'}
         </div></div>
       </article>
     `;

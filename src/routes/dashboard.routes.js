@@ -323,6 +323,30 @@ function clasificarNegocioGasto(item) {
   return { clave: "cilindreros", nombre: "Hinos / cilindreros", color: "#ef233c" };
 }
 
+function clasificarTipoUnidadResumen(item, negocioInfo) {
+  if (negocioInfo?.clave === "transportadora") {
+    return negocioInfo.subnegocio || clasificarDetalleTransportadora(item);
+  }
+
+  if (negocioInfo?.clave === "cilindreros") {
+    return { clave: "cilindreros", nombre: "Cilindreros", color: "#ef233c" };
+  }
+
+  if (negocioInfo?.clave === "granel") {
+    return { clave: "graneles", nombre: "Graneles", color: "#0f766e" };
+  }
+
+  if (negocioInfo?.clave === "comodines") {
+    return { clave: "comodines", nombre: "Comodines", color: "#7c3aed" };
+  }
+
+  if (negocioInfo?.clave === "aceites") {
+    return { clave: "aceites", nombre: "Aceites", color: "#0f766e" };
+  }
+
+  return { clave: "generales", nombre: "Generales", color: "#64748b" };
+}
+
 function recortarResumen(texto, limite = 150) {
   const limpio = String(texto || "").replace(/\s+/g, " ").trim();
   if (!limpio) return "-";
@@ -854,7 +878,7 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro, pe
   const porNegocio = new Map();
   const porRubroNegocio = new Map();
   const porNegocioRubro = new Map();
-  const porSedeRubroPlaca = new Map();
+  const porTipoUnidadPlaca = new Map();
 
   gastos.forEach(item => {
     const fuenteNombre = item.fuente === "ORDEN"
@@ -903,6 +927,7 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro, pe
     descripcion.registros += 1;
 
     const negocioInfo = clasificarNegocioGasto(item);
+    const tipoUnidadInfo = clasificarTipoUnidadResumen(item, negocioInfo);
     const rubroNombre = item.familia?.nombre || "Sin rubro";
     const rubroColor = item.familia?.color || "#64748b";
 
@@ -1012,28 +1037,31 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro, pe
     negocioDelRubro.total += item.monto;
     negocioDelRubro.registros += 1;
 
-    if (item.tieneSedeReal) {
-      const sedeResumen = sumarGrupo(porSedeRubroPlaca, etiquetaSedeTomza(item.sede), {
-        rubros: new Map()
-      });
-      sedeResumen.total += item.monto;
-      sedeResumen.registros += 1;
-
-      const rubroSede = sumarGrupo(sedeResumen.rubros, rubroNombre, {
-        color: rubroColor,
+    if (item.tienePlacaReal || ["generales", "aceites"].includes(tipoUnidadInfo.clave)) {
+      const tipoResumen = sumarGrupo(porTipoUnidadPlaca, tipoUnidadInfo.nombre, {
+        clave: tipoUnidadInfo.clave,
+        color: tipoUnidadInfo.color,
         placas: new Map()
       });
-      rubroSede.total += item.monto;
-      rubroSede.registros += 1;
+      tipoResumen.total += item.monto;
+      tipoResumen.registros += 1;
 
-      const placaSedeNombre = item.tienePlacaReal ? item.placa : "GENERAL";
-      const placaSede = sumarGrupo(rubroSede.placas, placaSedeNombre, {
-        sede: etiquetaSedeTomza(item.sede),
+      const placaResumenNombre = item.tienePlacaReal ? item.placa : tipoUnidadInfo.nombre.toUpperCase();
+      const placaResumen = sumarGrupo(tipoResumen.placas, placaResumenNombre, {
+        sede: item.tieneSedeReal ? etiquetaSedeTomza(item.sede) : "",
+        rubros: new Map()
+      });
+      placaResumen.total += item.monto;
+      placaResumen.registros += 1;
+      if (!placaResumen.sede && item.tieneSedeReal) placaResumen.sede = etiquetaSedeTomza(item.sede);
+
+      const rubroPlaca = sumarGrupo(placaResumen.rubros, rubroNombre, {
+        color: rubroColor,
         movimientos: []
       });
-      placaSede.total += item.monto;
-      placaSede.registros += 1;
-      placaSede.movimientos.push(movimientoParaRevisionPlaca(item));
+      rubroPlaca.total += item.monto;
+      rubroPlaca.registros += 1;
+      rubroPlaca.movimientos.push(movimientoParaRevisionPlaca(item));
     }
 
     if (item.familia?.clave === "general") {
@@ -1321,29 +1349,48 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro, pe
         .filter(item => Number(item.total || 0) > 0)
     };
   });
-  const mantenimientosPorSedeRubro = ordenarTop(porSedeRubroPlaca, 100).map(sede => {
-    const totalSede = Number(sede.total || 0);
+  const tiposUnidadResumenBase = [
+    { clave: "cilindreros", nombre: "Cilindreros", color: "#ef233c" },
+    { clave: "transportadora_cabezales", nombre: "Cabezales", color: "#0b3b82" },
+    { clave: "transportadora_cisternas", nombre: "Cisternas", color: "#0f766e" },
+    { clave: "transportadora_carretas", nombre: "Carretas", color: "#2563eb" },
+    { clave: "transportadora_tandem", nombre: "Tándem", color: "#0891b2" },
+    { clave: "graneles", nombre: "Graneles", color: "#0f766e" },
+    { clave: "comodines", nombre: "Comodines", color: "#7c3aed" },
+    { clave: "aceites", nombre: "Aceites", color: "#0f766e" },
+    { clave: "generales", nombre: "Generales", color: "#64748b" }
+  ];
+  const placasPorTipoUnidad = tiposUnidadResumenBase.map(base => {
+    const tipo = porTipoUnidadPlaca.get(base.nombre) || {
+      ...base,
+      total: 0,
+      registros: 0,
+      placas: new Map()
+    };
+    const totalTipo = Number(tipo.total || 0);
     return {
-      nombre: sede.nombre,
-      total: sede.total,
-      registros: sede.registros,
-      rubros: ordenarTop(sede.rubros || new Map(), 12).map(rubro => {
-        const totalRubro = Number(rubro.total || 0);
+      nombre: tipo.nombre,
+      clave: tipo.clave,
+      color: tipo.color,
+      total: tipo.total,
+      registros: tipo.registros,
+      placas: ordenarTop(tipo.placas || new Map(), 1000).map(placa => {
+        const totalPlaca = Number(placa.total || 0);
         return {
-          nombre: rubro.nombre,
-          color: rubro.color,
-          total: rubro.total,
-          registros: rubro.registros,
-          porcentaje: totalSede ? Math.round((totalRubro / totalSede) * 100) : 0,
-          placas: ordenarTop(rubro.placas || new Map(), 1000).map(placa => ({
-            nombre: placa.nombre,
-            sede: placa.sede,
-            total: placa.total,
-            registros: placa.registros,
-            porcentaje: totalRubro ? Math.round((Number(placa.total || 0) / totalRubro) * 100) : 0,
-            movimientos_total: Array.isArray(placa.movimientos) ? placa.movimientos.length : 0,
-            movimientos: Array.isArray(placa.movimientos)
-              ? placa.movimientos
+          nombre: placa.nombre,
+          sede: placa.sede,
+          total: placa.total,
+          registros: placa.registros,
+          porcentaje: totalTipo ? Math.round((totalPlaca / totalTipo) * 100) : 0,
+          rubros: ordenarTop(placa.rubros || new Map(), 12).map(rubro => ({
+            nombre: rubro.nombre,
+            color: rubro.color,
+            total: rubro.total,
+            registros: rubro.registros,
+            porcentaje: totalPlaca ? Math.round((Number(rubro.total || 0) / totalPlaca) * 100) : 0,
+            movimientos_total: Array.isArray(rubro.movimientos) ? rubro.movimientos.length : 0,
+            movimientos: Array.isArray(rubro.movimientos)
+              ? rubro.movimientos
                 .sort((a, b) => Number(b.monto || 0) - Number(a.monto || 0))
                 .slice(0, 80)
               : []
@@ -1351,7 +1398,7 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro, pe
         };
       })
     };
-  });
+  }).filter(item => Number(item.total || 0) > 0);
   const totalGastoConUnidad = Array.from(porPlaca.values()).reduce((sum, item) => sum + Number(item.total || 0), 0);
   const unidadesConGasto = porPlaca.size;
   const [flotaRow] = await safeQuery(
@@ -1449,7 +1496,7 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro, pe
     negociosGasto,
     rubrosPorNegocio,
     negociosPorRubro,
-    mantenimientosPorSedeRubro,
+    placasPorTipoUnidad,
     meses,
     tiposMant,
     familiasMant,
