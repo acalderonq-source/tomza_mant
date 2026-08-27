@@ -7,6 +7,8 @@ const ROLES_BODEGA = ["ADMIN", "TALLER", "PROVEEDURIA_TALLER", "BODEGA", "BODEGU
 const ROLES_AJUSTE = ["ADMIN", "TALLER"];
 const TIPOS_ARTICULO = ["REPUESTO", "CONSUMIBLE", "HERRAMIENTA", "OTRO"];
 const TIPOS_TRABAJO = ["MANTENIMIENTO", "CORRECTIVO", "REPARACION", "EMERGENCIA", "OTRO"];
+const ORIGENES_INVENTARIO = ["PROPIO", "CONSIGNACION"];
+const PROVEEDOR_CONSIGNACION_DEFAULT = "MAXI REPUESTOS";
 
 function requireAuth(req, res, next) {
   if (!req.session.user) return res.redirect("/login");
@@ -40,6 +42,16 @@ function upper(value) {
   return limpiar(value).toUpperCase();
 }
 
+function origenInventario(value, fallback = "PROPIO") {
+  const origen = upper(value);
+  return ORIGENES_INVENTARIO.includes(origen) ? origen : fallback;
+}
+
+function codigoTaller(value) {
+  const digits = limpiar(value).replace(/\D/g, "");
+  return digits ? digits.slice(-4).padStart(4, "0") : "";
+}
+
 function fechaCostaRica(date = new Date()) {
   return new Intl.DateTimeFormat("en-CA", {
     timeZone: "America/Costa_Rica",
@@ -47,6 +59,75 @@ function fechaCostaRica(date = new Date()) {
     month: "2-digit",
     day: "2-digit"
   }).format(date);
+}
+
+async function columnExists(table, column) {
+  const [[row]] = await pool.query(
+    `SELECT COUNT(*) AS total
+     FROM INFORMATION_SCHEMA.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE()
+       AND TABLE_NAME = ?
+       AND COLUMN_NAME = ?`,
+    [table, column]
+  );
+  return Number(row.total || 0) > 0;
+}
+
+async function indexExists(table, indexName) {
+  const [[row]] = await pool.query(
+    `SELECT COUNT(*) AS total
+     FROM INFORMATION_SCHEMA.STATISTICS
+     WHERE TABLE_SCHEMA = DATABASE()
+       AND TABLE_NAME = ?
+       AND INDEX_NAME = ?`,
+    [table, indexName]
+  );
+  return Number(row.total || 0) > 0;
+}
+
+async function indexIsUnique(table, indexName) {
+  const [[row]] = await pool.query(
+    `SELECT COUNT(*) AS total
+     FROM INFORMATION_SCHEMA.STATISTICS
+     WHERE TABLE_SCHEMA = DATABASE()
+       AND TABLE_NAME = ?
+       AND INDEX_NAME = ?
+       AND NON_UNIQUE = 0`,
+    [table, indexName]
+  );
+  return Number(row.total || 0) > 0;
+}
+
+async function uniqueCodigoIndexes(table) {
+  const [rows] = await pool.query(
+    `SELECT s.INDEX_NAME
+     FROM INFORMATION_SCHEMA.STATISTICS s
+     JOIN (
+       SELECT INDEX_NAME, COUNT(*) AS columnas
+       FROM INFORMATION_SCHEMA.STATISTICS
+       WHERE TABLE_SCHEMA = DATABASE()
+         AND TABLE_NAME = ?
+       GROUP BY INDEX_NAME
+     ) x ON x.INDEX_NAME = s.INDEX_NAME
+     WHERE s.TABLE_SCHEMA = DATABASE()
+       AND s.TABLE_NAME = ?
+       AND s.NON_UNIQUE = 0
+       AND s.INDEX_NAME <> 'PRIMARY'
+       AND s.COLUMN_NAME = 'codigo'
+       AND x.columnas = 1`,
+    [table, table]
+  );
+  return rows.map(row => row.INDEX_NAME);
+}
+
+async function siguienteCodigoTaller(conn = pool) {
+  const [[row]] = await conn.query(`
+    SELECT MAX(CAST(codigo_taller AS UNSIGNED)) AS ultimo
+    FROM bodega_articulos
+    WHERE codigo_taller REGEXP '^[0-9]{4}$'
+  `);
+  const siguiente = Number(row.ultimo || 0) + 1;
+  return String(siguiente).padStart(4, "0");
 }
 
 async function ensureBodegaTables() {
@@ -75,6 +156,53 @@ async function ensureBodegaTables() {
       actualizado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
     )
   `);
+
+  if (!(await columnExists("bodega_articulos", "codigo_taller"))) {
+    await pool.query(`
+      ALTER TABLE bodega_articulos
+      ADD COLUMN codigo_taller VARCHAR(4) NULL AFTER id
+    `);
+  }
+
+  if (!(await indexExists("bodega_articulos", "idx_bodega_articulos_codigo_taller"))) {
+    await pool.query(`
+      CREATE UNIQUE INDEX idx_bodega_articulos_codigo_taller
+      ON bodega_articulos (codigo_taller)
+    `);
+  }
+
+  if (!(await columnExists("bodega_articulos", "origen_inventario"))) {
+    await pool.query(`
+      ALTER TABLE bodega_articulos
+      ADD COLUMN origen_inventario ENUM('PROPIO','CONSIGNACION') NOT NULL DEFAULT 'PROPIO' AFTER tipo_articulo
+    `);
+  }
+
+  if (!(await columnExists("bodega_articulos", "proveedor_consignacion"))) {
+    await pool.query(`
+      ALTER TABLE bodega_articulos
+      ADD COLUMN proveedor_consignacion VARCHAR(180) NULL AFTER proveedor_nombre
+    `);
+  }
+
+  const codigoIndexes = await uniqueCodigoIndexes("bodega_articulos");
+  for (const indexName of codigoIndexes) {
+    await pool.query(`ALTER TABLE bodega_articulos DROP INDEX \`${indexName}\``);
+  }
+
+  if (
+    await indexExists("bodega_articulos", "idx_bodega_articulos_codigo_origen")
+    && await indexIsUnique("bodega_articulos", "idx_bodega_articulos_codigo_origen")
+  ) {
+    await pool.query("ALTER TABLE bodega_articulos DROP INDEX idx_bodega_articulos_codigo_origen");
+  }
+
+  if (!(await indexExists("bodega_articulos", "idx_bodega_articulos_codigo_origen"))) {
+    await pool.query(`
+      CREATE INDEX idx_bodega_articulos_codigo_origen
+      ON bodega_articulos (codigo, origen_inventario)
+    `);
+  }
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS bodega_entregas (
@@ -128,6 +256,13 @@ async function ensureBodegaTables() {
       creado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
     )
   `);
+
+  if (!(await columnExists("bodega_movimientos", "origen_inventario"))) {
+    await pool.query(`
+      ALTER TABLE bodega_movimientos
+      ADD COLUMN origen_inventario ENUM('PROPIO','CONSIGNACION') NOT NULL DEFAULT 'PROPIO' AFTER tipo_movimiento
+    `);
+  }
 }
 
 async function obtenerProveedor(proveedorId, proveedorTexto = "") {
@@ -158,15 +293,21 @@ router.get("/", async (req, res) => {
   try {
     await ensureBodegaTables();
     const q = limpiar(req.query.q);
+    const origen = origenInventario(req.query.origen, "");
     const condiciones = ["activo = 1"];
     const params = [];
 
+    if (origen) {
+      condiciones.push("origen_inventario = ?");
+      params.push(origen);
+    }
+
     if (q) {
       condiciones.push(`(
-        nombre LIKE ? OR codigo LIKE ? OR numero_parte LIKE ? OR categoria LIKE ? OR marca LIKE ? OR tipo_unidad LIKE ? OR ubicacion LIKE ?
+        nombre LIKE ? OR codigo LIKE ? OR codigo_taller LIKE ? OR numero_parte LIKE ? OR categoria LIKE ? OR marca LIKE ? OR tipo_unidad LIKE ? OR ubicacion LIKE ? OR proveedor_consignacion LIKE ?
       )`);
       const like = `%${q}%`;
-      params.push(like, like, like, like, like, like, like);
+      params.push(like, like, like, like, like, like, like, like, like);
     }
 
     const [articulos] = await pool.query(
@@ -188,7 +329,9 @@ router.get("/", async (req, res) => {
       SELECT
         COUNT(*) AS articulos,
         SUM(CASE WHEN activo = 1 AND stock_minimo > 0 AND stock_actual > 0 AND stock_actual <= stock_minimo THEN 1 ELSE 0 END) AS stock_bajo,
-        SUM(CASE WHEN activo = 1 AND stock_actual <= 0 THEN 1 ELSE 0 END) AS agotados
+        SUM(CASE WHEN activo = 1 AND stock_actual <= 0 THEN 1 ELSE 0 END) AS agotados,
+        SUM(CASE WHEN activo = 1 AND origen_inventario = 'PROPIO' THEN 1 ELSE 0 END) AS propios,
+        SUM(CASE WHEN activo = 1 AND origen_inventario = 'CONSIGNACION' THEN 1 ELSE 0 END) AS consignacion
       FROM bodega_articulos
     `);
 
@@ -213,7 +356,7 @@ router.get("/", async (req, res) => {
     `);
 
     const [movimientos] = await pool.query(`
-      SELECT bm.*, ba.nombre AS articulo_nombre, ba.codigo, ba.unidad_medida, u.usuario AS usuario_nombre
+      SELECT bm.*, ba.nombre AS articulo_nombre, ba.codigo, ba.codigo_taller, ba.unidad_medida, u.usuario AS usuario_nombre
       FROM bodega_movimientos bm
       JOIN bodega_articulos ba ON ba.id = bm.articulo_id
       LEFT JOIN usuarios u ON u.id = bm.creado_por
@@ -222,7 +365,7 @@ router.get("/", async (req, res) => {
     `);
 
     const [prestamos] = await pool.query(`
-      SELECT bh.*, ba.nombre AS articulo_nombre, ba.codigo, ba.ubicacion
+      SELECT bh.*, ba.nombre AS articulo_nombre, ba.codigo, ba.codigo_taller, ba.ubicacion
       FROM bodega_prestamos_herramientas bh
       JOIN bodega_articulos ba ON ba.id = bh.articulo_id
       WHERE bh.estado = 'PRESTADO'
@@ -231,10 +374,12 @@ router.get("/", async (req, res) => {
     `);
 
     const [proveedores] = await pool.query("SELECT id, nombre FROM proveedores ORDER BY nombre ASC LIMIT 500");
+    const proximoCodigoTaller = await siguienteCodigoTaller();
 
     res.render("bodega", {
       user: req.session.user,
       q,
+      origen,
       articulos,
       proveedores,
       porComprar,
@@ -244,11 +389,16 @@ router.get("/", async (req, res) => {
         articulos: Number(stats.articulos || 0),
         stock_bajo: Number(stats.stock_bajo || 0),
         agotados: Number(stats.agotados || 0),
+        propios: Number(stats.propios || 0),
+        consignacion: Number(stats.consignacion || 0),
         herramientas_prestadas: Number(prestadasRow.total || 0),
         movimientos_hoy: Number(movHoy.total || 0)
       },
       tiposArticulo: TIPOS_ARTICULO,
       tiposTrabajo: TIPOS_TRABAJO,
+      origenesInventario: ORIGENES_INVENTARIO,
+      proveedorConsignacionDefault: PROVEEDOR_CONSIGNACION_DEFAULT,
+      proximoCodigoTaller,
       puedeAjustar: puedeAjustar(req.session.user),
       success: req.session.success || "",
       error: req.session.error || ""
@@ -267,6 +417,8 @@ router.post("/articulos", async (req, res) => {
     await ensureBodegaTables();
     const proveedor = await obtenerProveedor(req.body.proveedor_id, req.body.proveedor_nombre);
     const tipo = TIPOS_ARTICULO.includes(upper(req.body.tipo_articulo)) ? upper(req.body.tipo_articulo) : "REPUESTO";
+    const origen = origenInventario(req.body.origen_inventario);
+    const codigoInterno = codigoTaller(req.body.codigo_taller) || await siguienteCodigoTaller();
     const codigo = limpiar(req.body.codigo) || null;
     const nombre = limpiar(req.body.nombre);
     if (!nombre) {
@@ -276,14 +428,16 @@ router.post("/articulos", async (req, res) => {
 
     await pool.query(
       `INSERT INTO bodega_articulos (
-        codigo, nombre, tipo_articulo, categoria, marca, numero_parte, tipo_unidad, unidad_medida,
+        codigo_taller, codigo, nombre, tipo_articulo, origen_inventario, categoria, marca, numero_parte, tipo_unidad, unidad_medida,
         stock_actual, stock_minimo, stock_maximo, ubicacion, precio_unitario,
-        proveedor_id, proveedor_nombre, fecha_ultima_compra, creado_por
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        proveedor_id, proveedor_nombre, proveedor_consignacion, fecha_ultima_compra, creado_por
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
+        codigoInterno,
         codigo,
         nombre,
         tipo,
+        origen,
         limpiar(req.body.categoria) || null,
         limpiar(req.body.marca) || null,
         limpiar(req.body.numero_parte) || null,
@@ -296,6 +450,7 @@ router.post("/articulos", async (req, res) => {
         numero(req.body.precio_unitario),
         proveedor.id,
         proveedor.nombre,
+        origen === "CONSIGNACION" ? (limpiar(req.body.proveedor_consignacion) || PROVEEDOR_CONSIGNACION_DEFAULT) : null,
         req.body.fecha_ultima_compra || null,
         req.session.user.id
       ]
@@ -318,8 +473,13 @@ router.post("/entregar", async (req, res) => {
     const tipoTrabajo = TIPOS_TRABAJO.includes(upper(req.body.tipo_trabajo)) ? upper(req.body.tipo_trabajo) : "MANTENIMIENTO";
     const articuloIds = toArray(req.body.articulo_id);
     const cantidades = toArray(req.body.cantidad);
+    const origenes = toArray(req.body.origen_salida);
     const lineas = articuloIds
-      .map((id, index) => ({ id: Number(id), cantidad: numero(cantidades[index]) }))
+      .map((id, index) => ({
+        id: Number(id),
+        cantidad: numero(cantidades[index]),
+        origen_salida: origenInventario(origenes[index], "")
+      }))
       .filter(linea => linea.id && linea.cantidad > 0);
 
     if (!placa || !mecanico || !lineas.length) {
@@ -342,6 +502,7 @@ router.post("/entregar", async (req, res) => {
       }
       const nueva = anterior - linea.cantidad;
       await conn.query("UPDATE bodega_articulos SET stock_actual = ? WHERE id = ?", [nueva, articulo.id]);
+      const origenSalida = linea.origen_salida || articulo.origen_inventario || "PROPIO";
 
       let prestamoId = null;
       const tipoMovimiento = articulo.tipo_articulo === "HERRAMIENTA" ? "PRESTAMO" : "SALIDA";
@@ -357,14 +518,15 @@ router.post("/entregar", async (req, res) => {
 
       await conn.query(
         `INSERT INTO bodega_movimientos (
-          articulo_id, entrega_id, prestamo_id, tipo_movimiento, cantidad, existencia_anterior, existencia_nueva,
+          articulo_id, entrega_id, prestamo_id, tipo_movimiento, origen_inventario, cantidad, existencia_anterior, existencia_nueva,
           placa, mecanico, tipo_trabajo, precio_unitario, motivo, creado_por
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           articulo.id,
           entregaId,
           prestamoId,
           tipoMovimiento,
+          origenSalida,
           linea.cantidad,
           anterior,
           nueva,
@@ -402,6 +564,7 @@ router.post("/recibir", async (req, res) => {
     }
 
     const proveedor = await obtenerProveedor(req.body.proveedor_id, req.body.proveedor_nombre);
+    const origen = origenInventario(req.body.origen_inventario);
     await conn.beginTransaction();
     const articulo = await articuloParaMovimiento(conn, articuloId);
     const anterior = Number(articulo.stock_actual || 0);
@@ -410,18 +573,28 @@ router.post("/recibir", async (req, res) => {
 
     await conn.query(
       `UPDATE bodega_articulos
-       SET stock_actual = ?, precio_unitario = ?, proveedor_id = ?, proveedor_nombre = ?, fecha_ultima_compra = ?
+       SET stock_actual = ?, precio_unitario = ?, proveedor_id = ?, proveedor_nombre = ?, proveedor_consignacion = ?, origen_inventario = ?, fecha_ultima_compra = ?
        WHERE id = ?`,
-      [nueva, precio, proveedor.id, proveedor.nombre, req.body.fecha || fechaCostaRica(), articulo.id]
+      [
+        nueva,
+        precio,
+        proveedor.id,
+        proveedor.nombre,
+        origen === "CONSIGNACION" ? (proveedor.nombre || articulo.proveedor_consignacion || PROVEEDOR_CONSIGNACION_DEFAULT) : articulo.proveedor_consignacion,
+        origen,
+        req.body.fecha || fechaCostaRica(),
+        articulo.id
+      ]
     );
 
     await conn.query(
       `INSERT INTO bodega_movimientos (
-        articulo_id, tipo_movimiento, cantidad, existencia_anterior, existencia_nueva,
+        articulo_id, tipo_movimiento, origen_inventario, cantidad, existencia_anterior, existencia_nueva,
         proveedor_id, proveedor_nombre, numero_factura, orden_compra_id, precio_unitario, motivo, creado_por
-      ) VALUES (?, 'ENTRADA', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (?, 'ENTRADA', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         articulo.id,
+        origen,
         cantidad,
         anterior,
         nueva,
@@ -465,11 +638,12 @@ router.post("/devolver", async (req, res) => {
     await conn.query("UPDATE bodega_articulos SET stock_actual = ? WHERE id = ?", [nueva, articulo.id]);
     await conn.query(
       `INSERT INTO bodega_movimientos (
-        articulo_id, tipo_movimiento, cantidad, existencia_anterior, existencia_nueva,
+        articulo_id, tipo_movimiento, origen_inventario, cantidad, existencia_anterior, existencia_nueva,
         placa, mecanico, motivo, creado_por
-      ) VALUES (?, 'DEVOLUCION', ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (?, 'DEVOLUCION', ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         articulo.id,
+        articulo.origen_inventario || "PROPIO",
         cantidad,
         anterior,
         nueva,
@@ -514,12 +688,13 @@ router.post("/prestamos/:id/devolver", async (req, res) => {
     );
     await conn.query(
       `INSERT INTO bodega_movimientos (
-        articulo_id, prestamo_id, tipo_movimiento, cantidad, existencia_anterior, existencia_nueva,
+        articulo_id, prestamo_id, tipo_movimiento, origen_inventario, cantidad, existencia_anterior, existencia_nueva,
         placa, mecanico, motivo, creado_por
-      ) VALUES (?, ?, 'DEVOLUCION_HERRAMIENTA', ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (?, ?, 'DEVOLUCION_HERRAMIENTA', ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         articulo.id,
         prestamo.id,
+        articulo.origen_inventario || "PROPIO",
         Number(prestamo.cantidad || 0),
         anterior,
         nueva,
@@ -560,9 +735,9 @@ router.post("/ajustar", async (req, res) => {
     await conn.query("UPDATE bodega_articulos SET stock_actual = ? WHERE id = ?", [conteo, articulo.id]);
     await conn.query(
       `INSERT INTO bodega_movimientos (
-        articulo_id, tipo_movimiento, cantidad, existencia_anterior, existencia_nueva, motivo, creado_por
-      ) VALUES (?, 'AJUSTE', ?, ?, ?, ?, ?)`,
-      [articulo.id, conteo - anterior, anterior, conteo, motivo, req.session.user.id]
+        articulo_id, tipo_movimiento, origen_inventario, cantidad, existencia_anterior, existencia_nueva, motivo, creado_por
+      ) VALUES (?, 'AJUSTE', ?, ?, ?, ?, ?, ?)`,
+      [articulo.id, articulo.origen_inventario || "PROPIO", conteo - anterior, anterior, conteo, motivo, req.session.user.id]
     );
     await conn.commit();
     req.session.success = "Ajuste de inventario guardado.";

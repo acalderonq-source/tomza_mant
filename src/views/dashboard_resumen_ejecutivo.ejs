@@ -394,6 +394,69 @@
       text-align: center;
     }
 
+    .matrix-detail,
+    .matrix-plate-detail {
+      display: block;
+    }
+
+    .matrix-detail > summary,
+    .matrix-plate-detail > summary {
+      list-style: none;
+    }
+
+    .matrix-detail > summary::-webkit-details-marker,
+    .matrix-plate-detail > summary::-webkit-details-marker {
+      display: none;
+    }
+
+    .matrix-detail > summary.matrix-line {
+      border-radius: 10px;
+      cursor: pointer;
+      padding: .28rem .32rem;
+    }
+
+    .matrix-detail > summary.matrix-line:hover,
+    .matrix-detail[open] > summary.matrix-line {
+      background: #f1f5f9;
+    }
+
+    .matrix-detail > summary.matrix-line::after {
+      color: var(--muted);
+      content: "Ver placas";
+      font-size: .66rem;
+      font-weight: 950;
+      grid-column: 1 / -1;
+    }
+
+    .matrix-detail[open] > summary.matrix-line::after {
+      content: "Ocultar placas";
+    }
+
+    .matrix-plate-detail > summary.matrix-plate-row {
+      border-radius: 10px;
+      cursor: pointer;
+      padding: .32rem .35rem;
+    }
+
+    .matrix-plate-detail > summary.matrix-plate-row:hover,
+    .matrix-plate-detail[open] > summary.matrix-plate-row {
+      background: #fff;
+    }
+
+    .matrix-plate-meta {
+      color: var(--muted);
+      display: block;
+      font-size: .68rem;
+      font-weight: 800;
+      margin-top: .08rem;
+    }
+
+    .matrix-movement-list {
+      display: grid;
+      gap: .35rem;
+      margin: .2rem 0 .45rem;
+    }
+
     .business-accordion {
       display: grid;
       gap: .65rem;
@@ -1173,13 +1236,12 @@
       ...negocio,
       rubros: safe(negocio.rubros).filter(item => !contieneCategoriaOculta(item.nombre))
     }));
-  const negociosPorRubro = safe(data.negociosPorRubro)
-    .filter(item => !contieneCategoriaOculta(item.nombre))
-    .map(rubro => ({
-      ...rubro,
-      negocios: safe(rubro.negocios).filter(item => !contieneCategoriaOculta(item.nombre))
+  const mantenimientosPorSedeRubro = safe(data.mantenimientosPorSedeRubro)
+    .map(sede => ({
+      ...sede,
+      rubros: safe(sede.rubros).filter(item => !contieneCategoriaOculta(item.nombre))
     }))
-    .filter(rubro => rubro.negocios.length);
+    .filter(sede => sede.rubros.length);
   const meses = safe(data.meses);
   const familiasMant = safe(data.familiasMant).filter(item => !contieneCategoriaOculta(item.nombre));
   const sedesMant = safe(data.sedesMant);
@@ -1417,29 +1479,63 @@
     <article class="manager-card manager-wide">
       <div class="manager-head">
         <div>
-          <h2 class="manager-title">Rubro dividido por negocio</h2>
-          <div class="manager-subtitle">La misma información al revés: cada rubro separado por negocio.</div>
+          <h2 class="manager-title">Mantenimientos realizados por sede</h2>
+          <div class="manager-subtitle">Abra una sede, luego un rubro; al tocar la placa verá de dónde salió el gasto.</div>
         </div>
-        <span class="pill pill-blue">Rubro -> negocio</span>
+        <span class="pill pill-blue">Sede -> rubro -> placa</span>
       </div>
       <div class="manager-body">
         <div class="manager-matrix">
-          <% if (!negociosPorRubro.length) { %>
-            <div class="empty-state">No hay datos cruzados para este filtro.</div>
+          <% if (!mantenimientosPorSedeRubro.length) { %>
+            <div class="empty-state">No hay sedes con gasto para este filtro.</div>
           <% } %>
-          <% negociosPorRubro.slice(0, 8).forEach(rubro => { %>
-            <div class="matrix-block" style="--matrix-color:<%= rubro.color || '#0b3b82' %>">
+          <% mantenimientosPorSedeRubro.forEach(sede => { %>
+            <div class="matrix-block" style="--matrix-color:#0b3b82">
               <div class="matrix-title">
-                <span><%= rubro.nombre %></span>
-                <span>₡<%= money(rubro.total || 0) %></span>
+                <span><%= sede.nombre %></span>
+                <span>₡<%= money(sede.total || 0) %></span>
               </div>
               <div class="matrix-lines">
-                <% safe(rubro.negocios).forEach(negocio => { %>
-                  <div class="matrix-line">
-                    <span class="matrix-line-name"><%= negocio.nombre %></span>
-                    <span class="matrix-line-money">₡<%= money(negocio.total || 0) %></span>
-                    <span class="matrix-line-pct"><%= negocio.porcentaje || 0 %>%</span>
-                  </div>
+                <% safe(sede.rubros).forEach(rubro => { %>
+                  <details class="matrix-detail">
+                    <summary class="matrix-line">
+                      <span class="matrix-line-name"><%= rubro.nombre %></span>
+                      <span class="matrix-line-money">₡<%= money(rubro.total || 0) %></span>
+                      <span class="matrix-line-pct"><%= rubro.porcentaje || 0 %>%</span>
+                    </summary>
+                    <div class="matrix-plate-list">
+                      <% if (!safe(rubro.placas).length) { %>
+                        <div class="empty-state py-2">No hay placas para este rubro.</div>
+                      <% } %>
+                      <% safe(rubro.placas).forEach(placa => { %>
+                        <details class="matrix-plate-detail">
+                          <summary class="matrix-plate-row">
+                            <span class="matrix-plate-name">
+                              <%= placa.nombre || '-' %>
+                              <span class="matrix-plate-meta"><%= placa.sede || '-' %> · <%= Number(placa.registros || 0).toLocaleString('es-CR') %> mov.</span>
+                            </span>
+                            <span class="matrix-line-money">₡<%= money(placa.total || 0) %></span>
+                            <span class="matrix-line-pct"><%= placa.porcentaje || 0 %>%</span>
+                          </summary>
+                          <div class="matrix-movement-list">
+                            <% safe(placa.movimientos).forEach(mov => { %>
+                              <div class="movimiento-row">
+                                <div>
+                                  <div class="movimiento-title"><%= mov.fuente_nombre || 'Movimiento' %> <%= mov.po_numero && mov.po_numero !== '-' ? `· ${mov.po_numero}` : '' %></div>
+                                  <div class="movimiento-meta"><%= fecha(mov.fecha) %> · <%= mov.proveedor || '-' %></div>
+                                </div>
+                                <div class="movimiento-desc"><%= mov.descripcion || mov.observaciones || '-' %></div>
+                                <div class="movimiento-actions">
+                                  <span class="matrix-line-money">₡<%= money(mov.monto || 0) %></span>
+                                  <% if (mov.url) { %><a class="movimiento-link" href="<%= mov.url %>">Abrir</a><% } %>
+                                </div>
+                              </div>
+                            <% }) %>
+                          </div>
+                        </details>
+                      <% }) %>
+                    </div>
+                  </details>
                 <% }) %>
               </div>
             </div>
@@ -2144,13 +2240,10 @@
       ...negocio,
       rubros: (negocio.rubros || []).filter(item => !isHiddenCategory(item.nombre))
     })).filter(negocio => Number(negocio.total || 0) > 0 || (negocio.rubros || []).length);
-    const negociosPorRubro = (data.negociosPorRubro || [])
-      .filter(item => !isHiddenCategory(item.nombre))
-      .map(rubro => ({
-        ...rubro,
-        negocios: (rubro.negocios || []).filter(item => !isHiddenCategory(item.nombre))
-      }))
-      .filter(rubro => rubro.negocios.length);
+    const mantenimientosPorSedeRubro = (data.mantenimientosPorSedeRubro || []).map(sede => ({
+      ...sede,
+      rubros: (sede.rubros || []).filter(item => !isHiddenCategory(item.nombre))
+    })).filter(sede => Number(sede.total || 0) > 0 && (sede.rubros || []).length);
     const totalGastos = Number(data.totalGastos || 0);
     const totalCategorias = categorias.reduce((sum, item) => sum + Number(item.total || 0), 0);
 
@@ -2358,19 +2451,54 @@
       </div>
     `;
 
-    const matrixBlock = (item, lines) => `
-      <div class="matrix-block" style="--matrix-color:${escapeHtml(item.color || '#0b3b82')}">
+    const renderMovimientoRows = (movimientos = []) => {
+      if (!movimientos.length) return '<div class="empty-state py-2">No hay detalle para esta placa.</div>';
+
+      return movimientos.map(mov => `
+        <div class="movimiento-row">
+          <div>
+            <div class="movimiento-title">${escapeHtml(mov.fuente_nombre || 'Movimiento')}${mov.po_numero && mov.po_numero !== '-' ? ` · ${escapeHtml(mov.po_numero)}` : ''}</div>
+            <div class="movimiento-meta">${escapeHtml(formatDate(mov.fecha))} · ${escapeHtml(mov.proveedor || '-')}</div>
+          </div>
+          <div class="movimiento-desc">${escapeHtml(mov.descripcion || mov.observaciones || '-')}</div>
+          <div class="movimiento-actions">
+            <span class="matrix-line-money">${formatMoney(mov.monto || 0)}</span>
+            ${mov.url ? `<a class="movimiento-link" href="${escapeHtml(mov.url)}">Abrir</a>` : ''}
+          </div>
+        </div>
+      `).join('');
+    };
+
+    const renderSedeMantenimientoBlock = (sede) => `
+      <div class="matrix-block" style="--matrix-color:#0b3b82">
         <div class="matrix-title">
-          <span>${escapeHtml(item.nombre || '-')}</span>
-          <span>${formatMoney(item.total || 0)}</span>
+          <span>${escapeHtml(sede.nombre || '-')}</span>
+          <span>${formatMoney(sede.total || 0)}</span>
         </div>
         <div class="matrix-lines">
-          ${lines.length ? lines.map(line => `
-            <div class="matrix-line">
-              <span class="matrix-line-name">${escapeHtml(line.nombre || '-')}</span>
-              <span class="matrix-line-money">${formatMoney(line.total || 0)}</span>
-              <span class="matrix-line-pct">${formatNumber(line.porcentaje || 0)}%</span>
-            </div>
+          ${(sede.rubros || []).length ? (sede.rubros || []).map(rubro => `
+            <details class="matrix-detail">
+              <summary class="matrix-line">
+                <span class="matrix-line-name">${escapeHtml(rubro.nombre || '-')}</span>
+                <span class="matrix-line-money">${formatMoney(rubro.total || 0)}</span>
+                <span class="matrix-line-pct">${formatNumber(rubro.porcentaje || 0)}%</span>
+              </summary>
+              <div class="matrix-plate-list">
+                ${(rubro.placas || []).length ? (rubro.placas || []).map(placa => `
+                  <details class="matrix-plate-detail">
+                    <summary class="matrix-plate-row">
+                      <span class="matrix-plate-name">
+                        ${escapeHtml(placa.nombre || '-')}
+                        <span class="matrix-plate-meta">${escapeHtml(placa.sede || '-')} · ${formatNumber(placa.registros || 0)} mov.</span>
+                      </span>
+                      <span class="matrix-line-money">${formatMoney(placa.total || 0)}</span>
+                      <span class="matrix-line-pct">${formatNumber(placa.porcentaje || 0)}%</span>
+                    </summary>
+                    <div class="matrix-movement-list">${renderMovimientoRows(placa.movimientos || [])}</div>
+                  </details>
+                `).join('') : '<div class="empty-state py-2">No hay placas para este rubro.</div>'}
+              </div>
+            </details>
           `).join('') : '<div class="empty-state py-2">Sin movimiento.</div>'}
         </div>
       </div>
@@ -2416,13 +2544,13 @@
       <article class="manager-card manager-wide">
         <div class="manager-head">
           <div>
-            <h2 class="manager-title">Rubro dividido por negocio</h2>
-            <div class="manager-subtitle">La misma información al revés: cada rubro separado por negocio.</div>
+            <h2 class="manager-title">Mantenimientos realizados por sede</h2>
+            <div class="manager-subtitle">Abra una sede, luego un rubro; al tocar la placa verá de dónde salió el gasto.</div>
           </div>
-          <span class="pill pill-blue">Rubro -> negocio</span>
+          <span class="pill pill-blue">Sede -> rubro -> placa</span>
         </div>
         <div class="manager-body"><div class="manager-matrix">
-          ${negociosPorRubro.length ? negociosPorRubro.slice(0, 8).map(rubro => matrixBlock(rubro, rubro.negocios || [])).join('') : '<div class="empty-state">No hay datos cruzados para este filtro.</div>'}
+          ${mantenimientosPorSedeRubro.length ? mantenimientosPorSedeRubro.map(renderSedeMantenimientoBlock).join('') : '<div class="empty-state">No hay sedes con gasto para este filtro.</div>'}
         </div></div>
       </article>
     `;

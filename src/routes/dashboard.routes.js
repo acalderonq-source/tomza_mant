@@ -854,6 +854,7 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro, pe
   const porNegocio = new Map();
   const porRubroNegocio = new Map();
   const porNegocioRubro = new Map();
+  const porSedeRubroPlaca = new Map();
 
   gastos.forEach(item => {
     const fuenteNombre = item.fuente === "ORDEN"
@@ -1010,6 +1011,30 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro, pe
     });
     negocioDelRubro.total += item.monto;
     negocioDelRubro.registros += 1;
+
+    if (item.tieneSedeReal) {
+      const sedeResumen = sumarGrupo(porSedeRubroPlaca, etiquetaSedeTomza(item.sede), {
+        rubros: new Map()
+      });
+      sedeResumen.total += item.monto;
+      sedeResumen.registros += 1;
+
+      const rubroSede = sumarGrupo(sedeResumen.rubros, rubroNombre, {
+        color: rubroColor,
+        placas: new Map()
+      });
+      rubroSede.total += item.monto;
+      rubroSede.registros += 1;
+
+      const placaSedeNombre = item.tienePlacaReal ? item.placa : "GENERAL";
+      const placaSede = sumarGrupo(rubroSede.placas, placaSedeNombre, {
+        sede: etiquetaSedeTomza(item.sede),
+        movimientos: []
+      });
+      placaSede.total += item.monto;
+      placaSede.registros += 1;
+      placaSede.movimientos.push(movimientoParaRevisionPlaca(item));
+    }
 
     if (item.familia?.clave === "general") {
       const detalle = sumarGrupo(porDetalleGeneral, describirGasto(item));
@@ -1296,6 +1321,37 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro, pe
         .filter(item => Number(item.total || 0) > 0)
     };
   });
+  const mantenimientosPorSedeRubro = ordenarTop(porSedeRubroPlaca, 100).map(sede => {
+    const totalSede = Number(sede.total || 0);
+    return {
+      nombre: sede.nombre,
+      total: sede.total,
+      registros: sede.registros,
+      rubros: ordenarTop(sede.rubros || new Map(), 12).map(rubro => {
+        const totalRubro = Number(rubro.total || 0);
+        return {
+          nombre: rubro.nombre,
+          color: rubro.color,
+          total: rubro.total,
+          registros: rubro.registros,
+          porcentaje: totalSede ? Math.round((totalRubro / totalSede) * 100) : 0,
+          placas: ordenarTop(rubro.placas || new Map(), 1000).map(placa => ({
+            nombre: placa.nombre,
+            sede: placa.sede,
+            total: placa.total,
+            registros: placa.registros,
+            porcentaje: totalRubro ? Math.round((Number(placa.total || 0) / totalRubro) * 100) : 0,
+            movimientos_total: Array.isArray(placa.movimientos) ? placa.movimientos.length : 0,
+            movimientos: Array.isArray(placa.movimientos)
+              ? placa.movimientos
+                .sort((a, b) => Number(b.monto || 0) - Number(a.monto || 0))
+                .slice(0, 80)
+              : []
+          }))
+        };
+      })
+    };
+  });
   const totalGastoConUnidad = Array.from(porPlaca.values()).reduce((sum, item) => sum + Number(item.total || 0), 0);
   const unidadesConGasto = porPlaca.size;
   const [flotaRow] = await safeQuery(
@@ -1393,6 +1449,7 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro, pe
     negociosGasto,
     rubrosPorNegocio,
     negociosPorRubro,
+    mantenimientosPorSedeRubro,
     meses,
     tiposMant,
     familiasMant,
