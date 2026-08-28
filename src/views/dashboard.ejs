@@ -287,6 +287,10 @@
   const mostrarSede = typeof etiquetaSede === 'function' ? etiquetaSede : (sede) => sede;
   const rolesTodasSedes = ['ADMIN', 'TALLER', 'TRAMITES', 'PROVEEDURIA', 'PROVEEDURIA_TALLER'];
   const usuarioTodasSedes = rolesTodasSedes.includes(user.rol);
+  const usuarioPesadosDashboard = typeof usuarioPesados !== 'undefined'
+    ? usuarioPesados
+    : user.rol === 'SUPERVISOR_PESADO' || String(user.usuario || '').trim().toLowerCase() === 'pesados';
+  const puedeSeleccionarTodas = usuarioTodasSedes || usuarioPesadosDashboard;
   const sedes = usuarioTodasSedes
     ? (Array.isArray(sedesDashboard) ? sedesDashboard : [])
     : (Array.isArray(sedesMultiples) ? sedesMultiples : []);
@@ -371,7 +375,7 @@
             <button class="btn btn-sm <%= sedeActual === sede ? 'btn-dark' : 'btn-outline-primary' %>" name="sede" value="<%= sede %>"><%= mostrarSede(sede) %></button>
           </form>
         <% }) %>
-        <% if (usuarioTodasSedes) { %>
+        <% if (puedeSeleccionarTodas) { %>
           <form method="POST" action="/cambiar-sede">
             <button class="btn btn-sm <%= sedeActual === 'TODAS' ? 'btn-dark' : 'btn-outline-dark' %>" name="sede" value="TODAS">TODAS</button>
           </form>

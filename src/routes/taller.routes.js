@@ -24,10 +24,10 @@ router.use(requireAuth);
 
 const ROLES_VER_TALLER = ["ADMIN", "TALLER", "MECANICO", "SUPERVISOR", "SUPERVISOR_PESADO"];
 const ROLES_GESTION_TALLER = ["ADMIN", "TALLER", "MECANICO"];
-const ROLES_PRIORIDADES_TALLER = ["ADMIN", "TALLER"];
+const ROLES_PRIORIDADES_TALLER = ["ADMIN", "TALLER", "SUPERVISOR_PESADO"];
 const SEDES_TRANSPORTE_AGRUPADAS = ["Transportadora", "Granel"];
 const SQL_SEDE_TRANSPORTE_EXPR = "UPPER(TRIM(COALESCE(NULLIF(tp.sede, ''), un.sede, '')))";
-const SQL_ES_SEDE_TRANSPORTE = `(${SQL_SEDE_TRANSPORTE_EXPR} IN ('TRANSPORTADORA', 'GRANEL') OR ${SQL_SEDE_TRANSPORTE_EXPR} LIKE 'GRANEL_%')`;
+const SQL_ES_SEDE_TRANSPORTE = `(${SQL_SEDE_TRANSPORTE_EXPR} IN ('TRANSPORTADORA', 'GRANEL', 'GRANEL_CARTAGO', 'CABEZALES', 'CISTERNAS', 'CARRETAS', 'TANDEM', 'TÁNDEM', 'TAMDEN') OR ${SQL_SEDE_TRANSPORTE_EXPR} LIKE 'GRANEL_%')`;
 
 function fechaCostaRica(offsetDays = 0) {
   const date = new Date();
@@ -153,6 +153,13 @@ async function obtenerSedesPermitidas(req) {
   }
 
   if (esUsuarioPesados(user)) {
+    if (
+      req.session.sedeSeleccionada &&
+      req.session.sedeSeleccionada !== "TODAS" &&
+      esSedeTransporte(req.session.sedeSeleccionada)
+    ) {
+      return [req.session.sedeSeleccionada];
+    }
     return obtenerSedesTransporte(pool);
   }
 

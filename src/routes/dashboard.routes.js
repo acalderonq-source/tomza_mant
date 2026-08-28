@@ -5,6 +5,7 @@ const {
   agregarTallerParaMecanico,
   expandirSedesEquivalentes,
   etiquetaSede: etiquetaSedeTomza,
+  esUsuarioPesados,
   esUsuarioTodasSedes,
   obtenerTodasSedes,
   obtenerSedesTransporte,
@@ -562,15 +563,14 @@ async function resolverSedesUsuario(req) {
     []
   );
 
-  const esUsuarioPesados = req.session.user.rol === "SUPERVISOR_PESADO" ||
-    String(req.session.user.usuario || "").trim().toLowerCase() === "pesados";
+  const usuarioPesados = esUsuarioPesados(req.session.user);
   const usuarioTodasSedes = esUsuarioTodasSedes(req.session.user);
   const sedeGranelUsuario = sedeGranelDesdeUsuario(req.session.user);
   const sedesPermitidas = usuarioTodasSedes
     ? await obtenerTodasSedes(pool)
     : sedeGranelUsuario
     ? [sedeGranelUsuario]
-    : esUsuarioPesados
+    : usuarioPesados
     ? await obtenerSedesTransporte(pool)
     : agregarTallerParaMecanico(req.session.user, [
         req.session.user.sede,
@@ -581,6 +581,12 @@ async function resolverSedesUsuario(req) {
   if (usuarioTodasSedes) {
     if (req.query.sede && req.query.sede !== "TODAS") sedeFiltro = req.query.sede;
     else if (req.session.sedeSeleccionada && req.session.sedeSeleccionada !== "TODAS") sedeFiltro = req.session.sedeSeleccionada;
+  } else if (usuarioPesados) {
+    if (req.query.sede && req.query.sede !== "TODAS" && sedesPermitidas.includes(req.query.sede)) {
+      sedeFiltro = req.query.sede;
+    } else if (req.session.sedeSeleccionada && req.session.sedeSeleccionada !== "TODAS" && sedesPermitidas.includes(req.session.sedeSeleccionada)) {
+      sedeFiltro = req.session.sedeSeleccionada;
+    }
   } else if (req.query.sede && sedesPermitidas.includes(req.query.sede)) {
     sedeFiltro = req.query.sede;
   } else if (req.session.sedeSeleccionada && sedesPermitidas.includes(req.session.sedeSeleccionada)) {
@@ -591,9 +597,10 @@ async function resolverSedesUsuario(req) {
 
   return {
     usuarioTodasSedes,
+    usuarioPesados,
     sedesPermitidas,
     sedeFiltro,
-    sedesFiltro: expandirSedeFiltro(sedeFiltro),
+    sedesFiltro: !sedeFiltro && usuarioPesados ? expandirSedesEquivalentes(sedesPermitidas) : expandirSedeFiltro(sedeFiltro),
     sedeSeleccionadaVista: etiquetaSede(sedeFiltro)
   };
 }
@@ -1660,15 +1667,14 @@ router.get("/", async (req, res) => {
     // =========================
     // ARMAR LISTA COMPLETA
     // =========================
-    const esUsuarioPesados = req.session.user.rol === "SUPERVISOR_PESADO" ||
-      String(req.session.user.usuario || "").trim().toLowerCase() === "pesados";
+    const usuarioPesados = esUsuarioPesados(req.session.user);
     const usuarioTodasSedes = esUsuarioTodasSedes(req.session.user);
     const sedeGranelUsuario = sedeGranelDesdeUsuario(req.session.user);
     const sedesPermitidas = usuarioTodasSedes
       ? await obtenerTodasSedes(pool)
       : sedeGranelUsuario
       ? [sedeGranelUsuario]
-      : esUsuarioPesados
+      : usuarioPesados
       ? await obtenerSedesTransporte(pool)
       : agregarTallerParaMecanico(req.session.user, [
           req.session.user.sede,
@@ -1684,6 +1690,10 @@ router.get("/", async (req, res) => {
       if (req.session.sedeSeleccionada && req.session.sedeSeleccionada !== "TODAS") {
         sedeFiltro = req.session.sedeSeleccionada;
       }
+    } else if (usuarioPesados) {
+      if (req.session.sedeSeleccionada && req.session.sedeSeleccionada !== "TODAS" && sedesPermitidas.includes(req.session.sedeSeleccionada)) {
+        sedeFiltro = req.session.sedeSeleccionada;
+      }
     } else {
       // MULTI-SEDE
       if (req.session.sedeSeleccionada && sedesPermitidas.includes(req.session.sedeSeleccionada)) {
@@ -1693,7 +1703,7 @@ router.get("/", async (req, res) => {
       }
     }
 
-    const sedesFiltro = expandirSedeFiltro(sedeFiltro);
+    const sedesFiltro = !sedeFiltro && usuarioPesados ? expandirSedesEquivalentes(sedesPermitidas) : expandirSedeFiltro(sedeFiltro);
     const sedeSeleccionadaVista = etiquetaSede(sedeFiltro);
 
     console.log("👤 Usuario:", req.session.user.usuario);
@@ -1932,6 +1942,7 @@ router.get("/", async (req, res) => {
       stats,
       sedeSeleccionada: sedeSeleccionadaVista,
       sedesMultiples: sedesPermitidas,
+      usuarioPesados,
       sedesDashboard,
       etiquetaSede: etiquetaSedeTomza,
       // Variables para evitar errores si la vista tiene bloques de trámites

@@ -178,6 +178,13 @@ function sedeGranelDesdeUsuario(user) {
   return SEDES_GRANEL.find(sede => sede.toLowerCase() === usuario) || "";
 }
 
+function esUsuarioPesados(user) {
+  const usuario = limpiarSede(user?.usuario || user?.nombre).toLowerCase();
+  return user?.rol === "SUPERVISOR_PESADO" ||
+    usuario === "pesados" ||
+    usuario.includes("pesado");
+}
+
 function esUsuarioTodasSedes(user) {
   return ["ADMIN", "TALLER", "TRAMITES"].includes(user?.rol) || esUsuarioProveeduria(user);
 }
@@ -249,7 +256,7 @@ function getSedesPermitidas(req) {
 
     }
 
-  } else if (String(user.usuario || "").trim().toLowerCase() === "pesados") {
+  } else if (esUsuarioPesados(user)) {
 
     if (
       req.session.sedeSeleccionada &&
@@ -288,6 +295,7 @@ module.exports = {
   expandirSedesEquivalentes,
   esUsuarioMecanico,
   esUsuarioProveeduria,
+  esUsuarioPesados,
   esUsuarioTodasSedes,
   sedeGranelDesdeUsuario,
   agregarTallerParaMecanico,

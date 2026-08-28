@@ -3,6 +3,7 @@ const router = express.Router();
 const pool = require("../db");
 const {
   agregarTallerParaMecanico,
+  esUsuarioPesados,
   esUsuarioTodasSedes,
   obtenerSedesTransporte,
   sedeGranelDesdeUsuario
@@ -55,7 +56,7 @@ router.post("/cambiar-sede", async (req, res) => {
     // ARMAR LISTA COMPLETA
     // =========================
     const sedeGranelUsuario = sedeGranelDesdeUsuario(user);
-    const esPesados = String(user.usuario || "").trim().toLowerCase() === "pesados" || user.rol === "SUPERVISOR_PESADO";
+    const esPesados = esUsuarioPesados(user);
     const sedesPermitidas = sedeGranelUsuario
       ? [sedeGranelUsuario]
       : esPesados
@@ -77,6 +78,12 @@ router.post("/cambiar-sede", async (req, res) => {
     // =========================
     // VALIDAR ACCESO
     // =========================
+    if (esPesados && sede === "TODAS") {
+      req.session.sedeSeleccionada = "TODAS";
+      console.log(`✅ ${user.usuario} cambió a TODAS (Granel + Transportadora)`);
+      return res.redirect("/dashboard");
+    }
+
     if (!sedesPermitidas.includes(sede)) {
 
       return res
