@@ -155,6 +155,19 @@
       height: 1px;
     }
 
+    .section-counter {
+      background: #eaf2ff;
+      border: 1px solid #c9dcff;
+      border-radius: 999px;
+      color: #0b3b82;
+      font-size: .72rem;
+      font-weight: 950;
+      letter-spacing: 0;
+      padding: .22rem .55rem;
+      text-transform: none;
+      white-space: nowrap;
+    }
+
     .manager-grid {
       display: grid;
       gap: .9rem;
@@ -1390,7 +1403,12 @@
     </div>
   </section>
 
-  <div class="section-label"><span>Vista solicitada por gerencia</span></div>
+  <div class="section-label">
+    <span>Vista solicitada por gerencia</span>
+    <span class="section-counter" id="managerUnidadesTrabajadas">
+      <%= Number(costoUnidad.unidadesConGasto || 0).toLocaleString('es-CR') %> unidades trabajadas
+    </span>
+  </div>
   <section class="manager-grid mb-4" id="managerGrid">
     <article class="manager-card">
       <div class="manager-head">
@@ -1421,7 +1439,9 @@
       <div class="manager-head">
         <div>
           <h2 class="manager-title">Por rubro del mantenimiento</h2>
-          <div class="manager-subtitle">Familias de gasto del periodo.</div>
+          <div class="manager-subtitle">
+            Familias de gasto del periodo · <%= Number(costoUnidad.unidadesConGasto || 0).toLocaleString('es-CR') %> unidades trabajadas.
+          </div>
         </div>
         <span class="pill pill-blue"><%= categorias.length %> rubros</span>
       </div>
@@ -2250,6 +2270,8 @@
     })).filter(tipo => Number(tipo.total || 0) > 0 && (tipo.placas || []).length);
     const totalGastos = Number(data.totalGastos || 0);
     const totalCategorias = categorias.reduce((sum, item) => sum + Number(item.total || 0), 0);
+    const unidadesTrabajadas = Number(data.costoUnidad?.unidadesConGasto || 0);
+    setText('managerUnidadesTrabajadas', `${formatNumber(unidadesTrabajadas)} unidades trabajadas`);
 
     const keyOf = (value) => String(value || '-').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
     const mergePlacas = (targetMap, placas = []) => {
@@ -2525,7 +2547,7 @@
         <div class="manager-head">
           <div>
             <h2 class="manager-title">Por rubro del mantenimiento</h2>
-            <div class="manager-subtitle">Familias de gasto del periodo.</div>
+            <div class="manager-subtitle">Familias de gasto del periodo · ${formatNumber(unidadesTrabajadas)} unidades trabajadas.</div>
           </div>
           <span class="pill pill-blue">${formatNumber(categorias.length)} rubros</span>
         </div>
