@@ -2,63 +2,492 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Cambios de Aceite</title>
+  <title>Control de Aceites</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <style>
+    :root {
+      --blue: #0b3b82;
+      --dark: #071735;
+      --line: #d8e2f0;
+      --soft: #f4f7fb;
+      --ink: #14213d;
+      --muted: #61718b;
+      --green: #0f766e;
+      --amber: #eab308;
+      --red: #dc2626;
+    }
+    body {
+      background: linear-gradient(135deg, #eef4fb, #dfe9f6);
+      color: var(--ink);
+      font-family: "Segoe UI", Arial, sans-serif;
+      min-height: 100vh;
+    }
+    .navbar-aceite {
+      background: linear-gradient(120deg, #071735, #0b3b82 70%, #0f766e);
+      box-shadow: 0 12px 26px rgba(7, 23, 53, .18);
+    }
+    .page-shell {
+      max-width: 1440px;
+    }
+    .hero {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      box-shadow: 0 14px 28px rgba(20, 33, 61, .08);
+      padding: 1.1rem;
+    }
+    .hero h1 {
+      font-size: clamp(1.6rem, 3vw, 2.4rem);
+      font-weight: 950;
+      letter-spacing: -.02em;
+      margin: 0;
+    }
+    .hero-copy {
+      color: var(--muted);
+      font-weight: 700;
+      margin: .2rem 0 0;
+    }
+    .kpi-grid {
+      display: grid;
+      gap: .75rem;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+    .kpi-card,
+    .panel,
+    .drum-card {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      box-shadow: 0 12px 24px rgba(20, 33, 61, .07);
+    }
+    .kpi-card {
+      padding: .9rem 1rem;
+    }
+    .kpi-label {
+      color: var(--muted);
+      font-size: .76rem;
+      font-weight: 900;
+      text-transform: uppercase;
+    }
+    .kpi-value {
+      color: var(--dark);
+      font-size: 1.55rem;
+      font-weight: 950;
+      line-height: 1;
+      margin-top: .35rem;
+    }
+    .panel {
+      overflow: hidden;
+    }
+    .panel-head {
+      align-items: center;
+      background: linear-gradient(90deg, #0b3b82, #071735);
+      color: #fff;
+      display: flex;
+      gap: 1rem;
+      justify-content: space-between;
+      padding: .85rem 1rem;
+    }
+    .panel-title {
+      font-size: 1rem;
+      font-weight: 950;
+      margin: 0;
+    }
+    .panel-copy {
+      color: rgba(255,255,255,.78);
+      font-size: .78rem;
+      font-weight: 700;
+      margin: .1rem 0 0;
+    }
+    .drum-grid {
+      display: grid;
+      gap: 1rem;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      padding: 1rem;
+    }
+    .drum-card {
+      display: grid;
+      gap: .75rem;
+      grid-template-columns: 108px minmax(0, 1fr);
+      padding: 1rem;
+      position: relative;
+    }
+    .drum-card.low {
+      border-color: #f59e0b;
+      box-shadow: 0 12px 24px rgba(245, 158, 11, .14);
+    }
+    .drum-card.empty {
+      border-color: #ef4444;
+      opacity: .86;
+    }
+    .drum-visual {
+      align-items: flex-end;
+      background:
+        radial-gradient(ellipse at top, rgba(255,255,255,.92) 0 45%, transparent 46%),
+        linear-gradient(90deg, #cbd5e1, #f8fafc 45%, #94a3b8);
+      border: 2px solid #334155;
+      border-radius: 48% 48% 12px 12px / 18px 18px 12px 12px;
+      display: flex;
+      height: 160px;
+      justify-content: center;
+      overflow: hidden;
+      position: relative;
+      width: 88px;
+    }
+    .drum-visual::before {
+      background: rgba(255,255,255,.55);
+      border: 2px solid rgba(51,65,85,.55);
+      border-left: 0;
+      border-right: 0;
+      content: "";
+      height: 22px;
+      left: 0;
+      position: absolute;
+      right: 0;
+      top: 13px;
+      z-index: 2;
+    }
+    .drum-visual::after {
+      background: linear-gradient(90deg, rgba(255,255,255,.45), transparent 55%);
+      content: "";
+      inset: 0;
+      position: absolute;
+      z-index: 3;
+    }
+    .oil-fill {
+      background: linear-gradient(180deg, #facc15, #ca8a04);
+      border-top: 2px solid rgba(120, 53, 15, .45);
+      bottom: 0;
+      height: var(--nivel);
+      left: 0;
+      position: absolute;
+      right: 0;
+      transition: height .35s ease;
+      z-index: 1;
+    }
+    .drum-label {
+      color: #111827;
+      font-size: .72rem;
+      font-weight: 950;
+      left: 50%;
+      line-height: 1.1;
+      position: absolute;
+      text-align: center;
+      text-transform: uppercase;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      width: 70px;
+      z-index: 4;
+    }
+    .drum-title {
+      font-size: 1.05rem;
+      font-weight: 950;
+    }
+    .drum-liters {
+      color: var(--dark);
+      font-size: 1.75rem;
+      font-weight: 950;
+      line-height: 1;
+      margin-top: .3rem;
+    }
+    .progress {
+      background: #e5eaf3;
+      height: .55rem;
+    }
+    .progress-bar {
+      background: linear-gradient(90deg, #0f766e, #22c55e);
+    }
+    .progress-bar.low {
+      background: linear-gradient(90deg, #f59e0b, #facc15);
+    }
+    .progress-bar.empty {
+      background: #dc2626;
+    }
+    .muted {
+      color: var(--muted);
+    }
+    .table th {
+      color: #334155;
+      font-size: .72rem;
+      text-transform: uppercase;
+    }
+    .table td {
+      vertical-align: middle;
+    }
+    .badge-soft {
+      border-radius: 999px;
+      font-weight: 850;
+      padding: .32rem .55rem;
+    }
+    .badge-entrada {
+      background: #dcfce7;
+      color: #166534;
+    }
+    .badge-salida {
+      background: #fee2e2;
+      color: #991b1b;
+    }
+    .form-card {
+      background: #f8fafc;
+      border: 1px solid #d8e2f0;
+      border-radius: 10px;
+      padding: 1rem;
+    }
+    @media (max-width: 900px) {
+      .kpi-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+    @media (max-width: 640px) {
+      .kpi-grid,
+      .drum-card {
+        grid-template-columns: 1fr;
+      }
+      .drum-visual {
+        margin: 0 auto;
+      }
+    }
+  </style>
 </head>
-<body class="bg-light">
+<body>
+<%
+  const factorGalon = Number(galonALitros || 3.78541);
+  const formatoGalones = value => Number(value || 0).toLocaleString('es-CR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const litrosAGalones = value => Number(value || 0) / factorGalon;
+  const porcentajeEstanon = item => {
+    const capacidad = Number(item.litros_capacidad || capacidadEstandar || 208.2);
+    const restantes = Number(item.litros_restantes || 0);
+    if (!capacidad) return 0;
+    return Math.max(0, Math.min(100, (restantes / capacidad) * 100));
+  };
+  const estadoClase = item => {
+    const porcentaje = porcentajeEstanon(item);
+    if (porcentaje <= 0.1 || item.estado === 'AGOTADO') return 'empty';
+    if (porcentaje <= 20) return 'low';
+    return '';
+  };
+%>
 
-<nav class="navbar navbar-dark bg-dark px-3">
-  <span class="navbar-brand">Tomza | Cambios de Aceite</span>
-  <div class="text-white">
-    <%= user.usuario %> (<%= user.rol %>)
-    <a href="/dashboard" class="btn btn-warning btn-sm ms-2">Volver</a>
+<nav class="navbar navbar-dark navbar-aceite px-3">
+  <span class="navbar-brand fw-bold"><i class="bi bi-droplet-half me-1"></i> Control de aceites</span>
+  <div class="d-flex align-items-center gap-2 text-white flex-wrap">
+    <span class="small fw-bold"><%= user.usuario %> (<%= user.rol %>)</span>
+    <a href="/dashboard" class="btn btn-light btn-sm fw-bold">Volver</a>
   </div>
 </nav>
 
-<div class="container mt-4">
-
-  <% if (['ADMIN','MECANICO'].includes(user.rol)) { %>
-    <a href="/aceite/nuevo" class="btn btn-success mb-3">
-      ➕ Registrar cambio de aceite
-    </a>
+<main class="container-fluid page-shell py-4">
+  <% if (success) { %>
+    <div class="alert alert-success fw-bold"><%= success %></div>
+  <% } %>
+  <% if (error) { %>
+    <div class="alert alert-danger fw-bold"><%= error %></div>
   <% } %>
 
-  <div class="table-responsive">
-    <table class="table table-bordered table-hover align-middle">
-      <thead class="table-dark">
-        <tr>
-          <th>Fecha</th>
-          <th>Placa</th>
-          <th>KM actual</th>
-          <th>Galones</th>
-          <th>Próximo cambio</th>
-          <th>Mecánico</th>
-          <th>Obs.</th>
-        </tr>
-      </thead>
-      <tbody>
-        <% if (cambios.length === 0) { %>
-          <tr>
-            <td colspan="7" class="text-center">No hay registros</td>
-          </tr>
+  <section class="hero mb-3">
+    <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
+      <div>
+        <div class="text-uppercase fw-black small text-success">Inventario por sede</div>
+        <h1>Aceite por estañón</h1>
+        <p class="hero-copy">Cada estañón representa <strong><%= formatoGalones(capacidadEstandarGalones || 55) %> galones</strong>. Cada cambio rebaja galones del estañón activo de la sede.</p>
+      </div>
+      <div class="d-flex gap-2 flex-wrap">
+        <% if (puedeGestionar) { %>
+          <a href="/aceite/nuevo" class="btn btn-success fw-bold"><i class="bi bi-tools"></i> Registrar cambio</a>
+          <button class="btn btn-primary fw-bold" data-bs-toggle="collapse" data-bs-target="#formEstanon"><i class="bi bi-plus-circle"></i> Agregar estañón</button>
         <% } %>
+      </div>
+    </div>
+  </section>
 
-        <% cambios.forEach(c => { %>
-          <tr>
-            <td><%= c.fecha_formato %></td>
-            <td><strong><%= c.placa %></strong></td>
-            <td><%= c.km_actual %></td>
-            <td><%= c.galones %></td>
-            <td><%= c.proximo_km %></td>
-            <td><%= c.mecanico %></td>
-            <td><%= c.observaciones || '—' %></td>
-          </tr>
+  <% if (puedeGestionar) { %>
+    <section class="collapse mb-3" id="formEstanon">
+      <div class="form-card">
+        <form method="POST" action="/aceite/estanones" class="row g-3 align-items-end">
+          <div class="col-md-3">
+            <label class="form-label fw-bold">Sede</label>
+            <select name="sede" class="form-select" required>
+              <option value="">Seleccione</option>
+              <% sedesGestion.forEach(sede => { %>
+                <option value="<%= sede %>"><%= etiquetaSede(sede) %></option>
+              <% }) %>
+            </select>
+          </div>
+          <div class="col-md-2">
+            <label class="form-label fw-bold">Fecha de compra</label>
+            <input type="date" name="fecha_compra" class="form-control" value="<%= fechaHoy %>" required>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label fw-bold">Descripción</label>
+            <input type="text" name="descripcion" class="form-control" value="Estañón de aceite 55 galones">
+          </div>
+          <div class="col-md-2">
+            <label class="form-label fw-bold">Capacidad galones</label>
+            <input type="number" step="0.01" name="galones_capacidad" class="form-control" value="<%= capacidadEstandarGalones || 55 %>">
+          </div>
+          <div class="col-md-2">
+            <label class="form-label fw-bold">Galones iniciales</label>
+            <input type="number" step="0.01" name="galones_iniciales" class="form-control" value="<%= capacidadEstandarGalones || 55 %>">
+          </div>
+          <div class="col-12">
+            <button class="btn btn-primary fw-bold"><i class="bi bi-save"></i> Guardar estañón</button>
+          </div>
+        </form>
+      </div>
+    </section>
+  <% } %>
+
+  <section class="kpi-grid mb-3">
+    <div class="kpi-card">
+      <div class="kpi-label">Galones disponibles</div>
+      <div class="kpi-value"><%= formatoGalones(litrosAGalones(resumen.restantes)) %> gal</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Capacidad registrada</div>
+      <div class="kpi-value"><%= formatoGalones(litrosAGalones(resumen.capacidad)) %> gal</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Estañones activos</div>
+      <div class="kpi-value"><%= Number(resumen.activos || 0).toLocaleString('es-CR') %></div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Alertas bajo 20%</div>
+      <div class="kpi-value"><%= Number(resumen.bajos || 0).toLocaleString('es-CR') %></div>
+    </div>
+  </section>
+
+  <section class="panel mb-3">
+    <div class="panel-head">
+      <div>
+        <h2 class="panel-title">Aceite disponible por sede</h2>
+        <p class="panel-copy">La imagen del estañón baja conforme se registran cambios de aceite.</p>
+      </div>
+    </div>
+
+    <% if (!estanones.length) { %>
+      <div class="p-4 text-center muted fw-bold">Todavía no hay estañones registrados.</div>
+    <% } else { %>
+      <div class="drum-grid">
+        <% estanones.forEach(item => {
+          const porcentaje = porcentajeEstanon(item);
+          const clase = estadoClase(item);
+        %>
+          <article class="drum-card <%= clase %>">
+            <div class="drum-visual" style="--nivel:<%= porcentaje.toFixed(2) %>%">
+              <div class="oil-fill"></div>
+              <div class="drum-label">Aceite<br>55 gal</div>
+            </div>
+            <div>
+              <div class="d-flex justify-content-between gap-2">
+                <div>
+                  <div class="drum-title"><%= etiquetaSede(item.sede) %></div>
+                  <div class="small muted"><%= item.descripcion || 'Estañón de aceite' %></div>
+                </div>
+                <span class="badge text-bg-light"><%= item.estado %></span>
+              </div>
+              <div class="drum-liters"><%= formatoGalones(litrosAGalones(item.litros_restantes)) %> gal</div>
+              <div class="small muted mt-1">de <%= formatoGalones(litrosAGalones(item.litros_capacidad)) %> gal · comprado <%= item.fecha_compra_formato %></div>
+              <div class="progress mt-3">
+                <div class="progress-bar <%= clase %>" style="width:<%= porcentaje.toFixed(2) %>%"></div>
+              </div>
+              <div class="d-flex justify-content-between small fw-bold mt-2">
+                <span><%= porcentaje.toFixed(0) %>% disponible</span>
+                <span><%= formatoGalones(litrosAGalones(item.litros_consumidos)) %> gal consumidos</span>
+              </div>
+              <div class="small muted mt-2"><%= Number(item.salidas || 0).toLocaleString('es-CR') %> rebajo(s) registrados</div>
+            </div>
+          </article>
         <% }) %>
-      </tbody>
-    </table>
-  </div>
+      </div>
+    <% } %>
+  </section>
 
-</div>
+  <div class="row g-3">
+    <div class="col-lg-7">
+      <section class="panel h-100">
+        <div class="panel-head">
+          <div>
+            <h2 class="panel-title">Últimos cambios de aceite</h2>
+            <p class="panel-copy">Cada registro descuenta galones de la sede de la unidad.</p>
+          </div>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-hover align-middle mb-0">
+            <thead>
+              <tr>
+                <th>Fecha</th>
+                <th>Placa</th>
+                <th>Sede</th>
+                <th>KM</th>
+                <th>Galones</th>
+                <th>Próximo</th>
+                <th>Mecánico</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% if (!cambios.length) { %>
+                <tr><td colspan="7" class="text-center muted fw-bold py-4">No hay registros</td></tr>
+              <% } %>
+              <% cambios.forEach(c => { %>
+                <tr>
+                  <td><%= c.fecha_formato %></td>
+                  <td><strong><%= c.placa %></strong><div class="small muted"><%= c.observaciones || '' %></div></td>
+                  <td><%= etiquetaSede(c.sede) %></td>
+                  <td><%= Number(c.km_actual || 0).toLocaleString('es-CR') %></td>
+                  <td><strong><%= formatoGalones(c.galones_usados || litrosAGalones(c.litros_usados)) %> gal</strong></td>
+                  <td><%= Number(c.proximo_km || 0).toLocaleString('es-CR') %></td>
+                  <td><%= c.mecanico || '—' %></td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+
+    <div class="col-lg-5">
+      <section class="panel h-100">
+        <div class="panel-head">
+          <div>
+            <h2 class="panel-title">Movimientos de aceite</h2>
+            <p class="panel-copy">Entradas de estañón y salidas por cambios.</p>
+          </div>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-hover align-middle mb-0">
+            <thead>
+              <tr>
+                <th>Fecha</th>
+                <th>Tipo</th>
+                <th>Sede</th>
+                <th>Detalle</th>
+                <th>Galones</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% if (!movimientos.length) { %>
+                <tr><td colspan="5" class="text-center muted fw-bold py-4">Sin movimientos</td></tr>
+              <% } %>
+              <% movimientos.forEach(m => { %>
+                <tr>
+                  <td><%= m.fecha_formato %></td>
+                  <td><span class="badge-soft <%= m.tipo === 'ENTRADA' ? 'badge-entrada' : 'badge-salida' %>"><%= m.tipo %></span></td>
+                  <td><%= etiquetaSede(m.sede) %></td>
+                  <td><strong><%= m.placa || '' %></strong><div class="small muted"><%= m.descripcion || '—' %></div></td>
+                  <td><strong><%= formatoGalones(litrosAGalones(m.litros)) %> gal</strong></td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  </div>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="/js/loading-guard.js"></script>
 </body>
 </html>

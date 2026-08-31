@@ -11,11 +11,33 @@ const SEDES_TRANSPORTADORA_DETALLE = [
   "Cabezales",
   "Cisternas",
   "Carretas",
-  "Tandem"
+  "Tandem",
+  "Tándem"
 ];
 
 const SEDES_TRANSPORTE = ["Transportadora", ...SEDES_TRANSPORTADORA_DETALLE, ...SEDES_GRANEL];
 const SEDES_GRANEL_CARTAGO_EQUIVALENTES = ["Granel", "granel_cartago"];
+const SEDES_GRANEL_OPERATIVAS = {
+  GRANEL: "Cartago",
+  GRANEL_CARTAGO: "Cartago",
+  GRANELALAJUELA: "Alajuela",
+  GRANEL_ALAJUELA: "Alajuela",
+  GRANELGUAPILES: "Guapiles",
+  GRANEL_GUAPILES: "Guapiles",
+  GRANEL_LA_CRUZ: "La Cruz",
+  GRANELLACRUZ: "La Cruz",
+  GRANEL_PEREZ_ZELEDON: "Perez Zeledon",
+  GRANELPEREZZELEDON: "Perez Zeledon"
+};
+const SEDES_OPERATIVAS_EQUIVALENTES = {
+  CARTAGO: ["Cartago", "Granel", "granel_cartago"],
+  ALAJUELA: ["Alajuela", "granel_alajuela"],
+  GUAPILES: ["Guapiles", "granel_guapiles"],
+  LA_CRUZ: ["La Cruz", "granel_la_cruz"],
+  LACRUZ: ["La Cruz", "granel_la_cruz"],
+  PEREZ_ZELEDON: ["Perez Zeledon", "granel_perez_zeledon"],
+  PEREZZELEDON: ["Perez Zeledon", "granel_perez_zeledon"]
+};
 
 const TODAS_SEDES = [
   "Cartago",
@@ -49,7 +71,8 @@ const ETIQUETAS_SEDES = {
   granel_la_cruz: "Granel La Cruz",
   granel_guapiles: "Granel Guapiles",
   granel_perez_zeledon: "Granel Perez Zeledon",
-  Tandem: "Tándem"
+  Tandem: "Tándem",
+  Tándem: "Tándem"
 };
 
 function limpiarSede(sede) {
@@ -57,7 +80,10 @@ function limpiarSede(sede) {
 }
 
 function normalizarSede(sede) {
-  return limpiarSede(sede).toUpperCase();
+  return limpiarSede(sede)
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toUpperCase();
 }
 
 function tituloDesdeSede(sede) {
@@ -72,6 +98,41 @@ function etiquetaSede(sede) {
   const sedeLimpia = limpiarSede(sede);
   if (!sedeLimpia) return "-";
   return ETIQUETAS_SEDES[sedeLimpia] || (esSedeGranel(sedeLimpia) ? tituloDesdeSede(sedeLimpia) : sedeLimpia);
+}
+
+function claveSede(sede) {
+  return normalizarSede(sede)
+    .replace(/[_\s]+/g, "_")
+    .replace(/[^A-Z0-9_]/g, "");
+}
+
+function sedeOperativaRepuestosAceites(sede) {
+  const sedeLimpia = limpiarSede(sede);
+  if (!sedeLimpia) return "";
+  const clave = claveSede(sedeLimpia);
+  return SEDES_GRANEL_OPERATIVAS[clave] || sedeLimpia;
+}
+
+function etiquetaSedeOperativa(sede) {
+  return etiquetaSede(sedeOperativaRepuestosAceites(sede));
+}
+
+function expandirSedeOperativaRepuestosAceites(sede) {
+  const operativa = sedeOperativaRepuestosAceites(sede);
+  const claveOperativa = claveSede(operativa);
+  return unirSedes(SEDES_OPERATIVAS_EQUIVALENTES[claveOperativa] || [operativa || sede]);
+}
+
+function expandirSedesOperativasRepuestosAceites(sedes) {
+  const lista = Array.isArray(sedes) ? sedes : [sedes];
+  return unirSedes(lista.flatMap(expandirSedeOperativaRepuestosAceites));
+}
+
+function sedesOperativasVisibles(sedes) {
+  return unirSedes(sedes)
+    .map(sedeOperativaRepuestosAceites)
+    .filter(Boolean)
+    .filter((sede, index, lista) => lista.findIndex(item => claveSede(item) === claveSede(sede)) === index);
 }
 
 function esSedeGranel(sede) {
@@ -287,12 +348,17 @@ module.exports = {
   SEDES_TRANSPORTADORA_DETALLE,
   SEDES_TRANSPORTE,
   etiquetaSede,
+  etiquetaSedeOperativa,
   esSedeGranelCartago,
   esSedeGranel,
   esSedeTransporte,
   clasificarSubgrupoTransportadora,
   expandirSedeEquivalente,
   expandirSedesEquivalentes,
+  expandirSedeOperativaRepuestosAceites,
+  expandirSedesOperativasRepuestosAceites,
+  sedeOperativaRepuestosAceites,
+  sedesOperativasVisibles,
   esUsuarioMecanico,
   esUsuarioProveeduria,
   esUsuarioPesados,

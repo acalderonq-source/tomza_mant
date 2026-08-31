@@ -4,7 +4,9 @@ const pool = require("../db");
 const {
   agregarTallerParaMecanico,
   esSedeTransporte,
+  esUsuarioPesados,
   esUsuarioTodasSedes,
+  expandirSedesEquivalentes,
   obtenerSedesTransporte,
   sedeGranelDesdeUsuario
 } = require("../utils/sedes");
@@ -23,13 +25,12 @@ async function sedesPermitidasUsuario(req) {
 
   if (esUsuarioTodasSedes(user)) {
     if (req.session.sedeSeleccionada && req.session.sedeSeleccionada !== "TODAS") {
-      return [req.session.sedeSeleccionada];
+      return expandirSedesEquivalentes(req.session.sedeSeleccionada);
     }
     return [];
   }
 
-  const esPesados = user.rol === "SUPERVISOR_PESADO" ||
-    String(user.usuario || "").trim().toLowerCase() === "pesados";
+  const esPesados = esUsuarioPesados(user);
   const sedeGranelUsuario = sedeGranelDesdeUsuario(user);
 
   if (sedeGranelUsuario) {
@@ -38,9 +39,9 @@ async function sedesPermitidasUsuario(req) {
       req.session.sedeSeleccionada !== "TODAS" &&
       req.session.sedeSeleccionada === sedeGranelUsuario
     ) {
-      return [req.session.sedeSeleccionada];
+      return expandirSedesEquivalentes(req.session.sedeSeleccionada);
     }
-    return [sedeGranelUsuario];
+    return expandirSedesEquivalentes(sedeGranelUsuario);
   }
 
   if (esPesados) {
@@ -49,9 +50,9 @@ async function sedesPermitidasUsuario(req) {
       req.session.sedeSeleccionada !== "TODAS" &&
       esSedeTransporte(req.session.sedeSeleccionada)
     ) {
-      return [req.session.sedeSeleccionada];
+      return expandirSedesEquivalentes(req.session.sedeSeleccionada);
     }
-    return obtenerSedesTransporte(pool);
+    return expandirSedesEquivalentes(await obtenerSedesTransporte(pool));
   }
 
   const [extras] = await pool.query(
@@ -61,10 +62,10 @@ async function sedesPermitidasUsuario(req) {
   const sedes = agregarTallerParaMecanico(user, [user.sede, ...extras.map(item => item.sede)]);
 
   if (req.session.sedeSeleccionada && sedes.includes(req.session.sedeSeleccionada)) {
-    return [req.session.sedeSeleccionada];
+    return expandirSedesEquivalentes(req.session.sedeSeleccionada);
   }
 
-  return sedes;
+  return expandirSedesEquivalentes(sedes);
 }
 
 function logDbSearchError(error) {

@@ -2,10 +2,15 @@ const express = require("express");
 const router = express.Router();
 const pool = require("../db");
 const {
-  etiquetaSede,
+  etiquetaSedeOperativa,
+  expandirSedesEquivalentes,
+  expandirSedeOperativaRepuestosAceites,
+  expandirSedesOperativasRepuestosAceites,
   getSedesPermitidas,
   obtenerTodasSedes,
-  obtenerSedesTransporte
+  obtenerSedesTransporte,
+  sedeOperativaRepuestosAceites,
+  sedesOperativasVisibles
 } = require("../utils/sedes");
 const {
   ESTADOS_REPUESTOS_SEMANALES,
@@ -50,7 +55,7 @@ function esSedeRecopeLimon(sede) {
 
 function etiquetaSedePedido(sede) {
   if (esSedeRecopeLimon(sede)) return "RECOPE_LIMON";
-  return etiquetaSede(sede);
+  return etiquetaSedeOperativa(sede);
 }
 
 function incluirRecopeLimonSiAplica(sedes) {
@@ -234,15 +239,15 @@ function excluirDePedidoCedis(item) {
 
 async function sedesDisponibles(req) {
   if (["ADMIN", "TALLER"].includes(req.session.user.rol) || ROLES_PROVEEDURIA.includes(req.session.user.rol)) {
-    return incluirRecopeLimonSiAplica(await obtenerTodasSedes(pool));
+    return incluirRecopeLimonSiAplica(expandirSedesOperativasRepuestosAceites(expandirSedesEquivalentes(await obtenerTodasSedes(pool))));
   }
 
   if (esUsuarioPesado(req.session.user)) {
-    return incluirRecopeLimonSiAplica(await obtenerSedesTransporte(pool));
+    return incluirRecopeLimonSiAplica(expandirSedesOperativasRepuestosAceites(expandirSedesEquivalentes(await obtenerSedesTransporte(pool))));
   }
 
   const sedes = getSedesPermitidas(req);
-  return incluirRecopeLimonSiAplica(sedes);
+  return incluirRecopeLimonSiAplica(expandirSedesOperativasRepuestosAceites(sedes));
 }
 
 async function resolverSedePorPlaca(req, placa, sedeFallback = "") {
@@ -277,12 +282,14 @@ async function resolverSedePorPlaca(req, placa, sedeFallback = "") {
 
     return {
       placa: unidades[0].placa,
-      sede: sedeDestinoPedido(unidades[0].sede, sedeFallback),
+      sede: esSedeRecopeLimon(sedeFallback)
+        ? sedeDestinoPedido(unidades[0].sede, sedeFallback)
+        : sedeOperativaRepuestosAceites(sedeDestinoPedido(unidades[0].sede, sedeFallback)),
       sedes
     };
   }
 
-  const sede = String(sedeFallback || "").trim();
+  const sede = sedeOperativaRepuestosAceites(sedeFallback);
   if (esGrupoRecopeLimon(placaLimpia)) {
     if (sedes.length && !sedes.includes(SEDE_RECOPE_LIMON)) {
       return {
@@ -326,9 +333,9 @@ async function obtenerSolicitudesFiltradas(req) {
     params.push(fechaFiltro);
   }
 
-  if (sedeFiltro && sedes.includes(sedeFiltro)) {
-    condiciones.push("rs.sede = ?");
-    params.push(sedeFiltro);
+  if (sedeFiltro && sedes.includes(sedeOperativaRepuestosAceites(sedeFiltro))) {
+    condiciones.push("rs.sede IN (?)");
+    params.push(expandirSedeOperativaRepuestosAceites(sedeFiltro));
   } else if (sedes.length) {
     condiciones.push("rs.sede IN (?)");
     params.push(sedes);
@@ -351,7 +358,7 @@ async function obtenerSolicitudesFiltradas(req) {
     }
   }
 
-  const [solicitudes] = await pool.query(
+  const [solicitudesRaw] = await pool.query(
     `SELECT
        rs.*,
        DATE_FORMAT(rs.fecha, '%d/%m/%Y') AS fecha_formato,
@@ -363,11 +370,21 @@ async function obtenerSolicitudesFiltradas(req) {
      ORDER BY rs.fecha DESC, rs.sede ASC, rs.placa ASC, rs.id ASC`,
     params
   );
+  const solicitudes = solicitudesRaw.map(item => ({
+    ...item,
+    sede_original: item.sede,
+    sede: esSedeRecopeLimon(item.sede) ? item.sede : sedeOperativaRepuestosAceites(item.sede)
+  }));
 
   return {
-    sedes,
+    sedes: unirLista(sedesOperativasVisibles(sedes), sedes.includes(SEDE_RECOPE_LIMON) ? [SEDE_RECOPE_LIMON] : []),
     solicitudes,
-    filtros: { fecha: fechaFiltro, sede: sedeFiltro, placa: placaFiltro, estado: estadoRaw }
+    filtros: {
+      fecha: fechaFiltro,
+      sede: esSedeRecopeLimon(sedeFiltro) ? SEDE_RECOPE_LIMON : sedeOperativaRepuestosAceites(sedeFiltro),
+      placa: placaFiltro,
+      estado: estadoRaw
+    }
   };
 }
 
@@ -426,7 +443,11 @@ router.get("/", async (req, res) => {
       user: req.session.user,
       solicitudes,
       sedes,
-      unidades,
+      unidades: unidades.map(unidad => ({
+        ...unidad,
+        sede_original: unidad.sede,
+        sede: esSedeRecopeLimon(unidad.sede) ? unidad.sede : sedeOperativaRepuestosAceites(unidad.sede)
+      })),
       filtros,
       estados: ESTADOS_REPUESTOS_SEMANALES,
       resumen,

@@ -6,7 +6,13 @@ const {
   ensureReportesSupervisoresTables,
   limpiarTextoReporte
 } = require("../utils/reportesSupervisoresDb");
-const { agregarTallerParaMecanico } = require("../utils/sedes");
+const {
+  agregarTallerParaMecanico,
+  esSedeTransporte,
+  esUsuarioPesados,
+  expandirSedesEquivalentes,
+  obtenerSedesTransporte
+} = require("../utils/sedes");
 const { agregarFiltroPlacaSql } = require("../utils/placas");
 const { normalizarTipoMantenimiento, detectarTipoMantenimiento } = require("../utils/tipoMantenimiento");
 
@@ -31,19 +37,30 @@ async function obtenerSedesPermitidas(req) {
   const user = req.session.user;
   if (["ADMIN", "TALLER"].includes(user.rol)) {
     if (req.session.sedeSeleccionada && req.session.sedeSeleccionada !== "TODAS") {
-      return [req.session.sedeSeleccionada];
+      return expandirSedesEquivalentes(req.session.sedeSeleccionada);
     }
     return [];
+  }
+
+  if (esUsuarioPesados(user)) {
+    if (
+      req.session.sedeSeleccionada &&
+      req.session.sedeSeleccionada !== "TODAS" &&
+      esSedeTransporte(req.session.sedeSeleccionada)
+    ) {
+      return expandirSedesEquivalentes(req.session.sedeSeleccionada);
+    }
+    return expandirSedesEquivalentes(await obtenerSedesTransporte(pool));
   }
 
   const [extras] = await pool.query("SELECT sede FROM usuarios_sedes WHERE usuario_id = ?", [user.id]);
   const sedes = agregarTallerParaMecanico(user, [user.sede, ...extras.map(e => e.sede)]);
 
   if (req.session.sedeSeleccionada && sedes.includes(req.session.sedeSeleccionada)) {
-    return [req.session.sedeSeleccionada];
+    return expandirSedesEquivalentes(req.session.sedeSeleccionada);
   }
 
-  return sedes;
+  return expandirSedesEquivalentes(sedes);
 }
 
 function aplicarFiltroSedes(sql, params, sedesPermitidas, alias = "rs") {
@@ -282,8 +299,8 @@ async function consultarReportesPendientes(req, filtros = {}) {
   sql = aplicarFiltroSedes(sql, params, sedesPermitidas, "rs");
 
   if (sede) {
-    sql += " AND rs.sede = ?";
-    params.push(sede);
+    sql += " AND rs.sede IN (?)";
+    params.push(expandirSedesEquivalentes(sede));
   }
   if (placa) {
     const condicionesPlaca = [];
@@ -529,8 +546,8 @@ router.get("/historial", allowRoles(...ROLES_VER), async (req, res) => {
     sql = aplicarFiltroSedes(sql, params, sedesPermitidas, "rs");
 
     if (sede) {
-      sql += " AND rs.sede = ?";
-      params.push(sede);
+      sql += " AND rs.sede IN (?)";
+      params.push(expandirSedesEquivalentes(sede));
     }
     if (placa) {
       const condicionesPlaca = [];
@@ -575,15 +592,16 @@ router.post("/limpiar-tabla", allowRoles(...ROLES_EDITAR), async (req, res) => {
       req.session.error = "Debe indicar la sede para reescribir la tabla.";
       return res.redirect("/reportes-supervisores");
     }
-    if (sedesPermitidas.length && !sedesPermitidas.includes(sede)) {
+    const sedesReescritura = expandirSedesEquivalentes(sede);
+    if (sedesPermitidas.length && !sedesReescritura.some(item => sedesPermitidas.includes(item))) {
       req.session.error = "No tiene permiso para reescribir esta sede.";
       return res.redirect("/reportes-supervisores");
     }
 
-    const paramsReportes = [sede];
+    const paramsReportes = [sedesReescritura];
     let sqlReportes = `SELECT id, descripcion_original
        FROM reportes_supervisores
-       WHERE sede = ?
+       WHERE sede IN (?)
          AND estado IN ('PENDIENTE','EN_REVISION')`;
     if (semanaReporteFecha) {
       sqlReportes += " AND COALESCE(semana_reporte, DATE(fecha_reporte)) = ?";

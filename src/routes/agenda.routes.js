@@ -1,7 +1,15 @@
 const express = require("express");
 const router = express.Router();
 const pool = require("../db");
-const { agregarTallerParaMecanico, esUsuarioTodasSedes, obtenerTodasSedes } = require("../utils/sedes");
+const {
+  agregarTallerParaMecanico,
+  esSedeTransporte,
+  esUsuarioPesados,
+  esUsuarioTodasSedes,
+  expandirSedesEquivalentes,
+  obtenerSedesTransporte,
+  obtenerTodasSedes
+} = require("../utils/sedes");
 const { ensureNumeroMantenimientoColumn, asignarNumeroMantenimiento } = require("../utils/mantenimientosNumero");
 
 // ================= FUNCIONES AUXILIARES =================
@@ -27,6 +35,17 @@ async function obtenerSedesPermitidas(req) {
     return obtenerTodasSedes(pool);
   }
 
+  if (esUsuarioPesados(req.session.user)) {
+    if (
+      req.session.sedeSeleccionada &&
+      req.session.sedeSeleccionada !== "TODAS" &&
+      esSedeTransporte(req.session.sedeSeleccionada)
+    ) {
+      return expandirSedesEquivalentes(req.session.sedeSeleccionada);
+    }
+    return expandirSedesEquivalentes(await obtenerSedesTransporte(pool));
+  }
+
   const [extras] = await pool.query(
     `SELECT sede FROM usuarios_sedes WHERE usuario_id = ?`,
     [req.session.user.id]
@@ -50,6 +69,23 @@ function obtenerSedeFiltro(req, sedesPermitidas) {
     return req.session.sedeSeleccionada;
   }
   return sedesPermitidas[0] || null;
+}
+
+function obtenerSedesConsulta(req, sedeFiltro, sedesPermitidas) {
+  if (sedeFiltro) return expandirSedesEquivalentes(sedeFiltro);
+  if (sedesPermitidas.length && !esUsuarioTodasSedes(req.session.user)) {
+    return expandirSedesEquivalentes(sedesPermitidas);
+  }
+  return [];
+}
+
+function aplicarFiltroSedesConsulta(sql, params, req, sedeFiltro, sedesPermitidas, alias = "u") {
+  const sedesConsulta = obtenerSedesConsulta(req, sedeFiltro, sedesPermitidas);
+  if (sedesConsulta.length) {
+    sql += ` AND ${alias}.sede IN (?)`;
+    params.push(sedesConsulta);
+  }
+  return sql;
 }
 
 // =====================================================
@@ -80,13 +116,7 @@ router.get("/", async (req, res) => {
     `;
     const params = [fecha];
 
-    if (sedeFiltro) {
-      sql += ` AND u.sede = ?`;
-      params.push(sedeFiltro);
-    } else if (sedesPermitidas.length && !esUsuarioTodasSedes(req.session.user)) {
-      sql += ` AND u.sede IN (?)`;
-      params.push(sedesPermitidas);
-    }
+    sql = aplicarFiltroSedesConsulta(sql, params, req, sedeFiltro, sedesPermitidas);
 
     sql += `
       UNION ALL
@@ -105,13 +135,7 @@ router.get("/", async (req, res) => {
     `;
     params.push(fecha);
 
-    if (sedeFiltro) {
-      sql += ` AND u.sede = ?`;
-      params.push(sedeFiltro);
-    } else if (sedesPermitidas.length && !esUsuarioTodasSedes(req.session.user)) {
-      sql += ` AND u.sede IN (?)`;
-      params.push(sedesPermitidas);
-    }
+    sql = aplicarFiltroSedesConsulta(sql, params, req, sedeFiltro, sedesPermitidas);
 
     sql += ` ORDER BY placa ASC`;
 
@@ -159,13 +183,7 @@ router.get("/manana", async (req, res) => {
     `;
     const params = [manana];
 
-    if (sedeFiltro) {
-      sql += ` AND u.sede = ?`;
-      params.push(sedeFiltro);
-    } else if (sedesPermitidas.length && !esUsuarioTodasSedes(req.session.user)) {
-      sql += ` AND u.sede IN (?)`;
-      params.push(sedesPermitidas);
-    }
+    sql = aplicarFiltroSedesConsulta(sql, params, req, sedeFiltro, sedesPermitidas);
 
     sql += `
       UNION ALL
@@ -184,13 +202,7 @@ router.get("/manana", async (req, res) => {
     `;
     params.push(manana);
 
-    if (sedeFiltro) {
-      sql += ` AND u.sede = ?`;
-      params.push(sedeFiltro);
-    } else if (sedesPermitidas.length && !esUsuarioTodasSedes(req.session.user)) {
-      sql += ` AND u.sede IN (?)`;
-      params.push(sedesPermitidas);
-    }
+    sql = aplicarFiltroSedesConsulta(sql, params, req, sedeFiltro, sedesPermitidas);
 
     sql += ` ORDER BY placa ASC`;
 
@@ -228,9 +240,10 @@ router.get("/nuevo", async (req, res) => {
 
     if (!sedeFiltro) return res.status(400).send("No hay sedes disponibles");
 
+    const sedesConsulta = obtenerSedesConsulta(req, sedeFiltro, sedesPermitidas);
     const [unidades] = await pool.query(
-      `SELECT id, placa FROM unidades WHERE sede = ? ORDER BY placa`,
-      [sedeFiltro]
+      `SELECT id, placa, sede FROM unidades WHERE sede IN (?) ORDER BY sede, placa`,
+      [sedesConsulta]
     );
 
     res.render("agenda_nuevo", {
@@ -263,6 +276,12 @@ router.post("/nuevo", async (req, res) => {
 
     const [[unidad]] = await pool.query("SELECT sede FROM unidades WHERE id = ?", [unidad_id]);
     if (!unidad) return res.status(404).send("Unidad no encontrada");
+    const sedesPermitidas = await obtenerSedesPermitidas(req);
+    const sedeFiltro = obtenerSedeFiltro(req, sedesPermitidas);
+    const sedesConsulta = obtenerSedesConsulta(req, sedeFiltro, sedesPermitidas);
+    if (sedesConsulta.length && !sedesConsulta.includes(unidad.sede)) {
+      return res.status(403).send("Unidad no autorizada para esta sede");
+    }
 
     await ensureNumeroMantenimientoColumn(pool);
     const [result] = await pool.query(

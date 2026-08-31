@@ -1,13 +1,15 @@
 const express = require("express");
-const fs = require("fs");
 const path = require("path");
-const ejs = require("ejs");
-const pdf = require("html-pdf");
+const PdfPrinter = require("pdfmake");
 const pool = require("../db");
 const {
   agregarTallerParaMecanico,
   esSedeGranel,
+  esSedeTransporte,
+  esUsuarioPesados,
   esUsuarioTodasSedes,
+  expandirSedesEquivalentes,
+  obtenerSedesTransporte,
   TODAS_SEDES,
   sedeGranelDesdeUsuario
 } = require("../utils/sedes");
@@ -16,13 +18,21 @@ const { agregarFiltroPlacaSql } = require("../utils/placas");
 const router = express.Router();
 
 const ESTADOS = ["SOLICITADA", "COTIZADA", "COMPRADA", "RECIBIDA"];
-const PDF_TMP_DIR = path.join(process.cwd(), "tmp");
 const ROLES_COTIZAR = ["ADMIN", "PROVEEDURIA_TALLER", "PROVEEDURIA"];
 const ROLES_COMPRAR = ["ADMIN", "PROVEEDURIA_TALLER", "PROVEEDURIA"];
 const ROLES_RECIBIR = ["ADMIN", "TALLER", "MECANICO"];
 const ROLES_VER_COTIZACION = ["ADMIN", "TALLER", "PROVEEDURIA_TALLER", "PROVEEDURIA", "SUPERVISOR", "SUPERVISOR_PESADO", "MECANICO"];
 const ROLES_SOLICITAR = ["ADMIN", "SUPERVISOR", "SUPERVISOR_PESADO", "TALLER", "MECANICO"];
 const ROLES_EDITAR = ["ADMIN", "TALLER", "MECANICO", "SUPERVISOR", "SUPERVISOR_PESADO", "PROVEEDURIA_TALLER", "PROVEEDURIA"];
+const PDF_FONTS = {
+  Helvetica: {
+    normal: "Helvetica",
+    bold: "Helvetica-Bold",
+    italics: "Helvetica-Oblique",
+    bolditalics: "Helvetica-BoldOblique"
+  }
+};
+const printer = new PdfPrinter(PDF_FONTS);
 
 function requireAuth(req, res, next) {
   if (!req.session.user) return res.redirect("/login");
@@ -105,9 +115,9 @@ async function obtenerSedesPermitidas(req) {
 
   if (esUsuarioTodasSedes(user)) {
     if (req.session.sedeSeleccionada && req.session.sedeSeleccionada !== "TODAS") {
-      return [req.session.sedeSeleccionada];
+      return expandirSedesEquivalentes(req.session.sedeSeleccionada);
     }
-    return TODAS_SEDES;
+    return expandirSedesEquivalentes(TODAS_SEDES);
   }
 
   if (sedeGranelUsuario) {
@@ -116,9 +126,20 @@ async function obtenerSedesPermitidas(req) {
       req.session.sedeSeleccionada !== "TODAS" &&
       req.session.sedeSeleccionada === sedeGranelUsuario
     ) {
-      return [req.session.sedeSeleccionada];
+      return expandirSedesEquivalentes(req.session.sedeSeleccionada);
     }
-    return [sedeGranelUsuario];
+    return expandirSedesEquivalentes(sedeGranelUsuario);
+  }
+
+  if (esUsuarioPesados(user)) {
+    if (
+      req.session.sedeSeleccionada &&
+      req.session.sedeSeleccionada !== "TODAS" &&
+      esSedeTransporte(req.session.sedeSeleccionada)
+    ) {
+      return expandirSedesEquivalentes(req.session.sedeSeleccionada);
+    }
+    return expandirSedesEquivalentes(await obtenerSedesTransporte(pool));
   }
 
   const [extras] = await pool.query(
@@ -129,10 +150,10 @@ async function obtenerSedesPermitidas(req) {
   const sedes = agregarTallerParaMecanico(user, [user.sede, ...extras.map(e => e.sede)]);
 
   if (req.session.sedeSeleccionada && sedes.includes(req.session.sedeSeleccionada)) {
-    return [req.session.sedeSeleccionada];
+    return expandirSedesEquivalentes(req.session.sedeSeleccionada);
   }
 
-  return sedes;
+  return expandirSedesEquivalentes(sedes);
 }
 
 async function registrarHistorial(solicitudId, estadoAnterior, estadoNuevo, usuarioId, comentario = null) {
@@ -179,7 +200,7 @@ function construirFiltrosSolicitudes(sedesPermitidas, filtros = {}) {
   const params = [];
   const ids = normalizarIds(filtros.ids);
   const sedesSeleccionadas = Array.isArray(filtros.sedes)
-    ? filtros.sedes.filter(sede => sedesPermitidas.includes(sede))
+    ? expandirSedesEquivalentes(filtros.sedes.filter(sede => sedesPermitidas.includes(sede)))
     : [];
 
   if (ids.length) {
@@ -194,8 +215,8 @@ function construirFiltrosSolicitudes(sedesPermitidas, filtros = {}) {
     condiciones.push("s.sede IN (?)");
     params.push(sedesSeleccionadas);
   } else if (filtros.sede && sedesPermitidas.includes(filtros.sede)) {
-    condiciones.push("s.sede = ?");
-    params.push(filtros.sede);
+    condiciones.push("s.sede IN (?)");
+    params.push(expandirSedesEquivalentes(filtros.sede));
   }
   if (filtros.estado && ESTADOS.includes(filtros.estado)) {
     condiciones.push("s.estado = ?");
@@ -221,7 +242,8 @@ function nombreCedi(sede) {
 }
 
 function destinoEntrega(sede) {
-  return ["Alajuela", "San Carlos", "Rio Claro"].includes(sede) ? "ALAJUELA" : "CARTAGO";
+  const sedeNormalizada = String(sede || "").trim().toLowerCase().replace(/\s+/g, "_");
+  return ["alajuela", "san_carlos", "orotina", "granel_alajuela"].includes(sedeNormalizada) ? "ALAJUELA" : "CARTAGO";
 }
 
 function descripcionLlanta(solicitud) {
@@ -253,6 +275,7 @@ function prepararCotizacion(solicitudes) {
     "Tecnicos",
     "Taller",
     "Nicoya",
+    "Orotina",
     "Alajuela",
     "San Carlos",
     "Rio Claro"
@@ -295,14 +318,167 @@ function prepararCotizacion(solicitudes) {
   };
 }
 
-function opcionesPdf() {
-  fs.mkdirSync(PDF_TMP_DIR, { recursive: true });
+function pdfStreamToBuffer(pdfDoc) {
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    pdfDoc.on("data", chunk => chunks.push(chunk));
+    pdfDoc.on("end", () => resolve(Buffer.concat(chunks)));
+    pdfDoc.on("error", reject);
+    pdfDoc.end();
+  });
+}
+
+function crearCeldasEncabezado(texto) {
   return {
-    format: "Letter",
-    orientation: "portrait",
-    border: "8mm",
-    directory: PDF_TMP_DIR
+    text: texto,
+    bold: true,
+    color: "#ffffff",
+    alignment: "center",
+    fillColor: "#244573",
+    margin: [4, 3, 4, 3]
   };
+}
+
+function contarFilasCedi(filas, indice) {
+  const cedi = filas[indice].cedi;
+  let total = 0;
+  for (let i = indice; i < filas.length && filas[i].cedi === cedi; i += 1) {
+    total += 1;
+  }
+  return total;
+}
+
+function crearTablaCotizacion(cotizacion) {
+  const body = [[
+    crearCeldasEncabezado("CEDI"),
+    crearCeldasEncabezado("Entregar"),
+    crearCeldasEncabezado("Placa"),
+    crearCeldasEncabezado("Cantidad"),
+    crearCeldasEncabezado("Descripción")
+  ]];
+
+  if (!cotizacion.grupos.length) {
+    body.push([
+      { text: "No hay solicitudes para descargar.", colSpan: 5, alignment: "center", margin: [0, 18, 0, 18] },
+      {},
+      {},
+      {},
+      {}
+    ]);
+  }
+
+  cotizacion.grupos.forEach(grupo => {
+    grupo.filas.forEach((fila, indice) => {
+      const primeraFilaEntrega = indice === 0;
+      const primeraFilaCedi = indice === 0 || grupo.filas[indice - 1].cedi !== fila.cedi;
+      const descripcion = fila.descripcion || fila.motivo || "Llanta solicitada";
+      const entregar = grupo.entregar || fila.entregar || "";
+
+      const row = [];
+      if (primeraFilaCedi) {
+        row.push({
+          text: fila.cedi || "",
+          rowSpan: contarFilasCedi(grupo.filas, indice),
+          alignment: "center",
+          margin: [0, 8, 0, 0]
+        });
+      } else {
+        row.push({});
+      }
+
+      if (primeraFilaEntrega) {
+        row.push({
+          text: entregar,
+          rowSpan: grupo.filas.length,
+          bold: true,
+          alignment: "center",
+          fillColor: entregar === "ALAJUELA" ? "#f8cbad" : "#fff59d",
+          margin: [0, Math.max(8, Math.min(30, grupo.filas.length * 4)), 0, 0]
+        });
+      } else {
+        row.push({});
+      }
+
+      row.push(
+        { text: fila.placa || "", bold: true, alignment: "center", margin: [2, 3, 2, 3] },
+        { text: String(fila.cantidad || ""), alignment: "center", margin: [2, 3, 2, 3] },
+        { text: descripcion, margin: [4, 3, 4, 3] }
+      );
+      body.push(row);
+    });
+  });
+
+  body.push([
+    { text: "", border: [false, false, false, false], colSpan: 2 },
+    {},
+    { text: "Total de unidades", bold: true, alignment: "right", fillColor: "#d9eaf7", margin: [4, 4, 4, 4] },
+    { text: String(cotizacion.totalUnidades || 0), bold: true, alignment: "center", fillColor: "#d9eaf7", margin: [4, 4, 4, 4] },
+    { text: "", border: [false, false, false, false] }
+  ]);
+
+  return {
+    table: {
+      headerRows: 1,
+      widths: [72, 86, 82, 62, "*"],
+      body
+    },
+    layout: {
+      hLineColor: () => "#1f2937",
+      vLineColor: () => "#1f2937",
+      hLineWidth: () => 0.7,
+      vLineWidth: () => 0.7,
+      paddingLeft: () => 0,
+      paddingRight: () => 0,
+      paddingTop: () => 0,
+      paddingBottom: () => 0
+    }
+  };
+}
+
+function generarPdfCotizacionLlantas(cotizacion, opciones = {}) {
+  const logoPath = path.join(process.cwd(), "public", "img", "logo_tomza.jpg");
+  const fechaGeneracion = opciones.fechaGeneracion || new Date().toLocaleDateString("es-CR");
+  const docDefinition = {
+    pageSize: "LETTER",
+    pageMargins: [28, 24, 28, 28],
+    defaultStyle: { font: "Helvetica", fontSize: 10, color: "#111827" },
+    content: [
+      {
+        table: {
+          widths: ["*"],
+          body: [[{ text: "Gas Tomza de Costa Rica S.A", bold: true, color: "#ffffff", alignment: "center", fontSize: 13, margin: [0, 3, 0, 3] }]]
+        },
+        layout: {
+          fillColor: () => "#244573",
+          hLineColor: () => "#111827",
+          vLineColor: () => "#111827"
+        }
+      },
+      {
+        columns: [
+          { image: logoPath, fit: [170, 70], margin: [0, 8, 0, 2] },
+          { text: fechaGeneracion, alignment: "right", bold: true, margin: [0, 22, 4, 0] }
+        ]
+      },
+      {
+        text: "La lima, Cartago\n3-101-349880\nTelefono: 2201-6000",
+        alignment: "center",
+        margin: [0, 0, 0, 0]
+      },
+      {
+        text: "facelectronica@tomza.com     efernandez.m@tomza.com",
+        alignment: "center",
+        color: "#0563c1",
+        decoration: "underline",
+        fontSize: 8,
+        margin: [0, 0, 0, 3]
+      },
+      crearTablaCotizacion(cotizacion)
+    ]
+  };
+
+  const pdfDoc = printer.createPdfKitDocument(docDefinition);
+  return pdfStreamToBuffer(pdfDoc);
 }
 
 router.use(requireAuth);
@@ -385,23 +561,14 @@ router.get("/cotizacion.pdf", allowRoles(...ROLES_VER_COTIZACION), async (req, r
       ORDER BY s.sede, s.placa, s.fecha_solicitud DESC
     `, params);
 
-    const templatePath = path.join(__dirname, "../views/llantas/cotizacion_pdf.ejs");
-    const html = await ejs.renderFile(templatePath, {
-      ...prepararCotizacion(solicitudes),
-      logoPath: path.join(__dirname, "../../public/img/logo_tomza.jpg").replace(/\\/g, "/"),
+    const buffer = await generarPdfCotizacionLlantas(prepararCotizacion(solicitudes), {
       fechaGeneracion: new Date().toLocaleDateString("es-CR"),
       titulo: "Cotización de llantas"
     });
 
-    pdf.create(html, opcionesPdf()).toBuffer((err, buffer) => {
-      if (err) {
-        console.error("Error generando cotización de llantas:", err);
-        return res.status(500).send("Error generando PDF");
-      }
-      res.setHeader("Content-Type", "application/pdf");
-      res.setHeader("Content-Disposition", "attachment; filename=cotizacion_llantas.pdf");
-      res.send(buffer);
-    });
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", "attachment; filename=cotizacion_llantas.pdf");
+    res.send(buffer);
   } catch (error) {
     console.error("Error generando PDF de cotización:", error);
     res.status(500).send("Error generando PDF");
@@ -687,23 +854,14 @@ router.get("/:id/cotizacion.pdf", allowRoles(...ROLES_VER_COTIZACION), async (re
     const sedesPermitidas = await obtenerSedesPermitidas(req);
     if (!sedesPermitidas.includes(solicitud.sede)) return res.status(403).send("No autorizado para esta sede");
 
-    const templatePath = path.join(__dirname, "../views/llantas/cotizacion_pdf.ejs");
-    const html = await ejs.renderFile(templatePath, {
-      ...prepararCotizacion([solicitud]),
-      logoPath: path.join(__dirname, "../../public/img/logo_tomza.jpg").replace(/\\/g, "/"),
+    const buffer = await generarPdfCotizacionLlantas(prepararCotizacion([solicitud]), {
       fechaGeneracion: new Date().toLocaleDateString("es-CR"),
       titulo: `Cotización de llanta ${solicitud.placa}`
     });
 
-    pdf.create(html, opcionesPdf()).toBuffer((err, buffer) => {
-      if (err) {
-        console.error("Error generando cotización de llanta:", err);
-        return res.status(500).send("Error generando PDF");
-      }
-      res.setHeader("Content-Type", "application/pdf");
-      res.setHeader("Content-Disposition", `attachment; filename=cotizacion_llanta_${solicitud.placa}_${solicitud.id}.pdf`);
-      res.send(buffer);
-    });
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename=cotizacion_llanta_${solicitud.placa}_${solicitud.id}.pdf`);
+    res.send(buffer);
   } catch (error) {
     console.error("Error generando PDF de cotización:", error);
     res.status(500).send("Error generando PDF");

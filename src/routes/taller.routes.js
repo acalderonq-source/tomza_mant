@@ -10,6 +10,7 @@ const {
   SEDES_TRANSPORTE,
   esSedeTransporte,
   esUsuarioTodasSedes,
+  expandirSedesEquivalentes,
   obtenerSedesTransporte,
   sedeGranelDesdeUsuario
 } = require("../utils/sedes");
@@ -25,7 +26,6 @@ router.use(requireAuth);
 const ROLES_VER_TALLER = ["ADMIN", "TALLER", "MECANICO", "SUPERVISOR", "SUPERVISOR_PESADO"];
 const ROLES_GESTION_TALLER = ["ADMIN", "TALLER", "MECANICO"];
 const ROLES_PRIORIDADES_TALLER = ["ADMIN", "TALLER", "SUPERVISOR_PESADO"];
-const SEDES_TRANSPORTE_AGRUPADAS = ["Transportadora", "Granel"];
 const SQL_SEDE_TRANSPORTE_EXPR = "UPPER(TRIM(COALESCE(NULLIF(tp.sede, ''), un.sede, '')))";
 const SQL_ES_SEDE_TRANSPORTE = `(${SQL_SEDE_TRANSPORTE_EXPR} IN ('TRANSPORTADORA', 'GRANEL', 'GRANEL_CARTAGO', 'CABEZALES', 'CISTERNAS', 'CARRETAS', 'TANDEM', 'TÁNDEM', 'TAMDEN') OR ${SQL_SEDE_TRANSPORTE_EXPR} LIKE 'GRANEL_%')`;
 
@@ -128,6 +128,14 @@ async function ensurePrioridadesTallerTable() {
     await pool.query("ALTER TABLE taller_prioridades ADD COLUMN fecha_prioridad DATE NULL AFTER sede");
     await pool.query("UPDATE taller_prioridades SET fecha_prioridad = DATE(creado_en) WHERE fecha_prioridad IS NULL");
   }
+
+  if (!(await columnExists("taller_prioridades", "atendido_por"))) {
+    await pool.query("ALTER TABLE taller_prioridades ADD COLUMN atendido_por INT NULL AFTER creado_en");
+  }
+
+  if (!(await columnExists("taller_prioridades", "atendido_en"))) {
+    await pool.query("ALTER TABLE taller_prioridades ADD COLUMN atendido_en DATETIME NULL AFTER atendido_por");
+  }
 }
 
 async function obtenerSedesPermitidas(req) {
@@ -181,12 +189,7 @@ async function obtenerSedesPermitidas(req) {
 }
 
 function expandirSedesTransporte(sedes) {
-  if (!Array.isArray(sedes) || sedes.length === 0) return sedes;
-  const set = new Set(sedes.filter(Boolean));
-  if (sedes.some(sede => SEDES_TRANSPORTE_AGRUPADAS.includes(sede))) {
-    SEDES_TRANSPORTE.forEach(sede => set.add(sede));
-  }
-  return [...set];
+  return expandirSedesEquivalentes(sedes);
 }
 
 function aplicarFiltroSedes(sql, params, sedesPermitidas, alias = "u") {
@@ -214,6 +217,34 @@ function dividirTrabajos(value) {
     .split(/\s*\|\s*|\n+/)
     .map(texto => texto.trim())
     .filter(Boolean);
+}
+
+function fechaSqlDesdeValor(value) {
+  if (!value) return null;
+  const texto = String(value);
+  if (/^\d{4}-\d{2}-\d{2}/.test(texto)) return texto.slice(0, 10);
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString().slice(0, 10);
+}
+
+function fechaHoraFinDia(value) {
+  const fecha = fechaSqlDesdeValor(value);
+  return fecha ? `${fecha} 23:59:59` : null;
+}
+
+function fechaHoraInicioDia(value) {
+  const fecha = fechaSqlDesdeValor(value);
+  return fecha ? `${fecha} 00:00:00` : null;
+}
+
+function calcularDiasTaller(inicio, fin) {
+  const inicioSql = fechaSqlDesdeValor(inicio);
+  const finSql = fechaSqlDesdeValor(fin) || fechaCostaRica();
+  if (!inicioSql || !finSql) return 1;
+  const inicioDate = new Date(`${inicioSql}T00:00:00`);
+  const finDate = new Date(`${finSql}T00:00:00`);
+  if (Number.isNaN(inicioDate.getTime()) || Number.isNaN(finDate.getTime())) return 1;
+  return Math.max(1, Math.floor((finDate - inicioDate) / 86400000) + 1);
 }
 
 function unirTextoUnico(actual, nuevo, separador = " / ") {
@@ -367,6 +398,179 @@ async function obtenerUltimosTrabajosAgrupados(sedesPermitidas) {
   return agruparTrabajosPorPlaca(rows, 2);
 }
 
+async function obtenerDetalleHistorialPrioridad(prioridad) {
+  const placas = variantesPlaca(prioridad.placa);
+  const inicio = fechaHoraInicioDia(prioridad.fecha_entrada || prioridad.creado_en);
+  const fin = fechaHoraFinDia(prioridad.fecha_salida || prioridad.atendido_en);
+
+  if (!placas.length || !inicio || !fin) {
+    return { mantenimientos: [], repuestos: [] };
+  }
+
+  const [mantenimientos] = await pool.query(
+    `
+    SELECT *
+    FROM (
+      SELECT
+        CONCAT('C-', c.id) AS numero,
+        'CORRECTIVO' AS tipo,
+        c.fecha AS fecha,
+        DATE_FORMAT(c.fecha, '%d/%m/%Y') AS fecha_formato,
+        u.placa,
+        u.sede,
+        c.trabajo_realizado AS detalle,
+        c.pendiente,
+        COALESCE(GROUP_CONCAT(DISTINCT me.nombre ORDER BY me.nombre SEPARATOR ', '), 'Sin asignar') AS mecanicos
+      FROM correctivos c
+      JOIN unidades u ON u.id = c.unidad_id
+      LEFT JOIN correctivo_trabajos ct ON ct.correctivo_id = c.id
+      LEFT JOIN mecanicos me ON me.id = ct.mecanico_id
+      WHERE ${expresionPlacaSql("u.placa")} IN (?)
+        AND c.fecha BETWEEN ? AND ?
+      GROUP BY c.id, c.fecha, u.placa, u.sede, c.trabajo_realizado, c.pendiente
+
+      UNION ALL
+
+      SELECT
+        COALESCE(m.numero_mantenimiento, CONCAT('M-', m.id)) AS numero,
+        m.tipo AS tipo,
+        COALESCE(m.fecha_cierre, m.fecha_programada) AS fecha,
+        DATE_FORMAT(COALESCE(m.fecha_cierre, m.fecha_programada), '%d/%m/%Y') AS fecha_formato,
+        u.placa,
+        u.sede,
+        COALESCE(m.ejecucion, m.plan) AS detalle,
+        m.pendiente,
+        COALESCE(GROUP_CONCAT(DISTINCT me.nombre ORDER BY me.nombre SEPARATOR ', '), 'Sin asignar') AS mecanicos
+      FROM mantenimientos m
+      JOIN unidades u ON u.id = m.unidad_id
+      LEFT JOIN mantenimiento_mecanicos mm ON mm.mantenimiento_id = m.id
+      LEFT JOIN mecanicos me ON me.id = mm.mecanico_id
+      WHERE ${expresionPlacaSql("u.placa")} IN (?)
+        AND COALESCE(m.fecha_cierre, m.fecha_programada) BETWEEN ? AND ?
+      GROUP BY m.id, m.numero_mantenimiento, m.tipo, m.fecha_cierre, m.fecha_programada, u.placa, u.sede, m.ejecucion, m.plan, m.pendiente
+    ) movimientos
+    ORDER BY fecha DESC, numero DESC
+    `,
+    [placas, inicio, fin, placas, inicio, fin]
+  );
+
+  const [repuestos] = await pool.query(
+    `SELECT
+       id,
+       fecha_solicitud,
+       DATE_FORMAT(fecha_solicitud, '%d/%m/%Y') AS fecha_formato,
+       placa,
+       sede,
+       repuesto_solicitado,
+       cantidad,
+       prioridad,
+       estado,
+       proveedor
+     FROM solicitudes_repuestos
+     WHERE ${expresionPlacaSql("placa")} IN (?)
+       AND fecha_solicitud BETWEEN ? AND ?
+     ORDER BY fecha_solicitud DESC, id DESC`,
+    [placas, inicio, fin]
+  );
+
+  return { mantenimientos, repuestos };
+}
+
+router.get("/prioridades-historial", async (req, res) => {
+  try {
+    if (!puedeVerTaller(req.session.user)) {
+      return res.status(403).send("No autorizado");
+    }
+
+    await ensurePrioridadesTallerTable();
+    await ensureRepuestosSolicitudesTable(pool);
+
+    const sedesPermitidas = expandirSedesTransporte(await obtenerSedesPermitidas(req));
+    const placaFiltro = String(req.query.placa || "").trim();
+    const fechaDesde = String(req.query.fecha_desde || "").trim();
+    const fechaHasta = String(req.query.fecha_hasta || "").trim();
+    const condiciones = ["tp.estado = 'ATENDIDA'"];
+    const params = [];
+
+    if (sedesPermitidas.length > 0) {
+      condiciones.push("COALESCE(NULLIF(tp.sede, ''), un.sede) IN (?)");
+      params.push(sedesPermitidas);
+    }
+
+    if (placaFiltro) {
+      const condicionesPlaca = [];
+      agregarFiltroPlacaSql(condicionesPlaca, params, "tp.placa", placaFiltro);
+      if (condicionesPlaca.length) condiciones.push(condicionesPlaca[0]);
+    }
+
+    if (fechaDesde) {
+      condiciones.push("DATE(tp.atendido_en) >= ?");
+      params.push(fechaDesde);
+    }
+
+    if (fechaHasta) {
+      condiciones.push("DATE(tp.atendido_en) <= ?");
+      params.push(fechaHasta);
+    }
+
+    const [rows] = await pool.query(
+      `SELECT
+         tp.id,
+         tp.placa,
+         COALESCE(NULLIF(tp.sede, ''), un.sede) AS sede,
+         tp.observacion,
+         tp.creado_en,
+         DATE_FORMAT(tp.creado_en, '%d/%m/%Y %H:%i') AS creado_formato,
+         COALESCE(tp.fecha_prioridad, DATE(tp.creado_en)) AS fecha_entrada,
+         DATE_FORMAT(COALESCE(tp.fecha_prioridad, DATE(tp.creado_en)), '%d/%m/%Y') AS entrada_formato,
+         tp.atendido_en,
+         DATE(tp.atendido_en) AS fecha_salida,
+         DATE_FORMAT(tp.atendido_en, '%d/%m/%Y %H:%i') AS salida_formato,
+         uc.usuario AS creado_por_nombre,
+         ua.usuario AS atendido_por_nombre
+       FROM taller_prioridades tp
+       LEFT JOIN unidades un ON ${expresionPlacaSql("un.placa")} = ${expresionPlacaSql("tp.placa")}
+       LEFT JOIN usuarios uc ON uc.id = tp.creado_por
+       LEFT JOIN usuarios ua ON ua.id = tp.atendido_por
+       WHERE ${condiciones.join(" AND ")}
+       ORDER BY tp.atendido_en DESC, tp.id DESC
+       LIMIT 80`,
+      params
+    );
+
+    const historiales = [];
+    for (const row of rows) {
+      const detalle = await obtenerDetalleHistorialPrioridad(row);
+      historiales.push({
+        ...row,
+        dias_taller: calcularDiasTaller(row.fecha_entrada || row.creado_en, row.fecha_salida || row.atendido_en),
+        mantenimientos: detalle.mantenimientos,
+        repuestos: detalle.repuestos
+      });
+    }
+
+    const resumen = historiales.reduce((acc, item) => {
+      acc.salidas += 1;
+      acc.dias += Number(item.dias_taller || 0);
+      acc.mantenimientos += item.mantenimientos.length;
+      acc.repuestos += item.repuestos.length;
+      return acc;
+    }, { salidas: 0, dias: 0, mantenimientos: 0, repuestos: 0 });
+
+    res.render("taller_prioridades_historial", {
+      user: req.session.user,
+      historiales,
+      resumen,
+      filtros: { placa: placaFiltro, fecha_desde: fechaDesde, fecha_hasta: fechaHasta },
+      sedeSeleccionada: sedesPermitidas.length ? "Sedes permitidas" : "TODAS",
+      etiquetaEstadoRepuesto
+    });
+  } catch (error) {
+    console.error("ERROR historial prioridades taller:", error);
+    res.status(500).send("Error cargando historial de prioridades");
+  }
+});
+
 router.get("/dashboard", async (req, res) => {
   try {
     if (!puedeVerTaller(req.session.user)) {
@@ -450,6 +654,8 @@ router.get("/dashboard", async (req, res) => {
           ELSE 'MECANICO'
         END AS grupo_prioridad,
         COALESCE(tp.fecha_prioridad, DATE(tp.creado_en)) AS fecha_prioridad,
+        DATE_FORMAT(COALESCE(tp.fecha_prioridad, DATE(tp.creado_en)), '%d/%m/%Y') AS fecha_prioridad_formato,
+        DATEDIFF(?, COALESCE(tp.fecha_prioridad, DATE(tp.creado_en))) + 1 AS dias_pendiente,
         tp.observacion,
         tp.estado,
         tp.creado_en,
@@ -458,9 +664,9 @@ router.get("/dashboard", async (req, res) => {
       LEFT JOIN usuarios usr ON usr.id = tp.creado_por
       LEFT JOIN unidades un ON UPPER(TRIM(un.placa)) = UPPER(TRIM(tp.placa))
       WHERE tp.estado = 'PENDIENTE'
-        AND COALESCE(tp.fecha_prioridad, DATE(tp.creado_en)) = ?
+        AND COALESCE(tp.fecha_prioridad, DATE(tp.creado_en)) <= ?
     `;
-    let prioridadesParams = [fechaPrioridadHoy];
+    let prioridadesParams = [fechaPrioridadHoy, fechaPrioridadHoy];
     if (sedesPermitidas.length > 0 && !esUsuarioPesados(req.session.user)) {
       prioridadesSql += " AND (UPPER(TRIM(COALESCE(NULLIF(tp.sede, ''), un.sede))) IN (?) OR tp.sede IS NULL OR tp.sede = '')";
       prioridadesParams.push(sedesPermitidas.map(sede => String(sede).trim().toUpperCase()));
@@ -474,12 +680,13 @@ router.get("/dashboard", async (req, res) => {
             THEN 0
             ELSE 1
           END,
+          COALESCE(tp.fecha_prioridad, DATE(tp.creado_en)) ASC,
           tp.creado_en DESC,
           tp.id DESC
         LIMIT 20
       `;
     } else {
-      prioridadesSql += " ORDER BY tp.creado_en DESC, tp.id DESC LIMIT 20";
+      prioridadesSql += " ORDER BY COALESCE(tp.fecha_prioridad, DATE(tp.creado_en)) ASC, tp.creado_en DESC, tp.id DESC LIMIT 20";
     }
     const [prioridadesTodas] = await pool.query(prioridadesSql, prioridadesParams);
     const prioridadesPesadosTodas = prioridadesTodas.filter(p =>
@@ -641,6 +848,157 @@ router.post("/prioridades", async (req, res) => {
   }
 });
 
+router.post("/prioridades/:id", async (req, res) => {
+  try {
+    if (!puedeGestionarPrioridades(req.session.user)) {
+      return res.status(403).send("No autorizado");
+    }
+
+    await ensurePrioridadesTallerTable();
+    const id = Number(req.params.id);
+    const placa = normalizarPlaca(req.body.placa);
+    const observacion = String(req.body.observacion || "").trim();
+    const fechaPrioridad = /^\d{4}-\d{2}-\d{2}$/.test(String(req.body.fecha_prioridad || ""))
+      ? req.body.fecha_prioridad
+      : fechaCostaRica(0);
+    const sedesPermitidas = expandirSedesTransporte(await obtenerSedesPermitidas(req));
+
+    if (!Number.isInteger(id) || !placa || !observacion) {
+      req.session.error = "Debe indicar placa y observación para actualizar la prioridad.";
+      return res.redirect("/taller/dashboard");
+    }
+
+    const [[prioridadActual]] = await pool.query(
+      `SELECT
+         tp.id,
+         tp.placa AS placa_actual,
+         tp.sede AS sede_guardada,
+         tp.observacion AS observacion_actual,
+         COALESCE(NULLIF(tp.sede, ''), un.sede) AS sede,
+         usr.usuario AS creado_por_nombre
+       FROM taller_prioridades tp
+       LEFT JOIN usuarios usr ON usr.id = tp.creado_por
+       LEFT JOIN unidades un ON UPPER(TRIM(un.placa)) = UPPER(TRIM(tp.placa))
+       WHERE tp.id = ?
+         AND tp.estado = 'PENDIENTE'
+       LIMIT 1`,
+      [id]
+    );
+
+    if (!prioridadActual) {
+      req.session.error = "No se encontró la prioridad pendiente.";
+      return res.redirect("/taller/dashboard");
+    }
+
+    if (esUsuarioPesados(req.session.user) && !esPrioridadPesados(prioridadActual)) {
+      req.session.error = "El usuario de Pesados solo puede editar prioridades de Granel o Transportadora.";
+      return res.redirect("/taller/dashboard");
+    }
+
+    if (esUsuarioMecanico(req.session.user) && esPrioridadPesados(prioridadActual)) {
+      req.session.error = "El usuario mecánico solo puede editar prioridades de taller/Cartago.";
+      return res.redirect("/taller/dashboard");
+    }
+
+    if (
+      sedesPermitidas.length > 0 &&
+      prioridadActual.sede &&
+      !sedesPermitidas
+        .map(sede => String(sede).trim().toUpperCase())
+        .includes(String(prioridadActual.sede).trim().toUpperCase())
+    ) {
+      req.session.error = "No tiene permiso para editar prioridades de esta sede.";
+      return res.redirect("/taller/dashboard");
+    }
+
+    const [[unidadNueva]] = await pool.query(
+      `SELECT id, sede FROM unidades WHERE ${expresionPlacaSql("placa")} IN (?) LIMIT 1`,
+      [variantesPlaca(placa)]
+    );
+
+    let sedeAsignada = unidadNueva?.sede || prioridadActual.sede_guardada || prioridadActual.sede || null;
+
+    if (!unidadNueva?.sede && sedesPermitidas.length === 1) {
+      sedeAsignada = sedesPermitidas[0];
+    }
+
+    if (!unidadNueva?.sede && esUsuarioPesados(req.session.user)) {
+      sedeAsignada = esSedeTransporte(req.session.sedeSeleccionada)
+        ? req.session.sedeSeleccionada
+        : (esSedeTransporte(sedeAsignada) ? sedeAsignada : "Transportadora");
+    }
+
+    if (esUsuarioPesados(req.session.user) && !esSedeTransporte(sedeAsignada)) {
+      req.session.error = "El usuario de Pesados solo puede dejar prioridades en Granel o Transportadora.";
+      return res.redirect("/taller/dashboard");
+    }
+
+    if (esUsuarioMecanico(req.session.user) && esSedeTransporte(sedeAsignada)) {
+      req.session.error = "El usuario mecánico solo puede dejar prioridades de taller/Cartago.";
+      return res.redirect("/taller/dashboard");
+    }
+
+    if (
+      sedesPermitidas.length > 0 &&
+      sedeAsignada &&
+      !sedesPermitidas
+        .map(sede => String(sede).trim().toUpperCase())
+        .includes(String(sedeAsignada).trim().toUpperCase())
+    ) {
+      req.session.error = "No tiene permiso para mover la prioridad a esa sede.";
+      return res.redirect("/taller/dashboard");
+    }
+
+    const [result] = await pool.query(
+      `UPDATE taller_prioridades
+       SET placa = ?,
+           sede = ?,
+           fecha_prioridad = ?,
+           observacion = ?
+       WHERE id = ?
+         AND estado = 'PENDIENTE'`,
+      [placa, sedeAsignada, fechaPrioridad, observacion, id]
+    );
+
+    req.session[result.affectedRows ? "success" : "error"] = result.affectedRows
+      ? "Prioridad actualizada correctamente."
+      : "No se encontró la prioridad o ya fue cerrada.";
+
+    if (result.affectedRows) {
+      try {
+        await pool.query(
+          `UPDATE logistica_taller
+           SET placa = ?,
+               unidad_id = ?,
+               sede = ?,
+               detalle_malo = CASE
+                 WHEN detalle_malo IS NULL OR TRIM(detalle_malo) = '' OR detalle_malo = ? THEN ?
+                 ELSE detalle_malo
+               END
+           WHERE prioridad_id = ?`,
+          [
+            placa,
+            unidadNueva?.id || null,
+            sedeAsignada,
+            prioridadActual.observacion_actual || "",
+            observacion,
+            id
+          ]
+        );
+      } catch (syncError) {
+        if (syncError.code !== "ER_NO_SUCH_TABLE") {
+          console.warn("No se pudo sincronizar prioridad con logística taller:", syncError.message);
+        }
+      }
+    }
+    res.redirect("/taller/dashboard");
+  } catch (error) {
+    console.error("ERROR actualizando prioridad taller:", error);
+    req.session.error = "Error interno al actualizar la prioridad.";
+    res.redirect("/taller/dashboard");
+  }
+});
+
 router.post("/prioridades/:id/atendida", async (req, res) => {
   try {
     if (!puedeGestionarPrioridades(req.session.user)) {
@@ -707,7 +1065,7 @@ router.post("/prioridades/:id/atendida", async (req, res) => {
     );
 
     req.session[result.affectedRows ? "success" : "error"] = result.affectedRows
-      ? "Prioridad marcada como atendida."
+      ? "Unidad marcada como salida de taller. El registro quedó en historial."
       : "No se encontró la prioridad o no tiene permiso para atenderla.";
     res.redirect("/taller/dashboard");
   } catch (error) {

@@ -348,6 +348,12 @@
     .priority-card .btn {
       min-width: 30px;
     }
+    .priority-actions {
+      align-items: center;
+      display: flex;
+      gap: .25rem;
+      justify-content: flex-end;
+    }
     .priority-modal .modal-content {
       border: 0;
       border-radius: 14px;
@@ -500,6 +506,19 @@
     const date = new Date(value);
     return Number.isNaN(date.getTime()) ? '—' : date.toLocaleDateString('es-CR');
   };
+  const fechaInput = value => {
+    if (!value) return fechaPrioridadModal;
+    if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}/.test(value)) return value.slice(0, 10);
+    const date = new Date(value);
+    return Number.isNaN(date.getTime())
+      ? fechaPrioridadModal
+      : new Intl.DateTimeFormat('en-CA', {
+          timeZone: 'America/Costa_Rica',
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit'
+        }).format(date);
+  };
   const fechaHora = value => {
     if (!value) return '—';
     const date = new Date(value);
@@ -542,6 +561,7 @@
         <% if (puedeAccionar) { %>
           <a href="/mantenimientos/correctivos/nuevo" class="btn btn-danger btn-sm"><i class="bi bi-plus-circle"></i> Registrar trabajo</a>
         <% } %>
+        <a href="/taller/prioridades-historial" class="btn btn-outline-success btn-sm"><i class="bi bi-clock-history"></i> Historial de salidas</a>
         <a href="/unidades?varado=1" class="btn btn-outline-dark btn-sm"><i class="bi bi-truck-front"></i> Ver unidades</a>
         <a href="/dashboard" class="btn btn-outline-primary btn-sm"><i class="bi bi-house"></i> Inicio</a>
       </div>
@@ -582,9 +602,12 @@
   <section class="dashboard-layout">
       <section class="panel priority-panel">
         <div class="tv-panel-title priority-title d-flex justify-content-between align-items-center gap-2 flex-wrap">
-          <span><i class="bi bi-exclamation-octagon me-1"></i> Prioridades</span>
+          <span><i class="bi bi-exclamation-octagon me-1"></i> Prioridades activas</span>
           <div class="d-flex align-items-center gap-2 flex-wrap">
-            <span class="badge text-bg-light text-dark"><%= fechaPrioridadActual || 'Hoy' %> · <%= prioridadesVisiblesLista.length %></span>
+            <span class="badge text-bg-light text-dark">Pendientes hasta <%= fechaPrioridadActual || 'hoy' %> · <%= prioridadesVisiblesLista.length %></span>
+            <a href="/taller/prioridades-historial" class="btn btn-sm btn-outline-light fw-bold py-0">
+              <i class="bi bi-clock-history"></i> Historial
+            </a>
             <% if (puedeEditarPrioridades) { %>
               <button type="button" class="btn btn-sm btn-light fw-bold py-0" data-bs-toggle="modal" data-bs-target="#agregarPrioridadModal">
                 <i class="bi bi-plus-circle"></i> Agregar
@@ -615,14 +638,28 @@
                         </div>
                         <div>
                           <div class="priority-note"><%= p.observacion %></div>
-                          <div class="muted priority-meta"><%= p.creado_por_nombre || 'Taller' %> · <%= fechaCorta(p.creado_en) %></div>
+                          <div class="muted priority-meta">
+                            Desde <%= p.fecha_prioridad_formato || fechaCorta(p.fecha_prioridad) || fechaCorta(p.creado_en) %>
+                            · <%= Number(p.dias_pendiente || 1).toLocaleString('es-CR') %> día(s)
+                            · <%= p.creado_por_nombre || 'Taller' %>
+                          </div>
                         </div>
                         <% if (puedeEditarPrioridades) { %>
-                          <form method="POST" action="/taller/prioridades/<%= p.id %>/atendida">
-                            <button class="btn btn-sm btn-success py-0 px-2" onclick="return confirm('¿Marcar esta prioridad como atendida?')">
-                              <i class="bi bi-check"></i>
+                          <div class="priority-actions">
+                            <button
+                              type="button"
+                              class="btn btn-sm btn-outline-primary py-0 px-2"
+                              title="Editar prioridad"
+                              data-bs-toggle="modal"
+                              data-bs-target="#editarPrioridadModal<%= p.id %>">
+                              <i class="bi bi-pencil"></i>
                             </button>
-                          </form>
+                            <form method="POST" action="/taller/prioridades/<%= p.id %>/atendida">
+                              <button class="btn btn-sm btn-success py-0 px-2" title="Marcar salida de taller" onclick="return confirm('¿Marcar que esta unidad ya salió de taller?')">
+                                <i class="bi bi-check"></i>
+                              </button>
+                            </form>
+                          </div>
                         <% } %>
                       </article>
                     <% }) %>
@@ -649,14 +686,28 @@
                         </div>
                         <div>
                           <div class="priority-note"><%= p.observacion %></div>
-                          <div class="muted priority-meta"><%= p.creado_por_nombre || 'Taller' %> · <%= fechaCorta(p.creado_en) %></div>
+                          <div class="muted priority-meta">
+                            Desde <%= p.fecha_prioridad_formato || fechaCorta(p.fecha_prioridad) || fechaCorta(p.creado_en) %>
+                            · <%= Number(p.dias_pendiente || 1).toLocaleString('es-CR') %> día(s)
+                            · <%= p.creado_por_nombre || 'Taller' %>
+                          </div>
                         </div>
                         <% if (puedeEditarPrioridades) { %>
-                          <form method="POST" action="/taller/prioridades/<%= p.id %>/atendida">
-                            <button class="btn btn-sm btn-success py-0 px-2" onclick="return confirm('¿Marcar esta prioridad como atendida?')">
-                              <i class="bi bi-check"></i>
+                          <div class="priority-actions">
+                            <button
+                              type="button"
+                              class="btn btn-sm btn-outline-primary py-0 px-2"
+                              title="Editar prioridad"
+                              data-bs-toggle="modal"
+                              data-bs-target="#editarPrioridadModal<%= p.id %>">
+                              <i class="bi bi-pencil"></i>
                             </button>
-                          </form>
+                            <form method="POST" action="/taller/prioridades/<%= p.id %>/atendida">
+                              <button class="btn btn-sm btn-success py-0 px-2" title="Marcar salida de taller" onclick="return confirm('¿Marcar que esta unidad ya salió de taller?')">
+                                <i class="bi bi-check"></i>
+                              </button>
+                            </form>
+                          </div>
                         <% } %>
                       </article>
                     <% }) %>
@@ -711,6 +762,11 @@
 </main>
 
 <% if (puedeEditarPrioridades) { %>
+  <%
+    const prioridadesEdicion = Array.from(
+      new Map(prioridadesVisiblesLista.map(p => [String(p.id), p])).values()
+    );
+  %>
   <div class="modal fade priority-modal" id="agregarPrioridadModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
       <div class="modal-content">
@@ -745,6 +801,42 @@
       </div>
     </div>
   </div>
+
+  <% prioridadesEdicion.forEach(p => { %>
+    <div class="modal fade priority-modal" id="editarPrioridadModal<%= p.id %>" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <form method="POST" action="/taller/prioridades/<%= p.id %>">
+            <div class="modal-header">
+              <div>
+                <h5 class="modal-title fw-bold mb-0"><i class="bi bi-pencil-square me-1"></i> Editar prioridad</h5>
+                <div class="small opacity-75">Cambie placa, fecha u observación antes de cerrar la salida.</div>
+              </div>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body">
+              <div class="mb-3">
+                <label class="form-label fw-bold">Fecha de prioridad</label>
+                <input type="date" name="fecha_prioridad" class="form-control" value="<%= fechaInput(p.fecha_prioridad || p.creado_en) %>" required>
+              </div>
+              <div class="mb-3">
+                <label class="form-label fw-bold">Placa</label>
+                <input type="text" name="placa" class="form-control text-uppercase" value="<%= p.placa %>" data-placa-autocomplete data-placa-mode="placa" data-placa-allow-free="true" required>
+              </div>
+              <div>
+                <label class="form-label fw-bold">Observación</label>
+                <textarea name="observacion" class="form-control" rows="3" required><%= p.observacion %></textarea>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+              <button class="btn btn-danger"><i class="bi bi-save"></i> Guardar cambios</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  <% }) %>
 <% } %>
 
 <script>

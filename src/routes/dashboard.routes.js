@@ -1919,14 +1919,14 @@ router.get("/", async (req, res) => {
       FROM taller_prioridades tp
       LEFT JOIN usuarios u ON u.id = tp.creado_por
       WHERE tp.estado = 'PENDIENTE'
-        AND DATE(tp.creado_en) = ?
+        AND COALESCE(tp.fecha_prioridad, DATE(tp.creado_en)) <= ?
     `;
     const prioridadesParams = [fechaHoy];
     if (sedesFiltro.length) {
       prioridadesSql += " AND (tp.sede IN (?) OR tp.sede IS NULL OR tp.sede = '')";
       prioridadesParams.push(sedesFiltro);
     }
-    prioridadesSql += " ORDER BY tp.creado_en DESC, tp.id DESC LIMIT 8";
+    prioridadesSql += " ORDER BY COALESCE(tp.fecha_prioridad, DATE(tp.creado_en)) ASC, tp.creado_en DESC, tp.id DESC LIMIT 8";
 
     const prioridadesTaller = await safeQuery(prioridadesSql, prioridadesParams, []);
 

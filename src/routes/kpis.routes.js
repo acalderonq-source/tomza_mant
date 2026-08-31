@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const pool = require("../db");
-const { etiquetaSede, esUsuarioTodasSedes, getSedesPermitidas } = require("../utils/sedes");
+const { etiquetaSede, esUsuarioTodasSedes, expandirSedesEquivalentes, getSedesPermitidas } = require("../utils/sedes");
 
 const ROLES_KPIS = ["ADMIN", "TALLER", "PROVEEDURIA_TALLER"];
 
@@ -104,11 +104,11 @@ function resolverSedes(req) {
   const user = req.session.user;
   if (esUsuarioTodasSedes(user)) {
     if (req.session.sedeSeleccionada && req.session.sedeSeleccionada !== "TODAS") {
-      return [req.session.sedeSeleccionada];
+      return expandirSedesEquivalentes(req.session.sedeSeleccionada);
     }
     return [];
   }
-  return getSedesPermitidas(req).filter(Boolean);
+  return expandirSedesEquivalentes(getSedesPermitidas(req).filter(Boolean));
 }
 
 function procesarKpis(rows) {

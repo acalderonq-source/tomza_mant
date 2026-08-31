@@ -411,11 +411,11 @@
     <section class="top-info-grid mb-2">
       <div class="priority-panel">
         <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap mb-2">
-          <h2 class="section-title mb-0"><i class="bi bi-exclamation-octagon text-danger"></i> Prioridades de taller</h2>
+          <h2 class="section-title mb-0"><i class="bi bi-exclamation-octagon text-danger"></i> Prioridades activas de taller</h2>
           <a href="/taller/dashboard" class="btn btn-sm btn-outline-dark py-0">Abrir panel</a>
         </div>
         <% if (!prioridadesLista.length) { %>
-          <div class="empty-state">No hay prioridades pendientes de hoy.</div>
+          <div class="empty-state">No hay prioridades pendientes activas.</div>
         <% } else { %>
           <div class="priority-list">
             <% prioridadesLista.forEach(p => { %>
@@ -469,6 +469,10 @@
           <a href="/taller/dashboard" class="module-card">
             <span class="module-icon icon-red"><i class="bi bi-display"></i></span>
             <div><div class="module-title">Dashboard taller</div><p class="module-copy">Unidades en taller y listas para ruta.</p></div>
+          </a>
+          <a href="/taller/prioridades-historial" class="module-card">
+            <span class="module-icon icon-green"><i class="bi bi-clock-history"></i></span>
+            <div><div class="module-title">Historial de prioridades</div><p class="module-copy">Salidas de taller, días, trabajos y repuestos.</p></div>
           </a>
         <% } %>
         <% if (puedeVerLogisticaTaller) { %>
@@ -538,7 +542,7 @@
         <% if (puedeVerAceite) { %>
           <a href="/aceite" class="module-card">
             <span class="module-icon icon-amber"><i class="bi bi-droplet-half"></i></span>
-            <div><div class="module-title">Aceite</div><p class="module-copy">Cambios y control.</p></div>
+            <div><div class="module-title">Aceite</div><p class="module-copy">Estañones, litros por sede y cambios.</p></div>
           </a>
         <% } %>
         <% if (puedeVerAires) { %>
