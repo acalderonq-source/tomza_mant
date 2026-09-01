@@ -259,7 +259,7 @@ function negocioLlanta(solicitud) {
   const placa = String(solicitud.placa || "").trim().toUpperCase();
 
   if (esSedeGranel(sede)) return "Granel";
-  if (sede.toUpperCase() === "TRANSPORTADORA" || /^S\d{5,6}$/.test(placa)) return "Transportadora";
+  if (sede.toUpperCase() === "TRANSPORTADORA" || /^S\d{5,6}$/.test(placa) || /^EE\d{5,6}$/.test(placa)) return "Transportadora";
   if (["TALLER", "TECNICOS"].includes(sede.toUpperCase())) return "Otros";
   return "Cilindros";
 }

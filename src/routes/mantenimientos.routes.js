@@ -203,7 +203,7 @@ const SEDES_CILINDREROS = [
 
 const ORDEN_NEGOCIOS_MANTENIMIENTO = ["TRANSPORTADORA", "CILINDREROS", "GRANELES", "OTROS"];
 const SUBGRUPOS_BASE_MANTENIMIENTO = {
-  TRANSPORTADORA: ["Cabezales", "Cisternas", "Carretas", "Tándem"],
+  TRANSPORTADORA: ["Cabezales", "Cisternas", "Carretas", "Grúas", "Tándem"],
   CILINDREROS: ["Alajuela", "Cartago", "Guapiles", "La Cruz", "Nicoya", "Orotina", "Perez Zeledon", "Rio Claro", "San Carlos"],
   GRANELES: SEDES_GRANEL.map(sede => etiquetaSede(sede)),
   OTROS: ["Taller", "Tecnicos", "Otros"]
@@ -359,7 +359,7 @@ function obtenerNegocioMantenimiento(item) {
     };
   }
 
-  if (sede === "TRANSPORTADORA" || ["CABEZAL", "CABEZALES", "CISTERNA", "CISTERNAS", "CARRETA", "CARRETAS", "TANDEM", "TAMDEN"].some(valor => sede.includes(valor))) {
+  if (sede === "TRANSPORTADORA" || placa.startsWith("EE") || ["CABEZAL", "CABEZALES", "CISTERNA", "CISTERNAS", "CARRETA", "CARRETAS", "GRUA", "GRUAS", "TANDEM", "TAMDEN"].some(valor => sede.includes(valor))) {
     return {
       grupo: "TRANSPORTADORA",
       subgrupo: clasificarSubgrupoTransportadora({ sede: item.sede, placa: item.placa, texto: item.detalle })

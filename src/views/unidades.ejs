@@ -50,8 +50,8 @@
     }
     .bulk-placa {
       font-weight: 850;
-      max-width: 110px;
-      min-width: 95px;
+      max-width: 150px;
+      min-width: 125px;
     }
     .plate-edit {
       display: flex;
@@ -60,6 +60,12 @@
     }
     .plate-prefix {
       flex: 0 0 70px;
+    }
+    .plate-help {
+      color: #64748b;
+      font-size: .68rem;
+      font-weight: 700;
+      margin-top: .18rem;
     }
     .bulk-sede { min-width: 210px; }
     .bulk-reason { min-width: 240px; }
@@ -133,6 +139,11 @@
     .mini-ok { background: #dcfce7; color: #166534; }
     .mini-off { background: #e2e8f0; color: #475569; }
     .mini-stop { background: #fee2e2; color: #991b1b; }
+    .delete-unit-btn {
+      border-radius: 999px;
+      font-weight: 850;
+      white-space: nowrap;
+    }
     @media (max-width: 1180px) { .kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
     @media (max-width: 1180px) { .business-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
     @media (max-width: 680px) { .kpi-grid, .business-grid { grid-template-columns: 1fr; } }
@@ -146,14 +157,6 @@
   const mostrarSede = typeof etiquetaSede === 'function' ? etiquetaSede : (sede) => sede;
   const negocioClase = nombre => `negocio-${String(nombre || 'otros').toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
   const collapseId = nombre => `negocio-${String(nombre || 'otros').toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
-  const separarPlaca = placa => {
-    const limpia = String(placa || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
-    const match = limpia.match(/^(CL|C|S)?(.+)$/);
-    return {
-      prefijo: match?.[1] || '',
-      numero: match?.[2] || limpia
-    };
-  };
 %>
 
 <nav class="navbar navbar-dark px-3 py-2">
@@ -317,16 +320,9 @@
       </div>
       <form method="POST" action="/unidades/agregar" class="row g-3 align-items-end">
         <div class="col-md-3">
-          <label class="filter-label">Placa</label>
-          <div class="plate-edit">
-            <select name="placa_prefijo" class="form-select plate-prefix">
-              <option value="C">C</option>
-              <option value="CL">CL</option>
-              <option value="S">S</option>
-              <option value="">Sin</option>
-            </select>
-            <input type="text" name="placa_numero" class="form-control" placeholder="Ej: 173136" required>
-          </div>
+          <label class="filter-label">Placa completa</label>
+          <input type="text" name="placa" class="form-control text-uppercase" placeholder="Ej: C138537, CL279805, EE38537" required>
+          <div class="plate-help">Escriba la placa tal como debe quedar guardada.</div>
         </div>
         <div class="col-md-2">
           <label class="filter-label">Marca</label>
@@ -391,37 +387,33 @@
               <th>Estado</th>
               <th>Condición</th>
               <th>Razón varada</th>
+              <% if (puedeEditar) { %>
+                <th>Acciones</th>
+              <% } %>
             </tr>
           </thead>
           <tbody>
             <% if (unidades.length === 0) { %>
               <tr>
-                <td colspan="8" class="empty-state">No hay unidades con los filtros seleccionados.</td>
+                <td colspan="<%= puedeEditar ? 9 : 8 %>" class="empty-state">No hay unidades con los filtros seleccionados.</td>
               </tr>
             <% } %>
 
             <% unidades.forEach(u => { %>
-              <% const placaPartes = separarPlaca(u.placa); %>
               <tr>
                 <td>
                   <% if (puedeEditar) { %>
                     <input type="hidden" name="unidades[<%= u.id %>][id]" value="<%= u.id %>">
-                    <div class="plate-edit">
-                      <select name="unidades[<%= u.id %>][placa_prefijo]" class="form-select form-select-sm plate-prefix" aria-label="Inicial de placa">
-                        <option value="" <%= placaPartes.prefijo === '' ? 'selected' : '' %>>Sin</option>
-                        <option value="C" <%= placaPartes.prefijo === 'C' ? 'selected' : '' %>>C</option>
-                        <option value="CL" <%= placaPartes.prefijo === 'CL' ? 'selected' : '' %>>CL</option>
-                        <option value="S" <%= placaPartes.prefijo === 'S' ? 'selected' : '' %>>S</option>
-                      </select>
-                      <input
-                        type="text"
-                        name="unidades[<%= u.id %>][placa_numero]"
-                        class="form-control form-control-sm bulk-placa"
-                        value="<%= placaPartes.numero || '' %>"
-                        aria-label="Número de placa"
-                        required
-                      >
-                    </div>
+                    <input
+                      type="text"
+                      name="unidades[<%= u.id %>][placa]"
+                      class="form-control form-control-sm bulk-placa text-uppercase"
+                      value="<%= u.placa || '' %>"
+                      aria-label="Placa completa"
+                      placeholder="Placa"
+                      title="Edite la placa completa, incluyendo inicial si aplica."
+                      required
+                    >
                   <% } else { %>
                     <strong><%= u.placa %></strong>
                   <% } %>
@@ -520,6 +512,19 @@
                     </div>
                   <% } %>
                 </td>
+                <% if (puedeEditar) { %>
+                  <td>
+                    <button
+                      type="submit"
+                      class="btn btn-outline-danger btn-sm delete-unit-btn"
+                      formmethod="POST"
+                      formaction="/unidades/<%= u.id %>/eliminar"
+                      data-delete-unit="<%= u.placa %>"
+                    >
+                      <i class="bi bi-trash me-1"></i>Eliminar
+                    </button>
+                  </td>
+                <% } %>
               </tr>
             <% }) %>
           </tbody>
@@ -535,24 +540,38 @@
 <script>
   (() => {
     const form = document.getElementById('bulkUnitsForm');
+
     if (!form) return;
+
+    const marcarFila = control => {
+      const row = control.closest('tr');
+      if (!row) return;
+      const changed = [...row.querySelectorAll('select, input')]
+        .some(item => item.value !== item.dataset.initialValue);
+      row.classList.toggle('dirty-row', changed);
+    };
 
     form.querySelectorAll('select, input').forEach(control => {
       control.dataset.initialValue = control.value;
-      control.addEventListener('change', () => {
-        const row = control.closest('tr');
-        if (!row) return;
-        const changed = [...row.querySelectorAll('select, input')]
-          .some(item => item.value !== item.dataset.initialValue);
-        row.classList.toggle('dirty-row', changed);
-      });
+      control.addEventListener('change', () => marcarFila(control));
+      control.addEventListener('input', () => marcarFila(control));
     });
 
-    form.addEventListener('submit', () => {
-      const button = form.querySelector('button[type="submit"]');
+    form.addEventListener('submit', (event) => {
+      const button = event.submitter || form.querySelector('button[type="submit"]');
+      if (button?.dataset.deleteUnit) {
+        const confirmar = window.confirm(`¿Eliminar la unidad ${button.dataset.deleteUnit}? Solo se eliminará si no tiene historial registrado.`);
+        if (!confirmar) {
+          event.preventDefault();
+          return;
+        }
+      }
+
       if (button) {
         button.disabled = true;
-        button.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Guardando...';
+        button.innerHTML = button.dataset.deleteUnit
+          ? '<span class="spinner-border spinner-border-sm me-1"></span>Eliminando...'
+          : '<span class="spinner-border spinner-border-sm me-1"></span>Guardando...';
       }
     });
   })();

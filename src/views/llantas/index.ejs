@@ -299,7 +299,7 @@
     const sede = String(solicitud.sede || '').toUpperCase();
     const placa = String(solicitud.placa || '').toUpperCase();
     if (sede.includes('GRANEL')) return 'Granel';
-    if (sede === 'TRANSPORTADORA' || /^S\d{5,6}$/.test(placa)) return 'Transportadora';
+    if (sede === 'TRANSPORTADORA' || /^S\d{5,6}$/.test(placa) || /^EE\d{5,6}$/.test(placa)) return 'Transportadora';
     if (sede === 'TALLER' || sede === 'TECNICOS') return 'Otros';
     return 'Cilindros';
   };

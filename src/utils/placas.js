@@ -47,6 +47,12 @@ function normalizarPlaca(value) {
   match = raw.match(/^S(\d{5,6})$/);
   if (match) return `S${match[1]}`;
 
+  match = raw.match(/^EEE(\d{5,6})$/);
+  if (match) return `EE${match[1]}`;
+
+  match = raw.match(/^EE(\d{5,6})$/);
+  if (match) return `EE${match[1]}`;
+
   match = raw.match(/^C(\d{5,6})$/);
   if (match) return `C${match[1]}`;
 
@@ -56,7 +62,7 @@ function normalizarPlaca(value) {
     return /^[23]/.test(numero) ? `CL${numero}` : `C${numero}`;
   }
 
-  match = raw.match(/(?:CL|C|S)?\d{5,6}/);
+  match = raw.match(/(?:CL|EE|C|S)?\d{5,6}/);
   if (match) return normalizarPlaca(match[0]);
 
   return raw;
@@ -73,8 +79,10 @@ function variantesPlaca(value) {
     valores.add(`C${numero}`);
     valores.add(`CL${numero}`);
     valores.add(`S${numero}`);
+    valores.add(`EE${numero}`);
     valores.add(`CLC${numero}`);
     valores.add(`SS${numero}`);
+    valores.add(`EEE${numero}`);
   }
 
   return [...valores].filter(Boolean);
@@ -95,7 +103,7 @@ function agregarFiltroPlacaSql(condiciones, params, column, value) {
 
 function extraerPlacasTexto(value) {
   const texto = String(value || "").toUpperCase();
-  const matches = texto.match(/\b(?:CL|C|S)?[\s.-]*\d{5,6}\b/g) || [];
+  const matches = texto.match(/\b(?:CL|EE|C|S)?[\s.-]*\d{5,6}\b/g) || [];
   const placas = matches
     .map(item => normalizarPlaca(item))
     .filter(Boolean);

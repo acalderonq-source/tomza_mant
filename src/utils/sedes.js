@@ -11,6 +11,8 @@ const SEDES_TRANSPORTADORA_DETALLE = [
   "Cabezales",
   "Cisternas",
   "Carretas",
+  "Gruas",
+  "Grúas",
   "Tandem",
   "Tándem"
 ];
@@ -47,6 +49,8 @@ const TODAS_SEDES = [
   "Cabezales",
   "Cisternas",
   "Carretas",
+  "Gruas",
+  "Grúas",
   "Tandem",
   "Granel",
   "granel_cartago",
@@ -170,6 +174,10 @@ function clasificarSubgrupoTransportadora({ sede, placa, texto } = {}) {
   const sedeNormalizada = normalizarSede(sede);
   const placaNormalizada = String(placa || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
   const textoNormalizado = normalizarSede([sede, placa, texto].filter(Boolean).join(" "));
+
+  if (placaNormalizada.startsWith("EE") || sedeNormalizada.includes("GRUA") || textoNormalizado.includes("GRUA")) {
+    return "Grúas";
+  }
 
   if (sedeNormalizada.includes("TANDEM") || sedeNormalizada.includes("TAMDEN") || textoNormalizado.includes("TANDEM") || textoNormalizado.includes("TAMDEN")) {
     return "Tándem";

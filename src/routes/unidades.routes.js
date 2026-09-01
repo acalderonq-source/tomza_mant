@@ -193,12 +193,51 @@ function normalizarPlacaUnidad(value) {
 function construirPlacaUnidad({ placa, prefijo, numero } = {}) {
   const prefijoLimpio = normalizarPlacaUnidad(prefijo);
   const numeroLimpio = normalizarPlacaUnidad(numero);
+  const usaSelectorPrefijo = prefijo !== null && typeof prefijo !== "undefined";
 
   if (numeroLimpio) {
-    return `${prefijoLimpio}${numeroLimpio}`;
+    const numeroSinPrefijo = numeroLimpio.replace(/^(CL|EE|C|S)(?=\d)/, "");
+    if (usaSelectorPrefijo) {
+      return `${prefijoLimpio}${numeroSinPrefijo}`;
+    }
+    if (/^(CL|EE|C|S)\d{1,}$/.test(numeroLimpio)) {
+      return numeroLimpio;
+    }
+    return `${prefijoLimpio}${numeroSinPrefijo}`;
   }
 
   return normalizarPlacaUnidad(placa);
+}
+
+function escapeIdentifier(identifier) {
+  return `\`${String(identifier || "").replace(/`/g, "``")}\``;
+}
+
+async function obtenerUsosUnidad(unidadId) {
+  const tablasIgnoradas = new Set(["unidades_sede_historial"]);
+  const [columnas] = await pool.query(
+    `SELECT TABLE_NAME AS tableName
+     FROM INFORMATION_SCHEMA.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE()
+       AND COLUMN_NAME = 'unidad_id'
+       AND TABLE_NAME <> 'unidades'
+     ORDER BY TABLE_NAME`
+  );
+
+  const usos = [];
+  for (const columna of columnas) {
+    const tableName = columna.tableName;
+    if (tablasIgnoradas.has(tableName)) continue;
+
+    const [[row]] = await pool.query(
+      `SELECT COUNT(*) AS total FROM ${escapeIdentifier(tableName)} WHERE unidad_id = ?`,
+      [unidadId]
+    );
+    const total = Number(row.total || 0);
+    if (total > 0) usos.push({ tableName, total });
+  }
+
+  return usos;
 }
 
 function normalizarClaveNegocio(value) {
@@ -222,7 +261,7 @@ function clasificarNegocioUnidad(unidad) {
     };
   }
 
-  if (sede === "TRANSPORTADORA" || ["CABEZAL", "CABEZALES", "CISTERNA", "CISTERNAS", "CARRETA", "CARRETAS", "TANDEM", "TAMDEN"].some(valor => sede.includes(valor))) {
+  if (sede === "TRANSPORTADORA" || placa.startsWith("EE") || ["CABEZAL", "CABEZALES", "CISTERNA", "CISTERNAS", "CARRETA", "CARRETAS", "GRUA", "GRUAS", "TANDEM", "TAMDEN"].some(valor => sede.includes(valor))) {
     return {
       negocio: "TRANSPORTADORA",
       subgrupo: clasificarSubgrupoTransportadora({ sede: unidad.sede, placa: unidad.placa })
@@ -284,7 +323,7 @@ function agruparUnidadesPorNegocio(unidades) {
   const subgruposBase = {
     CILINDREROS: ["Alajuela", "Cartago", "Guapiles", "La Cruz", "Nicoya", "Orotina", "Perez Zeledon", "Rio Claro", "San Carlos"],
     GRANELES: ["Granel Cartago", "Granel Alajuela", "Granel La Cruz", "Granel Guapiles", "Granel Perez Zeledon"],
-    TRANSPORTADORA: ["Cabezales", "Cisternas", "Carretas", "Tándem"],
+    TRANSPORTADORA: ["Cabezales", "Cisternas", "Carretas", "Grúas", "Tándem"],
     OTROS: ["Taller", "Tecnicos", "Otros"]
   };
 
@@ -722,6 +761,56 @@ router.post("/guardar-masivo", async (req, res) => {
     res.status(500).send("Error interno");
   } finally {
     conn.release();
+  }
+});
+
+// ===================== ELIMINAR UNIDAD =====================
+router.post("/:id/eliminar", async (req, res) => {
+  try {
+    await ensureUnidadEstadoColumns();
+
+    if (!puedeEditarUnidades(req.session.user)) {
+      return res.status(403).send("No autorizado");
+    }
+
+    const id = parseInt(req.params.id, 10);
+    if (Number.isNaN(id)) {
+      return res.status(400).send("ID de unidad inválido");
+    }
+
+    const resultado = await obtenerUnidadAutorizada(req, id);
+    if (resultado.error) {
+      return res.status(resultado.error).send(resultado.mensaje);
+    }
+
+    const unidad = resultado.unidad;
+    const usos = await obtenerUsosUnidad(id);
+    const totalUsos = usos.reduce((total, uso) => total + uso.total, 0);
+
+    if (totalUsos > 0) {
+      const detalle = usos
+        .slice(0, 4)
+        .map(uso => `${uso.total} en ${uso.tableName}`)
+        .join(", ");
+      return redirectUnidades(req, res, {
+        error: `No se puede eliminar ${unidad.placa} porque tiene historial registrado (${detalle}). Puede dejarla inactiva para que no se use.`
+      });
+    }
+
+    await pool.query("DELETE FROM unidades WHERE id = ?", [id]);
+
+    return redirectUnidades(req, res, {
+      success: `Unidad ${unidad.placa} eliminada correctamente.`
+    });
+  } catch (error) {
+    if (error.code === "ER_ROW_IS_REFERENCED_2" || error.code === "ER_ROW_IS_REFERENCED") {
+      return redirectUnidades(req, res, {
+        error: "No se pudo eliminar la unidad porque tiene registros relacionados. Déjela inactiva para conservar el historial."
+      });
+    }
+
+    console.error("ERROR eliminando unidad:", error);
+    res.status(500).send("Error interno");
   }
 });
 

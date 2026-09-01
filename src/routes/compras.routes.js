@@ -122,12 +122,17 @@ function resolverPlacaOrdenCompra({ placa_unidad = null, lineas = [], proveedor_
     linea.codigo_producto,
     linea.descripcion
   ]);
+  const placaManual = normalizarPlaca(placa_unidad);
+
+  if (placaManual) {
+    return placaManual;
+  }
 
   if (textoEsAceites(placa_unidad, proveedor_nombre, observaciones, ...textosLineas)) {
     return "ACEITES";
   }
 
-  return normalizarPlaca(placa_unidad) || normalizarPlaca((lineas.find(linea => linea.codigo) || {}).codigo);
+  return normalizarPlaca((lineas.find(linea => linea.codigo) || {}).codigo);
 }
 
 function obtenerPlacaOrden(lineasOrden, placaUnidad = null, contexto = {}) {
@@ -169,7 +174,7 @@ function clasificarPlacaCompra(placa, sede) {
   if (placaLimpia === "GENERALES TALLER" || ["GENERAL", "GENERALES", "GENERAL TALLER", "GENERALES TALLER"].includes(sedeUpper)) return "General taller";
   if (placaLimpia === "SIN PLACA") return "Sin placa / revisar";
   if (esSedeGranelDashboard(sedeLimpia)) return "Graneles";
-  if (sedeUpper === "TRANSPORTADORA" || /^S\d{5,6}$/.test(placaLimpia)) return "Transportadora";
+  if (sedeUpper === "TRANSPORTADORA" || /^S\d{5,6}$/.test(placaLimpia) || /^EE\d{5,6}$/.test(placaLimpia)) return "Transportadora";
   if (/^C[L]?\d{5,6}$/.test(placaLimpia) && !["TALLER", "TECNICOS"].includes(sedeUpper)) return "Cilindreros";
   return "Otros";
 }
@@ -5251,7 +5256,7 @@ router.get("/dashboard", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA
             CASE
               WHEN UPPER(CONCAT_WS(' ', d.descripcion, d.codigo, p.nombre)) REGEXP 'ACEITE|ACEITES|MOBIL|MOVIL|PICO|LIASA' THEN 'ACEITES'
             END,
-            REPLACE(REGEXP_SUBSTR(UPPER(COALESCE(d.codigo, '')), 'CL[[:space:]]*[0-9]{5,6}|C[[:space:]]*[0-9]{5,6}|S[[:space:]]*[0-9]{5,6}'), ' ', ''),
+            REPLACE(REGEXP_SUBSTR(UPPER(COALESCE(d.codigo, '')), 'CL[[:space:]]*[0-9]{5,6}|EE[[:space:]]*[0-9]{5,6}|C[[:space:]]*[0-9]{5,6}|S[[:space:]]*[0-9]{5,6}'), ' ', ''),
             CASE
               WHEN UPPER(TRIM(COALESCE(d.codigo, ''))) IN ('GENERAL GASTOS', 'GENERALES GASTOS', 'GASTOS GENERAL', 'GASTOS GENERALES', 'GENERALES DE GASTOS') THEN 'GENERALES GASTOS'
             END,
@@ -5272,7 +5277,7 @@ router.get("/dashboard", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA
               WHEN COALESCE(placas_detalle.tiene_placas, 0) = 0 AND UPPER(TRIM(COALESCE(o.placa_unidad, ''))) IN ('GENERAL', 'GENERALES', 'GENERAL TALLER', 'GENERALES TALLER') THEN 'GENERALES TALLER'
             END,
             CASE WHEN COALESCE(placas_detalle.tiene_placas, 0) = 0 THEN NULLIF(REPLACE(UPPER(TRIM(o.placa_unidad)), ' ', ''), '') END,
-            CASE WHEN COALESCE(placas_detalle.tiene_placas, 0) = 0 THEN REPLACE(REGEXP_SUBSTR(UPPER(COALESCE(o.observaciones, '')), 'CL[[:space:]]*[0-9]{5,6}|C[[:space:]]*[0-9]{5,6}|S[[:space:]]*[0-9]{5,6}'), ' ', '') END,
+            CASE WHEN COALESCE(placas_detalle.tiene_placas, 0) = 0 THEN REPLACE(REGEXP_SUBSTR(UPPER(COALESCE(o.observaciones, '')), 'CL[[:space:]]*[0-9]{5,6}|EE[[:space:]]*[0-9]{5,6}|C[[:space:]]*[0-9]{5,6}|S[[:space:]]*[0-9]{5,6}'), ' ', '') END,
             'SIN PLACA'
           ))) AS placa,
           CASE
@@ -5284,7 +5289,7 @@ router.get("/dashboard", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA
         LEFT JOIN (
           SELECT orden_compra_id, COUNT(*) AS tiene_placas
           FROM ordenes_compra_detalle
-          WHERE REGEXP_SUBSTR(UPPER(COALESCE(codigo, '')), 'CL[[:space:]]*[0-9]{5,6}|C[[:space:]]*[0-9]{5,6}|S[[:space:]]*[0-9]{5,6}') IS NOT NULL
+          WHERE REGEXP_SUBSTR(UPPER(COALESCE(codigo, '')), 'CL[[:space:]]*[0-9]{5,6}|EE[[:space:]]*[0-9]{5,6}|C[[:space:]]*[0-9]{5,6}|S[[:space:]]*[0-9]{5,6}') IS NOT NULL
           GROUP BY orden_compra_id
         ) placas_detalle ON placas_detalle.orden_compra_id = o.id
         LEFT JOIN (
@@ -5336,7 +5341,7 @@ router.get("/dashboard", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA
               CASE
                 WHEN UPPER(CONCAT_WS(' ', d.descripcion, d.codigo, p.nombre)) REGEXP 'ACEITE|ACEITES|MOBIL|MOVIL|PICO|LIASA' THEN 'ACEITES'
               END,
-              REPLACE(REGEXP_SUBSTR(UPPER(COALESCE(d.codigo, '')), 'CL[[:space:]]*[0-9]{5,6}|C[[:space:]]*[0-9]{5,6}|S[[:space:]]*[0-9]{5,6}'), ' ', ''),
+              REPLACE(REGEXP_SUBSTR(UPPER(COALESCE(d.codigo, '')), 'CL[[:space:]]*[0-9]{5,6}|EE[[:space:]]*[0-9]{5,6}|C[[:space:]]*[0-9]{5,6}|S[[:space:]]*[0-9]{5,6}'), ' ', ''),
               CASE
                 WHEN UPPER(TRIM(COALESCE(d.codigo, ''))) IN ('GENERAL GASTOS', 'GENERALES GASTOS', 'GASTOS GENERAL', 'GASTOS GENERALES', 'GENERALES DE GASTOS') THEN 'GENERALES GASTOS'
               END,
@@ -5357,7 +5362,7 @@ router.get("/dashboard", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA
                 WHEN COALESCE(placas_detalle.tiene_placas, 0) = 0 AND UPPER(TRIM(COALESCE(o.placa_unidad, ''))) IN ('GENERAL', 'GENERALES', 'GENERAL TALLER', 'GENERALES TALLER') THEN 'GENERALES TALLER'
               END,
               CASE WHEN COALESCE(placas_detalle.tiene_placas, 0) = 0 THEN NULLIF(REPLACE(UPPER(TRIM(o.placa_unidad)), ' ', ''), '') END,
-              CASE WHEN COALESCE(placas_detalle.tiene_placas, 0) = 0 THEN REPLACE(REGEXP_SUBSTR(UPPER(COALESCE(o.observaciones, '')), 'CL[[:space:]]*[0-9]{5,6}|C[[:space:]]*[0-9]{5,6}|S[[:space:]]*[0-9]{5,6}'), ' ', '') END,
+              CASE WHEN COALESCE(placas_detalle.tiene_placas, 0) = 0 THEN REPLACE(REGEXP_SUBSTR(UPPER(COALESCE(o.observaciones, '')), 'CL[[:space:]]*[0-9]{5,6}|EE[[:space:]]*[0-9]{5,6}|C[[:space:]]*[0-9]{5,6}|S[[:space:]]*[0-9]{5,6}'), ' ', '') END,
               'SIN PLACA'
             ))) AS placa,
             CASE
@@ -5368,7 +5373,7 @@ router.get("/dashboard", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA
           LEFT JOIN (
             SELECT orden_compra_id, COUNT(*) AS tiene_placas
             FROM ordenes_compra_detalle
-            WHERE REGEXP_SUBSTR(UPPER(COALESCE(codigo, '')), 'CL[[:space:]]*[0-9]{5,6}|C[[:space:]]*[0-9]{5,6}|S[[:space:]]*[0-9]{5,6}') IS NOT NULL
+            WHERE REGEXP_SUBSTR(UPPER(COALESCE(codigo, '')), 'CL[[:space:]]*[0-9]{5,6}|EE[[:space:]]*[0-9]{5,6}|C[[:space:]]*[0-9]{5,6}|S[[:space:]]*[0-9]{5,6}') IS NOT NULL
             GROUP BY orden_compra_id
           ) placas_detalle ON placas_detalle.orden_compra_id = o.id
           LEFT JOIN (

@@ -50,15 +50,14 @@ const ROLES_RESUMEN_EJECUTIVO = ["ADMIN", "TALLER", "PROVEEDURIA", "PROVEEDURIA_
 
 const FAMILIAS_GASTO = [
   { clave: "llantas", nombre: "Llantas", color: "#2563eb", palabras: ["llanta", "llantas", "aro", "aros", "rin", "rines"] },
-  { clave: "frenos", nombre: "Frenos y seguridad", color: "#dc2626", palabras: ["freno", "frenos", "fibra", "fibras", "clutch", "embrague", "seguridad", "pito", "zapata", "tambor", "disco", "plato"] },
-  { clave: "motor", nombre: "Motor y transmisión", color: "#ea580c", palabras: ["motor", "turbo", "inyector", "inyeccion", "inyección", "caja", "transmision", "transmisión", "compresor", "arrancador", "alternador", "bomba", "manguera", "cabezote", "overh", "overhaul", "isx", "detroit", "s60", "s-60", "manifold", "multiple", "múltiple", "piston", "pistón", "mano de obra", "reparacion", "reparación", "rectificacion", "rectificación", "rectificar", "limpieza", "calibracion", "calibración", "laboratorio", "romeros", "romero", "prodiesel", "alfonso mora", "jose guillermo", "guillermo campos", "kevin jesus", "leslie thomas", "edal mora", "tubo", "union", "unión", "codo", "abrazadera", "abrasadera"] },
+  { clave: "frenos", nombre: "Frenos y seguridad", color: "#dc2626", palabras: ["freno", "frenos", "fibra", "fibras", "friccion", "fricción", "seguridad", "pito", "zapata", "zapatas", "tambor", "tambores", "disco", "discos", "plato"] },
+  { clave: "motor", nombre: "Motor y transmisión", color: "#ea580c", palabras: ["motor", "turbo", "inyector", "inyectores", "inyeccion", "inyección", "caja", "transmision", "transmisión", "clutch", "embrague", "compresor", "bomba", "manguera", "cabezote", "culata", "overh", "overhaul", "isx", "detroit", "s60", "s-60", "manifold", "multiple", "múltiple", "piston", "pistón", "block", "viela", "vielas", "cigueñal", "ciguenal", "diferencial", "rockwell", "sincronizador", "fan c", "kysor", "tubo", "union", "unión", "codo", "abrazadera", "abrasadera"] },
   { clave: "aceites", nombre: "Aceites y fluidos", color: "#0f766e", palabras: ["aceite", "aceites", "mobil", "movil", "pico", "liasa", "pico liasa", "pico & liasa", "pico y liasa", "engrase", "filtro", "filtros", "hidraulico", "hidráulico", "coolant", "agua", "radiador", "liquido", "líquido"] },
   { clave: "suspension", nombre: "Suspensión y dirección", color: "#16a34a", palabras: ["suspension", "suspensión", "resorte", "resortes", "amortiguador", "balancin", "balancín", "rotula", "rótula", "barra", "direccion", "dirección", "tensor", "buje", "bushing", "pin", "muelle"] },
   { clave: "rodamientos", nombre: "Rodamientos y retenes", color: "#0e7490", palabras: ["roll", "rol ", "rodamiento", "cojinete", "reten", "retén", "retenedor", "sello", "camisa", "bocina", "porta roll"] },
-  { clave: "transportadora", nombre: "Cabezales, carretas y cisternas", color: "#4338ca", palabras: ["cabezal", "cabezales", "carreta", "carretas", "cisterna", "cisternas", "freightliner", "cascadia", "columbia", "century", "quinta rueda", "peterbilt", "hendrickson", "trailer", "remolque", "transportes ortega", "ortega y rojas", "andrea rv"] },
-  { clave: "electrico", nombre: "Eléctrico y luces", color: "#7c3aed", palabras: ["luz", "luces", "bateria", "batería", "cable", "electrico", "eléctrico", "sensor", "marcha", "tablero", "velocimetro", "velocímetro", "selenoide", "solenoide", "relay", "flasher", "halogeno", "halógeno", "bombillo", "switch", "fusible", "conector", "terminal"] },
+  { clave: "electrico", nombre: "Eléctrico y luces", color: "#7c3aed", palabras: ["luz", "luces", "bateria", "batería", "cable", "electrico", "eléctrico", "sensor", "marcha", "tablero", "velocimetro", "velocímetro", "selenoide", "solenoide", "relay", "flasher", "halogeno", "halógeno", "bombillo", "switch", "fusible", "conector", "terminal", "alternador", "alternadores", "arrancador", "arrancadores", "programador", "programadores", "modulo", "módulo", "sam chassis", "sam chasis"] },
   { clave: "carroceria", nombre: "Carrocería y estética", color: "#d97706", palabras: ["cabina", "puerta", "bumper", "bumber", "cajon", "cajón", "rotulacion", "rotulación", "calcomania", "calcomanía", "pintura", "pintar", "asiento", "vidrio", "parabrisas", "espejo", "retrovisor", "grada", "estribo", "suministro", "suministros", "materiales", "almacen de materiales", "almacén de materiales", "capris", "herramienta", "herramientas", "broca", "brocha", "spray", "loctite", "sellador", "pegamento", "cincho", "cinchos", "soldadura", "guante", "gaza", "tornillo", "tuerca", "arandela"] },
-  { clave: "caja", nombre: "Caja chica", color: "#f59e0b", palabras: ["caja chica", "reintegro"] }
+  { clave: "general", nombre: "Gastos generales", color: "#64748b", palabras: ["general", "generales", "general taller", "gastos generales", "caja chica", "reintegro", "pantalla", "pantallas", "tablet", "tablets", "equipo taller", "lamina", "lámina", "tubo cuadrado", "plywood", "tubo negro", "estructura", "estructural", "silicon", "silicone", "sellador", "materiales", "almacen de materiales", "almacén de materiales", "viatico", "viáticos", "viaticos", "hospedaje", "mensajeria", "mensajería", "encomienda", "control de plaga", "recarga de oxigeno", "recarga de oxígeno", "oxigeno", "oxígeno"] }
 ];
 
 const FAMILIAS_GASTO_OPERATIVO = FAMILIAS_GASTO;
@@ -158,7 +157,7 @@ function normalizarPlacaLocal(placa) {
 
 function esPlacaReal(placa) {
   const limpia = normalizarPlacaLocal(placa);
-  return /^CL\d{5,6}$/.test(limpia) || /^C\d{5,6}$/.test(limpia) || /^S\d{5,6}$/.test(limpia);
+  return /^CL\d{5,6}$/.test(limpia) || /^C\d{5,6}$/.test(limpia) || /^S\d{5,6}$/.test(limpia) || /^EE\d{5,6}$/.test(limpia);
 }
 
 function crearIndiceUnidades(unidades = []) {
@@ -235,17 +234,116 @@ function familiaPorClave(clave, familias = FAMILIAS_GASTO) {
   return familias.find(f => f.clave === clave) || familias[0];
 }
 
-function clasificarGastoOperativo(item) {
-  if (item.placa === "ACEITES") return familiaPorClave("aceites");
-  if (item.fuente === "PAGO_PROVEEDOR") {
-    return clasificarTexto(`${item.descripcion} ${item.proveedor}`, FAMILIAS_GASTO_OPERATIVO, "motor");
-  }
-  if (item.fuente === "CAJA_CHICA") return familiaPorClave("caja");
-  if (item.fuente === "ORDEN_MOTOR") {
-    return clasificarTexto(`${item.descripcion} ${item.proveedor}`, FAMILIAS_GASTO_OPERATIVO, "motor");
+function contienePalabras(texto, palabras = []) {
+  const normalizado = normalizarTexto(texto);
+  return palabras.some(palabra => normalizado.includes(normalizarTexto(palabra)));
+}
+
+function clasificarGastoPorReglas(item) {
+  const textoTrabajo = normalizarTexto([
+    item.codigo,
+    item.descripcion,
+    item.observaciones,
+    item.placa_unidad
+  ].filter(Boolean).join(" "));
+  const textoCompleto = normalizarTexto([
+    textoTrabajo,
+    item.proveedor
+  ].filter(Boolean).join(" "));
+
+  if (contienePalabras(textoTrabajo, ["pantalla", "pantallas", "tablet", "tablets", "equipo taller"])) {
+    return familiaPorClave("general", FAMILIAS_GASTO_OPERATIVO);
   }
 
-  return clasificarTexto(`${item.descripcion} ${item.proveedor}`, FAMILIAS_GASTO_OPERATIVO, "motor");
+  if (contienePalabras(textoTrabajo, ["viatico", "viáticos", "viaticos", "hospedaje", "mensajeria", "mensajería", "encomienda", "control de plaga", "recarga de oxigeno", "recarga de oxígeno", "oxigeno", "oxígeno"])) {
+    return familiaPorClave("general", FAMILIAS_GASTO_OPERATIVO);
+  }
+
+  if (contienePalabras(textoTrabajo, ["lamina", "lámina", "tubo cuadrado", "plywood", "tubo negro estruct", "silicon", "silicone", "sikaflex", "envase", "pichinga", "aluminol", "restaurador de aluminio"])) {
+    return familiaPorClave("general", FAMILIAS_GASTO_OPERATIVO);
+  }
+
+  if (
+    /\brectific\w*\s+(de\s+)?tambor/.test(textoTrabajo) ||
+    contienePalabras(textoTrabajo, ["freno", "frenos", "fibra", "fibras", "friccion", "fricción", "tambor", "tambores", "zapata", "zapatas", "disco de freno", "juego de mano", "tanque de vacio", "tanque de vacío", "liquido freno", "liquido de freno", "líquido freno", "líquido de freno", "dot3", "limpiador de frenos", "limpiador frenos", "valvula doble", "válvula doble", "valvula espalda", "válvula espalda", "valvula selectora", "válvula selectora", "valvula reguladora aire", "válvula reguladora aire", "valvula para proteccion", "válvula para protección", "manilla acople servicio", "servicio universal aire"])
+  ) {
+    return familiaPorClave("frenos", FAMILIAS_GASTO_OPERATIVO);
+  }
+
+  const compraRepuestosElectrico = contienePalabras(textoTrabajo, ["compra de repuestos"]) &&
+    !contienePalabras(textoCompleto, ["rectificadora", "taller romeros", "romeros", "detroit", "detriot", "block", "viela", "vielas"]);
+  if (contienePalabras(textoTrabajo, ["alternador", "alternadores", "arrancador", "arrancadores", "programador", "programadores", "sam chassis", "sam chasis", "modulo", "módulo", "bulbo", "bulvo", "thermo switch", "sensor", "selenoide", "solenoide", "electro valvula", "electroválvula", "cable de bateria", "cable thhn", "lampara led", "lámpara led", "lampara trasera", "lámpara trasera", "limpia contactos", "voltimetro", "voltímetro", "interruptor", "cigarrera", "servicios electromecanicos", "servicios electromecánicos", "diagnostico problema de computadora", "diagnóstico problema de computadora"]) || compraRepuestosElectrico || contienePalabras(textoCompleto, ["48 voltios"])) {
+    return familiaPorClave("electrico", FAMILIAS_GASTO_OPERATIVO);
+  }
+
+  if (
+    /\brectific\w*/.test(textoTrabajo) ||
+    contienePalabras(textoTrabajo, ["diferencial", "rockwell", "set de empaques", "empaque inferior", "empaques inferior", "empaque tapa valvulas", "empaque tapa válvulas", "empaque cabez", "empaque cabezote", "empaque cabez.", "empaque escape", "empaque admision", "empaque admisión", "juego cilindro", "block", "viela", "vielas", "fan c", "kysor", "compresor", "cummins", "detroit", "detriot", "n-14", "isx", "manguera cooler", "cooler", "intercooler", "secador de aire", "secador ad", "valvula purga secador", "válvula purga secador", "faja", "faja abanico", "termostato", "deposito expansion", "depósito expansión", "deposito de expansion", "depósito de expansión", "tapon respiradero", "tapón respiradero", "tapon para tanque", "tapón para tanque", "combustible", "conect curvo flare", "comp ftl"]) ||
+    (contienePalabras(textoTrabajo, ["repuestos"]) && contienePalabras(textoCompleto, ["rectificadora", "taller romeros", "romeros"]))
+  ) {
+    return familiaPorClave("motor", FAMILIAS_GASTO_OPERATIVO);
+  }
+
+  if (contienePalabras(textoCompleto, ["pico", "liasa", "pico liasa", "pico & liasa", "pico y liasa", "mobil", "movil"])) {
+    return familiaPorClave("aceites", FAMILIAS_GASTO_OPERATIVO);
+  }
+
+  if (contienePalabras(textoTrabajo, ["aceite", "aceites", "filtro", "filtros", "engrase", "coolant", "liquido", "líquido", "hidraulico", "hidráulico", "grasa", "cubeta grasa", "tubo de grasa", "varsol", "desengrasante", "degreaser", "hand cleaner", "shampoo"])) {
+    return familiaPorClave("aceites", FAMILIAS_GASTO_OPERATIVO);
+  }
+
+  if (contienePalabras(textoTrabajo, ["llanta", "llantas", "aro", "aros", "rin", "rines", "taco rueda", "esparrago rueda", "espárrago rueda", "vulca", "valv tubular", "válv tubular", "valvula tubular", "válvula tubular"])) {
+    return familiaPorClave("llantas", FAMILIAS_GASTO_OPERATIVO);
+  }
+
+  if (contienePalabras(textoTrabajo, ["juego de patas", "patas", "trapos", "alfombra", "aislante de cobija", "recibidor cierre", "cierre goma", "extension cepillo", "extensión cepillo", "cepillo p/ lavar", "cepillo para lavar"])) {
+    return familiaPorClave("carroceria", FAMILIAS_GASTO_OPERATIVO);
+  }
+
+  if (contienePalabras(textoTrabajo, ["soporte c/m", "soporte"])) {
+    return familiaPorClave("carroceria", FAMILIAS_GASTO_OPERATIVO);
+  }
+
+  if (contienePalabras(textoTrabajo, ["base torpedo", "torpedo", "varillaje limpiadores", "limpiadores", "limpiador", "escobilla", "escobillas", "cinta reflectiva", "espejo", "esquinero", "crema pulir", "tapiceria", "tapicería", "asiento", "llavines", "cerrajeria", "cerrajería", "llave", "tape 3m", "pintura", "fast dry", "monocapa", "primer", "premier", "thinner", "multi-shine", "tire shine"])) {
+    return familiaPorClave("carroceria", FAMILIAS_GASTO_OPERATIVO);
+  }
+
+  if (contienePalabras(textoTrabajo, ["extintor", "extintores", "pito caracol", "pito"])) {
+    return familiaPorClave("frenos", FAMILIAS_GASTO_OPERATIVO);
+  }
+
+  if (contienePalabras(textoTrabajo, ["yugo", "cooplen", "coupling", "cruceta", "cardan", "cardán", "rash", "dientes"])) {
+    return familiaPorClave("motor", FAMILIAS_GASTO_OPERATIVO);
+  }
+
+  if (contienePalabras(textoTrabajo, ["nivel de bolsas", "bolsas de m-2", "bolsa de aire", "deposito hidrahulico", "depósito hidrahulico", "deposito hidraulico", "depósito hidráulico", "chupon", "chupón"])) {
+    return familiaPorClave("suspension", FAMILIAS_GASTO_OPERATIVO);
+  }
+
+  if (contienePalabras(textoTrabajo, ["bocina artillera", "bosina artillera", "bocina", "bosina"])) {
+    return familiaPorClave("rodamientos", FAMILIAS_GASTO_OPERATIVO);
+  }
+
+  if (contienePalabras(textoTrabajo, ["cisterna", "cisternas", "carreta", "carretas", "trailer", "remolque"])) {
+    return familiaPorClave("carroceria", FAMILIAS_GASTO_OPERATIVO);
+  }
+
+  return null;
+}
+
+function clasificarGastoOperativo(item) {
+  if (item.placa === "ACEITES") return familiaPorClave("aceites");
+  const familiaPorRegla = clasificarGastoPorReglas(item);
+  if (familiaPorRegla) return familiaPorRegla;
+  if (item.fuente === "PAGO_PROVEEDOR") {
+    return clasificarTexto(`${item.descripcion} ${item.proveedor}`, FAMILIAS_GASTO_OPERATIVO, "general");
+  }
+  if (item.fuente === "CAJA_CHICA") return familiaPorClave("general");
+  if (item.fuente === "ORDEN_MOTOR") {
+    return clasificarTexto(`${item.descripcion} ${item.proveedor}`, FAMILIAS_GASTO_OPERATIVO, "general");
+  }
+
+  return clasificarTexto(`${item.descripcion} ${item.proveedor}`, FAMILIAS_GASTO_OPERATIVO, "general");
 }
 
 function clasificarDetalleTransportadora(item) {
@@ -260,6 +358,10 @@ function clasificarDetalleTransportadora(item) {
     item.proveedor,
     item.sede
   ].filter(Boolean).join(" "));
+
+  if (texto.includes("grua") || texto.includes("gruas")) {
+    return { clave: "transportadora_gruas", nombre: "Grúas", color: "#f97316" };
+  }
 
   if (texto.includes("tandem") || texto.includes("tamden")) {
     return { clave: "transportadora_tandem", nombre: "Tándem", color: "#0891b2" };
@@ -286,14 +388,38 @@ function clasificarDetalleTransportadora(item) {
 function clasificarNegocioGasto(item) {
   const sedeNormalizada = normalizarTexto(item.sede);
   const placa = normalizarPlacaLocal(item.placa);
+  const texto = normalizarTexto([
+    item.placa,
+    item.placa_registrada,
+    item.codigo,
+    item.placa_unidad,
+    item.descripcion,
+    item.observaciones,
+    item.proveedor,
+    item.sede
+  ].filter(Boolean).join(" "));
   const esDetalleTransportadora = ["cabezales", "cisternas", "carretas", "tandem", "tamden"]
     .some(valor => sedeNormalizada.includes(valor));
+  const textoTransportadora = contienePalabras(texto, [
+    "transportadora", "cabezal", "cabezales", "cisterna", "cisternas", "carreta", "carretas",
+    "freightliner", "cascadia", "columbia", "century", "andrea rv", "ortega y rojas",
+    "quinta rueda", "trailer", "remolque"
+  ]);
+  const textoGranel = contienePalabras(texto, ["granel", "granelera", "graneleras"]);
+  const textoCilindrero = contienePalabras(texto, [
+    "hino", "dutro", "npr", "cilindrero", "cilindreros", "mercedes", "atego", "man 18400", "higer"
+  ]);
+  const esFiltroSinPlaca = !item.tienePlacaReal && contienePalabras(texto, ["filtro", "filtros"]);
 
-  if (placa === "ACEITES" || item.familia?.clave === "aceites") {
+  if (placa === "ACEITES" || (item.familia?.clave === "aceites" && !item.tienePlacaReal && !esFiltroSinPlaca)) {
     return { clave: "aceites", nombre: "Aceites", color: "#0f766e" };
   }
 
-  if (sedeNormalizada.includes("transportadora") || esDetalleTransportadora || /^S\d{5,6}$/.test(placa)) {
+  if (item.familia?.clave === "general") {
+    return { clave: "generales", nombre: "Generales", color: "#64748b" };
+  }
+
+  if (sedeNormalizada.includes("transportadora") || esDetalleTransportadora || /^S\d{5,6}$/.test(placa) || textoTransportadora) {
     return {
       clave: "transportadora",
       nombre: "Transportadora",
@@ -302,7 +428,7 @@ function clasificarNegocioGasto(item) {
     };
   }
 
-  if (sedeNormalizada.includes("granel")) {
+  if (sedeNormalizada.includes("granel") || textoGranel) {
     return { clave: "granel", nombre: "Graneleras", color: "#0f766e" };
   }
 
@@ -314,11 +440,19 @@ function clasificarNegocioGasto(item) {
     return { clave: "comodines", nombre: "Comodines", color: "#7c3aed" };
   }
 
+  if (/^CL\d{5,6}$/.test(placa) || /^EE\d{5,6}$/.test(placa)) {
+    return { clave: "comodines", nombre: "Comodines", color: "#7c3aed" };
+  }
+
+  if (/^C\d{5,6}$/.test(placa) || textoCilindrero) {
+    return { clave: "cilindreros", nombre: "Hinos / cilindreros", color: "#ef233c" };
+  }
+
   if (
     !item.tienePlacaReal ||
     !item.tieneSedeReal
   ) {
-    return { clave: "generales", nombre: "Generales", color: "#64748b" };
+    return { clave: "comodines", nombre: "Comodines", color: "#7c3aed" };
   }
 
   return { clave: "cilindreros", nombre: "Hinos / cilindreros", color: "#ef233c" };
@@ -421,6 +555,7 @@ function etiquetaFuenteGasto(item) {
 }
 
 function movimientoParaRevisionPlaca(item) {
+  const esAceite = item.familia?.clave === "aceites" || normalizarPlacaLocal(item.placa) === "ACEITES";
   return {
     id: item.id,
     fuente: item.fuente,
@@ -429,8 +564,8 @@ function movimientoParaRevisionPlaca(item) {
     po_numero: item.po_numero || "-",
     fecha: item.fecha || null,
     proveedor: item.proveedor || "No registrado",
-    placa: item.placa || "GENERAL",
-    sede: item.sede ? etiquetaSedeTomza(item.sede) : "Sin sede asignada",
+    placa: item.placa || (esAceite ? "ACEITES" : "GENERAL"),
+    sede: item.sede ? etiquetaSedeTomza(item.sede) : (esAceite ? "Aceites" : "Sin sede asignada"),
     descripcion: recortarResumen(item.descripcion || item.observaciones, 140),
     observaciones: recortarResumen(item.observaciones, 140),
     monto: Number(item.monto || 0),
@@ -627,15 +762,15 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro, pe
       COALESCE(o.tipo_mantenimiento, 'CORRECTIVO') AS tipo_mantenimiento,
       u.placa AS placa_registrada,
       UPPER(TRIM(COALESCE(
-        CASE WHEN UPPER(TRIM(COALESCE(d.codigo, ''))) IN ('ACEITE', 'ACEITES') THEN 'ACEITES' END,
-        CASE WHEN UPPER(CONCAT_WS(' ', d.descripcion, d.codigo, o.observaciones, p.nombre)) REGEXP 'ACEITE|ACEITES|MOBIL|MOVIL|PICO|LIASA' THEN 'ACEITES' END,
+        REPLACE(REPLACE(REPLACE(REGEXP_SUBSTR(UPPER(CONCAT_WS(' ', d.codigo, d.descripcion)), 'CL[[:space:].-]*[0-9]{5,6}|EE[[:space:].-]*[0-9]{5,6}|C[[:space:].-]*[0-9]{5,6}|S[[:space:].-]*[0-9]{5,6}'), ' ', ''), '-', ''), '.', ''),
+        CASE WHEN COALESCE(placas_detalle.placas_distintas, 0) = 1 THEN placas_detalle.placa_unica END,
+        CASE WHEN COALESCE(placas_detalle.tiene_placas, 0) = 0 THEN REPLACE(NULLIF(UPPER(TRIM(o.placa_unidad)), ''), ' ', '') END,
+        CASE WHEN COALESCE(placas_detalle.tiene_placas, 0) = 0 THEN REPLACE(REPLACE(REPLACE(REGEXP_SUBSTR(UPPER(COALESCE(o.observaciones, '')), 'CL[[:space:].-]*[0-9]{5,6}|EE[[:space:].-]*[0-9]{5,6}|C[[:space:].-]*[0-9]{5,6}|S[[:space:].-]*[0-9]{5,6}'), ' ', ''), '-', ''), '.', '') END,
         CASE WHEN COALESCE(placas_detalle.tiene_placas, 0) = 0 AND (
           UPPER(TRIM(COALESCE(o.placa_unidad, ''))) IN ('ACEITE', 'ACEITES')
           OR UPPER(CONCAT_WS(' ', o.observaciones, p.nombre)) REGEXP 'ACEITE|ACEITES|MOBIL|MOVIL|PICO|LIASA'
         ) THEN 'ACEITES' END,
-        REPLACE(REPLACE(REPLACE(REGEXP_SUBSTR(UPPER(CONCAT_WS(' ', d.codigo, d.descripcion)), 'CL[[:space:].-]*[0-9]{5,6}|C[[:space:].-]*[0-9]{5,6}|S[[:space:].-]*[0-9]{5,6}'), ' ', ''), '-', ''), '.', ''),
-        CASE WHEN COALESCE(placas_detalle.tiene_placas, 0) = 0 THEN REPLACE(NULLIF(UPPER(TRIM(o.placa_unidad)), ''), ' ', '') END,
-        CASE WHEN COALESCE(placas_detalle.tiene_placas, 0) = 0 THEN REPLACE(REPLACE(REPLACE(REGEXP_SUBSTR(UPPER(COALESCE(o.observaciones, '')), 'CL[[:space:].-]*[0-9]{5,6}|C[[:space:].-]*[0-9]{5,6}|S[[:space:].-]*[0-9]{5,6}'), ' ', ''), '-', ''), '.', '') END,
+        CASE WHEN UPPER(TRIM(COALESCE(d.codigo, ''))) IN ('ACEITE', 'ACEITES') THEN 'ACEITES' END,
         NULL
       ))) AS placa,
       u.sede AS sede,
@@ -652,9 +787,18 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro, pe
     FROM ordenes_compra o
     LEFT JOIN proveedores p ON p.id = o.proveedor_id
     LEFT JOIN (
-      SELECT orden_compra_id, COUNT(*) AS tiene_placas
-      FROM ordenes_compra_detalle
-      WHERE REGEXP_SUBSTR(UPPER(CONCAT_WS(' ', codigo, descripcion)), 'CL[[:space:].-]*[0-9]{5,6}|C[[:space:].-]*[0-9]{5,6}|S[[:space:].-]*[0-9]{5,6}') IS NOT NULL
+      SELECT
+        orden_compra_id,
+        COUNT(*) AS tiene_placas,
+        COUNT(DISTINCT placa_detectada) AS placas_distintas,
+        MIN(placa_detectada) AS placa_unica
+      FROM (
+        SELECT
+          orden_compra_id,
+          REPLACE(REPLACE(REPLACE(REGEXP_SUBSTR(UPPER(CONCAT_WS(' ', codigo, descripcion)), 'CL[[:space:].-]*[0-9]{5,6}|EE[[:space:].-]*[0-9]{5,6}|C[[:space:].-]*[0-9]{5,6}|S[[:space:].-]*[0-9]{5,6}'), ' ', ''), '-', ''), '.', '') AS placa_detectada
+        FROM ordenes_compra_detalle
+      ) placas_detectadas
+      WHERE placa_detectada IS NOT NULL
       GROUP BY orden_compra_id
     ) placas_detalle ON placas_detalle.orden_compra_id = o.id
     LEFT JOIN (
@@ -664,15 +808,15 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro, pe
     ) detalle_totales ON detalle_totales.orden_compra_id = o.id
     LEFT JOIN ordenes_compra_detalle d ON d.orden_compra_id = o.id
     LEFT JOIN unidades u ON REPLACE(UPPER(TRIM(u.placa)), ' ', '') = UPPER(TRIM(COALESCE(
-      CASE WHEN UPPER(TRIM(COALESCE(d.codigo, ''))) IN ('ACEITE', 'ACEITES') THEN 'ACEITES' END,
-      CASE WHEN UPPER(CONCAT_WS(' ', d.descripcion, d.codigo, o.observaciones, p.nombre)) REGEXP 'ACEITE|ACEITES|MOBIL|MOVIL|PICO|LIASA' THEN 'ACEITES' END,
+      REPLACE(REPLACE(REPLACE(REGEXP_SUBSTR(UPPER(CONCAT_WS(' ', d.codigo, d.descripcion)), 'CL[[:space:].-]*[0-9]{5,6}|EE[[:space:].-]*[0-9]{5,6}|C[[:space:].-]*[0-9]{5,6}|S[[:space:].-]*[0-9]{5,6}'), ' ', ''), '-', ''), '.', ''),
+      CASE WHEN COALESCE(placas_detalle.placas_distintas, 0) = 1 THEN placas_detalle.placa_unica END,
+      CASE WHEN COALESCE(placas_detalle.tiene_placas, 0) = 0 THEN REPLACE(NULLIF(UPPER(TRIM(o.placa_unidad)), ''), ' ', '') END,
+      CASE WHEN COALESCE(placas_detalle.tiene_placas, 0) = 0 THEN REPLACE(REPLACE(REPLACE(REGEXP_SUBSTR(UPPER(COALESCE(o.observaciones, '')), 'CL[[:space:].-]*[0-9]{5,6}|EE[[:space:].-]*[0-9]{5,6}|C[[:space:].-]*[0-9]{5,6}|S[[:space:].-]*[0-9]{5,6}'), ' ', ''), '-', ''), '.', '') END,
       CASE WHEN COALESCE(placas_detalle.tiene_placas, 0) = 0 AND (
         UPPER(TRIM(COALESCE(o.placa_unidad, ''))) IN ('ACEITE', 'ACEITES')
         OR UPPER(CONCAT_WS(' ', o.observaciones, p.nombre)) REGEXP 'ACEITE|ACEITES|MOBIL|MOVIL|PICO|LIASA'
       ) THEN 'ACEITES' END,
-      REPLACE(REPLACE(REPLACE(REGEXP_SUBSTR(UPPER(CONCAT_WS(' ', d.codigo, d.descripcion)), 'CL[[:space:].-]*[0-9]{5,6}|C[[:space:].-]*[0-9]{5,6}|S[[:space:].-]*[0-9]{5,6}'), ' ', ''), '-', ''), '.', ''),
-      CASE WHEN COALESCE(placas_detalle.tiene_placas, 0) = 0 THEN REPLACE(NULLIF(UPPER(TRIM(o.placa_unidad)), ''), ' ', '') END,
-      CASE WHEN COALESCE(placas_detalle.tiene_placas, 0) = 0 THEN REPLACE(REPLACE(REPLACE(REGEXP_SUBSTR(UPPER(COALESCE(o.observaciones, '')), 'CL[[:space:].-]*[0-9]{5,6}|C[[:space:].-]*[0-9]{5,6}|S[[:space:].-]*[0-9]{5,6}'), ' ', ''), '-', ''), '.', '') END
+      CASE WHEN UPPER(TRIM(COALESCE(d.codigo, ''))) IN ('ACEITE', 'ACEITES') THEN 'ACEITES' END
     )))
     ${whereOrdenes}
   `, paramsOrdenes, []);
@@ -690,7 +834,7 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro, pe
       COALESCE(om.tipo_mantenimiento, 'CORRECTIVO') AS tipo_mantenimiento,
       u.placa AS placa_registrada,
       UPPER(TRIM(COALESCE(
-        REPLACE(REPLACE(REPLACE(REGEXP_SUBSTR(UPPER(CONCAT_WS(' ', d.codigo, d.descripcion, om.placa_unidad, om.observaciones)), 'CL[[:space:].-]*[0-9]{5,6}|C[[:space:].-]*[0-9]{5,6}|S[[:space:].-]*[0-9]{5,6}'), ' ', ''), '-', ''), '.', ''),
+        REPLACE(REPLACE(REPLACE(REGEXP_SUBSTR(UPPER(CONCAT_WS(' ', d.codigo, d.descripcion, om.placa_unidad, om.observaciones)), 'CL[[:space:].-]*[0-9]{5,6}|EE[[:space:].-]*[0-9]{5,6}|C[[:space:].-]*[0-9]{5,6}|S[[:space:].-]*[0-9]{5,6}'), ' ', ''), '-', ''), '.', ''),
         REPLACE(NULLIF(UPPER(TRIM(om.placa_unidad)), ''), ' ', ''),
         NULL
       ))) AS placa,
@@ -714,7 +858,7 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro, pe
     ) detalle_totales ON detalle_totales.orden_motor_id = om.id
     LEFT JOIN ordenes_motor_detalle d ON d.orden_motor_id = om.id
     LEFT JOIN unidades u ON REPLACE(UPPER(TRIM(u.placa)), ' ', '') = UPPER(TRIM(COALESCE(
-      REPLACE(REPLACE(REPLACE(REGEXP_SUBSTR(UPPER(CONCAT_WS(' ', d.codigo, d.descripcion, om.placa_unidad, om.observaciones)), 'CL[[:space:].-]*[0-9]{5,6}|C[[:space:].-]*[0-9]{5,6}|S[[:space:].-]*[0-9]{5,6}'), ' ', ''), '-', ''), '.', ''),
+      REPLACE(REPLACE(REPLACE(REGEXP_SUBSTR(UPPER(CONCAT_WS(' ', d.codigo, d.descripcion, om.placa_unidad, om.observaciones)), 'CL[[:space:].-]*[0-9]{5,6}|EE[[:space:].-]*[0-9]{5,6}|C[[:space:].-]*[0-9]{5,6}|S[[:space:].-]*[0-9]{5,6}'), ' ', ''), '-', ''), '.', ''),
       REPLACE(NULLIF(UPPER(TRIM(om.placa_unidad)), ''), ' ', '')
     )))
     ${whereOrdenesMotor}
@@ -899,7 +1043,10 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro, pe
     fuente.total += item.monto;
     fuente.registros += 1;
 
-    const categoria = sumarGrupo(porCategoria, item.familia.nombre, { color: item.familia.color });
+    const negocioInfo = clasificarNegocioGasto(item);
+    const rubroInfo = item.familia;
+
+    const categoria = sumarGrupo(porCategoria, rubroInfo.nombre, { color: rubroInfo.color });
     categoria.total += item.monto;
     categoria.registros += 1;
 
@@ -927,16 +1074,15 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro, pe
     mes.registros += 1;
 
     const descripcion = sumarGrupo(porDescripcion, describirCompraExacta(item), {
-      categoria: item.familia.nombre,
-      color: item.familia.color
+      categoria: rubroInfo.nombre,
+      color: rubroInfo.color
     });
     descripcion.total += item.monto;
     descripcion.registros += 1;
 
-    const negocioInfo = clasificarNegocioGasto(item);
     const tipoUnidadInfo = clasificarTipoUnidadResumen(item, negocioInfo);
-    const rubroNombre = item.familia?.nombre || "Sin rubro";
-    const rubroColor = item.familia?.color || "#64748b";
+    const rubroNombre = rubroInfo?.nombre || "Sin rubro";
+    const rubroColor = rubroInfo?.color || "#64748b";
 
     const negocio = sumarGrupo(porNegocio, negocioInfo.nombre, {
       clave: negocioInfo.clave,
@@ -950,8 +1096,8 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro, pe
     negocio.registros += 1;
 
     const compraNegocio = sumarGrupo(negocio.compras, describirCompraGerencial(item), {
-      categoria: item.familia.nombre,
-      color: item.familia.color,
+      categoria: rubroNombre,
+      color: rubroColor,
       movimientos: []
     });
     compraNegocio.total += item.monto;
@@ -960,12 +1106,13 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro, pe
       compraNegocio.movimientos.push(movimientoParaRevisionPlaca(item));
     }
 
-    const sedeNegocio = item.tieneSedeReal ? etiquetaSedeTomza(item.sede) : "General / taller";
+    const esGastoAceite = negocioInfo.clave === "aceites" || rubroInfo?.clave === "aceites";
+    const sedeNegocio = item.tieneSedeReal ? etiquetaSedeTomza(item.sede) : (esGastoAceite ? "Aceites" : "General / taller");
     const sedeItem = sumarGrupo(negocio.sedes, sedeNegocio, { placas: new Map() });
     sedeItem.total += item.monto;
     sedeItem.registros += 1;
 
-    const placaNegocio = item.tienePlacaReal ? item.placa : "GENERAL";
+    const placaNegocio = item.tienePlacaReal ? item.placa : (esGastoAceite ? "ACEITES" : "GENERAL");
     const placaItem = sumarGrupo(negocio.placas, placaNegocio, { sede: sedeNegocio });
     placaItem.total += item.monto;
     placaItem.registros += 1;
@@ -1022,13 +1169,17 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro, pe
     sedeDelRubro.total += item.monto;
     sedeDelRubro.registros += 1;
 
-    const placaDelRubro = sumarGrupo(rubroDelNegocio.placas, placaNegocio, { sede: sedeNegocio });
+    const movimientoRubro = movimientoParaRevisionPlaca({ ...item, familia: rubroInfo });
+
+    const placaDelRubro = sumarGrupo(rubroDelNegocio.placas, placaNegocio, { sede: sedeNegocio, movimientos: [] });
     placaDelRubro.total += item.monto;
     placaDelRubro.registros += 1;
+    placaDelRubro.movimientos.push(movimientoRubro);
 
-    const placaSedeDelRubro = sumarGrupo(sedeDelRubro.placas, placaNegocio, { sede: sedeNegocio });
+    const placaSedeDelRubro = sumarGrupo(sedeDelRubro.placas, placaNegocio, { sede: sedeNegocio, movimientos: [] });
     placaSedeDelRubro.total += item.monto;
     placaSedeDelRubro.registros += 1;
+    placaSedeDelRubro.movimientos.push(movimientoRubro);
 
     const rubroNegocio = sumarGrupo(porRubroNegocio, rubroNombre, {
       color: rubroColor,
@@ -1071,7 +1222,7 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro, pe
       rubroPlaca.movimientos.push(movimientoParaRevisionPlaca(item));
     }
 
-    if (item.familia?.clave === "general") {
+    if (rubroInfo?.clave === "general") {
       const detalle = sumarGrupo(porDetalleGeneral, describirGasto(item));
       detalle.total += item.monto;
       detalle.registros += 1;
@@ -1203,7 +1354,7 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro, pe
   const totalPagado = totalFacturasPagadas + totalOrdenesMotorPagadas + totalPagosProveedorPagados + totalCajaChica;
   const movimientosTotalPagado = movimientosFacturasPagadas + movimientosOrdenesMotorPagadas + pagosProveedorPagados.length + movimientosCajaChica;
   const fuentes = ordenarTop(porFuente, 10);
-  const categorias = ordenarTop(porCategoria, 12);
+  const categorias = ordenarTop(porCategoria, 1000);
   const detalleGeneralOtros = ordenarTop(porDetalleGeneral, 1000);
   const resumenGeneralOtros = {
     total: detalleGeneralOtros.reduce((sum, item) => sum + Number(item.total || 0), 0),
@@ -1321,14 +1472,32 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro, pe
             sede: placa.sede,
             total: placa.total,
             registros: placa.registros,
-            porcentaje: Number(sede.total || 0) ? Math.round((Number(placa.total || 0) / Number(sede.total || 1)) * 100) : 0
+            porcentaje: Number(sede.total || 0) ? Math.round((Number(placa.total || 0) / Number(sede.total || 1)) * 100) : 0,
+            movimientos_total: Array.isArray(placa.movimientos) ? placa.movimientos.length : 0,
+            movimientos: Array.isArray(placa.movimientos)
+              ? placa.movimientos
+                .sort((a, b) => Number(b.monto || 0) - Number(a.monto || 0))
+                .slice(0, 80)
+              : []
           }))
         })),
-        placas: ordenarTop(rubro.placas || new Map(), 10)
+        placas: ordenarTop(rubro.placas || new Map(), 10).map(placa => ({
+          nombre: placa.nombre,
+          sede: placa.sede,
+          total: placa.total,
+          registros: placa.registros,
+          porcentaje: Number(rubro.total || 0) ? Math.round((Number(placa.total || 0) / Number(rubro.total || 1)) * 100) : 0,
+          movimientos_total: Array.isArray(placa.movimientos) ? placa.movimientos.length : 0,
+          movimientos: Array.isArray(placa.movimientos)
+            ? placa.movimientos
+              .sort((a, b) => Number(b.monto || 0) - Number(a.monto || 0))
+              .slice(0, 80)
+            : []
+        }))
       }))
     };
   });
-  const negociosPorRubro = ordenarTop(porRubroNegocio, 12).map(rubro => {
+  const negociosPorRubro = ordenarTop(porRubroNegocio, 1000).map(rubro => {
     const totalRubro = Number(rubro.total || 0);
     return {
       nombre: rubro.nombre,
@@ -1361,6 +1530,7 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro, pe
     { clave: "transportadora_cabezales", nombre: "Cabezales", color: "#0b3b82" },
     { clave: "transportadora_cisternas", nombre: "Cisternas", color: "#0f766e" },
     { clave: "transportadora_carretas", nombre: "Carretas", color: "#2563eb" },
+    { clave: "transportadora_gruas", nombre: "Grúas", color: "#f97316" },
     { clave: "transportadora_tandem", nombre: "Tándem", color: "#0891b2" },
     { clave: "graneles", nombre: "Graneles", color: "#0f766e" },
     { clave: "comodines", nombre: "Comodines", color: "#7c3aed" },

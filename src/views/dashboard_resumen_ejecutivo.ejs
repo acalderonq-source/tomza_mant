@@ -276,6 +276,32 @@
       white-space: nowrap;
     }
 
+    .manager-total-row {
+      align-items: center;
+      background: #f1f5f9;
+      border: 1px solid #d7e2ef;
+      border-radius: 12px;
+      display: flex;
+      justify-content: space-between;
+      margin-top: .75rem;
+      padding: .7rem .85rem;
+    }
+
+    .manager-total-label {
+      color: #334155;
+      font-size: .72rem;
+      font-weight: 950;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+    }
+
+    .manager-total-amount {
+      color: #071f49;
+      font-size: 1rem;
+      font-weight: 950;
+      white-space: nowrap;
+    }
+
     .manager-bar {
       background: #edf2f7;
       border-radius: 999px;
@@ -1236,8 +1262,9 @@
       value.includes('cabezales, carretas y cisternas') ||
       value.includes('pago de proveedor');
   };
+  const totalGastosNumero = Number(data.totalGastos || 0);
   const categorias = safe(data.categorias).filter(item => !contieneCategoriaOculta(item.nombre));
-  const totalCategoriasOperativas = categorias.reduce((sum, item) => sum + Number(item.total || 0), 0);
+  const totalCategoriasOperativas = totalGastosNumero;
   const fuentes = safe(data.fuentes);
   const productosServicios = safe(data.productosServicios);
   const proveedores = safe(data.proveedores);
@@ -1277,7 +1304,6 @@
     minute: '2-digit',
     second: '2-digit'
   }).format(new Date());
-  const totalGastosNumero = Number(data.totalGastos || 0);
 %>
 
 <nav class="navbar navbar-dark topbar px-4 py-3">
@@ -1414,7 +1440,7 @@
       <div class="manager-head">
         <div>
           <h2 class="manager-title">General por negocio</h2>
-          <div class="manager-subtitle">Total gasto del mes: crédito, contado, pagos y caja chica.</div>
+          <div class="manager-subtitle">Agrupado por negocio o tipo de unidad.</div>
         </div>
         <span class="pill pill-blue">₡<%= money(totalGastosNumero) %></span>
       </div>
@@ -1432,6 +1458,12 @@
             <div class="manager-amount">₡<%= money(item.total || 0) %></div>
           </div>
         <% }) %>
+        <% if (negociosGasto.length) { %>
+          <div class="manager-total-row">
+            <span class="manager-total-label">Total del periodo</span>
+            <span class="manager-total-amount">₡<%= money(totalGastosNumero) %></span>
+          </div>
+        <% } %>
       </div>
     </article>
 
@@ -1440,25 +1472,31 @@
         <div>
           <h2 class="manager-title">Por rubro del mantenimiento</h2>
           <div class="manager-subtitle">
-            Familias de gasto del periodo · <%= Number(costoUnidad.unidadesConGasto || 0).toLocaleString('es-CR') %> unidades trabajadas.
+            Agrupado por rubro del gasto · <%= Number(costoUnidad.unidadesConGasto || 0).toLocaleString('es-CR') %> unidades trabajadas.
           </div>
         </div>
-        <span class="pill pill-blue"><%= categorias.length %> rubros</span>
+        <span class="pill pill-blue">₡<%= money(totalGastosNumero) %></span>
       </div>
       <div class="manager-body">
         <% if (!categorias.length) { %>
           <div class="empty-state">No hay rubros para este filtro.</div>
         <% } %>
-        <% categorias.slice(0, 8).forEach(item => { %>
+        <% categorias.forEach(item => { %>
           <div class="manager-row">
             <div>
               <div class="manager-name"><%= item.nombre %></div>
-              <div class="manager-meta"><%= Number(item.registros || 0).toLocaleString('es-CR') %> movimiento(s) · <%= pct(item.total, totalCategoriasOperativas) %>% del rubro operativo</div>
+              <div class="manager-meta"><%= Number(item.registros || 0).toLocaleString('es-CR') %> movimiento(s) · <%= pct(item.total, totalCategoriasOperativas) %>% del gasto</div>
               <div class="manager-bar" style="--bar-color:<%= item.color || '#0b3b82' %>"><span style="width:<%= Math.max(4, pct(item.total, totalCategoriasOperativas)) %>%"></span></div>
             </div>
             <div class="manager-amount">₡<%= money(item.total || 0) %></div>
           </div>
         <% }) %>
+        <% if (categorias.length) { %>
+          <div class="manager-total-row">
+            <span class="manager-total-label">Total del periodo</span>
+            <span class="manager-total-amount">₡<%= money(totalGastosNumero) %></span>
+          </div>
+        <% } %>
       </div>
     </article>
 
@@ -2269,7 +2307,7 @@
       placas: tipo.placas || []
     })).filter(tipo => Number(tipo.total || 0) > 0 && (tipo.placas || []).length);
     const totalGastos = Number(data.totalGastos || 0);
-    const totalCategorias = categorias.reduce((sum, item) => sum + Number(item.total || 0), 0);
+    const totalCategorias = totalGastos;
     const unidadesTrabajadas = Number(data.costoUnidad?.unidadesConGasto || 0);
     setText('managerUnidadesTrabajadas', `${formatNumber(unidadesTrabajadas)} unidades trabajadas`);
 
@@ -2386,7 +2424,7 @@
           <button type="button" class="manager-row ${open ? 'active' : ''}" data-manager-rubro-general="${escapeHtml(rubroKey)}">
             <div>
               <div class="manager-name">${escapeHtml(item.nombre || '-')}</div>
-              <div class="manager-meta">${formatNumber(item.registros || 0)} movimiento(s) · ${percent(item.total, totalCategorias)}% del gasto operativo · tocar para ver sedes</div>
+              <div class="manager-meta">${formatNumber(item.registros || 0)} movimiento(s) · ${percent(item.total, totalCategorias)}% del gasto · tocar para ver sedes</div>
               <div class="manager-bar" style="--bar-color:${escapeHtml(item.color || '#0b3b82')}"><span style="width:${Math.max(4, percent(item.total, totalCategorias))}%"></span></div>
             </div>
             <div class="manager-amount">${formatMoney(item.total || 0)}</div>
@@ -2401,13 +2439,32 @@
 
       return `
         <div class="matrix-plate-list">
-          ${placas.map(placa => `
-            <div class="matrix-plate-row">
-              <span class="matrix-plate-name">${escapeHtml(placa.nombre || '-')}</span>
-              <span class="matrix-line-money">${formatMoney(placa.total || 0)}</span>
-              <span class="matrix-line-pct">${formatNumber(placa.porcentaje || 0)}%</span>
-            </div>
-          `).join('')}
+          ${placas.map(placa => {
+            const movimientos = Array.isArray(placa.movimientos) ? placa.movimientos : [];
+            if (!movimientos.length) {
+              return `
+                <div class="matrix-plate-row">
+                  <span class="matrix-plate-name">${escapeHtml(placa.nombre || '-')}</span>
+                  <span class="matrix-line-money">${formatMoney(placa.total || 0)}</span>
+                  <span class="matrix-line-pct">${formatNumber(placa.porcentaje || 0)}%</span>
+                </div>
+              `;
+            }
+
+            return `
+              <details class="matrix-plate-detail">
+                <summary class="matrix-plate-row">
+                  <span class="matrix-plate-name">
+                    ${escapeHtml(placa.nombre || '-')}
+                    <span class="matrix-plate-meta">${formatNumber(placa.registros || 0)} mov. · tocar para ver origen</span>
+                  </span>
+                  <span class="matrix-line-money">${formatMoney(placa.total || 0)}</span>
+                  <span class="matrix-line-pct">${formatNumber(placa.porcentaje || 0)}%</span>
+                </summary>
+                <div class="matrix-movement-list">${renderMovimientoRows(movimientos)}</div>
+              </details>
+            `;
+          }).join('')}
         </div>
       `;
     };
@@ -2535,24 +2592,26 @@
         <div class="manager-head">
           <div>
             <h2 class="manager-title">General por negocio</h2>
-            <div class="manager-subtitle">Total gasto del mes: crédito, contado, pagos y caja chica.</div>
+            <div class="manager-subtitle">Agrupado por negocio o tipo de unidad.</div>
           </div>
           <span class="pill pill-blue">${formatMoney(totalGastos)}</span>
         </div>
         <div class="manager-body">
           ${negocios.length ? negocios.map(item => managerRow(item, totalGastos)).join('') : '<div class="empty-state">No hay gasto por negocio para este filtro.</div>'}
+          ${negocios.length ? `<div class="manager-total-row"><span class="manager-total-label">Total del periodo</span><span class="manager-total-amount">${formatMoney(totalGastos)}</span></div>` : ''}
         </div>
       </article>
       <article class="manager-card">
         <div class="manager-head">
           <div>
             <h2 class="manager-title">Por rubro del mantenimiento</h2>
-            <div class="manager-subtitle">Familias de gasto del periodo · ${formatNumber(unidadesTrabajadas)} unidades trabajadas.</div>
+            <div class="manager-subtitle">Agrupado por rubro del gasto · ${formatNumber(unidadesTrabajadas)} unidades trabajadas.</div>
           </div>
-          <span class="pill pill-blue">${formatNumber(categorias.length)} rubros</span>
+          <span class="pill pill-blue">${formatMoney(totalGastos)}</span>
         </div>
         <div class="manager-body">
-          ${rubrosConSedes.length ? rubrosConSedes.slice(0, 8).map((item, index) => managerRubroGeneralRow(item, index)).join('') : '<div class="empty-state">No hay rubros para este filtro.</div>'}
+          ${rubrosConSedes.length ? rubrosConSedes.map((item, index) => managerRubroGeneralRow(item, index)).join('') : '<div class="empty-state">No hay rubros para este filtro.</div>'}
+          ${rubrosConSedes.length ? `<div class="manager-total-row"><span class="manager-total-label">Total del periodo</span><span class="manager-total-amount">${formatMoney(totalGastos)}</span></div>` : ''}
         </div>
       </article>
       <article class="manager-card manager-wide">

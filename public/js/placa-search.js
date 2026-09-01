@@ -77,9 +77,11 @@
     if (/^CL\d{5,6}$/.test(raw)) return raw;
     if (/^SS\d{5,6}$/.test(raw)) return raw.replace(/^SS/, "S");
     if (/^S\d{5,6}$/.test(raw)) return raw;
+    if (/^EEE\d{5,6}$/.test(raw)) return raw.replace(/^EEE/, "EE");
+    if (/^EE\d{5,6}$/.test(raw)) return raw;
     if (/^C\d{5,6}$/.test(raw)) return raw;
     if (/^\d{5,6}$/.test(raw)) return /^[23]/.test(raw) ? `CL${raw}` : `C${raw}`;
-    const embedded = raw.match(/(?:CL|C|S)?\d{5,6}/);
+    const embedded = raw.match(/(?:CL|EE|C|S)?\d{5,6}/);
     if (embedded) return normalizePlate(embedded[0]);
     return raw;
   }
@@ -95,8 +97,10 @@
       values.add(`C${number}`);
       values.add(`CL${number}`);
       values.add(`S${number}`);
+      values.add(`EE${number}`);
       values.add(`CLC${number}`);
       values.add(`SS${number}`);
+      values.add(`EEE${number}`);
     }
 
     return [...values].filter(Boolean);
