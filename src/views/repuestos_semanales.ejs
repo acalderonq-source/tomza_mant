@@ -499,6 +499,19 @@
     if (filtros[key]) pedidoPdfParams.set(key, filtros[key]);
   });
   const pedidoPdfUrl = `/repuestos-semanales/pedido-cedis.pdf${pedidoPdfParams.toString() ? `?${pedidoPdfParams.toString()}` : ''}`;
+  const gruposListadoMap = new Map();
+  lista.forEach(item => {
+    const key = `${item.fecha_iso || item.fecha_formato || ''}|${item.sede || ''}`;
+    if (!gruposListadoMap.has(key)) {
+      gruposListadoMap.set(key, {
+        fecha: item.fecha_formato || '-',
+        sede: item.sede || '',
+        items: []
+      });
+    }
+    gruposListadoMap.get(key).items.push(item);
+  });
+  const gruposListado = [...gruposListadoMap.values()];
 %>
 
 <nav class="navbar navbar-dark topbar px-3 py-2">
@@ -597,85 +610,81 @@
             </tr>
           </thead>
           <tbody>
-            <% let grupoAnterior = ''; %>
-            <% lista.forEach(item => { %>
-              <%
-                const grupoActual = `${item.fecha_formato || ''}|${item.sede || ''}`;
-                const columnas = puedeGestionar ? 7 : 6;
-              %>
-              <% if (grupoActual !== grupoAnterior) { grupoAnterior = grupoActual; %>
-                <tr class="sede-row">
-                  <td colspan="<%= columnas %>"><%= item.fecha_formato || '-' %> · <%= mostrarSede(item.sede) %></td>
-                </tr>
-              <% } %>
-              <tr class="item-row <%= item.estado === 'NO_COMPRA' ? 'is-no-compra' : '' %>">
-                <td data-label="Placa" class="placa-cell"><%= item.placa %></td>
-                <td data-label="Semana" class="semana-cell"><%= item.fecha_formato || '-' %></td>
-                <td data-label="Solicitud" class="solicitud-cell"><%= item.solicitud %></td>
-                <td data-label="Va llegando / no compra" class="rojo-cell">
-                  <% if (item.marcado_rojo) { %>
-                    <%= item.marcado_rojo %>
-                  <% } else { %>
-                    <span class="empty-red">-</span>
-                  <% } %>
-                  <% if (item.no_compra) { %>
-                    <span class="no-compra-text">No se compra: <%= item.no_compra %></span>
-                  <% } %>
-                </td>
-                <td data-label="Estado" class="text-center">
-                  <span class="estado-badge estado-<%= estadoClase(item.estado) %>"><%= estadoTexto(item.estado) %></span>
-                </td>
-                <td data-label="Creado por"><%= item.creado_por_usuario || '-' %></td>
-                <% if (puedeGestionar) { %>
-                  <td data-label="Acciones">
-                    <div class="actions-grid">
-                      <button
-                        type="button"
-                        class="btn btn-sm btn-outline-primary js-editar-semanal"
-                        data-bs-toggle="modal"
-                        data-bs-target="#editarSemanalModal"
-                        data-id="<%= item.id %>"
-                        data-fecha="<%= item.fecha_iso || '' %>"
-                        data-placa="<%= item.placa %>"
-                        data-sede="<%= item.sede || '' %>"
-                        data-estado="<%= item.estado || 'PENDIENTE' %>"
-                        data-solicitud="<%- textoSeguroData(item.solicitud) %>"
-                        data-marcado="<%- textoSeguroData(item.marcado_rojo) %>">
-                        <i class="bi bi-pencil-square"></i> Editar
-                      </button>
-                      <button
-                        type="button"
-                        class="btn btn-sm btn-outline-danger js-marcar-rojo"
-                        data-bs-toggle="modal"
-                        data-bs-target="#marcadoRojoModal"
-                        data-id="<%= item.id %>"
-                        data-placa="<%= item.placa %>"
-                        data-solicitud="<%- textoSeguroData(item.solicitud) %>"
-                        data-marcado="<%- textoSeguroData(item.marcado_rojo) %>"
-                        data-no-compra="<%- textoSeguroData(item.no_compra) %>">
-                        <i class="bi bi-highlighter"></i> Marcar / no compra
-                      </button>
-                      <form method="POST" action="/repuestos-semanales/<%= item.id %>/estado">
-                        <input type="hidden" name="fecha" value="<%= filtros.fecha || '' %>">
-                        <input type="hidden" name="sede" value="<%= filtros.sede || '' %>">
-                        <input type="hidden" name="placa" value="<%= filtros.placa || '' %>">
-                        <select name="estado" class="form-select form-select-sm mb-1">
-                          <% estados.forEach(estado => { %>
-                            <option value="<%= estado %>" <%= item.estado === estado ? 'selected' : '' %>><%= estadoTexto(estado) %></option>
-                          <% }) %>
-                        </select>
-                        <button class="btn btn-sm btn-dark w-100"><i class="bi bi-save"></i> Guardar estado</button>
-                      </form>
-                      <form method="POST" action="/repuestos-semanales/<%= item.id %>/eliminar" onsubmit="return confirm('¿Eliminar este repuesto semanal?')">
-                        <input type="hidden" name="fecha" value="<%= filtros.fecha || '' %>">
-                        <input type="hidden" name="sede" value="<%= filtros.sede || '' %>">
-                        <input type="hidden" name="placa" value="<%= filtros.placa || '' %>">
-                        <button class="btn btn-sm btn-outline-danger w-100"><i class="bi bi-trash"></i> Eliminar</button>
-                      </form>
-                    </div>
-                  </td>
-                <% } %>
+            <% const columnas = puedeGestionar ? 7 : 6; %>
+            <% gruposListado.forEach(grupo => { %>
+              <tr class="sede-row">
+                <td colspan="<%= columnas %>"><%= grupo.fecha || '-' %> · <%= mostrarSede(grupo.sede) %></td>
               </tr>
+              <% grupo.items.forEach(item => { %>
+                <tr class="item-row <%= item.estado === 'NO_COMPRA' ? 'is-no-compra' : '' %>">
+                  <td data-label="Placa" class="placa-cell"><%= item.placa %></td>
+                  <td data-label="Semana" class="semana-cell"><%= item.fecha_formato || '-' %></td>
+                  <td data-label="Solicitud" class="solicitud-cell"><%= item.solicitud %></td>
+                  <td data-label="Va llegando / no compra" class="rojo-cell">
+                    <% if (item.marcado_rojo) { %>
+                      <%= item.marcado_rojo %>
+                    <% } else { %>
+                      <span class="empty-red">-</span>
+                    <% } %>
+                    <% if (item.no_compra) { %>
+                      <span class="no-compra-text">No se compra: <%= item.no_compra %></span>
+                    <% } %>
+                  </td>
+                  <td data-label="Estado" class="text-center">
+                    <span class="estado-badge estado-<%= estadoClase(item.estado) %>"><%= estadoTexto(item.estado) %></span>
+                  </td>
+                  <td data-label="Creado por"><%= item.creado_por_usuario || '-' %></td>
+                  <% if (puedeGestionar) { %>
+                    <td data-label="Acciones">
+                      <div class="actions-grid">
+                        <button
+                          type="button"
+                          class="btn btn-sm btn-outline-primary js-editar-semanal"
+                          data-bs-toggle="modal"
+                          data-bs-target="#editarSemanalModal"
+                          data-id="<%= item.id %>"
+                          data-fecha="<%= item.fecha_iso || '' %>"
+                          data-placa="<%= item.placa %>"
+                          data-sede="<%= item.sede || '' %>"
+                          data-estado="<%= item.estado || 'PENDIENTE' %>"
+                          data-solicitud="<%- textoSeguroData(item.solicitud) %>"
+                          data-marcado="<%- textoSeguroData(item.marcado_rojo) %>">
+                          <i class="bi bi-pencil-square"></i> Editar
+                        </button>
+                        <button
+                          type="button"
+                          class="btn btn-sm btn-outline-danger js-marcar-rojo"
+                          data-bs-toggle="modal"
+                          data-bs-target="#marcadoRojoModal"
+                          data-id="<%= item.id %>"
+                          data-placa="<%= item.placa %>"
+                          data-solicitud="<%- textoSeguroData(item.solicitud) %>"
+                          data-marcado="<%- textoSeguroData(item.marcado_rojo) %>"
+                          data-no-compra="<%- textoSeguroData(item.no_compra) %>">
+                          <i class="bi bi-highlighter"></i> Marcar / no compra
+                        </button>
+                        <form method="POST" action="/repuestos-semanales/<%= item.id %>/estado">
+                          <input type="hidden" name="fecha" value="<%= filtros.fecha || '' %>">
+                          <input type="hidden" name="sede" value="<%= filtros.sede || '' %>">
+                          <input type="hidden" name="placa" value="<%= filtros.placa || '' %>">
+                          <select name="estado" class="form-select form-select-sm mb-1">
+                            <% estados.forEach(estado => { %>
+                              <option value="<%= estado %>" <%= item.estado === estado ? 'selected' : '' %>><%= estadoTexto(estado) %></option>
+                            <% }) %>
+                          </select>
+                          <button class="btn btn-sm btn-dark w-100"><i class="bi bi-save"></i> Guardar estado</button>
+                        </form>
+                        <form method="POST" action="/repuestos-semanales/<%= item.id %>/eliminar" onsubmit="return confirm('¿Eliminar este repuesto semanal?')">
+                          <input type="hidden" name="fecha" value="<%= filtros.fecha || '' %>">
+                          <input type="hidden" name="sede" value="<%= filtros.sede || '' %>">
+                          <input type="hidden" name="placa" value="<%= filtros.placa || '' %>">
+                          <button class="btn btn-sm btn-outline-danger w-100"><i class="bi bi-trash"></i> Eliminar</button>
+                        </form>
+                      </div>
+                    </td>
+                  <% } %>
+                </tr>
+              <% }) %>
             <% }) %>
           </tbody>
         </table>
