@@ -149,6 +149,10 @@ async function ensureAceiteTables() {
   if (!(await columnExists("cambios_aceite_historial", "fecha"))) {
     await pool.query("ALTER TABLE cambios_aceite_historial ADD COLUMN fecha TIMESTAMP NULL AFTER creado_por");
   }
+
+  if (!(await columnExists("cambios_aceite_historial", "archivado_en"))) {
+    await pool.query("ALTER TABLE cambios_aceite_historial ADD COLUMN archivado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP AFTER fecha");
+  }
 }
 
 function puedeUsarSede(sede, sedesPermitidas) {
@@ -209,6 +213,210 @@ async function consumirAceitePorSede(connection, { sede, litros, cambioAceiteId,
   }
 }
 
+async function obtenerConsumosAceiteDesde(connection, { sede, fechaCompra }) {
+  const sedeOperativa = sedeOperativaRepuestosAceites(sede);
+  const sedesBusqueda = expandirSedeOperativaRepuestosAceites(sedeOperativa);
+  const [consumos] = await connection.query(
+    `SELECT *
+     FROM (
+       SELECT
+         ca.id AS cambio_id,
+         ca.unidad_id,
+         u.placa,
+         ca.sede,
+         ca.fecha,
+         GREATEST(
+           COALESCE(ca.litros_usados, ca.galones * ?) - COALESCE(am.litros_rebajados, 0),
+           0
+         ) AS litros_usados,
+         'ACTUAL' AS origen
+       FROM cambios_aceite ca
+       JOIN unidades u ON u.id = ca.unidad_id
+       LEFT JOIN (
+         SELECT cambio_aceite_id, SUM(litros) AS litros_rebajados
+         FROM aceite_movimientos
+         WHERE tipo = 'SALIDA'
+           AND cambio_aceite_id IS NOT NULL
+         GROUP BY cambio_aceite_id
+       ) am ON am.cambio_aceite_id = ca.id
+       WHERE ca.sede IN (?)
+         AND DATE(ca.fecha) >= ?
+         AND ca.fecha <= NOW()
+
+       UNION ALL
+
+       SELECT
+         cah.id AS cambio_id,
+         cah.unidad_id,
+         u.placa,
+         cah.sede,
+         COALESCE(cah.fecha, cah.archivado_en) AS fecha,
+         COALESCE(cah.litros_usados, cah.galones * ?) AS litros_usados,
+         'HISTORIAL' AS origen
+       FROM cambios_aceite_historial cah
+       JOIN unidades u ON u.id = cah.unidad_id
+       WHERE cah.sede IN (?)
+         AND DATE(COALESCE(cah.fecha, cah.archivado_en)) >= ?
+         AND COALESCE(cah.fecha, cah.archivado_en) <= NOW()
+         AND NOT EXISTS (
+           SELECT 1
+           FROM cambios_aceite ca_actual
+           WHERE ca_actual.unidad_id = cah.unidad_id
+             AND ca_actual.sede = cah.sede
+             AND ABS(TIMESTAMPDIFF(SECOND, ca_actual.fecha, COALESCE(cah.fecha, cah.archivado_en))) <= 2
+             AND ABS(COALESCE(ca_actual.litros_usados, ca_actual.galones * ?) - COALESCE(cah.litros_usados, cah.galones * ?)) <= 0.01
+         )
+     ) consumos
+     WHERE litros_usados > 0
+     ORDER BY fecha ASC, placa ASC, cambio_id ASC`,
+    [GALON_A_LITROS, sedesBusqueda, fechaCompra, GALON_A_LITROS, sedesBusqueda, fechaCompra, GALON_A_LITROS, GALON_A_LITROS]
+  );
+
+  return consumos;
+}
+
+async function rebajarConsumosHistoricosEstanon(connection, { estanonId, sede, fechaCompra, litrosDisponibles, userId }) {
+  const consumos = await obtenerConsumosAceiteDesde(connection, { sede, fechaCompra });
+  let litrosRestantes = Number(litrosDisponibles || 0);
+  let litrosRebajados = 0;
+  let cambiosAplicados = 0;
+
+  for (const consumo of consumos) {
+    if (litrosRestantes <= 0.001) break;
+
+    const litrosCambio = Number(consumo.litros_usados || 0);
+    const litrosSalida = Math.min(litrosRestantes, litrosCambio);
+    if (litrosSalida <= 0) continue;
+
+    litrosRestantes = Math.max(0, litrosRestantes - litrosSalida);
+    litrosRebajados += litrosSalida;
+    cambiosAplicados += 1;
+
+    const fechaCambio = consumo.fecha
+      ? new Date(consumo.fecha).toLocaleDateString("es-CR", { timeZone: "America/Costa_Rica" })
+      : fechaCompra;
+
+    await connection.query(
+      `INSERT INTO aceite_movimientos
+       (estanon_id, cambio_aceite_id, sede, tipo, litros, descripcion, unidad_id, placa, creado_por)
+       VALUES (?, ?, ?, 'SALIDA', ?, ?, ?, ?, ?)`,
+      [
+        estanonId,
+        consumo.origen === "ACTUAL" ? consumo.cambio_id : null,
+        sedeOperativaRepuestosAceites(sede),
+        litrosSalida,
+        `Rebajo automático por cambio de aceite ${consumo.placa} del ${fechaCambio}`,
+        consumo.unidad_id,
+        consumo.placa,
+        userId || null
+      ]
+    );
+  }
+
+  await connection.query(
+    `UPDATE aceite_estanones
+     SET litros_restantes = ?,
+         estado = CASE WHEN ? <= 0.001 THEN 'AGOTADO' ELSE 'ACTIVO' END
+     WHERE id = ?`,
+    [litrosRestantes, litrosRestantes, estanonId]
+  );
+
+  return {
+    litrosRestantes,
+    litrosRebajados,
+    cambiosAplicados,
+    cambiosEncontrados: consumos.length
+  };
+}
+
+async function sincronizarCambiosPendientesAceite(sedesPermitidas, userId) {
+  if (!sedesPermitidas.length) return;
+
+  const connection = await pool.getConnection();
+  try {
+    await connection.beginTransaction();
+
+    const [pendientes] = await connection.query(
+      `SELECT
+         ca.id,
+         ca.unidad_id,
+         u.placa,
+         ca.sede,
+         ca.fecha,
+         GREATEST(
+           COALESCE(ca.litros_usados, ca.galones * ?) - COALESCE(SUM(CASE WHEN am.tipo = 'SALIDA' THEN am.litros ELSE 0 END), 0),
+           0
+         ) AS litros_pendientes
+       FROM cambios_aceite ca
+       JOIN unidades u ON u.id = ca.unidad_id
+       LEFT JOIN aceite_movimientos am ON am.cambio_aceite_id = ca.id
+       WHERE ca.sede IN (?)
+       GROUP BY ca.id, ca.unidad_id, u.placa, ca.sede, ca.fecha, ca.litros_usados, ca.galones
+       HAVING litros_pendientes > 0.001
+       ORDER BY ca.fecha ASC, ca.id ASC`,
+      [GALON_A_LITROS, sedesPermitidas]
+    );
+
+    for (const pendiente of pendientes) {
+      const sedeOperativa = sedeOperativaRepuestosAceites(pendiente.sede);
+      const sedesBusqueda = expandirSedeOperativaRepuestosAceites(sedeOperativa);
+      const [estanones] = await connection.query(
+        `SELECT id, litros_restantes
+         FROM aceite_estanones
+         WHERE sede IN (?)
+           AND estado = 'ACTIVO'
+           AND litros_restantes > 0
+           AND fecha_compra <= DATE(?)
+         ORDER BY fecha_compra ASC, id ASC
+         FOR UPDATE`,
+        [sedesBusqueda, pendiente.fecha]
+      );
+
+      let litrosPendientes = Number(pendiente.litros_pendientes || 0);
+      for (const estanon of estanones) {
+        if (litrosPendientes <= 0.001) break;
+
+        const restanteActual = Number(estanon.litros_restantes || 0);
+        const litrosSalida = Math.min(restanteActual, litrosPendientes);
+        const nuevoRestante = Math.max(0, restanteActual - litrosSalida);
+
+        await connection.query(
+          `UPDATE aceite_estanones
+           SET litros_restantes = ?,
+               estado = CASE WHEN ? <= 0.001 THEN 'AGOTADO' ELSE estado END
+           WHERE id = ?`,
+          [nuevoRestante, nuevoRestante, estanon.id]
+        );
+
+        await connection.query(
+          `INSERT INTO aceite_movimientos
+           (estanon_id, cambio_aceite_id, sede, tipo, litros, descripcion, unidad_id, placa, creado_por)
+           VALUES (?, ?, ?, 'SALIDA', ?, ?, ?, ?, ?)`,
+          [
+            estanon.id,
+            pendiente.id,
+            sedeOperativa,
+            litrosSalida,
+            `Rebajo sincronizado por cambio de aceite ${pendiente.placa}`,
+            pendiente.unidad_id,
+            pendiente.placa,
+            userId || null
+          ]
+        );
+
+        litrosPendientes -= litrosSalida;
+      }
+    }
+
+    await connection.commit();
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
+}
+
 router.use(requireAuth);
 
 router.get("/", async (req, res) => {
@@ -216,6 +424,7 @@ router.get("/", async (req, res) => {
     await ensureAceiteTables();
     const sedesPermitidas = expandirSedesOperativasRepuestosAceites(getSedesPermitidas(req));
     const sedesGestion = sedesOperativasVisibles((await obtenerTodasSedes(pool)).filter(sede => puedeUsarSede(sede, sedesPermitidas)));
+    await sincronizarCambiosPendientesAceite(sedesPermitidas, req.session.user.id || null);
 
     const [cambios] = await pool.query(
       `SELECT
@@ -227,12 +436,20 @@ router.get("/", async (req, res) => {
         ca.galones,
         ca.galones AS galones_usados,
         COALESCE(ca.litros_usados, ca.galones * ${GALON_A_LITROS}) AS litros_usados,
+        COALESCE(am.litros_rebajados, 0) AS litros_rebajados,
         ca.proximo_km,
         ca.observaciones,
         us.nombre AS mecanico
       FROM cambios_aceite ca
       JOIN unidades u ON u.id = ca.unidad_id
       LEFT JOIN usuarios us ON us.id = ca.creado_por
+      LEFT JOIN (
+        SELECT cambio_aceite_id, SUM(litros) AS litros_rebajados
+        FROM aceite_movimientos
+        WHERE tipo = 'SALIDA'
+          AND cambio_aceite_id IS NOT NULL
+        GROUP BY cambio_aceite_id
+      ) am ON am.cambio_aceite_id = ca.id
       WHERE ca.sede IN (?)
       ORDER BY ca.fecha DESC
       LIMIT 120`,
@@ -326,6 +543,7 @@ router.get("/nuevo", async (req, res) => {
 });
 
 router.post("/estanones", async (req, res) => {
+  let connection;
   try {
     if (!puedeGestionarAceite(req.session.user)) {
       return res.status(403).send("No autorizado");
@@ -351,26 +569,46 @@ router.post("/estanones", async (req, res) => {
       return res.redirect("/aceite");
     }
 
-    const [result] = await pool.query(
+    connection = await pool.getConnection();
+    await connection.beginTransaction();
+
+    const [result] = await connection.query(
       `INSERT INTO aceite_estanones
        (sede, descripcion, fecha_compra, litros_capacidad, litros_restantes, creado_por)
        VALUES (?, ?, ?, ?, ?, ?)`,
       [sede, descripcion, fechaCompra, litrosCapacidad, litrosIniciales, req.session.user.id || null]
     );
 
-    await pool.query(
+    await connection.query(
       `INSERT INTO aceite_movimientos
        (estanon_id, sede, tipo, litros, descripcion, creado_por)
        VALUES (?, ?, 'ENTRADA', ?, ?, ?)`,
       [result.insertId, sede, litrosIniciales, descripcion, req.session.user.id || null]
     );
 
-    req.session.success = `Estañón agregado para ${etiquetaSedeOperativa(sede)} con ${galonesIniciales.toFixed(2)} galones.`;
+    const rebajo = await rebajarConsumosHistoricosEstanon(connection, {
+      estanonId: result.insertId,
+      sede,
+      fechaCompra,
+      litrosDisponibles: litrosIniciales,
+      userId: req.session.user.id || null
+    });
+
+    await connection.commit();
+
+    const galonesRebajados = rebajo.litrosRebajados / GALON_A_LITROS;
+    const galonesRestantes = rebajo.litrosRestantes / GALON_A_LITROS;
+    req.session.success = rebajo.cambiosAplicados > 0
+      ? `Estañón agregado para ${etiquetaSedeOperativa(sede)} con ${galonesIniciales.toFixed(2)} galones. Se rebajaron automáticamente ${galonesRebajados.toFixed(2)} galones de ${rebajo.cambiosAplicados} cambio(s) desde ${fechaCompra}. Disponible ahora: ${galonesRestantes.toFixed(2)} galones.`
+      : `Estañón agregado para ${etiquetaSedeOperativa(sede)} con ${galonesIniciales.toFixed(2)} galones. No había cambios registrados desde ${fechaCompra} para rebajar.`;
     res.redirect("/aceite");
   } catch (error) {
+    if (connection) await connection.rollback().catch(() => {});
     console.error("ERROR agregando estañón:", error);
     req.session.error = "No se pudo agregar el estañón.";
     res.redirect("/aceite");
+  } finally {
+    if (connection) connection.release();
   }
 });
 
