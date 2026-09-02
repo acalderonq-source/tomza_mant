@@ -265,7 +265,12 @@
                       <% item.mantenimientos.forEach(m => { %>
                         <tr>
                           <td><%= m.fecha_formato || '-' %></td>
-                          <td><%= m.numero || '-' %></td>
+                          <td>
+                            <%= m.numero || '-' %>
+                            <% if (Number(m.registros_agrupados || 0) > 1) { %>
+                              <div class="muted small"><%= Number(m.registros_agrupados).toLocaleString('es-CR') %> registros agrupados</div>
+                            <% } %>
+                          </td>
                           <td><span class="badge text-bg-dark"><%= m.tipo || '-' %></span></td>
                           <td>
                             <div><%= m.detalle || '-' %></div>
@@ -304,6 +309,9 @@
                           <td>
                             <div class="fw-bold"><%= r.repuesto_solicitado || '-' %></div>
                             <div class="muted small"><%= r.proveedor || 'Sin proveedor' %></div>
+                            <% if (Number(r.registros_agrupados || 0) > 1) { %>
+                              <div class="muted small"><%= Number(r.registros_agrupados).toLocaleString('es-CR') %> registros agrupados</div>
+                            <% } %>
                           </td>
                           <td><%= Number(r.cantidad || 0).toLocaleString('es-CR') %></td>
                           <td><%= estadoRepuesto(r.estado) %></td>

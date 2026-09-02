@@ -90,7 +90,7 @@ async function sincronizarPrioridadesDelDia(fecha, req) {
   const sedesFiltro = await obtenerSedesFiltro(req);
   const condiciones = [
     "tp.estado = 'PENDIENTE'",
-    "COALESCE(tp.fecha_prioridad, DATE(tp.creado_en)) <= ?"
+    "COALESCE(tp.fecha_prioridad, DATE(tp.creado_en)) = ?"
   ];
   const params = [fecha];
 

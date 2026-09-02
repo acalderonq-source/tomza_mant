@@ -212,6 +212,14 @@ function normalizarTrabajoTexto(value) {
     .trim();
 }
 
+function limpiarTextoHistorial(value) {
+  return String(value || "")
+    .replace(/\s*\|\s*$/g, "")
+    .replace(/\s*\|\s*/g, " | ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function dividirTrabajos(value) {
   return String(value || "")
     .split(/\s*\|\s*|\n+/)
@@ -266,6 +274,94 @@ function unirTextoUnico(actual, nuevo, separador = " / ") {
     });
 
   return [actual, ...nuevos].filter(Boolean).join(separador);
+}
+
+function resumirNumerosMantenimiento(numeros = []) {
+  const unicos = [...new Set(numeros.map(numero => String(numero || "").trim()).filter(Boolean))];
+  if (unicos.length <= 1) return unicos[0] || "-";
+
+  const parseados = unicos.map(numero => {
+    const match = numero.match(/^([A-Z]+)-(\d+)$/i);
+    return match ? { original: numero, prefijo: match[1].toUpperCase(), numero: Number(match[2]) } : null;
+  });
+  const todosSecuenciales = parseados.every(Boolean) &&
+    new Set(parseados.map(item => item.prefijo)).size === 1;
+
+  if (todosSecuenciales) {
+    const ordenados = parseados.sort((a, b) => a.numero - b.numero);
+    const consecutivos = ordenados.every((item, index) => index === 0 || item.numero === ordenados[index - 1].numero + 1);
+    if (consecutivos) {
+      return `${ordenados[0].prefijo}-${ordenados[0].numero} a ${ordenados[ordenados.length - 1].prefijo}-${ordenados[ordenados.length - 1].numero}`;
+    }
+  }
+
+  return unicos.length > 3 ? `${unicos.slice(0, 3).join(", ")} +${unicos.length - 3}` : unicos.join(", ");
+}
+
+function deduplicarDetalleMantenimientos(mantenimientos = []) {
+  const grupos = new Map();
+
+  for (const item of mantenimientos) {
+    const key = [
+      fechaSqlDesdeValor(item.fecha),
+      normalizarTrabajoTexto(item.tipo),
+      normalizarTrabajoTexto(limpiarTextoHistorial(item.detalle)),
+      normalizarTrabajoTexto(limpiarTextoHistorial(item.pendiente)),
+      normalizarTrabajoTexto(item.mecanicos)
+    ].join("|");
+
+    if (!grupos.has(key)) {
+      grupos.set(key, {
+        ...item,
+        detalle: limpiarTextoHistorial(item.detalle),
+        pendiente: limpiarTextoHistorial(item.pendiente),
+        numeros: [],
+        registros_agrupados: 0
+      });
+    }
+
+    const grupo = grupos.get(key);
+    grupo.numeros.push(item.numero);
+    grupo.registros_agrupados += 1;
+    grupo.mecanicos = unirTextoUnico(grupo.mecanicos, item.mecanicos);
+  }
+
+  return [...grupos.values()].map(item => ({
+    ...item,
+    numero: resumirNumerosMantenimiento(item.numeros),
+    numeros: undefined
+  }));
+}
+
+function deduplicarDetalleRepuestos(repuestos = []) {
+  const grupos = new Map();
+
+  for (const item of repuestos) {
+    const key = [
+      fechaSqlDesdeValor(item.fecha_solicitud),
+      normalizarTrabajoTexto(item.repuesto_solicitado),
+      Number(item.cantidad || 0),
+      normalizarTrabajoTexto(item.estado),
+      normalizarTrabajoTexto(item.proveedor)
+    ].join("|");
+
+    if (!grupos.has(key)) {
+      grupos.set(key, {
+        ...item,
+        ids: [],
+        registros_agrupados: 0
+      });
+    }
+
+    const grupo = grupos.get(key);
+    grupo.ids.push(item.id);
+    grupo.registros_agrupados += 1;
+  }
+
+  return [...grupos.values()].map(item => ({
+    ...item,
+    ids: undefined
+  }));
 }
 
 function agruparTrabajosPorPlaca(rows, diasCercanos = 2) {
@@ -473,7 +569,10 @@ async function obtenerDetalleHistorialPrioridad(prioridad) {
     [placas, inicio, fin]
   );
 
-  return { mantenimientos, repuestos };
+  return {
+    mantenimientos: deduplicarDetalleMantenimientos(mantenimientos),
+    repuestos: deduplicarDetalleRepuestos(repuestos)
+  };
 }
 
 router.get("/prioridades-historial", async (req, res) => {
@@ -664,7 +763,7 @@ router.get("/dashboard", async (req, res) => {
       LEFT JOIN usuarios usr ON usr.id = tp.creado_por
       LEFT JOIN unidades un ON UPPER(TRIM(un.placa)) = UPPER(TRIM(tp.placa))
       WHERE tp.estado = 'PENDIENTE'
-        AND COALESCE(tp.fecha_prioridad, DATE(tp.creado_en)) <= ?
+        AND COALESCE(tp.fecha_prioridad, DATE(tp.creado_en)) = ?
     `;
     let prioridadesParams = [fechaPrioridadHoy, fechaPrioridadHoy];
     if (sedesPermitidas.length > 0 && !esUsuarioPesados(req.session.user)) {
@@ -680,13 +779,12 @@ router.get("/dashboard", async (req, res) => {
             THEN 0
             ELSE 1
           END,
-          COALESCE(tp.fecha_prioridad, DATE(tp.creado_en)) ASC,
           tp.creado_en DESC,
           tp.id DESC
         LIMIT 20
       `;
     } else {
-      prioridadesSql += " ORDER BY COALESCE(tp.fecha_prioridad, DATE(tp.creado_en)) ASC, tp.creado_en DESC, tp.id DESC LIMIT 20";
+      prioridadesSql += " ORDER BY tp.creado_en DESC, tp.id DESC LIMIT 20";
     }
     const [prioridadesTodas] = await pool.query(prioridadesSql, prioridadesParams);
     const prioridadesPesadosTodas = prioridadesTodas.filter(p =>

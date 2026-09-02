@@ -602,9 +602,9 @@
   <section class="dashboard-layout">
       <section class="panel priority-panel">
         <div class="tv-panel-title priority-title d-flex justify-content-between align-items-center gap-2 flex-wrap">
-          <span><i class="bi bi-exclamation-octagon me-1"></i> Prioridades activas</span>
+          <span><i class="bi bi-exclamation-octagon me-1"></i> Prioridades del día</span>
           <div class="d-flex align-items-center gap-2 flex-wrap">
-            <span class="badge text-bg-light text-dark">Pendientes hasta <%= fechaPrioridadActual || 'hoy' %> · <%= prioridadesVisiblesLista.length %></span>
+            <span class="badge text-bg-light text-dark">Hoy <%= fechaPrioridadActual || '' %> · <%= prioridadesVisiblesLista.length %></span>
             <a href="/taller/prioridades-historial" class="btn btn-sm btn-outline-light fw-bold py-0">
               <i class="bi bi-clock-history"></i> Historial
             </a>
@@ -617,7 +617,7 @@
         </div>
 
         <% if (!prioridadesVisiblesLista.length) { %>
-          <div class="empty-state">No hay prioridades pendientes.</div>
+          <div class="empty-state">No hay prioridades pendientes para hoy.</div>
         <% } else { %>
           <div class="compact-panel-body priority-groups">
             <% if (mostrarPrioridadesPesados) { %>
