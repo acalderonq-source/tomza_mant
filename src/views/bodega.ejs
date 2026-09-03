@@ -59,7 +59,7 @@
     .kpi-grid {
       display: grid;
       gap: .7rem;
-      grid-template-columns: repeat(7, minmax(0, 1fr));
+      grid-template-columns: repeat(8, minmax(0, 1fr));
     }
 
     .kpi-card,
@@ -89,7 +89,7 @@
     .quick-actions {
       display: grid;
       gap: .75rem;
-      grid-template-columns: repeat(6, minmax(0, 1fr));
+      grid-template-columns: repeat(7, minmax(0, 1fr));
     }
 
     .quick-btn {
@@ -120,6 +120,28 @@
     .btn-amber i { background: var(--amber); }
     .btn-red i { background: var(--red); }
     .btn-darkx i { background: var(--navy); }
+
+    .module-tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: .45rem;
+    }
+
+    .module-tab {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      color: #0f274d;
+      font-weight: 900;
+      padding: .45rem .8rem;
+      text-decoration: none;
+    }
+
+    .module-tab.active {
+      background: var(--blue);
+      border-color: var(--blue);
+      color: #fff;
+    }
 
     .form-label { color: #334155; font-size: .75rem; font-weight: 900; margin-bottom: .25rem; }
     .form-control, .form-select {
@@ -192,6 +214,10 @@
   const origenClase = (value) => value === 'CONSIGNACION' ? 'pill-consignacion' : 'pill-propio';
   const articulosDisponibles = (Array.isArray(articulos) ? articulos : []).filter(a => Number(a.stock_actual || 0) > 0);
   const articulosConsignacion = (Array.isArray(articulos) ? articulos : []).filter(a => a.origen_inventario === 'CONSIGNACION');
+  const listaSuministros = Array.isArray(suministros) ? suministros : [];
+  const paginaActual = pagina || 'inicio';
+  const pageUrl = (page) => page === 'inicio' ? '/bodega' : `/bodega/${page}`;
+  const mostrar = (...pages) => pages.includes(paginaActual);
 %>
 
 <nav class="navbar navbar-dark topbar px-3 py-2">
@@ -208,7 +234,7 @@
         <h1 class="page-title">Inventario de bodega del taller</h1>
         <p class="page-copy">Buscar, entregar, recibir, devolver y controlar herramientas con código interno de taller.</p>
       </div>
-      <form method="GET" action="/bodega" class="d-flex gap-2 flex-wrap">
+      <form method="GET" action="<%= pageUrl(paginaActual) %>" class="d-flex gap-2 flex-wrap">
         <input class="form-control" name="q" value="<%= q || '' %>" placeholder="Buscar por código taller, proveedor, nombre, parte, ubicación..." style="min-width: 320px">
         <select class="form-select" name="origen" style="width: 190px">
           <option value="" <%= !origen ? 'selected' : '' %>>Todo inventario</option>
@@ -216,7 +242,7 @@
           <option value="CONSIGNACION" <%= origen === 'CONSIGNACION' ? 'selected' : '' %>>Consignación</option>
         </select>
         <button class="btn btn-light fw-bold"><i class="bi bi-search"></i> Buscar</button>
-        <a href="/bodega" class="btn btn-outline-light fw-bold">Limpiar</a>
+        <a href="<%= pageUrl(paginaActual) %>" class="btn btn-outline-light fw-bold">Limpiar</a>
       </form>
     </div>
   </section>
@@ -224,32 +250,102 @@
   <% if (success) { %><div class="alert alert-success fw-bold"><%= success %></div><% } %>
   <% if (error) { %><div class="alert alert-danger fw-bold"><%= error %></div><% } %>
 
+  <section class="module-tabs mb-3">
+    <a class="module-tab <%= paginaActual === 'inicio' ? 'active' : '' %>" href="/bodega">Inicio</a>
+    <a class="module-tab <%= paginaActual === 'entregas' ? 'active' : '' %>" href="/bodega/entregas">Entregas</a>
+    <a class="module-tab <%= paginaActual === 'suministros' ? 'active' : '' %>" href="/bodega/suministros">Suministros</a>
+    <a class="module-tab <%= paginaActual === 'consignacion' ? 'active' : '' %>" href="/bodega/consignacion">Consignación</a>
+    <a class="module-tab <%= paginaActual === 'inventario' ? 'active' : '' %>" href="/bodega/inventario">Inventario</a>
+    <a class="module-tab <%= paginaActual === 'herramientas' ? 'active' : '' %>" href="/bodega/herramientas">Herramientas</a>
+    <a class="module-tab <%= paginaActual === 'movimientos' ? 'active' : '' %>" href="/bodega/movimientos">Movimientos</a>
+  </section>
+
   <section class="kpi-grid mb-3">
     <div class="kpi-card"><div class="kpi-label">Artículos</div><div class="kpi-value"><%= stats.articulos %></div></div>
     <div class="kpi-card"><div class="kpi-label">Stock bajo</div><div class="kpi-value text-warning"><%= stats.stock_bajo %></div></div>
     <div class="kpi-card"><div class="kpi-label">Agotados</div><div class="kpi-value text-danger"><%= stats.agotados %></div></div>
     <div class="kpi-card"><div class="kpi-label">Inventario nuestro</div><div class="kpi-value text-success"><%= stats.propios %></div></div>
     <div class="kpi-card"><div class="kpi-label">Consignación</div><div class="kpi-value text-warning"><%= stats.consignacion %></div></div>
+    <div class="kpi-card"><div class="kpi-label">Suministros</div><div class="kpi-value text-primary"><%= stats.suministros %></div></div>
     <div class="kpi-card"><div class="kpi-label">Herramientas prestadas</div><div class="kpi-value text-primary"><%= stats.herramientas_prestadas %></div></div>
     <div class="kpi-card"><div class="kpi-label">Movimientos de hoy</div><div class="kpi-value text-success"><%= stats.movimientos_hoy %></div></div>
   </section>
 
   <section class="quick-actions mb-3">
-    <a href="#entregar" class="quick-btn btn-blue"><i class="bi bi-box-arrow-up-right"></i>Entregar</a>
-    <a href="#recibir" class="quick-btn btn-green"><i class="bi bi-box-arrow-in-down"></i>Recibir</a>
-    <a href="#devolver" class="quick-btn btn-amber"><i class="bi bi-arrow-counterclockwise"></i>Devolver</a>
-    <a href="#consignacion" class="quick-btn btn-amber"><i class="bi bi-truck"></i>Consignación</a>
-    <a href="#inventario" class="quick-btn btn-darkx"><i class="bi bi-list-check"></i>Inventario</a>
-    <a href="#herramientas" class="quick-btn btn-red"><i class="bi bi-tools"></i>Herramientas</a>
+    <a href="/bodega/entregas" class="quick-btn btn-blue"><i class="bi bi-box-arrow-up-right"></i>Entregas</a>
+    <a href="/bodega/suministros" class="quick-btn btn-blue"><i class="bi bi-clipboard2-check"></i>Suministros</a>
+    <a href="/bodega/consignacion" class="quick-btn btn-amber"><i class="bi bi-truck"></i>Consignación</a>
+    <a href="/bodega/inventario" class="quick-btn btn-darkx"><i class="bi bi-list-check"></i>Inventario</a>
+    <a href="/bodega/herramientas" class="quick-btn btn-red"><i class="bi bi-tools"></i>Herramientas</a>
+    <a href="/bodega/movimientos" class="quick-btn btn-green"><i class="bi bi-clock-history"></i>Movimientos</a>
+    <a href="/bodega" class="quick-btn btn-darkx"><i class="bi bi-house"></i>Bodega inicio</a>
   </section>
 
-  <section class="panel mb-3" id="consignacion">
+  <section class="panel mb-3 <%= mostrar('suministros') ? '' : 'd-none' %>" id="suministros">
+    <div class="panel-head">
+      <div>
+        <h2 class="panel-title">Suministros de bodega</h2>
+        <p class="panel-copy">Materiales de uso diario: limpieza, seguridad, oficina, empaque y lo que bodega ocupa controlar.</p>
+      </div>
+      <button class="btn btn-primary btn-sm fw-bold" data-bs-toggle="collapse" data-bs-target="#crear-suministro"><i class="bi bi-plus-circle"></i> Nuevo suministro</button>
+    </div>
+    <div class="collapse show" id="crear-suministro">
+      <div class="panel-body border-bottom">
+        <form method="POST" action="/bodega/suministros" class="row g-2">
+          <input type="hidden" name="redirect_to" value="suministros">
+          <div class="col-md-2">
+            <label class="form-label">Código taller</label>
+            <input class="form-control" value="<%= proximoCodigoTaller || 'Automático' %>" readonly>
+            <div class="small muted mt-1">Automático.</div>
+          </div>
+          <div class="col-md-2"><label class="form-label">Código proveedor</label><input class="form-control" name="codigo" placeholder="Opcional"></div>
+          <div class="col-md-3"><label class="form-label">Suministro</label><input class="form-control" name="nombre" placeholder="Guantes, bolsas, desengrasante..." required></div>
+          <div class="col-md-2"><label class="form-label">Categoría</label><input class="form-control" name="categoria" placeholder="Limpieza, seguridad..."></div>
+          <div class="col-md-2"><label class="form-label">Marca / medida</label><input class="form-control" name="marca" placeholder="3M, galón, caja..."></div>
+          <div class="col-md-1"><label class="form-label">Unidad</label><input class="form-control" name="unidad_medida" value="UND"></div>
+          <div class="col-md-1"><label class="form-label">Stock</label><input class="form-control" type="number" step="0.01" name="stock_actual" value="0"></div>
+          <div class="col-md-1"><label class="form-label">Mín.</label><input class="form-control" type="number" step="0.01" name="stock_minimo" value="0"></div>
+          <div class="col-md-1"><label class="form-label">Máx.</label><input class="form-control" type="number" step="0.01" name="stock_maximo" value="0"></div>
+          <div class="col-md-2"><label class="form-label">Ubicación</label><input class="form-control" name="ubicacion" placeholder="Estante / gaveta"></div>
+          <div class="col-md-2"><label class="form-label">Precio unitario</label><input class="form-control" type="number" step="0.01" name="precio_unitario" value="0"></div>
+          <div class="col-md-3"><label class="form-label">Proveedor</label><select class="form-select" name="proveedor_id"><option value="">Seleccione</option><% proveedores.forEach(p => { %><option value="<%= p.id %>"><%= p.nombre %></option><% }) %></select></div>
+          <div class="col-md-3"><label class="form-label">Proveedor manual</label><input class="form-control" name="proveedor_nombre" placeholder="Si no está en lista"></div>
+          <div class="col-md-6"><label class="form-label">Observación / uso</label><input class="form-control" name="observacion" placeholder="Para qué se usa, presentación, detalle de compra..."></div>
+          <div class="col-md-2 d-grid"><label class="form-label">&nbsp;</label><button class="btn btn-primary fw-bold">Guardar suministro</button></div>
+        </form>
+      </div>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-sm mb-0 align-middle">
+        <thead><tr><th>Cód. taller</th><th>Cód. proveedor</th><th>Suministro</th><th>Categoría</th><th>Existencia</th><th>Mín/Max</th><th>Ubicación</th><th>Proveedor</th><th>Observación</th><th>Estado</th></tr></thead>
+        <tbody>
+          <% if (!listaSuministros.length) { %><tr><td colspan="10" class="text-center text-muted py-3">No hay suministros registrados todavía.</td></tr><% } %>
+          <% listaSuministros.forEach(a => { const estado = estadoStock(a); %>
+            <tr>
+              <td><strong><%= a.codigo_taller || '-' %></strong></td>
+              <td><%= a.codigo || '-' %><div class="small muted"><%= a.numero_parte || '' %></div></td>
+              <td><strong><%= a.nombre %></strong><div class="small muted"><%= a.marca || '-' %></div></td>
+              <td><%= a.categoria || 'Suministros' %></td>
+              <td class="money"><%= fmt(a.stock_actual) %> <%= a.unidad_medida %></td>
+              <td><%= fmt(a.stock_minimo) %> / <%= fmt(a.stock_maximo) %></td>
+              <td><%= a.ubicacion || '-' %></td>
+              <td><%= a.proveedor_nombre || '-' %></td>
+              <td><%= a.observacion || '-' %></td>
+              <td><span class="stock-badge <%= estado.className %>"><%= estado.label %></span></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="panel mb-3 <%= mostrar('consignacion') ? '' : 'd-none' %>" id="consignacion">
     <div class="panel-head">
       <div>
         <h2 class="panel-title">Consignación Maxi Repuestos</h2>
         <p class="panel-copy">Inventario recibido en consignación; al despachar queda marcado como salida de consignación.</p>
       </div>
-      <a href="/bodega?origen=CONSIGNACION#inventario" class="btn btn-outline-dark btn-sm fw-bold">Ver solo consignación</a>
+      <a href="/bodega/inventario?origen=CONSIGNACION" class="btn btn-outline-dark btn-sm fw-bold">Ver solo consignación</a>
     </div>
     <div class="table-responsive">
       <table class="table table-sm mb-0 align-middle">
@@ -272,7 +368,7 @@
     </div>
   </section>
 
-  <div class="row g-3">
+  <div class="row g-3 <%= mostrar('entregas') ? '' : 'd-none' %>">
     <div class="col-xl-7">
       <section class="panel" id="entregar">
         <div class="panel-head">
@@ -283,6 +379,7 @@
         </div>
         <div class="panel-body">
           <form method="POST" action="/bodega/entregar">
+            <input type="hidden" name="redirect_to" value="entregas">
             <div class="row g-2 mb-2">
               <div class="col-md-3"><label class="form-label">Placa</label><input class="form-control placa-search" name="placa" placeholder="C173517" required></div>
               <div class="col-md-4"><label class="form-label">Mecánico</label><input class="form-control" name="mecanico" placeholder="Nombre del mecánico" required></div>
@@ -326,6 +423,7 @@
         <div class="panel-head"><div><h2 class="panel-title">Recibir mercadería</h2><p class="panel-copy">Entrada por factura, proveedor u orden de compra.</p></div></div>
         <div class="panel-body">
           <form method="POST" action="/bodega/recibir" class="row g-2">
+            <input type="hidden" name="redirect_to" value="entregas">
             <div class="col-12"><label class="form-label">Artículo</label><select class="form-select" name="articulo_id" required><option value="">Seleccione</option><% articulos.forEach(a => { %><option value="<%= a.id %>"><%= a.codigo_taller || '----' %> · <%= a.nombre %> · Prov. <%= a.codigo || 'Sin código' %></option><% }) %></select></div>
             <div class="col-md-4"><label class="form-label">Cantidad</label><input class="form-control" type="number" step="0.01" min="0.01" name="cantidad" required></div>
             <div class="col-md-4"><label class="form-label">Precio unitario</label><input class="form-control" type="number" step="0.01" min="0" name="precio_unitario"></div>
@@ -343,12 +441,13 @@
     </div>
   </div>
 
-  <div class="row g-3 mt-1">
-    <div class="col-xl-4">
+  <div class="row g-3 mt-1 <%= (mostrar('entregas') || mostrar('herramientas')) ? '' : 'd-none' %>">
+    <div class="<%= mostrar('entregas') ? 'col-xl-4' : 'd-none' %>">
       <section class="panel" id="devolver">
         <div class="panel-head"><div><h2 class="panel-title">Devolución de repuesto</h2><p class="panel-copy">Para artículos que salieron pero no se utilizaron.</p></div></div>
         <div class="panel-body">
           <form method="POST" action="/bodega/devolver" class="row g-2">
+            <input type="hidden" name="redirect_to" value="entregas">
             <div class="col-12"><label class="form-label">Artículo</label><select class="form-select" name="articulo_id" required><option value="">Seleccione</option><% articulos.forEach(a => { %><option value="<%= a.id %>"><%= a.nombre %></option><% }) %></select></div>
             <div class="col-md-4"><label class="form-label">Cantidad</label><input class="form-control" type="number" step="0.01" min="0.01" name="cantidad" value="1" required></div>
             <div class="col-md-4"><label class="form-label">Placa</label><input class="form-control placa-search" name="placa"></div>
@@ -360,7 +459,7 @@
       </section>
     </div>
 
-    <div class="col-xl-8">
+    <div class="<%= mostrar('herramientas') ? 'col-xl-12' : 'd-none' %>">
       <section class="panel" id="herramientas">
         <div class="panel-head"><div><h2 class="panel-title">Herramientas prestadas</h2><p class="panel-copy">Lo que debe regresar a bodega.</p></div></div>
         <div class="table-responsive">
@@ -376,6 +475,7 @@
                   <td><%= fecha(p.salida_en) %></td>
                   <td class="text-end">
                     <form method="POST" action="/bodega/prestamos/<%= p.id %>/devolver" class="d-inline-flex gap-1">
+                      <input type="hidden" name="redirect_to" value="herramientas">
                       <input class="form-control form-control-sm" name="recibido_por" placeholder="Recibió" style="width: 120px">
                       <button class="btn btn-sm btn-success fw-bold">Devolver</button>
                     </form>
@@ -389,7 +489,7 @@
     </div>
   </div>
 
-  <section class="panel mt-3" id="inventario">
+  <section class="panel mt-3 <%= mostrar('inventario') ? '' : 'd-none' %>" id="inventario">
     <div class="panel-head">
       <div><h2 class="panel-title">Inventario general</h2><p class="panel-copy">Existencia actual, ubicación, mínimo y proveedor.</p></div>
       <button class="btn btn-dark btn-sm fw-bold" data-bs-toggle="collapse" data-bs-target="#crear-articulo"><i class="bi bi-plus-circle"></i> Nuevo artículo</button>
@@ -397,6 +497,7 @@
     <div class="collapse" id="crear-articulo">
       <div class="panel-body border-bottom">
         <form method="POST" action="/bodega/articulos" class="row g-2">
+          <input type="hidden" name="redirect_to" value="inventario">
           <div class="col-md-2">
             <label class="form-label">Código taller</label>
             <input class="form-control" value="<%= proximoCodigoTaller || 'Automático' %>" readonly>
@@ -418,6 +519,7 @@
           <div class="col-md-2"><label class="form-label">Precio unitario</label><input class="form-control" type="number" step="0.01" name="precio_unitario" value="0"></div>
           <div class="col-md-3"><label class="form-label">Proveedor</label><select class="form-select" name="proveedor_id"><option value="">Seleccione</option><% proveedores.forEach(p => { %><option value="<%= p.id %>"><%= p.nombre %></option><% }) %></select></div>
           <div class="col-md-3"><label class="form-label">Proveedor consignación</label><input class="form-control" name="proveedor_consignacion" value="<%= proveedorConsignacionDefault %>"></div>
+          <div class="col-md-4"><label class="form-label">Observación / uso</label><input class="form-control" name="observacion"></div>
           <div class="col-md-2 d-grid"><label class="form-label">&nbsp;</label><button class="btn btn-primary fw-bold">Guardar artículo</button></div>
         </form>
       </div>
@@ -431,7 +533,7 @@
             <tr>
               <td><strong><%= a.codigo_taller || '-' %></strong></td>
               <td><%= a.codigo || '-' %><div class="small muted"><%= a.numero_parte || '' %></div></td>
-              <td><strong><%= a.nombre %></strong><div class="small muted"><%= a.categoria || '-' %> · <%= a.marca || '-' %> · <%= a.tipo_unidad || '-' %></div></td>
+              <td><strong><%= a.nombre %></strong><div class="small muted"><%= a.categoria || '-' %> · <%= a.marca || '-' %> · <%= a.tipo_unidad || '-' %><% if (a.observacion) { %> · <%= a.observacion %><% } %></div></td>
               <td><span class="pill"><%= a.tipo_articulo %></span></td>
               <td><span class="pill <%= origenClase(a.origen_inventario) %>"><%= origenTexto(a.origen_inventario) %></span><% if (a.origen_inventario === 'CONSIGNACION') { %><div class="small muted"><%= a.proveedor_consignacion || proveedorConsignacionDefault %></div><% } %></td>
               <td class="money"><%= fmt(a.stock_actual) %> <%= a.unidad_medida %></td>
@@ -443,6 +545,7 @@
               <% if (puedeAjustar) { %>
                 <td>
                   <form method="POST" action="/bodega/ajustar" class="d-flex gap-1">
+                    <input type="hidden" name="redirect_to" value="inventario">
                     <input type="hidden" name="articulo_id" value="<%= a.id %>">
                     <input class="form-control form-control-sm" type="number" step="0.01" name="conteo_fisico" placeholder="Conteo" style="width: 85px">
                     <input class="form-control form-control-sm" name="motivo" placeholder="Motivo" style="width: 120px">
@@ -457,7 +560,7 @@
     </div>
   </section>
 
-  <div class="row g-3 mt-1">
+  <div class="row g-3 mt-1 <%= mostrar('movimientos') ? '' : 'd-none' %>">
     <div class="col-xl-5">
       <section class="panel">
         <div class="panel-head"><div><h2 class="panel-title">Por comprar</h2><p class="panel-copy">Se genera solo cuando llega al mínimo.</p></div></div>

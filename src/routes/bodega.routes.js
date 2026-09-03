@@ -130,6 +130,31 @@ async function siguienteCodigoTaller(conn = pool) {
   return String(siguiente).padStart(4, "0");
 }
 
+async function asignarCodigosTallerPendientes(conn = pool) {
+  const [[row]] = await conn.query(`
+    SELECT MAX(CAST(codigo_taller AS UNSIGNED)) AS ultimo
+    FROM bodega_articulos
+    WHERE codigo_taller REGEXP '^[0-9]{4}$'
+  `);
+  let siguiente = Number(row.ultimo || 0) + 1;
+
+  const [pendientes] = await conn.query(`
+    SELECT id
+    FROM bodega_articulos
+    WHERE activo = 1
+      AND (codigo_taller IS NULL OR TRIM(codigo_taller) = '' OR codigo_taller = '-')
+    ORDER BY origen_inventario DESC, nombre ASC, id ASC
+  `);
+
+  for (const articulo of pendientes) {
+    await conn.query(
+      "UPDATE bodega_articulos SET codigo_taller = ? WHERE id = ?",
+      [String(siguiente).padStart(4, "0"), articulo.id]
+    );
+    siguiente += 1;
+  }
+}
+
 async function ensureBodegaTables() {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS bodega_articulos (
@@ -137,6 +162,7 @@ async function ensureBodegaTables() {
       codigo VARCHAR(80) NULL UNIQUE,
       nombre VARCHAR(180) NOT NULL,
       tipo_articulo ENUM('REPUESTO','CONSUMIBLE','HERRAMIENTA','OTRO') NOT NULL DEFAULT 'REPUESTO',
+      grupo_bodega VARCHAR(30) NOT NULL DEFAULT 'INVENTARIO',
       categoria VARCHAR(100) NULL,
       marca VARCHAR(100) NULL,
       numero_parte VARCHAR(120) NULL,
@@ -150,6 +176,7 @@ async function ensureBodegaTables() {
       proveedor_id INT NULL,
       proveedor_nombre VARCHAR(180) NULL,
       fecha_ultima_compra DATE NULL,
+      observacion TEXT NULL,
       activo TINYINT(1) NOT NULL DEFAULT 1,
       creado_por INT NULL,
       creado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -185,6 +212,20 @@ async function ensureBodegaTables() {
     `);
   }
 
+  if (!(await columnExists("bodega_articulos", "grupo_bodega"))) {
+    await pool.query(`
+      ALTER TABLE bodega_articulos
+      ADD COLUMN grupo_bodega VARCHAR(30) NOT NULL DEFAULT 'INVENTARIO' AFTER tipo_articulo
+    `);
+  }
+
+  if (!(await columnExists("bodega_articulos", "observacion"))) {
+    await pool.query(`
+      ALTER TABLE bodega_articulos
+      ADD COLUMN observacion TEXT NULL AFTER fecha_ultima_compra
+    `);
+  }
+
   const codigoIndexes = await uniqueCodigoIndexes("bodega_articulos");
   for (const indexName of codigoIndexes) {
     await pool.query(`ALTER TABLE bodega_articulos DROP INDEX \`${indexName}\``);
@@ -203,6 +244,8 @@ async function ensureBodegaTables() {
       ON bodega_articulos (codigo, origen_inventario)
     `);
   }
+
+  await asignarCodigosTallerPendientes();
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS bodega_entregas (
@@ -284,12 +327,15 @@ async function articuloParaMovimiento(conn, articuloId) {
 
 function redirectBodega(req, res) {
   const q = limpiar(req.body.q || req.query.q);
-  res.redirect(`/bodega${q ? `?q=${encodeURIComponent(q)}` : ""}`);
+  const pagina = limpiar(req.body.redirect_to || req.query.redirect_to);
+  const paginas = new Set(["entregas", "suministros", "consignacion", "inventario", "herramientas", "movimientos"]);
+  const base = paginas.has(pagina) ? `/bodega/${pagina}` : "/bodega";
+  res.redirect(`${base}${q ? `?q=${encodeURIComponent(q)}` : ""}`);
 }
 
 router.use(requireAuth, requireBodega);
 
-router.get("/", async (req, res) => {
+async function renderBodega(req, res, pagina = "inicio") {
   try {
     await ensureBodegaTables();
     const q = limpiar(req.query.q);
@@ -331,7 +377,8 @@ router.get("/", async (req, res) => {
         SUM(CASE WHEN activo = 1 AND stock_minimo > 0 AND stock_actual > 0 AND stock_actual <= stock_minimo THEN 1 ELSE 0 END) AS stock_bajo,
         SUM(CASE WHEN activo = 1 AND stock_actual <= 0 THEN 1 ELSE 0 END) AS agotados,
         SUM(CASE WHEN activo = 1 AND origen_inventario = 'PROPIO' THEN 1 ELSE 0 END) AS propios,
-        SUM(CASE WHEN activo = 1 AND origen_inventario = 'CONSIGNACION' THEN 1 ELSE 0 END) AS consignacion
+        SUM(CASE WHEN activo = 1 AND origen_inventario = 'CONSIGNACION' THEN 1 ELSE 0 END) AS consignacion,
+        SUM(CASE WHEN activo = 1 AND grupo_bodega = 'SUMINISTRO' THEN 1 ELSE 0 END) AS suministros
       FROM bodega_articulos
     `);
 
@@ -353,6 +400,21 @@ router.get("/", async (req, res) => {
         AND stock_actual <= stock_minimo
       ORDER BY stock_actual ASC, nombre ASC
       LIMIT 80
+    `);
+
+    const [suministros] = await pool.query(`
+      SELECT *
+      FROM bodega_articulos
+      WHERE activo = 1
+        AND grupo_bodega = 'SUMINISTRO'
+      ORDER BY
+        CASE
+          WHEN stock_actual <= 0 THEN 0
+          WHEN stock_minimo > 0 AND stock_actual <= stock_minimo THEN 1
+          ELSE 2
+        END,
+        nombre ASC
+      LIMIT 150
     `);
 
     const [movimientos] = await pool.query(`
@@ -383,6 +445,7 @@ router.get("/", async (req, res) => {
       articulos,
       proveedores,
       porComprar,
+      suministros,
       movimientos,
       prestamos,
       stats: {
@@ -391,6 +454,7 @@ router.get("/", async (req, res) => {
         agotados: Number(stats.agotados || 0),
         propios: Number(stats.propios || 0),
         consignacion: Number(stats.consignacion || 0),
+        suministros: Number(stats.suministros || 0),
         herramientas_prestadas: Number(prestadasRow.total || 0),
         movimientos_hoy: Number(movHoy.total || 0)
       },
@@ -399,6 +463,7 @@ router.get("/", async (req, res) => {
       origenesInventario: ORIGENES_INVENTARIO,
       proveedorConsignacionDefault: PROVEEDOR_CONSIGNACION_DEFAULT,
       proximoCodigoTaller,
+      pagina,
       puedeAjustar: puedeAjustar(req.session.user),
       success: req.session.success || "",
       error: req.session.error || ""
@@ -410,7 +475,15 @@ router.get("/", async (req, res) => {
     console.error("ERROR bodega:", error);
     res.status(500).send("Error cargando bodega");
   }
-});
+}
+
+router.get("/", (req, res) => renderBodega(req, res, "inicio"));
+router.get("/entregas", (req, res) => renderBodega(req, res, "entregas"));
+router.get("/suministros", (req, res) => renderBodega(req, res, "suministros"));
+router.get("/consignacion", (req, res) => renderBodega(req, res, "consignacion"));
+router.get("/inventario", (req, res) => renderBodega(req, res, "inventario"));
+router.get("/herramientas", (req, res) => renderBodega(req, res, "herramientas"));
+router.get("/movimientos", (req, res) => renderBodega(req, res, "movimientos"));
 
 router.post("/articulos", async (req, res) => {
   try {
@@ -418,6 +491,7 @@ router.post("/articulos", async (req, res) => {
     const proveedor = await obtenerProveedor(req.body.proveedor_id, req.body.proveedor_nombre);
     const tipo = TIPOS_ARTICULO.includes(upper(req.body.tipo_articulo)) ? upper(req.body.tipo_articulo) : "REPUESTO";
     const origen = origenInventario(req.body.origen_inventario);
+    const grupo = upper(req.body.grupo_bodega) === "SUMINISTRO" ? "SUMINISTRO" : "INVENTARIO";
     const codigoInterno = codigoTaller(req.body.codigo_taller) || await siguienteCodigoTaller();
     const codigo = limpiar(req.body.codigo) || null;
     const nombre = limpiar(req.body.nombre);
@@ -428,15 +502,16 @@ router.post("/articulos", async (req, res) => {
 
     await pool.query(
       `INSERT INTO bodega_articulos (
-        codigo_taller, codigo, nombre, tipo_articulo, origen_inventario, categoria, marca, numero_parte, tipo_unidad, unidad_medida,
+        codigo_taller, codigo, nombre, tipo_articulo, grupo_bodega, origen_inventario, categoria, marca, numero_parte, tipo_unidad, unidad_medida,
         stock_actual, stock_minimo, stock_maximo, ubicacion, precio_unitario,
-        proveedor_id, proveedor_nombre, proveedor_consignacion, fecha_ultima_compra, creado_por
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        proveedor_id, proveedor_nombre, proveedor_consignacion, fecha_ultima_compra, observacion, creado_por
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         codigoInterno,
         codigo,
         nombre,
         tipo,
+        grupo,
         origen,
         limpiar(req.body.categoria) || null,
         limpiar(req.body.marca) || null,
@@ -452,6 +527,7 @@ router.post("/articulos", async (req, res) => {
         proveedor.nombre,
         origen === "CONSIGNACION" ? (limpiar(req.body.proveedor_consignacion) || PROVEEDOR_CONSIGNACION_DEFAULT) : null,
         req.body.fecha_ultima_compra || null,
+        limpiar(req.body.observacion) || null,
         req.session.user.id
       ]
     );
@@ -462,6 +538,53 @@ router.post("/articulos", async (req, res) => {
     req.session.error = error.code === "ER_DUP_ENTRY" ? "Ya existe un artículo con ese código." : "No se pudo crear el artículo.";
   }
   redirectBodega(req, res);
+});
+
+router.post("/suministros", async (req, res) => {
+  try {
+    await ensureBodegaTables();
+    const proveedor = await obtenerProveedor(req.body.proveedor_id, req.body.proveedor_nombre);
+    const codigoInterno = codigoTaller(req.body.codigo_taller) || await siguienteCodigoTaller();
+    const nombre = limpiar(req.body.nombre);
+    if (!nombre) {
+      req.session.error = "Debe escribir el nombre del suministro.";
+      return redirectBodega(req, res);
+    }
+
+    await pool.query(
+      `INSERT INTO bodega_articulos (
+        codigo_taller, codigo, nombre, tipo_articulo, grupo_bodega, origen_inventario, categoria, marca, numero_parte, tipo_unidad, unidad_medida,
+        stock_actual, stock_minimo, stock_maximo, ubicacion, precio_unitario,
+        proveedor_id, proveedor_nombre, proveedor_consignacion, fecha_ultima_compra, observacion, creado_por
+      ) VALUES (?, ?, ?, 'CONSUMIBLE', 'SUMINISTRO', 'PROPIO', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?)`,
+      [
+        codigoInterno,
+        limpiar(req.body.codigo) || null,
+        nombre,
+        limpiar(req.body.categoria) || "Suministros",
+        limpiar(req.body.marca) || null,
+        limpiar(req.body.numero_parte) || null,
+        limpiar(req.body.tipo_unidad) || null,
+        limpiar(req.body.unidad_medida) || "UND",
+        numero(req.body.stock_actual),
+        numero(req.body.stock_minimo),
+        numero(req.body.stock_maximo),
+        limpiar(req.body.ubicacion) || null,
+        numero(req.body.precio_unitario),
+        proveedor.id,
+        proveedor.nombre,
+        req.body.fecha_ultima_compra || fechaCostaRica(),
+        limpiar(req.body.observacion) || null,
+        req.session.user.id
+      ]
+    );
+
+    req.session.success = "Suministro agregado correctamente.";
+  } catch (error) {
+    console.error("ERROR crear suministro bodega:", error);
+    req.session.error = error.code === "ER_DUP_ENTRY" ? "Ya existe un artículo con ese código." : "No se pudo agregar el suministro.";
+  }
+  res.redirect("/bodega/suministros");
 });
 
 router.post("/entregar", async (req, res) => {
