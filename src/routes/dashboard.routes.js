@@ -14,6 +14,7 @@ const {
 const { extraerPlacasTexto, normalizarPlaca } = require("../utils/placas");
 const { ensureNumeroMantenimientoColumn } = require("../utils/mantenimientosNumero");
 const { ensureTipoMantenimientoColumns, normalizarTipoMantenimiento } = require("../utils/tipoMantenimiento");
+const { construirResumenFinanciero, auditarResumenFinanciero } = require("../utils/resumenFinanciero");
 
 const DB_CONNECTION_ERRORS = new Set(["ECONNRESET", "PROTOCOL_CONNECTION_LOST", "ETIMEDOUT", "ENOTFOUND", "ECONNREFUSED"]);
 const RESUMEN_EJECUTIVO_CACHE_MS = Number(process.env.RESUMEN_EJECUTIVO_CACHE_MS || 1000 * 60);
@@ -51,8 +52,9 @@ const ROLES_RESUMEN_EJECUTIVO = ["ADMIN", "TALLER", "PROVEEDURIA", "PROVEEDURIA_
 const FAMILIAS_GASTO = [
   { clave: "llantas", nombre: "Llantas", color: "#2563eb", palabras: ["llanta", "llantas", "aro", "aros", "rin", "rines"] },
   { clave: "frenos", nombre: "Frenos y seguridad", color: "#dc2626", palabras: ["freno", "frenos", "fibra", "fibras", "friccion", "fricción", "seguridad", "pito", "zapata", "zapatas", "tambor", "tambores", "disco", "discos", "plato"] },
-  { clave: "motor", nombre: "Motor y transmisión", color: "#ea580c", palabras: ["motor", "turbo", "inyector", "inyectores", "inyeccion", "inyección", "caja", "transmision", "transmisión", "clutch", "embrague", "compresor", "bomba", "manguera", "cabezote", "culata", "overh", "overhaul", "isx", "detroit", "s60", "s-60", "manifold", "multiple", "múltiple", "piston", "pistón", "block", "viela", "vielas", "cigueñal", "ciguenal", "diferencial", "rockwell", "sincronizador", "fan c", "kysor", "tubo", "union", "unión", "codo", "abrazadera", "abrasadera"] },
-  { clave: "aceites", nombre: "Aceites y fluidos", color: "#0f766e", palabras: ["aceite", "aceites", "mobil", "movil", "pico", "liasa", "pico liasa", "pico & liasa", "pico y liasa", "engrase", "filtro", "filtros", "hidraulico", "hidráulico", "coolant", "agua", "radiador", "liquido", "líquido"] },
+  { clave: "transmision", nombre: "Transmisión y tren motriz", color: "#9333ea", palabras: ["transmision", "transmisión", "caja", "clutch", "embrague", "diferencial", "rockwell", "sincronizador", "cardan", "cardán", "cruceta", "crucetas", "yugo", "eje", "ejes", "flecha", "corona", "piñon", "piñón", "tren motriz"] },
+  { clave: "motor", nombre: "Motor", color: "#ea580c", palabras: ["motor", "turbo", "inyector", "inyectores", "inyeccion", "inyección", "compresor", "bomba", "manguera", "cabezote", "culata", "overh", "overhaul", "isx", "detroit", "s60", "s-60", "manifold", "multiple", "múltiple", "piston", "pistón", "block", "viela", "vielas", "cigueñal", "ciguenal", "fan c", "kysor", "tubo", "union", "unión", "codo", "abrazadera", "abrasadera"] },
+  { clave: "aceites", nombre: "Aceites y fluidos", color: "#0f766e", palabras: ["aceite", "aceites", "mobil", "movil", "pico", "liasa", "pico liasa", "pico & liasa", "pico y liasa", "engrase", "hidraulico", "hidráulico", "coolant", "agua", "radiador", "liquido", "líquido"] },
   { clave: "suspension", nombre: "Suspensión y dirección", color: "#16a34a", palabras: ["suspension", "suspensión", "resorte", "resortes", "amortiguador", "balancin", "balancín", "rotula", "rótula", "barra", "direccion", "dirección", "tensor", "buje", "bushing", "pin", "muelle"] },
   { clave: "rodamientos", nombre: "Rodamientos y retenes", color: "#0e7490", palabras: ["roll", "rol ", "rodamiento", "cojinete", "reten", "retén", "retenedor", "sello", "camisa", "bocina", "porta roll"] },
   { clave: "electrico", nombre: "Eléctrico y luces", color: "#7c3aed", palabras: ["luz", "luces", "bateria", "batería", "cable", "electrico", "eléctrico", "sensor", "marcha", "tablero", "velocimetro", "velocímetro", "selenoide", "solenoide", "relay", "flasher", "halogeno", "halógeno", "bombillo", "switch", "fusible", "conector", "terminal", "alternador", "alternadores", "arrancador", "arrancadores", "programador", "programadores", "modulo", "módulo", "sam chassis", "sam chasis"] },
@@ -142,6 +144,17 @@ function puedeUsarOficinaDiaDia(user) {
 function requireAuth(req, res, next) {
   if (!req.session.user) return res.redirect("/login");
   next();
+}
+
+function esUsuarioMecanicoLimitado(user) {
+  const usuario = String(user?.usuario || "").trim().toLowerCase();
+  return user?.rol === "MECANICO" ||
+    usuario.startsWith("mecanico") ||
+    usuario.startsWith("mecanicos");
+}
+
+function puedeUsarResumenEjecutivo(user) {
+  return ROLES_RESUMEN_EJECUTIVO.includes(user?.rol) || esUsuarioMecanicoLimitado(user);
 }
 
 function normalizarTexto(texto) {
@@ -239,6 +252,115 @@ function contienePalabras(texto, palabras = []) {
   return palabras.some(palabra => normalizado.includes(normalizarTexto(palabra)));
 }
 
+async function obtenerReglasClasificacionGastos() {
+  return safeQuery(
+    `SELECT id, patron, familia_clave, aplicar_en, prioridad, observacion
+     FROM gasto_clasificacion_reglas
+     WHERE activo = 1
+       AND familia_clave <> 'general'
+     ORDER BY prioridad ASC, id ASC`,
+    [],
+    []
+  );
+}
+
+function familiasClasificacionEditables() {
+  return FAMILIAS_GASTO_OPERATIVO.filter(familia => familia.clave !== "general");
+}
+
+async function obtenerClasificacionesManualesGastos() {
+  return safeQuery(
+    `SELECT fuente, referencia_id, detalle_id, familia_clave, observacion
+     FROM gasto_clasificacion_manual`,
+    [],
+    []
+  );
+}
+
+function claveClasificacionManual(item) {
+  return [
+    String(item.fuente || "").trim().toUpperCase(),
+    Number(item.id || item.referencia_id || 0),
+    Number(item.detalle_id || 0)
+  ].join(":");
+}
+
+function mapaClasificacionesManuales(rows = []) {
+  const map = new Map();
+  rows.forEach(row => {
+    map.set(claveClasificacionManual({
+      fuente: row.fuente,
+      referencia_id: row.referencia_id,
+      detalle_id: row.detalle_id
+    }), row);
+  });
+  return map;
+}
+
+function clasificarGastoPorManual(item, clasificacionesManuales = new Map()) {
+  const ajuste = clasificacionesManuales.get(claveClasificacionManual(item));
+  if (!ajuste) return null;
+  const familia = FAMILIAS_GASTO_OPERATIVO.find(f => f.clave === ajuste.familia_clave);
+  if (!familia) return null;
+  return {
+    ...familia,
+    clasificacion_manual: true,
+    clasificacion_manual_observacion: ajuste.observacion || ""
+  };
+}
+
+function textoReglaClasificacion(item, aplicarEn = "TODO") {
+  const campos = {
+    DESCRIPCION: [item.codigo, item.descripcion, item.observaciones, item.placa_unidad],
+    PROVEEDOR: [item.proveedor],
+    PLACA: [item.placa, item.placa_registrada, item.placa_unidad, item.codigo],
+    TODO: [
+      item.codigo,
+      item.descripcion,
+      item.observaciones,
+      item.placa_unidad,
+      item.proveedor,
+      item.placa,
+      item.placa_registrada,
+      item.sede
+    ]
+  };
+  return normalizarTexto((campos[aplicarEn] || campos.TODO).filter(Boolean).join(" "));
+}
+
+function clasificarGastoPorReglasEditables(item, reglas = []) {
+  const textoTrabajo = normalizarTexto([
+    item.codigo,
+    item.descripcion,
+    item.observaciones,
+    item.placa_unidad
+  ].filter(Boolean).join(" "));
+
+  for (const regla of reglas) {
+    const patron = normalizarTexto(regla.patron);
+    if (!patron) continue;
+    const texto = textoReglaClasificacion(item, regla.aplicar_en);
+    if (!texto.includes(patron)) continue;
+    if (
+      regla.familia_clave === "aceites" &&
+      regla.aplicar_en === "PROVEEDOR" &&
+      contienePalabras(textoTrabajo, ["filtro", "filtros"])
+    ) {
+      continue;
+    }
+    const familia = FAMILIAS_GASTO_OPERATIVO.find(f => f.clave === regla.familia_clave);
+    if (familia) {
+      return {
+        ...familia,
+        regla_id: regla.id,
+        regla_patron: regla.patron
+      };
+    }
+  }
+
+  return null;
+}
+
 function clasificarGastoPorReglas(item) {
   const textoTrabajo = normalizarTexto([
     item.codigo,
@@ -278,17 +400,28 @@ function clasificarGastoPorReglas(item) {
 
   if (
     /\brectific\w*/.test(textoTrabajo) ||
-    contienePalabras(textoTrabajo, ["diferencial", "rockwell", "set de empaques", "empaque inferior", "empaques inferior", "empaque tapa valvulas", "empaque tapa válvulas", "empaque cabez", "empaque cabezote", "empaque cabez.", "empaque escape", "empaque admision", "empaque admisión", "juego cilindro", "block", "viela", "vielas", "fan c", "kysor", "compresor", "cummins", "detroit", "detriot", "n-14", "isx", "manguera cooler", "cooler", "intercooler", "secador de aire", "secador ad", "valvula purga secador", "válvula purga secador", "faja", "faja abanico", "termostato", "deposito expansion", "depósito expansión", "deposito de expansion", "depósito de expansión", "tapon respiradero", "tapón respiradero", "tapon para tanque", "tapón para tanque", "combustible", "conect curvo flare", "comp ftl"]) ||
+    contienePalabras(textoTrabajo, ["set de empaques", "empaque inferior", "empaques inferior", "empaque tapa valvulas", "empaque tapa válvulas", "empaque cabez", "empaque cabezote", "empaque cabez.", "empaque escape", "empaque admision", "empaque admisión", "juego cilindro", "block", "viela", "vielas", "fan c", "kysor", "compresor", "cummins", "detroit", "detriot", "n-14", "isx", "manguera cooler", "cooler", "intercooler", "secador de aire", "secador ad", "valvula purga secador", "válvula purga secador", "faja", "faja abanico", "termostato", "deposito expansion", "depósito expansión", "deposito de expansion", "depósito de expansión", "tapon respiradero", "tapón respiradero", "tapon para tanque", "tapón para tanque", "combustible", "conect curvo flare", "comp ftl"]) ||
     (contienePalabras(textoTrabajo, ["repuestos"]) && contienePalabras(textoCompleto, ["rectificadora", "taller romeros", "romeros"]))
   ) {
     return familiaPorClave("motor", FAMILIAS_GASTO_OPERATIVO);
   }
 
-  if (contienePalabras(textoCompleto, ["pico", "liasa", "pico liasa", "pico & liasa", "pico y liasa", "mobil", "movil"])) {
+  if (contienePalabras(textoTrabajo, ["diferencial", "rockwell", "caja", "clutch", "embrague", "sincronizador", "cardan", "cardán", "cruceta", "crucetas", "yugo"])) {
+    return familiaPorClave("transmision", FAMILIAS_GASTO_OPERATIVO);
+  }
+
+  if (contienePalabras(textoTrabajo, ["filtro", "filtros"])) {
+    return familiaPorClave("motor", FAMILIAS_GASTO_OPERATIVO);
+  }
+
+  if (
+    contienePalabras(textoCompleto, ["pico", "liasa", "pico liasa", "pico & liasa", "pico y liasa", "mobil", "movil"]) &&
+    !contienePalabras(textoTrabajo, ["filtro", "filtros"])
+  ) {
     return familiaPorClave("aceites", FAMILIAS_GASTO_OPERATIVO);
   }
 
-  if (contienePalabras(textoTrabajo, ["aceite", "aceites", "filtro", "filtros", "engrase", "coolant", "liquido", "líquido", "hidraulico", "hidráulico", "grasa", "cubeta grasa", "tubo de grasa", "varsol", "desengrasante", "degreaser", "hand cleaner", "shampoo"])) {
+  if (contienePalabras(textoTrabajo, ["aceite", "aceites", "engrase", "coolant", "liquido", "líquido", "hidraulico", "hidráulico", "grasa", "cubeta grasa", "tubo de grasa", "varsol", "desengrasante", "degreaser", "hand cleaner", "shampoo"])) {
     return familiaPorClave("aceites", FAMILIAS_GASTO_OPERATIVO);
   }
 
@@ -331,8 +464,12 @@ function clasificarGastoPorReglas(item) {
   return null;
 }
 
-function clasificarGastoOperativo(item) {
+function clasificarGastoOperativo(item, reglasClasificacion = [], clasificacionesManuales = new Map()) {
+  const familiaManual = clasificarGastoPorManual(item, clasificacionesManuales);
+  if (familiaManual) return familiaManual;
   if (item.placa === "ACEITES") return familiaPorClave("aceites");
+  const familiaEditable = clasificarGastoPorReglasEditables(item, reglasClasificacion);
+  if (familiaEditable) return familiaEditable;
   const familiaPorRegla = clasificarGastoPorReglas(item);
   if (familiaPorRegla) return familiaPorRegla;
   if (item.fuente === "PAGO_PROVEEDOR") {
@@ -510,7 +647,8 @@ function describirCompraExacta(item) {
 
 const GRUPOS_COMPRA_GERENCIAL = [
   { nombre: "Escobillas", palabras: ["escobilla", "escobillas", "plumilla", "plumillas"] },
-  { nombre: "Aceites y filtros", palabras: ["aceite", "aceites", "mobil", "movil", "pico", "liasa", "filtro", "filtros"] },
+  { nombre: "Aceites", palabras: ["aceite", "aceites", "mobil", "movil", "pico", "liasa"] },
+  { nombre: "Filtros", palabras: ["filtro", "filtros"] },
   { nombre: "Llantas y aros", palabras: ["llanta", "llantas", "aro", "aros", "rin", "rines"] },
   { nombre: "Frenos y fibras", palabras: ["freno", "frenos", "fibra", "fibras", "zapata", "tambor", "disco"] },
   { nombre: "Baterías", palabras: ["bateria", "batería", "baterias", "baterías"] },
@@ -558,6 +696,7 @@ function movimientoParaRevisionPlaca(item) {
   const esAceite = item.familia?.clave === "aceites" || normalizarPlacaLocal(item.placa) === "ACEITES";
   return {
     id: item.id,
+    detalle_id: Number(item.detalle_id || 0),
     fuente: item.fuente,
     fuente_nombre: etiquetaFuenteGasto(item),
     url: urlMovimientoGasto(item),
@@ -569,7 +708,10 @@ function movimientoParaRevisionPlaca(item) {
     descripcion: recortarResumen(item.descripcion || item.observaciones, 140),
     observaciones: recortarResumen(item.observaciones, 140),
     monto: Number(item.monto || 0),
-    categoria: item.familia?.nombre || "Sin rubro"
+    categoria: item.familia?.nombre || "Sin rubro",
+    familia_clave: item.familia?.clave || "",
+    clasificacion_manual: Boolean(item.familia?.clasificacion_manual),
+    regla_patron: item.familia?.regla_patron || ""
   };
 }
 
@@ -747,6 +889,8 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro, pe
   const rangoPeriodo = rangoFechasDesdePeriodo(periodoFiltro);
   fechaDesde = fechaDesde || rangoPeriodo.desde;
   fechaHasta = fechaHasta || rangoPeriodo.hasta;
+  const reglasClasificacion = await obtenerReglasClasificacionGastos();
+  const clasificacionesManuales = mapaClasificacionesManuales(await obtenerClasificacionesManualesGastos());
 
   const paramsOrdenes = [];
   const condicionesOrdenes = armarFiltrosFecha("o.fecha", fechaDesde, fechaHasta, paramsOrdenes);
@@ -756,6 +900,7 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro, pe
     SELECT
       'ORDEN' AS fuente,
       o.id,
+      COALESCE(d.id, 0) AS detalle_id,
       o.fecha,
       o.po_numero,
       p.nombre AS proveedor,
@@ -768,7 +913,10 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro, pe
         CASE WHEN COALESCE(placas_detalle.tiene_placas, 0) = 0 THEN REPLACE(REPLACE(REPLACE(REGEXP_SUBSTR(UPPER(COALESCE(o.observaciones, '')), 'CL[[:space:].-]*[0-9]{5,6}|EE[[:space:].-]*[0-9]{5,6}|C[[:space:].-]*[0-9]{5,6}|S[[:space:].-]*[0-9]{5,6}'), ' ', ''), '-', ''), '.', '') END,
         CASE WHEN COALESCE(placas_detalle.tiene_placas, 0) = 0 AND (
           UPPER(TRIM(COALESCE(o.placa_unidad, ''))) IN ('ACEITE', 'ACEITES')
-          OR UPPER(CONCAT_WS(' ', o.observaciones, p.nombre)) REGEXP 'ACEITE|ACEITES|MOBIL|MOVIL|PICO|LIASA'
+          OR (
+            UPPER(CONCAT_WS(' ', d.descripcion, o.observaciones, p.nombre)) REGEXP 'ACEITE|ACEITES|MOBIL|MOVIL|PICO|LIASA'
+            AND UPPER(CONCAT_WS(' ', d.descripcion, o.observaciones)) NOT REGEXP 'FILTRO|FILTROS'
+          )
         ) THEN 'ACEITES' END,
         CASE WHEN UPPER(TRIM(COALESCE(d.codigo, ''))) IN ('ACEITE', 'ACEITES') THEN 'ACEITES' END,
         NULL
@@ -814,7 +962,10 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro, pe
       CASE WHEN COALESCE(placas_detalle.tiene_placas, 0) = 0 THEN REPLACE(REPLACE(REPLACE(REGEXP_SUBSTR(UPPER(COALESCE(o.observaciones, '')), 'CL[[:space:].-]*[0-9]{5,6}|EE[[:space:].-]*[0-9]{5,6}|C[[:space:].-]*[0-9]{5,6}|S[[:space:].-]*[0-9]{5,6}'), ' ', ''), '-', ''), '.', '') END,
       CASE WHEN COALESCE(placas_detalle.tiene_placas, 0) = 0 AND (
         UPPER(TRIM(COALESCE(o.placa_unidad, ''))) IN ('ACEITE', 'ACEITES')
-        OR UPPER(CONCAT_WS(' ', o.observaciones, p.nombre)) REGEXP 'ACEITE|ACEITES|MOBIL|MOVIL|PICO|LIASA'
+        OR (
+          UPPER(CONCAT_WS(' ', d.descripcion, o.observaciones, p.nombre)) REGEXP 'ACEITE|ACEITES|MOBIL|MOVIL|PICO|LIASA'
+          AND UPPER(CONCAT_WS(' ', d.descripcion, o.observaciones)) NOT REGEXP 'FILTRO|FILTROS'
+        )
       ) THEN 'ACEITES' END,
       CASE WHEN UPPER(TRIM(COALESCE(d.codigo, ''))) IN ('ACEITE', 'ACEITES') THEN 'ACEITES' END
     )))
@@ -828,6 +979,7 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro, pe
     SELECT
       'ORDEN_MOTOR' AS fuente,
       om.id,
+      COALESCE(d.id, 0) AS detalle_id,
       om.fecha,
       om.numero AS po_numero,
       p.nombre AS proveedor,
@@ -872,6 +1024,7 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro, pe
     SELECT
       'PAGO_PROVEEDOR' AS fuente,
       pp.id,
+      0 AS detalle_id,
       ${fechaPago} AS fecha,
       pp.periodo_cierre,
         NULL AS po_numero,
@@ -898,6 +1051,7 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro, pe
     SELECT
       'CAJA_CHICA' AS fuente,
       cc.id,
+      0 AS detalle_id,
       cc.fecha,
       NULL AS po_numero,
       'Caja chica' AS proveedor,
@@ -1001,7 +1155,7 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro, pe
       const placaReal = esPlacaReal(placaLimpia);
       const sedeFinal = unidadResuelta?.sede || item.sede || "";
       const sedeReal = Boolean(String(sedeFinal || "").trim()) && sedeFinal !== "General";
-      const familia = clasificarGastoOperativo(item);
+      const familia = clasificarGastoOperativo(item, reglasClasificacion, clasificacionesManuales);
       return {
         ...item,
         tipo_mantenimiento: ["ORDEN", "ORDEN_MOTOR"].includes(item.fuente)
@@ -1017,6 +1171,16 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro, pe
     })
     .filter(aplicaSede)
     .filter(item => item.monto > 0);
+  const gastosConNegocio = gastos.map(item => ({
+    ...item,
+    negocioInfo: clasificarNegocioGasto(item)
+  }));
+  const gastosExcluidosGenerales = gastosConNegocio.filter(item =>
+    item.negocioInfo?.clave === "generales" || item.familia?.clave === "general"
+  );
+  const gastosGerenciales = gastosConNegocio.filter(item =>
+    item.negocioInfo?.clave !== "generales" && item.familia?.clave !== "general"
+  );
 
   const porFuente = new Map();
   const porCategoria = new Map();
@@ -1031,7 +1195,7 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro, pe
   const porNegocioRubro = new Map();
   const porTipoUnidadPlaca = new Map();
 
-  gastos.forEach(item => {
+  gastosGerenciales.forEach(item => {
     const fuenteNombre = item.fuente === "ORDEN"
       ? "Órdenes de compra"
       : item.fuente === "ORDEN_MOTOR"
@@ -1043,8 +1207,10 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro, pe
     fuente.total += item.monto;
     fuente.registros += 1;
 
-    const negocioInfo = clasificarNegocioGasto(item);
-    const rubroInfo = item.familia;
+    const negocioInfo = item.negocioInfo || clasificarNegocioGasto(item);
+    const rubroInfo = negocioInfo.clave === "generales"
+      ? familiaPorClave("general", FAMILIAS_GASTO_OPERATIVO)
+      : item.familia;
 
     const categoria = sumarGrupo(porCategoria, rubroInfo.nombre, { color: rubroInfo.color });
     categoria.total += item.monto;
@@ -1326,33 +1492,30 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro, pe
     }
   });
 
-  const totalGastos = gastos.reduce((sum, item) => sum + item.monto, 0);
-  const totalOrdenesCompra = gastos.filter(item => item.fuente === "ORDEN").reduce((sum, item) => sum + item.monto, 0);
-  const totalOrdenesMotor = gastos.filter(item => item.fuente === "ORDEN_MOTOR").reduce((sum, item) => sum + item.monto, 0);
-  const gastosMantenimientoPorTipo = ["CORRECTIVO", "PREVENTIVO"].map(tipo => {
-    const items = gastos.filter(item => ["ORDEN", "ORDEN_MOTOR"].includes(item.fuente) && item.tipo_mantenimiento === tipo);
-    return {
-      tipo,
-      nombre: tipo === "PREVENTIVO" ? "Preventivo" : "Correctivo",
-      total: items.reduce((sum, item) => sum + item.monto, 0),
-      registros: items.length
-    };
-  });
-  const gastoCorrectivo = gastosMantenimientoPorTipo.find(item => item.tipo === "CORRECTIVO") || { total: 0, registros: 0 };
-  const gastoPreventivo = gastosMantenimientoPorTipo.find(item => item.tipo === "PREVENTIVO") || { total: 0, registros: 0 };
-  const totalPagosProveedor = gastos.filter(item => item.fuente === "PAGO_PROVEEDOR").reduce((sum, item) => sum + item.monto, 0);
-  const pagosProveedorPagados = gastos.filter(item => item.fuente === "PAGO_PROVEEDOR" && Number(item.pagada || 0) === 1);
-  const pagosProveedorPendientes = gastos.filter(item => item.fuente === "PAGO_PROVEEDOR" && Number(item.pagada || 0) !== 1);
-  const totalPagosProveedorPagados = pagosProveedorPagados.reduce((sum, item) => sum + item.monto, 0);
-  const totalPagosProveedorPendientes = pagosProveedorPendientes.reduce((sum, item) => sum + item.monto, 0);
-  const totalCajaChica = gastos.filter(item => item.fuente === "CAJA_CHICA").reduce((sum, item) => sum + item.monto, 0);
-  const totalFacturasPagadas = Number(facturasPagadasRow.total || 0);
-  const totalOrdenesMotorPagadas = totalOrdenesMotor;
-  const movimientosFacturasPagadas = Number(facturasPagadasRow.movimientos || 0);
-  const movimientosOrdenesMotorPagadas = gastos.filter(item => item.fuente === "ORDEN_MOTOR").length;
-  const movimientosCajaChica = gastos.filter(item => item.fuente === "CAJA_CHICA").length;
-  const totalPagado = totalFacturasPagadas + totalOrdenesMotorPagadas + totalPagosProveedorPagados + totalCajaChica;
-  const movimientosTotalPagado = movimientosFacturasPagadas + movimientosOrdenesMotorPagadas + pagosProveedorPagados.length + movimientosCajaChica;
+  const totalGastos = gastosGerenciales.reduce((sum, item) => sum + item.monto, 0);
+  const totalGastosExcluidosGenerales = gastosExcluidosGenerales.reduce((sum, item) => sum + item.monto, 0);
+  const resumenFinanciero = construirResumenFinanciero({ gastos, facturasPagadasRow });
+  const resumenOperativo = construirResumenFinanciero({ gastos: gastosGerenciales, facturasPagadasRow: { total: 0, movimientos: 0 } });
+  const gastosMantenimientoPorTipo = [
+    {
+      tipo: "CORRECTIVO",
+      nombre: "Correctivo",
+      total: resumenOperativo.totalGastoCorrectivo,
+      registros: resumenOperativo.movimientosGastoCorrectivo
+    },
+    {
+      tipo: "PREVENTIVO",
+      nombre: "Preventivo",
+      total: resumenOperativo.totalGastoPreventivo,
+      registros: resumenOperativo.movimientosGastoPreventivo
+    },
+    {
+      tipo: "SUMINISTROS",
+      nombre: "Suministros",
+      total: resumenOperativo.totalGastoSuministros,
+      registros: resumenOperativo.movimientosGastoSuministros
+    }
+  ];
   const fuentes = ordenarTop(porFuente, 10);
   const categorias = ordenarTop(porCategoria, 1000);
   const detalleGeneralOtros = ordenarTop(porDetalleGeneral, 1000);
@@ -1370,8 +1533,7 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro, pe
     { clave: "transportadora", nombre: "Transportadora", color: "#0b3b82" },
     { clave: "granel", nombre: "Graneleras", color: "#0f766e" },
     { clave: "comodines", nombre: "Comodines", color: "#7c3aed" },
-    { clave: "aceites", nombre: "Aceites", color: "#0f766e" },
-    { clave: "generales", nombre: "Generales", color: "#64748b" }
+    { clave: "aceites", nombre: "Aceites", color: "#0f766e" }
   ];
   const negociosGasto = negociosBase
     .map(base => {
@@ -1576,6 +1738,11 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro, pe
       })
     };
   }).filter(item => Number(item.total || 0) > 0);
+  const auditoriaFinanciera = auditarResumenFinanciero({
+    totalGastos,
+    negocios: negociosGasto,
+    rubros: categorias
+  });
   const totalGastoConUnidad = Array.from(porPlaca.values()).reduce((sum, item) => sum + Number(item.total || 0), 0);
   const unidadesConGasto = porPlaca.size;
   const [flotaRow] = await safeQuery(
@@ -1623,32 +1790,15 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro, pe
 
   return {
     totalGastos,
-    totalRegistrosGasto: gastos.length,
+    totalRegistrosGasto: gastosGerenciales.length,
+    totalGastosIncluyendoGenerales: gastos.reduce((sum, item) => sum + item.monto, 0),
+    totalGastosExcluidosGenerales,
+    movimientosGeneralesExcluidos: gastosExcluidosGenerales.length,
     totalMantenimientos: mantenimientos.length,
-    resumenFinanciero: {
-      totalOrdenesCompra,
-      totalOrdenesMotor,
-      totalGastoCorrectivo: gastoCorrectivo.total,
-      totalGastoPreventivo: gastoPreventivo.total,
-      totalOrdenesMotorPagadas,
-      totalPagosProveedor,
-      totalPagosProveedorPagados,
-      totalPagosProveedorPendientes,
-      totalCajaChica,
-      totalFacturasPagadas,
-      totalPagado,
-      movimientosOrdenesCompra: gastos.filter(item => item.fuente === "ORDEN").length,
-      movimientosOrdenesMotor: gastos.filter(item => item.fuente === "ORDEN_MOTOR").length,
-      movimientosGastoCorrectivo: gastoCorrectivo.registros,
-      movimientosGastoPreventivo: gastoPreventivo.registros,
-      movimientosOrdenesMotorPagadas,
-      movimientosPagosProveedor: gastos.filter(item => item.fuente === "PAGO_PROVEEDOR").length,
-      movimientosPagosProveedorPagados: pagosProveedorPagados.length,
-      movimientosPagosProveedorPendientes: pagosProveedorPendientes.length,
-      movimientosCajaChica,
-      movimientosFacturasPagadas,
-      movimientosTotalPagado
-    },
+    resumenFinanciero,
+    auditoriaFinanciera,
+    reglasClasificacion: reglasClasificacion.slice(0, 80),
+    familiasClasificacion: familiasClasificacionEditables().map(({ clave, nombre, color }) => ({ clave, nombre, color })),
     gastosMantenimientoPorTipo,
     costoUnidad: {
       totalGastoConUnidad,
@@ -1680,7 +1830,7 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro, pe
     sedesMant,
     placasMant,
     trabajosPorSede,
-    recientesGasto: gastos
+    recientesGasto: gastosGerenciales
       .filter(item => item.tienePlacaReal && item.tieneSedeReal)
       .sort((a, b) => new Date(b.fecha || 0) - new Date(a.fecha || 0))
       .slice(0, 12),
@@ -1762,9 +1912,20 @@ async function prepararResumenEjecutivoRequest(req) {
   };
 }
 
+function redirectResumenEjecutivo(req) {
+  const referer = req.get("Referrer") || req.get("Referer") || "";
+  try {
+    const url = new URL(referer, "http://local");
+    if (url.pathname === "/dashboard/resumen-ejecutivo") {
+      return `${url.pathname}${url.search}`;
+    }
+  } catch (_) {}
+  return "/dashboard/resumen-ejecutivo";
+}
+
 router.get("/resumen-ejecutivo/datos", requireAuth, async (req, res) => {
   try {
-    if (!ROLES_RESUMEN_EJECUTIVO.includes(req.session.user.rol)) {
+    if (!puedeUsarResumenEjecutivo(req.session.user)) {
       return res.status(403).json({ ok: false, message: "No autorizado" });
     }
 
@@ -1785,9 +1946,128 @@ router.get("/resumen-ejecutivo/datos", requireAuth, async (req, res) => {
   }
 });
 
+router.post("/resumen-ejecutivo/reglas", requireAuth, async (req, res) => {
+  try {
+    if (!["ADMIN", "TALLER"].includes(req.session.user?.rol)) {
+      return res.status(403).send("No autorizado");
+    }
+
+    const patron = String(req.body.patron || "").trim();
+    const familiaClave = String(req.body.familia_clave || "").trim().toLowerCase();
+    const aplicarEn = String(req.body.aplicar_en || "TODO").trim().toUpperCase();
+    const prioridad = Math.max(1, Math.min(999, Number(req.body.prioridad || 50)));
+    const observacion = String(req.body.observacion || "").trim().slice(0, 255);
+
+    if (!patron || !familiasClasificacionEditables().some(familia => familia.clave === familiaClave)) {
+      req.session.error = "Debe indicar un patrón y una familia válida.";
+      return res.redirect(redirectResumenEjecutivo(req));
+    }
+
+    await pool.query(
+      `INSERT INTO gasto_clasificacion_reglas
+        (patron, familia_clave, aplicar_en, prioridad, activo, observacion)
+       VALUES (?, ?, ?, ?, 1, ?)
+       ON DUPLICATE KEY UPDATE
+        prioridad = VALUES(prioridad),
+        activo = 1,
+        observacion = VALUES(observacion)`,
+      [
+        patron,
+        familiaClave,
+        ["TODO", "DESCRIPCION", "PROVEEDOR", "PLACA"].includes(aplicarEn) ? aplicarEn : "TODO",
+        prioridad,
+        observacion || null
+      ]
+    );
+
+    resumenEjecutivoCache.clear();
+    req.session.success = "Regla de clasificación guardada.";
+    res.redirect(redirectResumenEjecutivo(req));
+  } catch (error) {
+    console.error("ERROR guardando regla resumen ejecutivo:", error);
+    req.session.error = "No se pudo guardar la regla. Ejecute las migraciones si la tabla no existe.";
+    res.redirect(redirectResumenEjecutivo(req));
+  }
+});
+
+router.post("/resumen-ejecutivo/reglas/:id/desactivar", requireAuth, async (req, res) => {
+  try {
+    if (!["ADMIN", "TALLER"].includes(req.session.user?.rol)) {
+      return res.status(403).send("No autorizado");
+    }
+
+    await pool.query(
+      "UPDATE gasto_clasificacion_reglas SET activo = 0 WHERE id = ?",
+      [req.params.id]
+    );
+    resumenEjecutivoCache.clear();
+    req.session.success = "Regla desactivada.";
+    res.redirect(redirectResumenEjecutivo(req));
+  } catch (error) {
+    console.error("ERROR desactivando regla resumen ejecutivo:", error);
+    req.session.error = "No se pudo desactivar la regla.";
+    res.redirect(redirectResumenEjecutivo(req));
+  }
+});
+
+router.post("/resumen-ejecutivo/clasificacion-manual", requireAuth, async (req, res) => {
+  try {
+    if (!["ADMIN", "TALLER"].includes(req.session.user?.rol)) {
+      return res.status(403).send("No autorizado");
+    }
+
+    const fuente = String(req.body.fuente || "").trim().toUpperCase();
+    const referenciaId = Number(req.body.referencia_id || 0);
+    const detalleId = Number(req.body.detalle_id || 0);
+    const familiaClave = String(req.body.familia_clave || "").trim().toLowerCase();
+    const observacion = String(req.body.observacion || "").trim().slice(0, 255);
+    const fuentesValidas = new Set(["ORDEN", "ORDEN_MOTOR", "PAGO_PROVEEDOR", "CAJA_CHICA"]);
+
+    if (!fuentesValidas.has(fuente) || !referenciaId) {
+      req.session.error = "No se pudo identificar el movimiento a clasificar.";
+      return res.redirect(redirectResumenEjecutivo(req));
+    }
+
+    if (familiaClave === "auto") {
+      await pool.query(
+        `DELETE FROM gasto_clasificacion_manual
+         WHERE fuente = ? AND referencia_id = ? AND detalle_id = ?`,
+        [fuente, referenciaId, detalleId]
+      );
+      resumenEjecutivoCache.clear();
+      req.session.success = "Clasificación manual eliminada; el movimiento vuelve a automático.";
+      return res.redirect(redirectResumenEjecutivo(req));
+    }
+
+    if (!familiasClasificacionEditables().some(familia => familia.clave === familiaClave)) {
+      req.session.error = "Debe seleccionar una familia válida.";
+      return res.redirect(redirectResumenEjecutivo(req));
+    }
+
+    await pool.query(
+      `INSERT INTO gasto_clasificacion_manual
+        (fuente, referencia_id, detalle_id, familia_clave, observacion, creado_por)
+       VALUES (?, ?, ?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE
+        familia_clave = VALUES(familia_clave),
+        observacion = VALUES(observacion),
+        creado_por = VALUES(creado_por)`,
+      [fuente, referenciaId, detalleId, familiaClave, observacion || null, req.session.user?.id || null]
+    );
+
+    resumenEjecutivoCache.clear();
+    req.session.success = "Movimiento reclasificado correctamente.";
+    res.redirect(redirectResumenEjecutivo(req));
+  } catch (error) {
+    console.error("ERROR guardando clasificación manual:", error);
+    req.session.error = "No se pudo guardar la clasificación manual.";
+    res.redirect(redirectResumenEjecutivo(req));
+  }
+});
+
 router.get("/resumen-ejecutivo", requireAuth, async (req, res) => {
   try {
-    if (!ROLES_RESUMEN_EJECUTIVO.includes(req.session.user.rol)) {
+    if (!puedeUsarResumenEjecutivo(req.session.user)) {
       return res.status(403).send("No autorizado");
     }
 
@@ -1800,8 +2080,13 @@ router.get("/resumen-ejecutivo", requireAuth, async (req, res) => {
       sedes: contexto.sedes,
       usuarioTodasSedes: contexto.usuarioTodasSedes,
       sedeSeleccionada: contexto.sedeSeleccionada,
-      etiquetaSede: etiquetaSedeTomza
+      etiquetaSede: etiquetaSedeTomza,
+      success: req.session.success || "",
+      error: req.session.error || ""
     });
+
+    req.session.success = null;
+    req.session.error = null;
   } catch (error) {
     console.error("ERROR resumen ejecutivo:", error);
     res.status(500).send("Error cargando resumen ejecutivo");

@@ -233,8 +233,10 @@ function unirSedesVisibles(...listas) {
 }
 
 function esUsuarioMecanico(user) {
+  const usuario = limpiarSede(user?.usuario).toLowerCase();
   return user?.rol === "MECANICO" ||
-    limpiarSede(user?.usuario).toLowerCase() === "mecanico";
+    usuario === "mecanico" ||
+    usuario.startsWith("mecanico");
 }
 
 function esUsuarioProveeduria(user) {

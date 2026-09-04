@@ -21,8 +21,15 @@ function requireAuth(req, res, next) {
   next();
 }
 
+function esUsuarioMecanicoLimitado(user) {
+  const usuario = String(user?.usuario || "").trim().toLowerCase();
+  return user?.rol === "MECANICO" ||
+    usuario.startsWith("mecanico") ||
+    usuario.startsWith("mecanicos");
+}
+
 function puedeGestionarAceite(user) {
-  return ROLES_GESTION_ACEITE.includes(user?.rol);
+  return ROLES_GESTION_ACEITE.includes(user?.rol) || esUsuarioMecanicoLimitado(user);
 }
 
 function parseMonto(value) {

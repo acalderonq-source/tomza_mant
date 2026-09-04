@@ -297,23 +297,29 @@
   const money = (value) => Number(value || 0).toLocaleString('es-CR', { maximumFractionDigits: 0 });
   const esMensajeroDashboard = ['MENSAJERO', 'MENSAJERIA', 'MENSAJERO_FACTURAS'].includes(user.rol);
   const esBodegaDashboard = ['BODEGA', 'BODEGUERO'].includes(user.rol);
-  const puedeVerCompras = ['ADMIN', 'TALLER', 'PROVEEDURIA_TALLER', 'CONTABILIDAD'].includes(user.rol);
+  const usuarioDashboardLower = String(user.usuario || '').trim().toLowerCase();
+  const esMecanicoLimitado = user.rol === 'MECANICO'
+    || usuarioDashboardLower.startsWith('mecanico')
+    || usuarioDashboardLower.startsWith('mecanicos');
+  const puedeVerCompras = !esMecanicoLimitado && ['ADMIN', 'TALLER', 'PROVEEDURIA_TALLER', 'CONTABILIDAD'].includes(user.rol);
   const puedeVerOperaciones = user.rol !== 'CONTABILIDAD' && !esMensajeroDashboard && !esBodegaDashboard;
-  const puedeVerReportesSupervisores = ['ADMIN', 'TALLER', 'MECANICO', 'SUPERVISOR', 'SUPERVISOR_PESADO'].includes(user.rol);
-  const puedeVerAceite = ['ADMIN', 'MECANICO'].includes(user.rol)
-    || String(user.usuario || '').trim().toLowerCase() === 'supervisor_rio_claro';
-  const puedeVerAires = ['ADMIN', 'TALLER', 'MECANICO'].includes(user.rol);
-  const puedeVerRevisionRuta = ['ADMIN', 'TALLER', 'MECANICO', 'SUPERVISOR', 'SUPERVISOR_PESADO'].includes(user.rol);
-  const puedeVerGiras = ['ADMIN', 'TALLER', 'MECANICO', 'SUPERVISOR', 'SUPERVISOR_PESADO'].includes(user.rol);
-  const puedeVerDashboardTaller = ['ADMIN', 'TALLER', 'MECANICO', 'SUPERVISOR', 'SUPERVISOR_PESADO'].includes(user.rol);
-  const puedeVerLogisticaTaller = ['ADMIN', 'TALLER', 'MECANICO', 'PROVEEDURIA_TALLER'].includes(user.rol);
-  const puedeVerLavadoUnidades = ['ADMIN', 'TALLER', 'MECANICO'].includes(user.rol);
-  const puedeVerKpisMecanicos = ['ADMIN', 'TALLER', 'PROVEEDURIA_TALLER'].includes(user.rol);
-  const puedeVerOrdenesMotor = ['ADMIN', 'TALLER', 'PROVEEDURIA_TALLER'].includes(user.rol);
-  const puedeVerResumenEjecutivo = ['ADMIN', 'TALLER', 'PROVEEDURIA', 'PROVEEDURIA_TALLER', 'TRAMITES'].includes(user.rol);
-  const puedeVerRepuestos = ['ADMIN', 'TALLER', 'PROVEEDURIA_TALLER', 'PROVEEDURIA', 'SUPERVISOR_PESADO', 'MENSAJERO', 'MENSAJERIA', 'MENSAJERO_FACTURAS'].includes(user.rol)
-    || String(user.usuario || '').trim().toLowerCase() === 'pesados';
-  const puedeVerBodega = ['ADMIN', 'TALLER', 'PROVEEDURIA_TALLER', 'BODEGA', 'BODEGUERO'].includes(user.rol);
+  const puedeVerReportesSupervisores = !esMecanicoLimitado && ['ADMIN', 'TALLER', 'MECANICO', 'SUPERVISOR', 'SUPERVISOR_PESADO'].includes(user.rol);
+  const puedeVerAceite = esMecanicoLimitado || ['ADMIN', 'MECANICO'].includes(user.rol)
+    || usuarioDashboardLower === 'supervisor_rio_claro';
+  const puedeVerAires = !esMecanicoLimitado && ['ADMIN', 'TALLER', 'MECANICO'].includes(user.rol);
+  const puedeVerRevisionRuta = esMecanicoLimitado || ['ADMIN', 'TALLER', 'MECANICO', 'SUPERVISOR', 'SUPERVISOR_PESADO'].includes(user.rol);
+  const puedeVerGiras = !esMecanicoLimitado && ['ADMIN', 'TALLER', 'MECANICO', 'SUPERVISOR', 'SUPERVISOR_PESADO'].includes(user.rol);
+  const puedeVerDashboardTaller = esMecanicoLimitado || ['ADMIN', 'TALLER', 'MECANICO', 'SUPERVISOR', 'SUPERVISOR_PESADO'].includes(user.rol);
+  const puedeVerLogisticaTaller = !esMecanicoLimitado && ['ADMIN', 'TALLER', 'MECANICO', 'PROVEEDURIA_TALLER'].includes(user.rol);
+  const puedeVerLavadoUnidades = esMecanicoLimitado || ['ADMIN', 'TALLER', 'MECANICO'].includes(user.rol);
+  const puedeVerKpisMecanicos = !esMecanicoLimitado && ['ADMIN', 'TALLER', 'PROVEEDURIA_TALLER'].includes(user.rol);
+  const puedeVerOrdenesMotor = !esMecanicoLimitado && ['ADMIN', 'TALLER', 'PROVEEDURIA_TALLER'].includes(user.rol);
+  const puedeVerResumenEjecutivo = esMecanicoLimitado || ['ADMIN', 'TALLER', 'PROVEEDURIA', 'PROVEEDURIA_TALLER', 'TRAMITES'].includes(user.rol);
+  const puedeVerRepuestos = !esMecanicoLimitado && (
+    ['ADMIN', 'TALLER', 'PROVEEDURIA_TALLER', 'PROVEEDURIA', 'SUPERVISOR_PESADO', 'MENSAJERO', 'MENSAJERIA', 'MENSAJERO_FACTURAS'].includes(user.rol)
+    || usuarioDashboardLower === 'pesados'
+  );
+  const puedeVerBodega = !esMecanicoLimitado && ['ADMIN', 'TALLER', 'PROVEEDURIA_TALLER', 'BODEGA', 'BODEGUERO'].includes(user.rol);
   const prioridadesLista = Array.isArray(prioridadesTaller) ? prioridadesTaller : [];
   const llantasEnProceso = Number(exec.llantasSolicitadas || 0) + Number(exec.llantasCotizadas || 0) + Number(exec.llantasCompradas || 0);
   const unidadesActivas = Number(exec.unidadesActivas ?? exec.unidades ?? 0);
@@ -362,7 +368,9 @@
         <h1 class="page-title">Inicio</h1>
         <div class="page-subtitle">Sede actual: <strong><%= sedeActual %></strong> · <%= new Date().toLocaleDateString('es-CR') %></div>
       </div>
-      <a href="/ia" class="btn btn-dark btn-sm rounded-pill px-3"><i class="bi bi-stars"></i> IA Tomza</a>
+      <% if (!esMecanicoLimitado) { %>
+        <a href="/ia" class="btn btn-dark btn-sm rounded-pill px-3"><i class="bi bi-stars"></i> IA Tomza</a>
+      <% } %>
     </div>
   </section>
 
@@ -395,16 +403,18 @@
       <div class="summary-value"><%= exec.unidades || 0 %></div>
       <div class="summary-foot"><%= unidadesActivas %> activas · <%= unidadesVaradas %> varadas</div>
     </div>
-    <div class="summary-card">
-      <div class="summary-label">Facturas</div>
-      <div class="summary-value"><%= facturasPendientes %></div>
-      <div class="summary-foot"><%= facturasVencidas %> vencidas · CRC <%= money(exec.montoPendiente) %></div>
-    </div>
-    <div class="summary-card">
-      <div class="summary-label">Llantas</div>
-      <div class="summary-value"><%= llantasEnProceso %></div>
-      <div class="summary-foot"><%= exec.llantasCompradas || 0 %> compradas sin recibir</div>
-    </div>
+    <% if (!esMecanicoLimitado) { %>
+      <div class="summary-card">
+        <div class="summary-label">Facturas</div>
+        <div class="summary-value"><%= facturasPendientes %></div>
+        <div class="summary-foot"><%= facturasVencidas %> vencidas · CRC <%= money(exec.montoPendiente) %></div>
+      </div>
+      <div class="summary-card">
+        <div class="summary-label">Llantas</div>
+        <div class="summary-value"><%= llantasEnProceso %></div>
+        <div class="summary-foot"><%= exec.llantasCompradas || 0 %> compradas sin recibir</div>
+      </div>
+    <% } %>
   </section>
 
   <% if (puedeVerOperaciones) { %>
@@ -461,19 +471,23 @@
             <div><div class="module-title">Reportes supervisores</div><p class="module-copy">Fallas reportadas por unidad.</p></div>
           </a>
         <% } %>
-        <a href="/unidades" class="module-card">
-          <span class="module-icon icon-green"><i class="bi bi-truck-front"></i></span>
-          <div><div class="module-title">Unidades</div><p class="module-copy">Activas, inactivas y varadas.</p></div>
-        </a>
+        <% if (!esMecanicoLimitado) { %>
+          <a href="/unidades" class="module-card">
+            <span class="module-icon icon-green"><i class="bi bi-truck-front"></i></span>
+            <div><div class="module-title">Unidades</div><p class="module-copy">Activas, inactivas y varadas.</p></div>
+          </a>
+        <% } %>
         <% if (puedeVerDashboardTaller) { %>
           <a href="/taller/dashboard" class="module-card">
             <span class="module-icon icon-red"><i class="bi bi-display"></i></span>
             <div><div class="module-title">Dashboard taller</div><p class="module-copy">Unidades en taller y listas para ruta.</p></div>
           </a>
-          <a href="/taller/prioridades-historial" class="module-card">
-            <span class="module-icon icon-green"><i class="bi bi-clock-history"></i></span>
-            <div><div class="module-title">Historial de prioridades</div><p class="module-copy">Salidas de taller, días, trabajos y repuestos.</p></div>
-          </a>
+          <% if (!esMecanicoLimitado) { %>
+            <a href="/taller/prioridades-historial" class="module-card">
+              <span class="module-icon icon-green"><i class="bi bi-clock-history"></i></span>
+              <div><div class="module-title">Historial de prioridades</div><p class="module-copy">Salidas de taller, días, trabajos y repuestos.</p></div>
+            </a>
+          <% } %>
         <% } %>
         <% if (puedeVerLogisticaTaller) { %>
           <a href="/logistica-taller" class="module-card">
@@ -499,10 +513,12 @@
             <div><div class="module-title">Giras de taller</div><p class="module-copy">Inspecciones y observaciones por sede.</p></div>
           </a>
         <% } %>
-        <a href="/llantas" class="module-card">
-          <span class="module-icon icon-dark"><i class="bi bi-circle"></i></span>
-          <div><div class="module-title">Llantas</div><p class="module-copy">Solicitudes, compras y llegadas.</p></div>
-        </a>
+        <% if (!esMecanicoLimitado) { %>
+          <a href="/llantas" class="module-card">
+            <span class="module-icon icon-dark"><i class="bi bi-circle"></i></span>
+            <div><div class="module-title">Llantas</div><p class="module-copy">Solicitudes, compras y llegadas.</p></div>
+          </a>
+        <% } %>
         <% if (puedeVerRepuestos) { %>
           <a href="/repuestos" class="module-card">
             <span class="module-icon icon-amber"><i class="bi bi-box-seam"></i></span>
@@ -535,10 +551,12 @@
           <span class="module-icon icon-blue"><i class="bi bi-clipboard-check"></i></span>
           <div><div class="module-title">DEKRA</div><p class="module-copy">Revisión técnica y vencimientos.</p></div>
         </a>
-        <a href="/minae" class="module-card">
-          <span class="module-icon icon-blue"><i class="bi bi-bank"></i></span>
-          <div><div class="module-title">MINAE</div><p class="module-copy">Trámites y permisos.</p></div>
-        </a>
+        <% if (!esMecanicoLimitado) { %>
+          <a href="/minae" class="module-card">
+            <span class="module-icon icon-blue"><i class="bi bi-bank"></i></span>
+            <div><div class="module-title">MINAE</div><p class="module-copy">Trámites y permisos.</p></div>
+          </a>
+        <% } %>
         <% if (puedeVerAceite) { %>
           <a href="/aceite" class="module-card">
             <span class="module-icon icon-amber"><i class="bi bi-droplet-half"></i></span>

@@ -22,12 +22,19 @@ function requireAuth(req, res, next) {
   next();
 }
 
+function esUsuarioMecanicoLimitado(user) {
+  const usuario = String(user?.usuario || "").trim().toLowerCase();
+  return user?.rol === "MECANICO" ||
+    usuario.startsWith("mecanico") ||
+    usuario.startsWith("mecanicos");
+}
+
 function puedeVerLavado(user) {
-  return ROLES_LAVADO_VER.includes(user?.rol);
+  return ROLES_LAVADO_VER.includes(user?.rol) || esUsuarioMecanicoLimitado(user);
 }
 
 function puedeCrearLavado(user) {
-  return ROLES_LAVADO_CREAR.includes(user?.rol);
+  return ROLES_LAVADO_CREAR.includes(user?.rol) || esUsuarioMecanicoLimitado(user);
 }
 
 function hoyISO() {

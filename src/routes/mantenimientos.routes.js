@@ -29,6 +29,17 @@ function requireAuth(req, res, next) {
   next();
 }
 
+function esUsuarioMecanicoLimitado(user) {
+  const usuario = String(user?.usuario || "").trim().toLowerCase();
+  return user?.rol === "MECANICO" ||
+    usuario === "mecanico" ||
+    usuario.startsWith("mecanico");
+}
+
+function puedeTrabajarComoMecanico(user) {
+  return ["ADMIN", "TALLER"].includes(user?.rol) || esUsuarioMecanicoLimitado(user);
+}
+
 // =====================================================
 // OBTENER SEDE SEGÚN USUARIO
 // =====================================================
@@ -693,7 +704,7 @@ router.get("/correctivos", requireAuth, async (req, res) => {
       `,
       params
     );
-    const reportesPendientes = ["MECANICO", "ADMIN", "TALLER"].includes(req.session.user.rol)
+    const reportesPendientes = puedeTrabajarComoMecanico(req.session.user)
       ? await obtenerReportesPendientesSupervisores(sedeFiltro, sedesFiltro)
       : [];
 
@@ -867,7 +878,7 @@ router.get("/dashboard", requireAuth, async (req, res) => {
 router.get("/correctivos/nuevo", requireAuth, async (req, res) => {
   try {
     await ensureTipoMantenimientoColumns(pool);
-    if (!["MECANICO", "ADMIN", "TALLER"].includes(req.session.user.rol))
+    if (!puedeTrabajarComoMecanico(req.session.user))
       return res.redirect("/mantenimientos");
     let sedeFiltro = obtenerSedeFiltro(req);
     let sedesFormulario = obtenerSedesFiltroUsuario(req, sedeFiltro);
@@ -904,7 +915,7 @@ router.get("/correctivos/nuevo", requireAuth, async (req, res) => {
 // =====================================================
 router.post("/correctivos", requireAuth, async (req, res) => {
   try {
-    if (!["MECANICO", "ADMIN", "TALLER"].includes(req.session.user.rol)) {
+    if (!puedeTrabajarComoMecanico(req.session.user)) {
       return res.status(403).send("No autorizado");
     }
     await ensureUnidadEstadoColumns();
@@ -1199,7 +1210,7 @@ router.get("/", requireAuth, async (req, res) => {
 
     const sedeFiltro = obtenerSedeFiltro(req);
     aplicarFiltroSedesPermitidas(req, condiciones, params, "u.sede", sedeFiltro);
-    if (req.session.user.rol === "MECANICO") {
+    if (esUsuarioMecanicoLimitado(req.session.user)) {
       condiciones.push("DATE(m.fecha_programada) <= CURDATE()");
     }
     const where = condiciones.length ? "WHERE " + condiciones.join(" AND ") : "";
@@ -1452,7 +1463,7 @@ router.post("/:id/plan", requireAuth, async (req, res) => {
 
 router.post("/:id/ejecucion", requireAuth, async (req, res) => {
   try {
-    if (!["ADMIN", "MECANICO"].includes(req.session.user.rol)) return res.status(403).send("No autorizado");
+    if (!["ADMIN"].includes(req.session.user.rol) && !esUsuarioMecanicoLimitado(req.session.user)) return res.status(403).send("No autorizado");
     const { ejecucion, pendiente } = req.body;
     let mecanicos = [];
     if (req.body.mecanicos !== undefined) {

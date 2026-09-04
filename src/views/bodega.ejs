@@ -8,36 +8,55 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
   <style>
     :root {
-      --navy: #101827;
-      --blue: #0b3b82;
+      --navy: #0b1733;
+      --blue: #123f86;
       --red: #dc2626;
       --green: #16a34a;
       --amber: #d97706;
-      --line: #dbe4f0;
-      --bg: #f3f6fa;
+      --line: #d7e2f0;
+      --bg: #edf2f8;
       --muted: #64748b;
+      --soft: #f8fafc;
+      --ink: #08172f;
     }
 
     body {
-      background: var(--bg);
-      color: #0f172a;
+      background:
+        linear-gradient(180deg, #eef3f9 0, #f7f9fc 340px),
+        var(--bg);
+      color: var(--ink);
       font-family: "Segoe UI", Roboto, Arial, sans-serif;
-      font-size: .92rem;
+      font-size: .9rem;
     }
 
     .topbar {
       background: var(--navy);
       border-bottom: 3px solid var(--red);
+      box-shadow: 0 10px 26px rgba(8, 23, 47, .18);
     }
 
     .shell { max-width: 1580px; }
 
+    .brand-mark {
+      align-items: center;
+      background: #fff;
+      border-radius: 8px;
+      color: var(--red);
+      display: inline-flex;
+      height: 32px;
+      justify-content: center;
+      margin-right: .5rem;
+      width: 32px;
+    }
+
     .hero {
-      background: linear-gradient(135deg, #0b3b82, #101827 72%);
-      border-radius: 16px;
+      background: linear-gradient(135deg, #0d3777, #0b1733 70%);
+      border: 1px solid rgba(255, 255, 255, .12);
+      border-radius: 10px;
+      box-shadow: 0 16px 34px rgba(8, 23, 47, .18);
       color: #fff;
       overflow: hidden;
-      padding: 1rem;
+      padding: 1rem 1.1rem;
       position: relative;
     }
 
@@ -45,36 +64,75 @@
       background: linear-gradient(135deg, #f4b000, #e4262d);
       content: "";
       height: 160%;
+      opacity: .95;
       position: absolute;
-      right: 8%;
+      right: 7%;
       top: -30%;
       transform: skewX(-18deg);
-      width: 9rem;
+      width: 8rem;
     }
 
     .hero > * { position: relative; z-index: 1; }
-    .page-title { font-size: 1.45rem; font-weight: 950; margin: 0; }
-    .page-copy { color: #dbeafe; margin: .15rem 0 0; }
+    .page-kicker {
+      color: #bfdbfe;
+      font-size: .72rem;
+      font-weight: 950;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+    .page-title { font-size: 1.5rem; font-weight: 950; letter-spacing: -.01em; margin: .1rem 0 0; }
+    .page-copy { color: #dbeafe; margin: .15rem 0 0; max-width: 720px; }
+    .page-chip {
+      background: rgba(255, 255, 255, .14);
+      border: 1px solid rgba(255, 255, 255, .2);
+      border-radius: 999px;
+      color: #fff;
+      font-weight: 900;
+      padding: .35rem .7rem;
+      white-space: nowrap;
+    }
 
     .kpi-grid {
       display: grid;
       gap: .7rem;
-      grid-template-columns: repeat(8, minmax(0, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
     }
 
     .kpi-card,
     .panel {
       background: #fff;
       border: 1px solid var(--line);
-      border-radius: 14px;
-      box-shadow: 0 12px 28px rgba(15, 23, 42, .06);
+      border-radius: 10px;
+      box-shadow: 0 10px 24px rgba(15, 23, 42, .06);
     }
 
-    .kpi-card { padding: .85rem; }
-    .kpi-label { color: #52627a; font-size: .72rem; font-weight: 900; letter-spacing: .04em; text-transform: uppercase; }
-    .kpi-value { color: #061a40; font-size: 1.65rem; font-weight: 950; line-height: 1; margin-top: .25rem; }
+    .kpi-card {
+      border-top: 4px solid var(--blue);
+      display: grid;
+      gap: .45rem;
+      grid-template-columns: minmax(0, 1fr) 38px;
+      padding: .9rem;
+    }
+    .kpi-card.is-warning { border-top-color: var(--amber); }
+    .kpi-card.is-danger { border-top-color: var(--red); }
+    .kpi-card.is-success { border-top-color: var(--green); }
+    .kpi-label { color: #52627a; font-size: .68rem; font-weight: 950; letter-spacing: .04em; text-transform: uppercase; }
+    .kpi-value { color: #061a40; font-size: 1.55rem; font-weight: 950; line-height: 1; margin-top: .2rem; }
+    .kpi-note { color: var(--muted); font-size: .72rem; font-weight: 750; margin-top: .2rem; }
+    .kpi-icon {
+      align-items: center;
+      background: #eff6ff;
+      border-radius: 8px;
+      color: var(--blue);
+      display: inline-flex;
+      font-size: 1.05rem;
+      height: 38px;
+      justify-content: center;
+      width: 38px;
+    }
     .panel-head {
       align-items: center;
+      background: linear-gradient(180deg, #ffffff, #f8fafc);
       border-bottom: 1px solid var(--line);
       display: flex;
       gap: .75rem;
@@ -89,20 +147,29 @@
     .quick-actions {
       display: grid;
       gap: .75rem;
-      grid-template-columns: repeat(7, minmax(0, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
     }
 
     .quick-btn {
       align-items: center;
       border: 1px solid var(--line);
-      border-radius: 14px;
-      color: #061a40;
+      border-radius: 10px;
+      color: var(--ink);
       display: flex;
       font-weight: 950;
       gap: .7rem;
-      justify-content: center;
-      min-height: 4.2rem;
+      justify-content: flex-start;
+      min-height: 4.6rem;
+      padding: .75rem;
       text-decoration: none;
+      transition: border-color .12s ease, box-shadow .12s ease, transform .12s ease;
+    }
+
+    .quick-btn:hover {
+      border-color: #93a4bb;
+      box-shadow: 0 12px 26px rgba(15, 23, 42, .08);
+      color: var(--ink);
+      transform: translateY(-1px);
     }
 
     .quick-btn i {
@@ -115,6 +182,19 @@
       width: 2rem;
     }
 
+    .quick-btn strong {
+      display: block;
+      line-height: 1.1;
+    }
+
+    .quick-btn small {
+      color: var(--muted);
+      display: block;
+      font-weight: 750;
+      line-height: 1.2;
+      margin-top: .15rem;
+    }
+
     .btn-blue i { background: var(--blue); }
     .btn-green i { background: var(--green); }
     .btn-amber i { background: var(--amber); }
@@ -122,18 +202,22 @@
     .btn-darkx i { background: var(--navy); }
 
     .module-tabs {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 10px;
       display: flex;
       flex-wrap: wrap;
       gap: .45rem;
+      padding: .45rem;
     }
 
     .module-tab {
-      background: #fff;
-      border: 1px solid var(--line);
-      border-radius: 999px;
+      background: transparent;
+      border: 1px solid transparent;
+      border-radius: 8px;
       color: #0f274d;
       font-weight: 900;
-      padding: .45rem .8rem;
+      padding: .5rem .75rem;
       text-decoration: none;
     }
 
@@ -143,23 +227,73 @@
       color: #fff;
     }
 
+    .form-card {
+      background: var(--soft);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: .85rem;
+    }
+
     .form-label { color: #334155; font-size: .75rem; font-weight: 900; margin-bottom: .25rem; }
     .form-control, .form-select {
       border-color: #cbd8ea;
-      border-radius: 10px;
+      border-radius: 8px;
       min-height: 2.35rem;
     }
 
+    .articulo-picker {
+      background: #fff;
+      border: 1px solid #dbe6f3;
+      border-radius: 10px;
+      padding: .55rem;
+    }
+
+    .articulo-search-status {
+      color: #64748b;
+      font-size: .72rem;
+      font-weight: 800;
+      min-height: 1rem;
+    }
+
+    .table-responsive {
+      border-radius: 0 0 10px 10px;
+    }
+
+    .table-modern {
+      margin: 0;
+    }
+
     .table thead th {
-      background: #0b2d63;
-      color: #fff;
+      background: #f8fafc;
+      border-bottom: 1px solid var(--line);
+      color: #475569;
       font-size: .72rem;
       letter-spacing: .03em;
       text-transform: uppercase;
       white-space: nowrap;
     }
 
-    .table td { vertical-align: middle; }
+    .table td {
+      border-color: #e5edf7;
+      vertical-align: middle;
+    }
+
+    .table tbody tr:hover {
+      background: #f8fbff;
+    }
+
+    .code-badge {
+      background: #0b1733;
+      border-radius: 6px;
+      color: #fff;
+      display: inline-flex;
+      font-weight: 950;
+      letter-spacing: .04em;
+      min-width: 44px;
+      padding: .22rem .4rem;
+      justify-content: center;
+    }
+
     .stock-badge {
       border-radius: 999px;
       display: inline-flex;
@@ -179,9 +313,16 @@
     .line-row {
       background: #f8fafc;
       border: 1px solid var(--line);
-      border-radius: 12px;
+      border-radius: 10px;
       margin-bottom: .55rem;
       padding: .7rem;
+    }
+
+    .empty-row {
+      color: var(--muted);
+      font-weight: 800;
+      padding: 1rem;
+      text-align: center;
     }
 
     @media (max-width: 1100px) {
@@ -218,11 +359,45 @@
   const paginaActual = pagina || 'inicio';
   const pageUrl = (page) => page === 'inicio' ? '/bodega' : `/bodega/${page}`;
   const mostrar = (...pages) => pages.includes(paginaActual);
+  const pageInfo = {
+    inicio: {
+      titulo: 'Centro de control de bodega',
+      texto: 'Inventario, consignación, suministros, entradas, salidas, herramientas y movimientos desde un solo módulo.'
+    },
+    entregas: {
+      titulo: 'Entregas y entradas de bodega',
+      texto: 'Registre salidas por placa, entradas de mercadería y devoluciones con trazabilidad de stock.'
+    },
+    suministros: {
+      titulo: 'Suministros de bodega',
+      texto: 'Control separado de materiales de uso diario, mínimos, máximos, ubicación y proveedor.'
+    },
+    consignacion: {
+      titulo: 'Consignación Maxi Repuestos',
+      texto: 'Repuestos en consignación identificados con código interno de taller y existencia disponible.'
+    },
+    inventario: {
+      titulo: 'Inventario general',
+      texto: 'Existencia actual, origen, ubicación, costo unitario, proveedor y ajuste físico.'
+    },
+    herramientas: {
+      titulo: 'Herramientas prestadas',
+      texto: 'Herramientas fuera de bodega, responsable, placa asociada y devolución.'
+    },
+    movimientos: {
+      titulo: 'Movimientos y compras sugeridas',
+      texto: 'Historial reciente de entradas, salidas, ajustes y lista de artículos por reponer.'
+    }
+  }[paginaActual] || {
+    titulo: 'Bodega Taller',
+    texto: 'Control operativo del inventario del taller.'
+  };
 %>
 
 <nav class="navbar navbar-dark topbar px-3 py-2">
-  <span class="navbar-brand fw-semibold"><i class="bi bi-boxes me-2"></i>Bodega Taller</span>
-  <div class="d-flex gap-2">
+  <span class="navbar-brand fw-semibold"><span class="brand-mark"><i class="bi bi-boxes"></i></span>Bodega Taller</span>
+  <div class="d-flex align-items-center gap-2 flex-wrap text-white">
+    <span class="small fw-bold"><%= user.usuario %> · <%= user.rol %></span>
     <a href="/dashboard" class="btn btn-outline-light btn-sm rounded-pill px-3">Inicio</a>
   </div>
 </nav>
@@ -231,9 +406,11 @@
   <section class="hero mb-3">
     <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
       <div>
-        <h1 class="page-title">Inventario de bodega del taller</h1>
-        <p class="page-copy">Buscar, entregar, recibir, devolver y controlar herramientas con código interno de taller.</p>
+        <div class="page-kicker">Bodega · Taller · Inventario</div>
+        <h1 class="page-title"><%= pageInfo.titulo %></h1>
+        <p class="page-copy"><%= pageInfo.texto %></p>
       </div>
+      <div class="page-chip"><i class="bi bi-calendar3 me-1"></i><%= new Date().toLocaleDateString('es-CR') %></div>
       <form method="GET" action="<%= pageUrl(paginaActual) %>" class="d-flex gap-2 flex-wrap">
         <input class="form-control" name="q" value="<%= q || '' %>" placeholder="Buscar por código taller, proveedor, nombre, parte, ubicación..." style="min-width: 320px">
         <select class="form-select" name="origen" style="width: 190px">
@@ -261,25 +438,107 @@
   </section>
 
   <section class="kpi-grid mb-3">
-    <div class="kpi-card"><div class="kpi-label">Artículos</div><div class="kpi-value"><%= stats.articulos %></div></div>
-    <div class="kpi-card"><div class="kpi-label">Stock bajo</div><div class="kpi-value text-warning"><%= stats.stock_bajo %></div></div>
-    <div class="kpi-card"><div class="kpi-label">Agotados</div><div class="kpi-value text-danger"><%= stats.agotados %></div></div>
-    <div class="kpi-card"><div class="kpi-label">Inventario nuestro</div><div class="kpi-value text-success"><%= stats.propios %></div></div>
-    <div class="kpi-card"><div class="kpi-label">Consignación</div><div class="kpi-value text-warning"><%= stats.consignacion %></div></div>
-    <div class="kpi-card"><div class="kpi-label">Suministros</div><div class="kpi-value text-primary"><%= stats.suministros %></div></div>
-    <div class="kpi-card"><div class="kpi-label">Herramientas prestadas</div><div class="kpi-value text-primary"><%= stats.herramientas_prestadas %></div></div>
-    <div class="kpi-card"><div class="kpi-label">Movimientos de hoy</div><div class="kpi-value text-success"><%= stats.movimientos_hoy %></div></div>
+    <div class="kpi-card">
+      <div><div class="kpi-label">Artículos activos</div><div class="kpi-value"><%= stats.articulos %></div><div class="kpi-note">Inventario controlado</div></div>
+      <span class="kpi-icon"><i class="bi bi-box-seam"></i></span>
+    </div>
+    <div class="kpi-card is-warning">
+      <div><div class="kpi-label">Stock bajo</div><div class="kpi-value text-warning"><%= stats.stock_bajo %></div><div class="kpi-note">Requieren revisión</div></div>
+      <span class="kpi-icon"><i class="bi bi-exclamation-triangle"></i></span>
+    </div>
+    <div class="kpi-card is-danger">
+      <div><div class="kpi-label">Agotados</div><div class="kpi-value text-danger"><%= stats.agotados %></div><div class="kpi-note">Sin existencia</div></div>
+      <span class="kpi-icon"><i class="bi bi-x-octagon"></i></span>
+    </div>
+    <div class="kpi-card is-success">
+      <div><div class="kpi-label">Valor estimado</div><div class="kpi-value">₡<%= money(stats.valor_total) %></div><div class="kpi-note">Stock x precio</div></div>
+      <span class="kpi-icon"><i class="bi bi-cash-stack"></i></span>
+    </div>
+    <div class="kpi-card is-success">
+      <div><div class="kpi-label">Inventario nuestro</div><div class="kpi-value text-success"><%= stats.propios %></div><div class="kpi-note">₡<%= money(stats.valor_propio) %></div></div>
+      <span class="kpi-icon"><i class="bi bi-building-check"></i></span>
+    </div>
+    <div class="kpi-card is-warning">
+      <div><div class="kpi-label">Consignación</div><div class="kpi-value text-warning"><%= stats.consignacion %></div><div class="kpi-note">₡<%= money(stats.valor_consignacion) %></div></div>
+      <span class="kpi-icon"><i class="bi bi-truck"></i></span>
+    </div>
+    <div class="kpi-card">
+      <div><div class="kpi-label">Suministros</div><div class="kpi-value text-primary"><%= stats.suministros %></div><div class="kpi-note">Uso diario</div></div>
+      <span class="kpi-icon"><i class="bi bi-clipboard2-check"></i></span>
+    </div>
+    <div class="kpi-card">
+      <div><div class="kpi-label">Movimientos hoy</div><div class="kpi-value text-success"><%= stats.movimientos_hoy %></div><div class="kpi-note"><%= stats.herramientas_prestadas %> herramienta(s) prestada(s)</div></div>
+      <span class="kpi-icon"><i class="bi bi-activity"></i></span>
+    </div>
   </section>
 
-  <section class="quick-actions mb-3">
-    <a href="/bodega/entregas" class="quick-btn btn-blue"><i class="bi bi-box-arrow-up-right"></i>Entregas</a>
-    <a href="/bodega/suministros" class="quick-btn btn-blue"><i class="bi bi-clipboard2-check"></i>Suministros</a>
-    <a href="/bodega/consignacion" class="quick-btn btn-amber"><i class="bi bi-truck"></i>Consignación</a>
-    <a href="/bodega/inventario" class="quick-btn btn-darkx"><i class="bi bi-list-check"></i>Inventario</a>
-    <a href="/bodega/herramientas" class="quick-btn btn-red"><i class="bi bi-tools"></i>Herramientas</a>
-    <a href="/bodega/movimientos" class="quick-btn btn-green"><i class="bi bi-clock-history"></i>Movimientos</a>
-    <a href="/bodega" class="quick-btn btn-darkx"><i class="bi bi-house"></i>Bodega inicio</a>
+  <section class="quick-actions mb-3 <%= mostrar('inicio') ? '' : 'd-none' %>">
+    <a href="/bodega/entregas" class="quick-btn btn-blue"><i class="bi bi-box-arrow-up-right"></i><span><strong>Entregas</strong><small>Salidas, entradas y devoluciones</small></span></a>
+    <a href="/bodega/suministros" class="quick-btn btn-blue"><i class="bi bi-clipboard2-check"></i><span><strong>Suministros</strong><small>Materiales de uso diario</small></span></a>
+    <a href="/bodega/consignacion" class="quick-btn btn-amber"><i class="bi bi-truck"></i><span><strong>Consignación</strong><small>Inventario Maxi Repuestos</small></span></a>
+    <a href="/bodega/inventario" class="quick-btn btn-darkx"><i class="bi bi-list-check"></i><span><strong>Inventario</strong><small>Existencias y ajustes físicos</small></span></a>
+    <a href="/bodega/herramientas" class="quick-btn btn-red"><i class="bi bi-tools"></i><span><strong>Herramientas</strong><small>Préstamos pendientes</small></span></a>
+    <a href="/bodega/movimientos" class="quick-btn btn-green"><i class="bi bi-clock-history"></i><span><strong>Movimientos</strong><small>Historial y compras sugeridas</small></span></a>
+    <a href="/dashboard" class="quick-btn btn-darkx"><i class="bi bi-house"></i><span><strong>Dashboard</strong><small>Volver al inicio general</small></span></a>
   </section>
+
+  <div class="row g-3 mb-3 <%= mostrar('inicio') ? '' : 'd-none' %>">
+    <div class="col-xl-5">
+      <section class="panel h-100">
+        <div class="panel-head">
+          <div>
+            <h2 class="panel-title">Alertas de inventario</h2>
+            <p class="panel-copy">Artículos que necesitan compra o revisión de existencia.</p>
+          </div>
+          <a href="/bodega/movimientos" class="btn btn-outline-dark btn-sm fw-bold">Ver todo</a>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-sm table-modern align-middle">
+            <thead><tr><th>Artículo</th><th>Actual</th><th>Mín.</th><th>Comprar</th></tr></thead>
+            <tbody>
+              <% if (!porComprar.length) { %><tr><td colspan="4" class="empty-row">Sin alertas de stock bajo.</td></tr><% } %>
+              <% porComprar.slice(0, 6).forEach(a => { %>
+                <tr>
+                  <td><span class="code-badge me-1"><%= a.codigo_taller || '----' %></span><strong><%= a.nombre %></strong><div class="small muted"><%= a.ubicacion || 'Sin ubicación' %> · <%= origenTexto(a.origen_inventario) %></div></td>
+                  <td class="money"><%= fmt(a.stock_actual) %></td>
+                  <td class="money"><%= fmt(a.stock_minimo) %></td>
+                  <td class="money"><%= fmt(a.cantidad_comprar) %></td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+    <div class="col-xl-7">
+      <section class="panel h-100">
+        <div class="panel-head">
+          <div>
+            <h2 class="panel-title">Últimos movimientos</h2>
+            <p class="panel-copy">Trazabilidad reciente de entradas, salidas, devoluciones y ajustes.</p>
+          </div>
+          <a href="/bodega/movimientos" class="btn btn-outline-dark btn-sm fw-bold">Historial</a>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-sm table-modern align-middle">
+            <thead><tr><th>Fecha</th><th>Tipo</th><th>Artículo</th><th>Cant.</th><th>Responsable</th></tr></thead>
+            <tbody>
+              <% if (!movimientos.length) { %><tr><td colspan="5" class="empty-row">Sin movimientos recientes.</td></tr><% } %>
+              <% movimientos.slice(0, 6).forEach(m => { %>
+                <tr>
+                  <td><%= fecha(m.creado_en) %></td>
+                  <td><span class="pill"><%= m.tipo_movimiento %></span></td>
+                  <td><span class="code-badge me-1"><%= m.codigo_taller || '----' %></span><strong><%= m.articulo_nombre %></strong><div class="small muted"><%= origenTexto(m.origen_inventario) %></div></td>
+                  <td class="money"><%= fmt(m.cantidad) %> <%= m.unidad_medida %></td>
+                  <td><%= m.mecanico || m.proveedor_nombre || m.usuario_nombre || '-' %></td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  </div>
 
   <section class="panel mb-3 <%= mostrar('suministros') ? '' : 'd-none' %>" id="suministros">
     <div class="panel-head">
@@ -291,7 +550,7 @@
     </div>
     <div class="collapse show" id="crear-suministro">
       <div class="panel-body border-bottom">
-        <form method="POST" action="/bodega/suministros" class="row g-2">
+        <form method="POST" action="/bodega/suministros" class="row g-2 form-card">
           <input type="hidden" name="redirect_to" value="suministros">
           <div class="col-md-2">
             <label class="form-label">Código taller</label>
@@ -316,13 +575,13 @@
       </div>
     </div>
     <div class="table-responsive">
-      <table class="table table-sm mb-0 align-middle">
+      <table class="table table-sm table-modern align-middle">
         <thead><tr><th>Cód. taller</th><th>Cód. proveedor</th><th>Suministro</th><th>Categoría</th><th>Existencia</th><th>Mín/Max</th><th>Ubicación</th><th>Proveedor</th><th>Observación</th><th>Estado</th></tr></thead>
         <tbody>
-          <% if (!listaSuministros.length) { %><tr><td colspan="10" class="text-center text-muted py-3">No hay suministros registrados todavía.</td></tr><% } %>
+          <% if (!listaSuministros.length) { %><tr><td colspan="10" class="empty-row">No hay suministros registrados todavía.</td></tr><% } %>
           <% listaSuministros.forEach(a => { const estado = estadoStock(a); %>
             <tr>
-              <td><strong><%= a.codigo_taller || '-' %></strong></td>
+              <td><span class="code-badge"><%= a.codigo_taller || '-' %></span></td>
               <td><%= a.codigo || '-' %><div class="small muted"><%= a.numero_parte || '' %></div></td>
               <td><strong><%= a.nombre %></strong><div class="small muted"><%= a.marca || '-' %></div></td>
               <td><%= a.categoria || 'Suministros' %></td>
@@ -348,13 +607,13 @@
       <a href="/bodega/inventario?origen=CONSIGNACION" class="btn btn-outline-dark btn-sm fw-bold">Ver solo consignación</a>
     </div>
     <div class="table-responsive">
-      <table class="table table-sm mb-0 align-middle">
+      <table class="table table-sm table-modern align-middle">
         <thead><tr><th>Cód. taller</th><th>Cód. proveedor</th><th>Repuesto</th><th>Proveedor consignación</th><th>Stock</th><th>Ubicación</th><th>Estado</th></tr></thead>
         <tbody>
-          <% if (!articulosConsignacion.length) { %><tr><td colspan="7" class="text-center text-muted py-3">No hay repuestos de consignación con el filtro actual.</td></tr><% } %>
+          <% if (!articulosConsignacion.length) { %><tr><td colspan="7" class="empty-row">No hay repuestos de consignación con el filtro actual.</td></tr><% } %>
           <% articulosConsignacion.forEach(a => { const estado = estadoStock(a); %>
             <tr>
-              <td><strong><%= a.codigo_taller || '-' %></strong></td>
+              <td><span class="code-badge"><%= a.codigo_taller || '-' %></span></td>
               <td><%= a.codigo || '-' %><div class="small muted"><%= a.numero_parte || '' %></div></td>
               <td><strong><%= a.nombre %></strong><div class="small muted"><%= a.categoria || '-' %> · <%= a.marca || '-' %></div></td>
               <td><%= a.proveedor_consignacion || a.proveedor_nombre || proveedorConsignacionDefault %></td>
@@ -378,7 +637,7 @@
           </div>
         </div>
         <div class="panel-body">
-          <form method="POST" action="/bodega/entregar">
+          <form method="POST" action="/bodega/entregar" class="form-card">
             <input type="hidden" name="redirect_to" value="entregas">
             <div class="row g-2 mb-2">
               <div class="col-md-3"><label class="form-label">Placa</label><input class="form-control placa-search" name="placa" placeholder="C173517" required></div>
@@ -392,12 +651,26 @@
                 <div class="row g-2 align-items-end">
                   <div class="col-md-7">
                     <label class="form-label">Artículo</label>
-                    <select class="form-select" name="articulo_id" required>
-                      <option value="">Seleccione</option>
-                      <% articulosDisponibles.forEach(a => { %>
-                        <option value="<%= a.id %>"><%= a.codigo_taller || '----' %> · <%= a.nombre %> · <%= origenTexto(a.origen_inventario) %> · Stock <%= fmt(a.stock_actual) %> <%= a.unidad_medida %> · <%= a.ubicacion || 'Sin ubicación' %></option>
-                      <% }) %>
-                    </select>
+                    <div class="articulo-picker">
+                      <input class="form-control articulo-search mb-1" type="search" placeholder="Buscar por código, nombre, marca, categoría o ubicación" autocomplete="off">
+                      <select class="form-select articulo-select" name="articulo_id" required>
+                        <option value="">Seleccione</option>
+                        <% articulosDisponibles.forEach(a => { %>
+                          <option value="<%= a.id %>" data-search="<%= [
+                            a.codigo_taller,
+                            a.codigo,
+                            a.nombre,
+                            a.categoria,
+                            a.marca,
+                            a.numero_parte,
+                            a.tipo_unidad,
+                            a.ubicacion,
+                            origenTexto(a.origen_inventario)
+                          ].filter(Boolean).join(' ') %>"><%= a.codigo_taller || '----' %> · <%= a.nombre %> · <%= origenTexto(a.origen_inventario) %> · Stock <%= fmt(a.stock_actual) %> <%= a.unidad_medida %> · <%= a.ubicacion || 'Sin ubicación' %></option>
+                        <% }) %>
+                      </select>
+                      <div class="articulo-search-status mt-1">Escriba para filtrar el listado.</div>
+                    </div>
                   </div>
                   <div class="col-md-2">
                     <label class="form-label">Sale de</label>
@@ -422,9 +695,31 @@
       <section class="panel h-100" id="recibir">
         <div class="panel-head"><div><h2 class="panel-title">Recibir mercadería</h2><p class="panel-copy">Entrada por factura, proveedor u orden de compra.</p></div></div>
         <div class="panel-body">
-          <form method="POST" action="/bodega/recibir" class="row g-2">
+          <form method="POST" action="/bodega/recibir" class="row g-2 form-card">
             <input type="hidden" name="redirect_to" value="entregas">
-            <div class="col-12"><label class="form-label">Artículo</label><select class="form-select" name="articulo_id" required><option value="">Seleccione</option><% articulos.forEach(a => { %><option value="<%= a.id %>"><%= a.codigo_taller || '----' %> · <%= a.nombre %> · Prov. <%= a.codigo || 'Sin código' %></option><% }) %></select></div>
+            <div class="col-12">
+              <label class="form-label">Artículo</label>
+              <div class="articulo-picker">
+                <input class="form-control articulo-search mb-1" type="search" placeholder="Buscar por código, nombre, marca, categoría o ubicación" autocomplete="off">
+                <select class="form-select articulo-select" name="articulo_id" required>
+                  <option value="">Seleccione</option>
+                  <% articulos.forEach(a => { %>
+                    <option value="<%= a.id %>" data-search="<%= [
+                      a.codigo_taller,
+                      a.codigo,
+                      a.nombre,
+                      a.categoria,
+                      a.marca,
+                      a.numero_parte,
+                      a.tipo_unidad,
+                      a.ubicacion,
+                      origenTexto(a.origen_inventario)
+                    ].filter(Boolean).join(' ') %>"><%= a.codigo_taller || '----' %> · <%= a.nombre %> · Prov. <%= a.codigo || 'Sin código' %></option>
+                  <% }) %>
+                </select>
+                <div class="articulo-search-status mt-1">Escriba para filtrar el listado.</div>
+              </div>
+            </div>
             <div class="col-md-4"><label class="form-label">Cantidad</label><input class="form-control" type="number" step="0.01" min="0.01" name="cantidad" required></div>
             <div class="col-md-4"><label class="form-label">Precio unitario</label><input class="form-control" type="number" step="0.01" min="0" name="precio_unitario"></div>
             <div class="col-md-4"><label class="form-label">Fecha</label><input class="form-control" type="date" name="fecha"></div>
@@ -446,9 +741,31 @@
       <section class="panel" id="devolver">
         <div class="panel-head"><div><h2 class="panel-title">Devolución de repuesto</h2><p class="panel-copy">Para artículos que salieron pero no se utilizaron.</p></div></div>
         <div class="panel-body">
-          <form method="POST" action="/bodega/devolver" class="row g-2">
+          <form method="POST" action="/bodega/devolver" class="row g-2 form-card">
             <input type="hidden" name="redirect_to" value="entregas">
-            <div class="col-12"><label class="form-label">Artículo</label><select class="form-select" name="articulo_id" required><option value="">Seleccione</option><% articulos.forEach(a => { %><option value="<%= a.id %>"><%= a.nombre %></option><% }) %></select></div>
+            <div class="col-12">
+              <label class="form-label">Artículo</label>
+              <div class="articulo-picker">
+                <input class="form-control articulo-search mb-1" type="search" placeholder="Buscar por código, nombre, marca, categoría o ubicación" autocomplete="off">
+                <select class="form-select articulo-select" name="articulo_id" required>
+                  <option value="">Seleccione</option>
+                  <% articulos.forEach(a => { %>
+                    <option value="<%= a.id %>" data-search="<%= [
+                      a.codigo_taller,
+                      a.codigo,
+                      a.nombre,
+                      a.categoria,
+                      a.marca,
+                      a.numero_parte,
+                      a.tipo_unidad,
+                      a.ubicacion,
+                      origenTexto(a.origen_inventario)
+                    ].filter(Boolean).join(' ') %>"><%= a.codigo_taller || '----' %> · <%= a.nombre %> · Stock <%= fmt(a.stock_actual) %> <%= a.unidad_medida %></option>
+                  <% }) %>
+                </select>
+                <div class="articulo-search-status mt-1">Escriba para filtrar el listado.</div>
+              </div>
+            </div>
             <div class="col-md-4"><label class="form-label">Cantidad</label><input class="form-control" type="number" step="0.01" min="0.01" name="cantidad" value="1" required></div>
             <div class="col-md-4"><label class="form-label">Placa</label><input class="form-control placa-search" name="placa"></div>
             <div class="col-md-4"><label class="form-label">Mecánico</label><input class="form-control" name="mecanico"></div>
@@ -463,13 +780,13 @@
       <section class="panel" id="herramientas">
         <div class="panel-head"><div><h2 class="panel-title">Herramientas prestadas</h2><p class="panel-copy">Lo que debe regresar a bodega.</p></div></div>
         <div class="table-responsive">
-          <table class="table table-sm mb-0 align-middle">
+          <table class="table table-sm table-modern align-middle">
             <thead><tr><th>Herramienta</th><th>Mecánico</th><th>Placa</th><th>Salida</th><th class="text-end">Acción</th></tr></thead>
             <tbody>
-              <% if (!prestamos.length) { %><tr><td colspan="5" class="text-center text-muted py-3">No hay herramientas prestadas.</td></tr><% } %>
+              <% if (!prestamos.length) { %><tr><td colspan="5" class="empty-row">No hay herramientas prestadas.</td></tr><% } %>
               <% prestamos.forEach(p => { %>
                 <tr>
-                  <td><strong><%= p.codigo_taller || '----' %> · <%= p.articulo_nombre %></strong><div class="small muted">Prov. <%= p.codigo || '-' %> · <%= p.ubicacion || 'Sin ubicación' %></div></td>
+                  <td><span class="code-badge me-1"><%= p.codigo_taller || '----' %></span><strong><%= p.articulo_nombre %></strong><div class="small muted">Prov. <%= p.codigo || '-' %> · <%= p.ubicacion || 'Sin ubicación' %></div></td>
                   <td><%= p.mecanico %></td>
                   <td><%= p.placa || '-' %></td>
                   <td><%= fecha(p.salida_en) %></td>
@@ -496,7 +813,7 @@
     </div>
     <div class="collapse" id="crear-articulo">
       <div class="panel-body border-bottom">
-        <form method="POST" action="/bodega/articulos" class="row g-2">
+        <form method="POST" action="/bodega/articulos" class="row g-2 form-card">
           <input type="hidden" name="redirect_to" value="inventario">
           <div class="col-md-2">
             <label class="form-label">Código taller</label>
@@ -525,13 +842,13 @@
       </div>
     </div>
     <div class="table-responsive">
-      <table class="table table-hover table-sm mb-0 align-middle">
+      <table class="table table-hover table-sm table-modern align-middle">
         <thead><tr><th>Cód. taller</th><th>Cód. proveedor</th><th>Artículo</th><th>Tipo</th><th>Origen</th><th>Existencia</th><th>Estado</th><th>Ubicación</th><th>Min/Max</th><th>Proveedor</th><th>Precio</th><% if (puedeAjustar) { %><th>Ajuste</th><% } %></tr></thead>
         <tbody>
-          <% if (!articulos.length) { %><tr><td colspan="<%= puedeAjustar ? 12 : 11 %>" class="text-center text-muted py-4">No hay artículos con ese filtro.</td></tr><% } %>
+          <% if (!articulos.length) { %><tr><td colspan="<%= puedeAjustar ? 12 : 11 %>" class="empty-row">No hay artículos con ese filtro.</td></tr><% } %>
           <% articulos.forEach(a => { const estado = estadoStock(a); %>
             <tr>
-              <td><strong><%= a.codigo_taller || '-' %></strong></td>
+              <td><span class="code-badge"><%= a.codigo_taller || '-' %></span></td>
               <td><%= a.codigo || '-' %><div class="small muted"><%= a.numero_parte || '' %></div></td>
               <td><strong><%= a.nombre %></strong><div class="small muted"><%= a.categoria || '-' %> · <%= a.marca || '-' %> · <%= a.tipo_unidad || '-' %><% if (a.observacion) { %> · <%= a.observacion %><% } %></div></td>
               <td><span class="pill"><%= a.tipo_articulo %></span></td>
@@ -565,12 +882,12 @@
       <section class="panel">
         <div class="panel-head"><div><h2 class="panel-title">Por comprar</h2><p class="panel-copy">Se genera solo cuando llega al mínimo.</p></div></div>
         <div class="table-responsive">
-          <table class="table table-sm mb-0 align-middle">
+          <table class="table table-sm table-modern align-middle">
             <thead><tr><th>Artículo</th><th>Origen</th><th>Actual</th><th>Mín.</th><th>Máx.</th><th>Comprar</th></tr></thead>
             <tbody>
-              <% if (!porComprar.length) { %><tr><td colspan="6" class="text-center text-muted py-3">No hay productos en stock bajo.</td></tr><% } %>
+              <% if (!porComprar.length) { %><tr><td colspan="6" class="empty-row">No hay productos en stock bajo.</td></tr><% } %>
               <% porComprar.forEach(a => { %>
-                <tr><td><strong><%= a.codigo_taller || '----' %> · <%= a.nombre %></strong><div class="small muted">Prov. <%= a.codigo || '-' %> · <%= a.proveedor_nombre || '-' %></div></td><td><span class="pill <%= origenClase(a.origen_inventario) %>"><%= origenTexto(a.origen_inventario) %></span></td><td><%= fmt(a.stock_actual) %></td><td><%= fmt(a.stock_minimo) %></td><td><%= fmt(a.stock_maximo) %></td><td class="money"><%= fmt(a.cantidad_comprar) %></td></tr>
+                <tr><td><span class="code-badge me-1"><%= a.codigo_taller || '----' %></span><strong><%= a.nombre %></strong><div class="small muted">Prov. <%= a.codigo || '-' %> · <%= a.proveedor_nombre || '-' %></div></td><td><span class="pill <%= origenClase(a.origen_inventario) %>"><%= origenTexto(a.origen_inventario) %></span></td><td><%= fmt(a.stock_actual) %></td><td><%= fmt(a.stock_minimo) %></td><td><%= fmt(a.stock_maximo) %></td><td class="money"><%= fmt(a.cantidad_comprar) %></td></tr>
               <% }) %>
             </tbody>
           </table>
@@ -581,16 +898,16 @@
       <section class="panel">
         <div class="panel-head"><div><h2 class="panel-title">Historial de movimientos</h2><p class="panel-copy">Entradas, salidas, devoluciones, ajustes y herramientas.</p></div></div>
         <div class="table-responsive">
-          <table class="table table-sm mb-0 align-middle">
+          <table class="table table-sm table-modern align-middle">
             <thead><tr><th>Fecha</th><th>Tipo</th><th>Origen</th><th>Artículo</th><th>Placa / mecánico</th><th>Cant.</th><th>Stock</th><th>Usuario</th></tr></thead>
             <tbody>
-              <% if (!movimientos.length) { %><tr><td colspan="8" class="text-center text-muted py-3">Sin movimientos todavía.</td></tr><% } %>
+              <% if (!movimientos.length) { %><tr><td colspan="8" class="empty-row">Sin movimientos todavía.</td></tr><% } %>
               <% movimientos.forEach(m => { %>
                 <tr>
                   <td><%= fecha(m.creado_en) %></td>
                   <td><span class="pill"><%= m.tipo_movimiento %></span></td>
                   <td><span class="pill <%= origenClase(m.origen_inventario) %>"><%= origenTexto(m.origen_inventario) %></span></td>
-                  <td><strong><%= m.codigo_taller || '----' %> · <%= m.articulo_nombre %></strong><div class="small muted">Prov. <%= m.codigo || '-' %></div></td>
+                  <td><span class="code-badge me-1"><%= m.codigo_taller || '----' %></span><strong><%= m.articulo_nombre %></strong><div class="small muted">Prov. <%= m.codigo || '-' %></div></td>
                   <td><%= m.placa || '-' %><div class="small muted"><%= m.mecanico || m.proveedor_nombre || '-' %></div></td>
                   <td class="money"><%= fmt(m.cantidad) %> <%= m.unidad_medida %></td>
                   <td><%= fmt(m.existencia_anterior) %> → <strong><%= fmt(m.existencia_nueva) %></strong></td>
@@ -610,12 +927,26 @@
     <div class="row g-2 align-items-end">
       <div class="col-md-7">
         <label class="form-label">Artículo</label>
-        <select class="form-select" name="articulo_id" required>
-          <option value="">Seleccione</option>
-          <% articulosDisponibles.forEach(a => { %>
-            <option value="<%= a.id %>"><%= a.codigo_taller || '----' %> · <%= a.nombre %> · <%= origenTexto(a.origen_inventario) %> · Stock <%= fmt(a.stock_actual) %> <%= a.unidad_medida %> · <%= a.ubicacion || 'Sin ubicación' %></option>
-          <% }) %>
-        </select>
+        <div class="articulo-picker">
+          <input class="form-control articulo-search mb-1" type="search" placeholder="Buscar por código, nombre, marca, categoría o ubicación" autocomplete="off">
+          <select class="form-select articulo-select" name="articulo_id" required>
+            <option value="">Seleccione</option>
+            <% articulosDisponibles.forEach(a => { %>
+              <option value="<%= a.id %>" data-search="<%= [
+                a.codigo_taller,
+                a.codigo,
+                a.nombre,
+                a.categoria,
+                a.marca,
+                a.numero_parte,
+                a.tipo_unidad,
+                a.ubicacion,
+                origenTexto(a.origen_inventario)
+              ].filter(Boolean).join(' ') %>"><%= a.codigo_taller || '----' %> · <%= a.nombre %> · <%= origenTexto(a.origen_inventario) %> · Stock <%= fmt(a.stock_actual) %> <%= a.unidad_medida %> · <%= a.ubicacion || 'Sin ubicación' %></option>
+            <% }) %>
+          </select>
+          <div class="articulo-search-status mt-1">Escriba para filtrar el listado.</div>
+        </div>
       </div>
       <div class="col-md-2">
         <label class="form-label">Sale de</label>
@@ -633,11 +964,78 @@
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
+  const normalizarBusquedaArticulo = (value) => String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+
+  const actualizarFiltroArticulo = (picker) => {
+    const input = picker.querySelector('.articulo-search');
+    const select = picker.querySelector('.articulo-select');
+    const status = picker.querySelector('.articulo-search-status');
+    if (!input || !select) return;
+
+    const query = normalizarBusquedaArticulo(input.value.trim());
+    let visibles = 0;
+
+    Array.from(select.options).forEach((option, index) => {
+      if (index === 0) {
+        option.hidden = false;
+        option.disabled = false;
+        return;
+      }
+
+      const text = normalizarBusquedaArticulo(`${option.dataset.search || ''} ${option.textContent || ''}`);
+      const visible = !query || text.includes(query);
+      option.hidden = !visible;
+      option.disabled = !visible;
+      if (visible) visibles += 1;
+    });
+
+    const selected = select.selectedOptions[0];
+    if (selected?.disabled) select.value = '';
+    if (status) {
+      status.textContent = query
+        ? `${visibles} artículo(s) encontrados.`
+        : 'Escriba para filtrar el listado.';
+    }
+  };
+
+  const prepararBuscadorArticulo = (picker) => {
+    if (!picker || picker.dataset.ready === '1') return;
+    const input = picker.querySelector('.articulo-search');
+    const select = picker.querySelector('.articulo-select');
+    const status = picker.querySelector('.articulo-search-status');
+    if (!input || !select) return;
+
+    picker.dataset.ready = '1';
+    input.addEventListener('input', () => actualizarFiltroArticulo(picker));
+    input.addEventListener('keydown', (event) => {
+      if (event.key !== 'Enter') return;
+      event.preventDefault();
+      const firstVisible = Array.from(select.options).find(option => option.value && !option.disabled && !option.hidden);
+      if (firstVisible) {
+        select.value = firstVisible.value;
+        select.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+    });
+    select.addEventListener('change', () => {
+      const option = select.selectedOptions[0];
+      if (status) status.textContent = option?.value ? 'Artículo seleccionado.' : 'Seleccione un artículo.';
+    });
+    actualizarFiltroArticulo(picker);
+  };
+
+  document.querySelectorAll('.articulo-picker').forEach(prepararBuscadorArticulo);
+
   document.getElementById('add-linea')?.addEventListener('click', () => {
     const template = document.getElementById('linea-template');
     const target = document.getElementById('lineas-entrega');
     if (!template || !target) return;
-    target.appendChild(template.content.cloneNode(true));
+    const fragment = template.content.cloneNode(true);
+    const nuevaLinea = fragment.querySelector('.line-row');
+    target.appendChild(fragment);
+    nuevaLinea?.querySelectorAll('.articulo-picker').forEach(prepararBuscadorArticulo);
   });
 
   document.addEventListener('click', (event) => {

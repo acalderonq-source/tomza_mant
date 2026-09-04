@@ -482,7 +482,11 @@
   const usuarioDashboard = String(user.usuario || '').trim().toLowerCase();
   const rolDashboard = String(user.rol || '').trim().toUpperCase();
   const esPantallaPesados = usuarioDashboard.includes('pesado') || rolDashboard === 'SUPERVISOR_PESADO';
-  const esPantallaMecanico = !esPantallaPesados && (usuarioDashboard === 'mecanico' || rolDashboard === 'MECANICO');
+  const esPantallaMecanico = !esPantallaPesados && (
+    usuarioDashboard === 'mecanico' ||
+    usuarioDashboard.startsWith('mecanico') ||
+    rolDashboard === 'MECANICO'
+  );
   const prioridadesPesadosBase = Array.isArray(prioridadesPesados) ? prioridadesPesados : [];
   const prioridadesMecanicoBase = Array.isArray(prioridadesMecanico) ? prioridadesMecanico : [];
   const prioridadesPesadosLista = esPantallaPesados && !prioridadesPesadosBase.length

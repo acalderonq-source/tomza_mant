@@ -378,7 +378,10 @@ async function renderBodega(req, res, pagina = "inicio") {
         SUM(CASE WHEN activo = 1 AND stock_actual <= 0 THEN 1 ELSE 0 END) AS agotados,
         SUM(CASE WHEN activo = 1 AND origen_inventario = 'PROPIO' THEN 1 ELSE 0 END) AS propios,
         SUM(CASE WHEN activo = 1 AND origen_inventario = 'CONSIGNACION' THEN 1 ELSE 0 END) AS consignacion,
-        SUM(CASE WHEN activo = 1 AND grupo_bodega = 'SUMINISTRO' THEN 1 ELSE 0 END) AS suministros
+        SUM(CASE WHEN activo = 1 AND grupo_bodega = 'SUMINISTRO' THEN 1 ELSE 0 END) AS suministros,
+        SUM(CASE WHEN activo = 1 THEN COALESCE(stock_actual, 0) * COALESCE(precio_unitario, 0) ELSE 0 END) AS valor_total,
+        SUM(CASE WHEN activo = 1 AND origen_inventario = 'PROPIO' THEN COALESCE(stock_actual, 0) * COALESCE(precio_unitario, 0) ELSE 0 END) AS valor_propio,
+        SUM(CASE WHEN activo = 1 AND origen_inventario = 'CONSIGNACION' THEN COALESCE(stock_actual, 0) * COALESCE(precio_unitario, 0) ELSE 0 END) AS valor_consignacion
       FROM bodega_articulos
     `);
 
@@ -455,6 +458,9 @@ async function renderBodega(req, res, pagina = "inicio") {
         propios: Number(stats.propios || 0),
         consignacion: Number(stats.consignacion || 0),
         suministros: Number(stats.suministros || 0),
+        valor_total: Number(stats.valor_total || 0),
+        valor_propio: Number(stats.valor_propio || 0),
+        valor_consignacion: Number(stats.valor_consignacion || 0),
         herramientas_prestadas: Number(prestadasRow.total || 0),
         movimientos_hoy: Number(movHoy.total || 0)
       },

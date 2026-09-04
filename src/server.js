@@ -140,6 +140,48 @@ app.use(session({
 
 app.use(ensureCsrfToken);
 
+function esUsuarioMecanicoLimitado(user) {
+  const usuario = String(user?.usuario || "").trim().toLowerCase();
+  return user?.rol === "MECANICO" ||
+    usuario.startsWith("mecanico") ||
+    usuario.startsWith("mecanicos");
+}
+
+function mecanicoPuedeUsarRuta(pathname) {
+  const rutasPermitidas = [
+    "/",
+    "/login",
+    "/logout",
+    "/dashboard",
+    "/mantenimientos",
+    "/taller/dashboard",
+    "/taller/prioridades",
+    "/taller/unidades",
+    "/lavado-unidades",
+    "/revision-ruta",
+    "/dekra",
+    "/aceite",
+    "/api/unidades/buscar",
+    "/cambiar-sede"
+  ];
+
+  return rutasPermitidas.some(ruta => pathname === ruta || pathname.startsWith(`${ruta}/`));
+}
+
+app.use((req, res, next) => {
+  const user = req.session.user;
+  if (!user || !esUsuarioMecanicoLimitado(user)) return next();
+
+  const pathname = req.path || "/";
+  if (mecanicoPuedeUsarRuta(pathname)) return next();
+
+  if (req.xhr || req.headers.accept?.includes("application/json")) {
+    return res.status(403).json({ error: "No autorizado" });
+  }
+
+  return res.status(403).send("No autorizado");
+});
+
 // ===================== VISTAS =====================
 app.set("view engine", "ejs");
 app.set("views", path.join(__dirname, "views"));

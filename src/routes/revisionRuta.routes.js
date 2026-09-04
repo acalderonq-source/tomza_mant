@@ -30,12 +30,19 @@ function requireAuth(req, res, next) {
   next();
 }
 
+function esUsuarioMecanicoLimitado(user) {
+  const usuario = String(user?.usuario || "").trim().toLowerCase();
+  return user?.rol === "MECANICO" ||
+    usuario.startsWith("mecanico") ||
+    usuario.startsWith("mecanicos");
+}
+
 function puedeVerRevisionRuta(user) {
-  return ROLES_REVISION_RUTA.includes(user.rol);
+  return ROLES_REVISION_RUTA.includes(user.rol) || esUsuarioMecanicoLimitado(user);
 }
 
 function puedeCrearRevisionRuta(user) {
-  return ROLES_CREAR_REVISION_RUTA.includes(user.rol);
+  return ROLES_CREAR_REVISION_RUTA.includes(user.rol) || esUsuarioMecanicoLimitado(user);
 }
 
 function hoyISO() {

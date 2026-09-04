@@ -8,6 +8,7 @@ const ExcelJS = require("exceljs");
 const { generarPDFOrden } = require('../utils/pdfOrdenCompra');
 const { agregarFiltroPlacaSql, normalizarPlaca: normalizarPlacaSistema } = require("../utils/placas");
 const { ensureTipoMantenimientoColumns, normalizarTipoMantenimiento, detectarTipoMantenimiento } = require("../utils/tipoMantenimiento");
+const { construirResumenFinanciero } = require("../utils/resumenFinanciero");
 
 // ===================== MIDDLEWARES =====================
 function requireAuth(req, res, next) {
@@ -1454,12 +1455,48 @@ async function obtenerDashboardFinancieroFacturas(filtros = {}) {
 
   const totalOrdenes = Number(ordenesResumen?.total || 0);
   const totalOrdenesMotor = Number(ordenesMotorResumen?.total || 0);
-  const totalOrdenesMotorPagadas = totalOrdenesMotor;
-  const totalFacturasPagadas = Number(facturasPagadasResumen?.total || 0);
   const totalPagosProveedor = Number(pagosResumen?.total || 0);
   const totalPagosProveedorPagados = Number(pagosPagadosResumen?.total || 0);
+  const totalPagosProveedorPendientes = Math.max(totalPagosProveedor - totalPagosProveedorPagados, 0);
   const totalCajaChica = Number(cajaResumen?.total || 0);
   const totalReintegrosGastos = Number(reintegrosResumen?.total || 0);
+  const resumenFinanciero = construirResumenFinanciero({
+    gastos: [
+      {
+        fuente: "ORDEN",
+        monto: totalOrdenes,
+        registros: Number(ordenesResumen?.registros || 0)
+      },
+      {
+        fuente: "ORDEN_MOTOR",
+        monto: totalOrdenesMotor,
+        registros: Number(ordenesMotorResumen?.registros || 0)
+      },
+      {
+        fuente: "PAGO_PROVEEDOR",
+        pagada: 1,
+        monto: totalPagosProveedorPagados,
+        registros: Number(pagosPagadosResumen?.registros || 0)
+      },
+      {
+        fuente: "PAGO_PROVEEDOR",
+        pagada: 0,
+        monto: totalPagosProveedorPendientes,
+        registros: Math.max(Number(pagosResumen?.registros || 0) - Number(pagosPagadosResumen?.registros || 0), 0)
+      },
+      {
+        fuente: "CAJA_CHICA",
+        monto: totalCajaChica,
+        registros: Number(cajaResumen?.registros || 0)
+      },
+      {
+        fuente: "REINTEGRO_GASTOS",
+        monto: totalReintegrosGastos,
+        registros: Number(reintegrosResumen?.registros || 0)
+      }
+    ],
+    facturasPagadasRow: facturasPagadasResumen
+  });
   const porTipo = [
     { tipo: "Ordenes de compra", total: totalOrdenes, registros: Number(ordenesResumen?.registros || 0), color: "#0f3b82" },
     { tipo: "Ordenes motor", total: totalOrdenesMotor, registros: Number(ordenesMotorResumen?.registros || 0), color: "#ea580c" },
@@ -1470,17 +1507,9 @@ async function obtenerDashboardFinancieroFacturas(filtros = {}) {
 
   return {
     resumen: {
+      ...resumenFinanciero,
       totalOrdenes,
-      totalOrdenesMotor,
-      totalOrdenesMotorPagadas,
-      totalFacturasPagadas,
-      totalPagosProveedor,
-      totalPagosProveedorPagados,
-      totalCajaChica,
-      totalReintegrosGastos,
-      totalPagado: totalFacturasPagadas + totalOrdenesMotor + totalPagosProveedorPagados + totalCajaChica,
-      totalGeneral: totalOrdenes + totalOrdenesMotor + totalPagosProveedor + totalCajaChica + totalReintegrosGastos,
-      registros: porTipo.reduce((sum, item) => sum + item.registros, 0)
+      registros: resumenFinanciero.registros
     },
     porTipo,
     porMes: Array.from(porMesMap.values()).sort((a, b) => a.mes.localeCompare(b.mes, "es"))

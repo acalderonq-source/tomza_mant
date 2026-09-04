@@ -1,0 +1,57 @@
+CREATE TABLE IF NOT EXISTS gasto_clasificacion_reglas (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  patron VARCHAR(180) NOT NULL,
+  familia_clave VARCHAR(40) NOT NULL,
+  aplicar_en ENUM('TODO','DESCRIPCION','PROVEEDOR','PLACA') NOT NULL DEFAULT 'TODO',
+  prioridad INT NOT NULL DEFAULT 100,
+  activo TINYINT(1) NOT NULL DEFAULT 1,
+  observacion VARCHAR(255) NULL,
+  creado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  actualizado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_gasto_regla_patron_familia (patron, familia_clave, aplicar_en),
+  INDEX idx_gasto_reglas_activo_prioridad (activo, prioridad)
+);
+
+INSERT INTO gasto_clasificacion_reglas
+  (patron, familia_clave, aplicar_en, prioridad, activo, observacion)
+VALUES
+  ('rectificacion de tambor', 'frenos', 'DESCRIPCION', 5, 1, 'Tambor pesado/liviano pertenece a frenos'),
+  ('rectificacion tambor', 'frenos', 'DESCRIPCION', 5, 1, 'Tambor pertenece a frenos'),
+  ('juego de mano', 'frenos', 'DESCRIPCION', 5, 1, 'Freno de mano'),
+  ('tanque de vacio', 'frenos', 'DESCRIPCION', 5, 1, 'Sistema de frenos'),
+  ('tanque de vacío', 'frenos', 'DESCRIPCION', 5, 1, 'Sistema de frenos'),
+  ('fibra freno', 'frenos', 'DESCRIPCION', 5, 1, 'Fibras de freno'),
+  ('diferencial', 'transmision', 'DESCRIPCION', 5, 1, 'Diferencial es transmisión'),
+  ('transmision', 'transmision', 'DESCRIPCION', 5, 1, 'Transmisión y tren motriz'),
+  ('transmisión', 'transmision', 'DESCRIPCION', 5, 1, 'Transmisión y tren motriz'),
+  ('set de empaques', 'motor', 'DESCRIPCION', 5, 1, 'Empaques de motor'),
+  ('block', 'motor', 'DESCRIPCION', 5, 1, 'Block es motor'),
+  ('viela', 'motor', 'DESCRIPCION', 5, 1, 'Vielas de motor'),
+  ('fan c', 'motor', 'DESCRIPCION', 5, 1, 'Fan C estilo Kysor'),
+  ('kysor', 'motor', 'DESCRIPCION', 5, 1, 'Sistema motor/enfriamiento'),
+  ('repuestos rectificadora', 'motor', 'DESCRIPCION', 5, 1, 'Rectificadora de motor'),
+  ('alternador', 'electrico', 'DESCRIPCION', 5, 1, 'Alternadores'),
+  ('arrancador', 'electrico', 'DESCRIPCION', 5, 1, 'Arrancadores'),
+  ('programador', 'electrico', 'DESCRIPCION', 5, 1, 'Programadores eléctricos'),
+  ('sam chassis', 'electrico', 'DESCRIPCION', 5, 1, 'Módulo eléctrico'),
+  ('sam chasis', 'electrico', 'DESCRIPCION', 5, 1, 'Módulo eléctrico'),
+  ('modulo', 'electrico', 'DESCRIPCION', 5, 1, 'Módulos'),
+  ('módulo', 'electrico', 'DESCRIPCION', 5, 1, 'Módulos'),
+  ('juego de patas', 'carroceria', 'DESCRIPCION', 5, 1, 'Carrocería'),
+  ('base de torpedo', 'carroceria', 'DESCRIPCION', 5, 1, 'Carrocería'),
+  ('varillaje limpiadores', 'carroceria', 'DESCRIPCION', 5, 1, 'Carrocería'),
+  ('escobilla', 'carroceria', 'DESCRIPCION', 10, 1, 'Carrocería'),
+  ('compra de pantalla', 'general', 'DESCRIPCION', 5, 1, 'Suministros/gasto general'),
+  ('tablets', 'general', 'DESCRIPCION', 5, 1, 'Suministros/gasto general'),
+  ('lamina acl', 'general', 'DESCRIPCION', 5, 1, 'Materiales generales'),
+  ('lámina acl', 'general', 'DESCRIPCION', 5, 1, 'Materiales generales'),
+  ('tubo cuadrado', 'general', 'DESCRIPCION', 5, 1, 'Materiales generales'),
+  ('plywood', 'general', 'DESCRIPCION', 5, 1, 'Materiales generales'),
+  ('mobil', 'aceites', 'PROVEEDOR', 5, 1, 'Proveedor/marca de aceite'),
+  ('movil', 'aceites', 'PROVEEDOR', 5, 1, 'Proveedor/marca de aceite'),
+  ('pico', 'aceites', 'PROVEEDOR', 5, 1, 'Pico y Liasa'),
+  ('liasa', 'aceites', 'PROVEEDOR', 5, 1, 'Pico y Liasa')
+ON DUPLICATE KEY UPDATE
+  prioridad = VALUES(prioridad),
+  activo = VALUES(activo),
+  observacion = VALUES(observacion);

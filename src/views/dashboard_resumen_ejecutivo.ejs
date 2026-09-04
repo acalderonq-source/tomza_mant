@@ -746,6 +746,41 @@
       background: #0b3b82;
     }
 
+    .classification-form {
+      display: grid;
+      gap: .25rem;
+      min-width: 11.5rem;
+      width: 100%;
+    }
+
+    .classification-form select,
+    .classification-form input {
+      border: 1px solid #dbe4f0;
+      border-radius: 8px;
+      color: #0f172a;
+      font-size: .68rem;
+      font-weight: 800;
+      min-height: 1.8rem;
+      padding: .2rem .35rem;
+    }
+
+    .classification-form button {
+      border-radius: 999px;
+      font-size: .66rem;
+      font-weight: 950;
+      padding: .22rem .5rem;
+    }
+
+    .classification-badge {
+      background: #dcfce7;
+      border-radius: 999px;
+      color: #166534;
+      font-size: .63rem;
+      font-weight: 950;
+      padding: .12rem .45rem;
+      white-space: nowrap;
+    }
+
     .business-empty {
       color: var(--muted);
       font-weight: 850;
@@ -1033,6 +1068,78 @@
       font-weight: 950;
     }
 
+    .control-strip {
+      background: #ffffff;
+      border: 1px solid #dbe4f0;
+      border-radius: 16px;
+      box-shadow: 0 10px 26px rgba(15, 23, 42, .06);
+      display: grid;
+      gap: .85rem;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      padding: .85rem;
+    }
+
+    .control-item {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      padding: .75rem .8rem;
+    }
+
+    .control-label {
+      color: #64748b;
+      font-size: .68rem;
+      font-weight: 950;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+    }
+
+    .control-value {
+      color: #061a40;
+      font-size: 1rem;
+      font-weight: 950;
+      margin-top: .2rem;
+    }
+
+    .control-ok { color: #166534; }
+    .control-warn { color: #991b1b; }
+
+    .rules-grid {
+      display: grid;
+      gap: 1rem;
+      grid-template-columns: minmax(260px, .8fr) minmax(0, 1.2fr);
+      padding: 1rem;
+    }
+
+    .rules-list {
+      display: grid;
+      gap: .5rem;
+      max-height: 330px;
+      overflow: auto;
+    }
+
+    .rule-chip {
+      align-items: center;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      display: grid;
+      gap: .65rem;
+      grid-template-columns: minmax(0, 1fr) auto;
+      padding: .65rem .7rem;
+    }
+
+    .rule-title {
+      color: #0f172a;
+      font-weight: 950;
+    }
+
+    .rule-meta {
+      color: #64748b;
+      font-size: .72rem;
+      font-weight: 750;
+    }
+
     .conclusion-item {
       background: #fff7ed;
       border: 1px solid #fed7aa;
@@ -1215,6 +1322,8 @@
       .spend-summary { align-items: flex-start; flex-direction: column; }
       .detail-hub-head { align-items: flex-start; flex-direction: column; }
       .detail-grid { grid-template-columns: 1fr; }
+      .control-strip,
+      .rules-grid { grid-template-columns: 1fr; }
       canvas { max-height: 280px; }
     }
 
@@ -1260,7 +1369,10 @@
     const value = String(texto || '').toLowerCase();
     return value.includes('otros por revisar') ||
       value.includes('cabezales, carretas y cisternas') ||
-      value.includes('pago de proveedor');
+      value.includes('pago de proveedor') ||
+      value === 'generales' ||
+      value === 'general' ||
+      value.includes('gastos generales');
   };
   const totalGastosNumero = Number(data.totalGastos || 0);
   const categorias = safe(data.categorias).filter(item => !contieneCategoriaOculta(item.nombre));
@@ -1298,6 +1410,10 @@
   const conclusiones = safe(data.conclusiones).filter(item => !contieneCategoriaOculta(item));
   const costoUnidad = data.costoUnidad || {};
   const resumenFinanciero = data.resumenFinanciero || {};
+  const auditoriaFinanciera = data.auditoriaFinanciera || {};
+  const reglasClasificacion = safe(data.reglasClasificacion);
+  const familiasClasificacion = safe(data.familiasClasificacion);
+  const puedeAdministrarReglas = ['ADMIN', 'TALLER'].includes(user.rol);
   const horaActualizacion = new Intl.DateTimeFormat('es-CR', {
     timeZone: 'America/Costa_Rica',
     hour: '2-digit',
@@ -1336,6 +1452,13 @@
       </div>
     </div>
   </section>
+
+  <% if (success) { %>
+    <div class="alert alert-success fw-bold"><%= success %></div>
+  <% } %>
+  <% if (error) { %>
+    <div class="alert alert-danger fw-bold"><%= error %></div>
+  <% } %>
 
   <section class="panel mb-4">
     <form method="GET" action="/dashboard/resumen-ejecutivo" class="row g-3 align-items-end">
@@ -1379,6 +1502,29 @@
     </form>
   </section>
 
+  <section class="control-strip mb-4" id="controlConsistencia">
+    <div class="control-item">
+      <div class="control-label">Total del periodo</div>
+      <div class="control-value" id="controlTotalPeriodo">₡<%= money(auditoriaFinanciera.totalGastos || totalGastosNumero) %></div>
+    </div>
+    <div class="control-item">
+      <div class="control-label">Suma por negocio</div>
+      <div class="control-value" id="controlTotalNegocios">₡<%= money(auditoriaFinanciera.totalNegocios || 0) %></div>
+    </div>
+    <div class="control-item">
+      <div class="control-label">Suma por rubro</div>
+      <div class="control-value" id="controlTotalRubros">₡<%= money(auditoriaFinanciera.totalRubros || 0) %></div>
+    </div>
+    <div class="control-item">
+      <div class="control-label">Control interno</div>
+      <% const diferenciasOk = auditoriaFinanciera.consistenteNegocios && auditoriaFinanciera.consistenteRubros; %>
+      <% const diferenciaControl = Math.max(Math.abs(auditoriaFinanciera.diferenciaNegocios || 0), Math.abs(auditoriaFinanciera.diferenciaRubros || 0)); %>
+      <div class="control-value <%= diferenciasOk ? 'control-ok' : 'control-warn' %>" id="controlEstado">
+        <%= diferenciasOk ? 'Cuadrado' : `Diferencia ₡${money(diferenciaControl)}` %>
+      </div>
+    </div>
+  </section>
+
   <section class="row g-3 mb-4">
     <div class="col-xl col-md-6">
       <div class="metric-card" style="--accent:#0b3b82">
@@ -1398,7 +1544,7 @@
     </div>
     <div class="col-xl col-md-6">
       <div class="metric-card" style="--accent:#ef233c">
-        <div class="metric-label">Mayor tipo de gasto</div>
+        <div class="metric-label">Rubro principal</div>
         <div class="metric-value" id="kpiMayorTipo"><%= categorias[0]?.nombre || '-' %></div>
         <div class="metric-foot" id="kpiMayorTipoFoot">₡<%= money(categorias[0]?.total || 0) %> · <%= pct(categorias[0]?.total, totalCategoriasOperativas) %>% del gasto operativo</div>
       </div>
@@ -1417,12 +1563,12 @@
       <div class="metric-card" style="--accent:#f8b400">
         <div class="metric-label">Mantenimientos</div>
         <div class="metric-value" id="kpiMantenimientos"><%= Number(data.totalMantenimientos || 0).toLocaleString('es-CR') %></div>
-        <div class="metric-foot" id="kpiMantenimientosFoot"><%= familiasMant[0]?.nombre || '-' %> es lo más repetido</div>
+        <div class="metric-foot" id="kpiMantenimientosFoot"><%= familiasMant[0]?.nombre || '-' %> es la familia más frecuente</div>
       </div>
     </div>
     <div class="col-xl col-md-6">
       <div class="metric-card" style="--accent:#0f766e">
-        <div class="metric-label">Placa con más gasto</div>
+        <div class="metric-label">Unidad con mayor gasto</div>
         <div class="metric-value" id="kpiPlacaGasto"><%= placasGasto[0]?.nombre || '-' %></div>
         <div class="metric-foot" id="kpiPlacaGastoFoot">₡<%= money(placasGasto[0]?.total || 0) %> · <%= placasGasto[0]?.sede || '-' %></div>
       </div>
@@ -1773,7 +1919,72 @@
     </div>
   </section>
 
-  <div class="section-label"><span>3. Tendencias y mantenimiento</span></div>
+  <% if (puedeAdministrarReglas) { %>
+    <div class="section-label"><span>Control de clasificación</span></div>
+    <section class="table-card mb-4">
+      <div class="card-head">
+        <div>
+          <h2 class="card-title"><i class="bi bi-sliders me-1"></i>Reglas editables de gastos</h2>
+          <div class="card-subtitle">Use esto para corregir compras que caen en rubros incorrectos sin tocar código.</div>
+        </div>
+        <span class="pill pill-blue"><%= reglasClasificacion.length %> regla(s)</span>
+      </div>
+      <div class="rules-grid">
+        <form method="POST" action="/dashboard/resumen-ejecutivo/reglas" class="row g-2 align-content-start">
+          <div class="col-12">
+            <label class="form-label">Texto a detectar</label>
+            <input class="form-control form-control-sm" name="patron" placeholder="Ej: diferencial, juego de mano, PICO" required>
+          </div>
+          <div class="col-12">
+            <label class="form-label">Familia correcta</label>
+            <select class="form-select form-select-sm" name="familia_clave" required>
+              <% familiasClasificacion.forEach(familia => { %>
+                <option value="<%= familia.clave %>"><%= familia.nombre %></option>
+              <% }) %>
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Buscar en</label>
+            <select class="form-select form-select-sm" name="aplicar_en">
+              <option value="TODO">Todo</option>
+              <option value="DESCRIPCION">Descripción</option>
+              <option value="PROVEEDOR">Proveedor</option>
+              <option value="PLACA">Placa / código</option>
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Prioridad</label>
+            <input class="form-control form-control-sm" type="number" name="prioridad" value="50" min="1" max="999">
+          </div>
+          <div class="col-12">
+            <label class="form-label">Observación</label>
+            <input class="form-control form-control-sm" name="observacion" placeholder="Opcional">
+          </div>
+          <div class="col-12 d-grid">
+            <button class="btn btn-primary btn-sm fw-bold">Guardar regla</button>
+          </div>
+        </form>
+        <div class="rules-list">
+          <% if (!reglasClasificacion.length) { %>
+            <div class="empty-state">No hay reglas activas todavía. Ejecute las migraciones para cargar las reglas base.</div>
+          <% } %>
+          <% reglasClasificacion.forEach(regla => { %>
+            <div class="rule-chip">
+              <div>
+                <div class="rule-title"><%= regla.patron %></div>
+                <div class="rule-meta"><%= regla.aplicar_en %> · <%= regla.familia_clave %> · prioridad <%= regla.prioridad %><% if (regla.observacion) { %> · <%= regla.observacion %><% } %></div>
+              </div>
+              <form method="POST" action="/dashboard/resumen-ejecutivo/reglas/<%= regla.id %>/desactivar">
+                <button class="btn btn-outline-danger btn-sm fw-bold">Apagar</button>
+              </form>
+            </div>
+          <% }) %>
+        </div>
+      </div>
+    </section>
+  <% } %>
+
+  <div class="section-label"><span>4. Tendencias y mantenimiento</span></div>
   <section class="row g-3 mb-4">
     <div class="col-lg-8">
       <div class="chart-card">
@@ -1842,7 +2053,7 @@
     </div>
   </section>
 
-  <div class="section-label"><span>4. Panel de respaldo</span></div>
+  <div class="section-label"><span>5. Panel de respaldo</span></div>
   <section class="detail-hub mb-4">
     <div class="detail-hub-head">
       <div>
@@ -2116,6 +2327,7 @@
 <script type="application/json" id="json-mantenimientos"><%- JSON.stringify(familiasMant) %></script>
 <script type="application/json" id="json-negocios"><%- JSON.stringify(negociosGasto) %></script>
 <script type="application/json" id="json-resumen"><%- JSON.stringify(data) %></script>
+<script type="application/json" id="json-familias-clasificacion"><%- JSON.stringify(familiasClasificacion) %></script>
 <script>
   const readJson = (id) => {
     try { return JSON.parse(document.getElementById(id)?.textContent || '[]'); }
@@ -2133,7 +2345,10 @@
     const value = String(name || '').toLowerCase();
     return value.includes('otros por revisar') ||
       value.includes('cabezales, carretas y cisternas') ||
-      value.includes('pago de proveedor');
+      value.includes('pago de proveedor') ||
+      value === 'generales' ||
+      value === 'general' ||
+      value.includes('gastos generales');
   };
   const escapeHtml = (value) => String(value ?? '')
     .replace(/&/g, '&amp;')
@@ -2146,6 +2361,9 @@
   let mantenimientosData = readJson('json-mantenimientos');
   let negociosData = readJson('json-negocios');
   let resumenData = readJson('json-resumen');
+  const familiasClasificacionData = readJson('json-familias-clasificacion');
+  const puedeAdministrarClasificacion = <%= puedeAdministrarReglas ? 'true' : 'false' %>;
+  const csrfToken = <%- JSON.stringify(typeof csrfToken !== 'undefined' ? csrfToken : '') %>;
   const managerState = {
     rubro: {},
     sede: {},
@@ -2162,12 +2380,37 @@
     if (element) element.textContent = value;
   };
 
+  const renderClassificationForm = (mov = {}) => {
+    if (!puedeAdministrarClasificacion || !mov.fuente || !mov.id) return '';
+    const current = String(mov.familia_clave || '').toLowerCase();
+    const options = [
+      `<option value="auto">Automático</option>`,
+      ...familiasClasificacionData.map(familia => {
+        const clave = String(familia.clave || '');
+        return `<option value="${escapeHtml(clave)}" ${clave === current ? 'selected' : ''}>${escapeHtml(familia.nombre || clave)}</option>`;
+      })
+    ].join('');
+
+    return `
+      <form method="POST" action="/dashboard/resumen-ejecutivo/clasificacion-manual" class="classification-form">
+        <input type="hidden" name="fuente" value="${escapeHtml(mov.fuente)}">
+        <input type="hidden" name="referencia_id" value="${escapeHtml(mov.id)}">
+        <input type="hidden" name="detalle_id" value="${escapeHtml(mov.detalle_id || 0)}">
+        <input type="hidden" name="_csrf" value="${escapeHtml(csrfToken)}">
+        <select name="familia_clave" aria-label="Rubro del movimiento">${options}</select>
+        <input name="observacion" maxlength="255" placeholder="Nota opcional">
+        <button class="btn btn-outline-primary btn-sm" type="submit">Guardar rubro</button>
+      </form>
+      ${mov.clasificacion_manual ? '<span class="classification-badge">Manual</span>' : ''}
+    `;
+  };
+
   const businessDetailLabel = (negocio) => {
     if (negocio?.clave === 'transportadora') return 'Dividido en cabezales, cisternas, carretas y tándem';
     if (negocio?.clave === 'cilindreros') return 'Camiones Hino / cilindreros';
     if (negocio?.clave === 'granel') return 'Unidades graneleras por sede';
     if (negocio?.clave === 'comodines') return 'Taller, técnicos y comodines';
-    if (negocio?.clave === 'aceites') return 'Aceites, filtros y fluidos';
+    if (negocio?.clave === 'aceites') return 'Aceites y fluidos';
     if (negocio?.clave === 'generales') return 'Compras generales sin placa';
     return 'Gasto operativo';
   };
@@ -2547,6 +2790,7 @@
           <div class="movimiento-actions">
             <span class="matrix-line-money">${formatMoney(mov.monto || 0)}</span>
             ${mov.url ? `<a class="movimiento-link" href="${escapeHtml(mov.url)}">Abrir</a>` : ''}
+            ${renderClassificationForm(mov)}
           </div>
         </div>
       `).join('');
@@ -2675,11 +2919,17 @@
 
   const updateKpis = (data) => {
     const resumenFinanciero = data.resumenFinanciero || {};
+    const auditoria = data.auditoriaFinanciera || {};
     const costoUnidad = data.costoUnidad || {};
     const categorias = (data.categorias || []).filter(item => !isHiddenCategory(item.nombre));
     const totalCategorias = categorias.reduce((sum, item) => sum + Number(item.total || 0), 0);
     const familiasMant = (data.familiasMant || []).filter(item => !isHiddenCategory(item.nombre));
     const placas = data.placas || [];
+    const controlOk = Boolean(auditoria.consistenteNegocios && auditoria.consistenteRubros);
+    const diferenciaControl = Math.max(
+      Math.abs(Number(auditoria.diferenciaNegocios || 0)),
+      Math.abs(Number(auditoria.diferenciaRubros || 0))
+    );
 
     setText('kpiTotalGastado', formatMoney(data.totalGastos || 0));
     setText('kpiTotalGastadoFoot', `${formatNumber(data.totalRegistrosGasto || 0)} movimientos de dinero`);
@@ -2689,9 +2939,19 @@
     setText('kpiCostoUnidad', formatMoney(costoUnidad.costoPromedioPorUnidad || 0));
     setText('kpiCostoUnidadFoot', `${formatNumber(costoUnidad.unidadesConGasto || 0)} placa(s) con gasto · ${formatNumber(costoUnidad.totalUnidadesFlota || 0)} en flota`);
     setText('kpiMantenimientos', formatNumber(data.totalMantenimientos || 0));
-    setText('kpiMantenimientosFoot', `${familiasMant[0]?.nombre || '-'} es lo más repetido`);
+    setText('kpiMantenimientosFoot', `${familiasMant[0]?.nombre || '-'} es la familia más frecuente`);
     setText('kpiPlacaGasto', placas[0]?.nombre || '-');
     setText('kpiPlacaGastoFoot', `${formatMoney(placas[0]?.total || 0)} · ${placas[0]?.sede || '-'}`);
+    setText('controlTotalPeriodo', formatMoney(auditoria.totalGastos ?? data.totalGastos ?? 0));
+    setText('controlTotalNegocios', formatMoney(auditoria.totalNegocios || 0));
+    setText('controlTotalRubros', formatMoney(auditoria.totalRubros || 0));
+
+    const controlEstado = document.getElementById('controlEstado');
+    if (controlEstado) {
+      controlEstado.textContent = controlOk ? 'Cuadrado' : `Diferencia ${formatMoney(diferenciaControl)}`;
+      controlEstado.classList.toggle('control-ok', controlOk);
+      controlEstado.classList.toggle('control-warn', !controlOk);
+    }
   };
 
   renderManagerGrid(resumenData || {});
@@ -2809,6 +3069,7 @@
                     <div class="movimiento-actions">
                       <div class="placa-money">${formatMoney(mov.monto || 0)}</div>
                       ${mov.url ? `<a class="movimiento-link" href="${escapeHtml(mov.url)}">Editar</a>` : ''}
+                      ${renderClassificationForm(mov)}
                     </div>
                   </div>
                 `;
@@ -3002,10 +3263,14 @@
       if (counter) counter.textContent = String(remaining);
     };
 
-    document.querySelectorAll('input, select, textarea').forEach(control => {
-      control.addEventListener('focus', () => setEditing(true));
-      control.addEventListener('blur', () => setEditing(false));
-      control.addEventListener('change', () => setEditing(false));
+    document.addEventListener('focusin', (event) => {
+      if (event.target?.matches?.('input, select, textarea')) setEditing(true);
+    });
+    document.addEventListener('focusout', (event) => {
+      if (event.target?.matches?.('input, select, textarea')) setEditing(false);
+    });
+    document.addEventListener('change', (event) => {
+      if (event.target?.matches?.('input, select, textarea')) setEditing(false);
     });
 
     const buildDataUrl = () => {

@@ -41,15 +41,15 @@ function fechaCostaRica(offsetDays = 0) {
 }
 
 function puedeVerTaller(user) {
-  return ROLES_VER_TALLER.includes(user.rol);
+  return ROLES_VER_TALLER.includes(user.rol) || esUsuarioMecanico(user);
 }
 
 function puedeGestionarTaller(user) {
-  return ROLES_GESTION_TALLER.includes(user.rol);
+  return ROLES_GESTION_TALLER.includes(user.rol) || esUsuarioMecanico(user);
 }
 
 function puedeGestionarPrioridades(user) {
-  return ROLES_PRIORIDADES_TALLER.includes(user.rol);
+  return ROLES_PRIORIDADES_TALLER.includes(user.rol) || esUsuarioMecanico(user);
 }
 
 function esUsuarioPesados(user) {
@@ -61,11 +61,13 @@ function esUsuarioPesados(user) {
 }
 
 function esUsuarioMecanico(user) {
+  const usuario = String(user.usuario || "").trim().toLowerCase();
   return (
     !esUsuarioPesados(user) &&
     (
       user.rol === "MECANICO" ||
-      String(user.usuario || "").trim().toLowerCase() === "mecanico"
+      usuario === "mecanico" ||
+      usuario.startsWith("mecanico")
     )
   );
 }
