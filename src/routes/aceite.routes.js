@@ -85,6 +85,11 @@ async function getSedesPermitidasAceite(req) {
   );
 }
 
+function expandirSedesInventarioAceite(sedes) {
+  const lista = Array.isArray(sedes) ? sedes : [sedes];
+  return unirSedesAceite(lista.flatMap(expandirSedeInventarioAceite));
+}
+
 function parseMonto(value) {
   if (value === null || typeof value === "undefined") return 0;
   const texto = String(value)
@@ -112,6 +117,34 @@ function fechaValida(value) {
 
 function galonesALitros(galones) {
   return Number(galones || 0) * GALON_A_LITROS;
+}
+
+function claveSedeAceite(sede) {
+  return String(sede || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, "");
+}
+
+function sedeInventarioAceite(sede) {
+  const operativa = sedeOperativaRepuestosAceites(sede);
+  return claveSedeAceite(operativa) === "SANCARLOS" ? "Guapiles" : operativa;
+}
+
+function expandirSedeInventarioAceite(sede) {
+  const inventario = sedeInventarioAceite(sede);
+  const sedes = expandirSedeOperativaRepuestosAceites(inventario);
+  if (claveSedeAceite(inventario) === "GUAPILES") {
+    return unirSedesAceite(sedes, ["San Carlos"]);
+  }
+  return sedes;
+}
+
+function etiquetaSedeInventarioAceite(sede) {
+  return claveSedeAceite(sedeInventarioAceite(sede)) === "GUAPILES"
+    ? "Guapiles / San Carlos"
+    : etiquetaSedeOperativa(sede);
 }
 
 async function columnExists(tableName, columnName) {
@@ -251,8 +284,8 @@ function puedeUsarSede(sede, sedesPermitidas) {
 }
 
 async function consumirAceitePorSede(connection, { sede, litros, cambioAceiteId, unidadId, placa, userId }) {
-  const sedeOperativa = sedeOperativaRepuestosAceites(sede);
-  const sedesBusqueda = expandirSedeOperativaRepuestosAceites(sedeOperativa);
+  const sedeInventario = sedeInventarioAceite(sede);
+  const sedesBusqueda = expandirSedeInventarioAceite(sede);
   const [estanones] = await connection.query(
     `SELECT id, litros_restantes
      FROM aceite_estanones
@@ -266,7 +299,7 @@ async function consumirAceitePorSede(connection, { sede, litros, cambioAceiteId,
 
   const disponible = estanones.reduce((total, item) => total + Number(item.litros_restantes || 0), 0);
   if (disponible + 0.001 < litros) {
-    throw new Error(`No hay suficiente aceite registrado en ${etiquetaSedeOperativa(sedeOperativa)}. Disponible: ${(disponible / GALON_A_LITROS).toFixed(2)} galones.`);
+    throw new Error(`No hay suficiente aceite registrado en ${etiquetaSedeInventarioAceite(sede)}. Disponible: ${(disponible / GALON_A_LITROS).toFixed(2)} galones.`);
   }
 
   let pendiente = litros;
@@ -291,7 +324,7 @@ async function consumirAceitePorSede(connection, { sede, litros, cambioAceiteId,
       [
         estanon.id,
         cambioAceiteId,
-        sedeOperativa,
+        sedeInventario,
         consumo,
         `Cambio de aceite ${placa}`,
         unidadId,
@@ -305,8 +338,7 @@ async function consumirAceitePorSede(connection, { sede, litros, cambioAceiteId,
 }
 
 async function obtenerConsumosAceiteDesde(connection, { sede, fechaCompra }) {
-  const sedeOperativa = sedeOperativaRepuestosAceites(sede);
-  const sedesBusqueda = expandirSedeOperativaRepuestosAceites(sedeOperativa);
+  const sedesBusqueda = expandirSedeInventarioAceite(sede);
   const [consumos] = await connection.query(
     `SELECT *
      FROM (
@@ -394,7 +426,7 @@ async function rebajarConsumosHistoricosEstanon(connection, { estanonId, sede, f
       [
         estanonId,
         consumo.origen === "ACTUAL" ? consumo.cambio_id : null,
-        sedeOperativaRepuestosAceites(sede),
+        sedeInventarioAceite(sede),
         litrosSalida,
         `Rebajo automático por cambio de aceite ${consumo.placa} del ${fechaCambio}`,
         consumo.unidad_id,
@@ -449,8 +481,8 @@ async function sincronizarCambiosPendientesAceite(sedesPermitidas, userId) {
     );
 
     for (const pendiente of pendientes) {
-      const sedeOperativa = sedeOperativaRepuestosAceites(pendiente.sede);
-      const sedesBusqueda = expandirSedeOperativaRepuestosAceites(sedeOperativa);
+      const sedeInventario = sedeInventarioAceite(pendiente.sede);
+      const sedesBusqueda = expandirSedeInventarioAceite(pendiente.sede);
       const [estanones] = await connection.query(
         `SELECT id, litros_restantes
          FROM aceite_estanones
@@ -486,7 +518,7 @@ async function sincronizarCambiosPendientesAceite(sedesPermitidas, userId) {
           [
             estanon.id,
             pendiente.id,
-            sedeOperativa,
+            sedeInventario,
             litrosSalida,
             `Rebajo sincronizado por cambio de aceite ${pendiente.placa}`,
             pendiente.unidad_id,
@@ -575,6 +607,7 @@ router.get("/", async (req, res) => {
   try {
     await ensureAceiteTables();
     const sedesPermitidas = await getSedesPermitidasAceite(req);
+    const sedesInventario = expandirSedesInventarioAceite(sedesPermitidas);
     const sedesGestion = sedesOperativasVisibles((await obtenerTodasSedes(pool)).filter(sede => puedeUsarSede(sede, sedesPermitidas)));
     await sincronizarCambiosPendientesAceite(sedesPermitidas, req.session.user.id || null);
 
@@ -619,7 +652,7 @@ router.get("/", async (req, res) => {
        WHERE ae.sede IN (?)
        GROUP BY ae.id
        ORDER BY ae.estado = 'ACTIVO' DESC, ae.sede ASC, ae.fecha_compra DESC, ae.id DESC`,
-      [sedesPermitidas]
+      [sedesInventario]
     );
 
     const [movimientos] = await pool.query(
@@ -632,11 +665,11 @@ router.get("/", async (req, res) => {
        WHERE am.sede IN (?)
        ORDER BY am.creado_en DESC, am.id DESC
        LIMIT 80`,
-      [sedesPermitidas]
+      [sedesInventario]
     );
 
     const ordenesAceite = await obtenerOrdenesAceiteRecientes();
-    const gastoPorPlaca = await obtenerGastoAceitePorPlaca(sedesPermitidas);
+    const gastoPorPlaca = await obtenerGastoAceitePorPlaca(sedesInventario);
 
     const resumen = estanones.reduce((acc, item) => {
       const capacidad = Number(item.litros_capacidad || CAPACIDAD_ESTANON_LITROS);
@@ -711,7 +744,8 @@ router.post("/estanones", async (req, res) => {
 
     await ensureAceiteTables();
     const sedesPermitidas = await getSedesPermitidasAceite(req);
-    const sede = sedeOperativaRepuestosAceites(req.body.sede);
+    const sedeSolicitada = sedeOperativaRepuestosAceites(req.body.sede);
+    const sede = sedeInventarioAceite(sedeSolicitada);
     const fechaCompra = fechaValida(req.body.fecha_compra);
     const descripcion = String(req.body.descripcion || "").trim() || "Estañón de aceite 55 galones";
     const galonesCapacidad = parseMonto(req.body.galones_capacidad || req.body.litros_capacidad) || CAPACIDAD_ESTANON_GALONES;
@@ -722,7 +756,7 @@ router.post("/estanones", async (req, res) => {
     let montoTotal = parseMonto(req.body.monto_total);
     let ordenCompraNumero = null;
 
-    if (!sede || !puedeUsarSede(sede, sedesPermitidas)) {
+    if (!sedeSolicitada || !puedeUsarSede(sedeSolicitada, sedesPermitidas)) {
       req.session.error = "Seleccione una sede permitida para el estañón.";
       return res.redirect("/aceite");
     }
@@ -785,8 +819,8 @@ router.post("/estanones", async (req, res) => {
     const galonesRebajados = rebajo.litrosRebajados / GALON_A_LITROS;
     const galonesRestantes = rebajo.litrosRestantes / GALON_A_LITROS;
     req.session.success = rebajo.cambiosAplicados > 0
-      ? `Estañón agregado para ${etiquetaSedeOperativa(sede)} con ${galonesIniciales.toFixed(2)} galones. Se rebajaron automáticamente ${galonesRebajados.toFixed(2)} galones de ${rebajo.cambiosAplicados} cambio(s) desde ${fechaCompra}. Disponible ahora: ${galonesRestantes.toFixed(2)} galones.`
-      : `Estañón agregado para ${etiquetaSedeOperativa(sede)} con ${galonesIniciales.toFixed(2)} galones. No había cambios registrados desde ${fechaCompra} para rebajar.`;
+      ? `Estañón agregado para ${etiquetaSedeInventarioAceite(sede)} con ${galonesIniciales.toFixed(2)} galones. Se rebajaron automáticamente ${galonesRebajados.toFixed(2)} galones de ${rebajo.cambiosAplicados} cambio(s) desde ${fechaCompra}. Disponible ahora: ${galonesRestantes.toFixed(2)} galones.`
+      : `Estañón agregado para ${etiquetaSedeInventarioAceite(sede)} con ${galonesIniciales.toFixed(2)} galones. No había cambios registrados desde ${fechaCompra} para rebajar.`;
     res.redirect("/aceite");
   } catch (error) {
     if (connection) await connection.rollback().catch(() => {});
@@ -928,7 +962,7 @@ router.post("/", async (req, res) => {
     });
 
     await connection.commit();
-    req.session.success = `Cambio de aceite guardado y se rebajaron ${galonesUsados.toFixed(2)} galones de ${etiquetaSedeOperativa(unidad.sede)}.`;
+    req.session.success = `Cambio de aceite guardado y se rebajaron ${galonesUsados.toFixed(2)} galones de ${etiquetaSedeInventarioAceite(unidad.sede)}.`;
     res.redirect("/aceite");
   } catch (error) {
     await connection.rollback();
