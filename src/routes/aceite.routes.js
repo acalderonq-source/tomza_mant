@@ -44,8 +44,8 @@ function unirSedesAceite(...listas) {
 function sedesAceitePorUsuario(user) {
   const usuario = String(user?.usuario || "").trim().toLowerCase();
   const sedesPorUsuario = {
-    mecanico_guapiles: ["Guapiles"],
-    mecanicos_guapiles: ["Guapiles"],
+    mecanico_guapiles: ["Guapiles", "San Carlos"],
+    mecanicos_guapiles: ["Guapiles", "San Carlos"],
     mecanico_la_cruz: ["La Cruz"],
     mecanicos_la_cruz: ["La Cruz"],
     mecanico_perez_zeledon: ["Perez Zeledon"],

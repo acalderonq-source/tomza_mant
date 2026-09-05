@@ -260,6 +260,16 @@ function esUsuarioTodasSedes(user) {
   return ["ADMIN", "TALLER", "TRAMITES"].includes(user?.rol) || esUsuarioProveeduria(user);
 }
 
+function sedesEspecialesPorUsuario(user) {
+  const usuario = limpiarSede(user?.usuario).toLowerCase();
+  const sedesPorUsuario = {
+    mecanico_guapiles: ["Guapiles", "San Carlos"],
+    mecanicos_guapiles: ["Guapiles", "San Carlos"]
+  };
+
+  return sedesPorUsuario[usuario] || [];
+}
+
 function agregarTallerParaMecanico(user, sedes) {
   const lista = Array.isArray(sedes) ? sedes : [];
   const usuario = limpiarSede(user?.usuario).toLowerCase();
@@ -345,7 +355,16 @@ function getSedesPermitidas(req) {
 
   } else {
 
-    sedes = agregarTallerParaMecanico(user, [user.sede]);
+    const sedesUsuario = unirSedes([user.sede], sedesEspecialesPorUsuario(user));
+    if (
+      req.session.sedeSeleccionada &&
+      req.session.sedeSeleccionada !== "TODAS" &&
+      sedesUsuario.includes(req.session.sedeSeleccionada)
+    ) {
+      sedes = [req.session.sedeSeleccionada];
+    } else {
+      sedes = agregarTallerParaMecanico(user, sedesUsuario);
+    }
 
   }
 
@@ -373,6 +392,7 @@ module.exports = {
   esUsuarioProveeduria,
   esUsuarioPesados,
   esUsuarioTodasSedes,
+  sedesEspecialesPorUsuario,
   sedeGranelDesdeUsuario,
   agregarTallerParaMecanico,
   obtenerTodasSedes,
