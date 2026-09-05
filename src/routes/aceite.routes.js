@@ -32,6 +32,59 @@ function puedeGestionarAceite(user) {
   return ROLES_GESTION_ACEITE.includes(user?.rol) || esUsuarioMecanicoLimitado(user);
 }
 
+function unirSedesAceite(...listas) {
+  return [...new Set(
+    listas
+      .flat()
+      .map(sede => String(sede || "").trim())
+      .filter(Boolean)
+  )];
+}
+
+function sedesAceitePorUsuario(user) {
+  const usuario = String(user?.usuario || "").trim().toLowerCase();
+  const sedesPorUsuario = {
+    mecanico_guapiles: ["Guapiles"],
+    mecanicos_guapiles: ["Guapiles"],
+    mecanico_la_cruz: ["La Cruz"],
+    mecanicos_la_cruz: ["La Cruz"],
+    mecanico_perez_zeledon: ["Perez Zeledon"],
+    mecanicos_perez_zeledon: ["Perez Zeledon"],
+    mecanico_rio_claro: ["Rio Claro"],
+    mecanicos_rio_claro: ["Rio Claro"],
+    mecanico_nicoya: ["Nicoya"],
+    mecanicos_nicoya: ["Nicoya"],
+    mecanico_limon: ["Transportadora", "Cabezales", "Cisternas", "Carretas", "Tandem", "Tándem"],
+    mecanicos_limon: ["Transportadora", "Cabezales", "Cisternas", "Carretas", "Tandem", "Tándem"]
+  };
+
+  return sedesPorUsuario[usuario] || [];
+}
+
+async function getSedesPermitidasAceite(req) {
+  const user = req.session.user || {};
+  const sedesUsuario = sedesAceitePorUsuario(user);
+  if (sedesUsuario.length) {
+    return expandirSedesOperativasRepuestosAceites(sedesUsuario);
+  }
+
+  const sedesBase = getSedesPermitidas(req);
+  if (!user.id) {
+    return expandirSedesOperativasRepuestosAceites(sedesBase);
+  }
+
+  const [sedesDb] = await pool.query(
+    `SELECT sede FROM usuarios WHERE id = ?
+     UNION
+     SELECT sede FROM usuarios_sedes WHERE usuario_id = ?`,
+    [user.id, user.id]
+  );
+
+  return expandirSedesOperativasRepuestosAceites(
+    unirSedesAceite(sedesBase, sedesDb.map(row => row.sede))
+  );
+}
+
 function parseMonto(value) {
   if (value === null || typeof value === "undefined") return 0;
   const texto = String(value)
@@ -69,6 +122,18 @@ async function columnExists(tableName, columnName) {
        AND TABLE_NAME = ?
        AND COLUMN_NAME = ?`,
     [tableName, columnName]
+  );
+  return Number(row.count) > 0;
+}
+
+async function indexExists(tableName, indexName) {
+  const [[row]] = await pool.query(
+    `SELECT COUNT(*) AS count
+     FROM INFORMATION_SCHEMA.STATISTICS
+     WHERE TABLE_SCHEMA = DATABASE()
+       AND TABLE_NAME = ?
+       AND INDEX_NAME = ?`,
+    [tableName, indexName]
   );
   return Number(row.count) > 0;
 }
@@ -117,6 +182,9 @@ async function ensureAceiteTables() {
       fecha_compra DATE NOT NULL,
       litros_capacidad DECIMAL(10,2) NOT NULL DEFAULT 208.20,
       litros_restantes DECIMAL(10,2) NOT NULL DEFAULT 208.20,
+      monto_total DECIMAL(14,2) NOT NULL DEFAULT 0,
+      orden_compra_id INT NULL,
+      orden_compra_numero VARCHAR(50) NULL,
       estado ENUM('ACTIVO','AGOTADO','CERRADO') NOT NULL DEFAULT 'ACTIVO',
       creado_por INT NULL,
       creado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -159,6 +227,22 @@ async function ensureAceiteTables() {
 
   if (!(await columnExists("cambios_aceite_historial", "archivado_en"))) {
     await pool.query("ALTER TABLE cambios_aceite_historial ADD COLUMN archivado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP AFTER fecha");
+  }
+
+  if (!(await columnExists("aceite_estanones", "monto_total"))) {
+    await pool.query("ALTER TABLE aceite_estanones ADD COLUMN monto_total DECIMAL(14,2) NOT NULL DEFAULT 0 AFTER litros_restantes");
+  }
+
+  if (!(await columnExists("aceite_estanones", "orden_compra_id"))) {
+    await pool.query("ALTER TABLE aceite_estanones ADD COLUMN orden_compra_id INT NULL AFTER monto_total");
+  }
+
+  if (!(await columnExists("aceite_estanones", "orden_compra_numero"))) {
+    await pool.query("ALTER TABLE aceite_estanones ADD COLUMN orden_compra_numero VARCHAR(50) NULL AFTER orden_compra_id");
+  }
+
+  if (!(await indexExists("aceite_estanones", "idx_aceite_estanones_orden_compra"))) {
+    await pool.query("CREATE INDEX idx_aceite_estanones_orden_compra ON aceite_estanones (orden_compra_id)");
   }
 }
 
@@ -424,12 +508,73 @@ async function sincronizarCambiosPendientesAceite(sedesPermitidas, userId) {
   }
 }
 
+async function obtenerOrdenesAceiteRecientes() {
+  const [ordenes] = await pool.query(
+    `SELECT
+       o.id,
+       o.po_numero,
+       DATE_FORMAT(o.fecha, '%d/%m/%Y') AS fecha_formato,
+       o.fecha,
+       o.total,
+       o.placa_unidad,
+       o.factura,
+       p.nombre AS proveedor_nombre
+     FROM ordenes_compra o
+     LEFT JOIN proveedores p ON p.id = o.proveedor_id
+     WHERE UPPER(CONCAT_WS(' ', o.placa_unidad, o.observaciones, o.factura, p.nombre)) REGEXP 'ACEITE|ACEITES|MOBIL|MOVIL|PICO|LIASA'
+     ORDER BY o.fecha DESC, o.id DESC
+     LIMIT 150`
+  );
+  return ordenes;
+}
+
+async function obtenerGastoAceitePorPlaca(sedesPermitidas) {
+  const [rows] = await pool.query(
+    `SELECT
+       am.placa,
+       COALESCE(u.sede, am.sede) AS sede,
+       COUNT(DISTINCT COALESCE(am.cambio_aceite_id, am.id)) AS cambios,
+       COALESCE(SUM(am.litros), 0) AS litros,
+       COALESCE(SUM(
+         am.litros *
+         CASE
+           WHEN COALESCE(ae.monto_total, 0) > 0 AND COALESCE(entrada.litros_entrada, ae.litros_capacidad, 0) > 0
+             THEN ae.monto_total / COALESCE(entrada.litros_entrada, ae.litros_capacidad)
+           ELSE 0
+         END
+       ), 0) AS gasto,
+       COALESCE(SUM(CASE WHEN COALESCE(ae.monto_total, 0) <= 0 THEN am.litros ELSE 0 END), 0) AS litros_sin_costo,
+       GROUP_CONCAT(
+         DISTINCT COALESCE(ae.orden_compra_numero, CONCAT('Estañón ', ae.id))
+         ORDER BY ae.fecha_compra ASC, ae.id ASC
+         SEPARATOR ', '
+       ) AS ordenes
+     FROM aceite_movimientos am
+     JOIN aceite_estanones ae ON ae.id = am.estanon_id
+     LEFT JOIN (
+       SELECT estanon_id, SUM(litros) AS litros_entrada
+       FROM aceite_movimientos
+       WHERE tipo = 'ENTRADA'
+       GROUP BY estanon_id
+     ) entrada ON entrada.estanon_id = ae.id
+     LEFT JOIN unidades u ON u.id = am.unidad_id
+     WHERE am.sede IN (?)
+       AND am.tipo = 'SALIDA'
+       AND NULLIF(TRIM(am.placa), '') IS NOT NULL
+     GROUP BY am.placa, COALESCE(u.sede, am.sede)
+     ORDER BY gasto DESC, litros DESC, am.placa ASC
+     LIMIT 300`,
+    [sedesPermitidas]
+  );
+  return rows;
+}
+
 router.use(requireAuth);
 
 router.get("/", async (req, res) => {
   try {
     await ensureAceiteTables();
-    const sedesPermitidas = expandirSedesOperativasRepuestosAceites(getSedesPermitidas(req));
+    const sedesPermitidas = await getSedesPermitidasAceite(req);
     const sedesGestion = sedesOperativasVisibles((await obtenerTodasSedes(pool)).filter(sede => puedeUsarSede(sede, sedesPermitidas)));
     await sincronizarCambiosPendientesAceite(sedesPermitidas, req.session.user.id || null);
 
@@ -490,16 +635,22 @@ router.get("/", async (req, res) => {
       [sedesPermitidas]
     );
 
+    const ordenesAceite = await obtenerOrdenesAceiteRecientes();
+    const gastoPorPlaca = await obtenerGastoAceitePorPlaca(sedesPermitidas);
+
     const resumen = estanones.reduce((acc, item) => {
       const capacidad = Number(item.litros_capacidad || CAPACIDAD_ESTANON_LITROS);
       const restantes = Number(item.litros_restantes || 0);
       acc.capacidad += capacidad;
       acc.restantes += restantes;
       acc.consumidos += Number(item.litros_consumidos || 0);
+      acc.costoRegistrado += Number(item.monto_total || 0);
       if (item.estado === "ACTIVO") acc.activos += 1;
       if (restantes <= capacidad * 0.2 && item.estado === "ACTIVO") acc.bajos += 1;
       return acc;
-    }, { capacidad: 0, restantes: 0, consumidos: 0, activos: 0, bajos: 0 });
+    }, { capacidad: 0, restantes: 0, consumidos: 0, costoRegistrado: 0, activos: 0, bajos: 0 });
+
+    resumen.gastoAsignadoPlacas = gastoPorPlaca.reduce((sum, item) => sum + Number(item.gasto || 0), 0);
 
     const success = req.session.success;
     const error = req.session.error;
@@ -510,6 +661,8 @@ router.get("/", async (req, res) => {
       cambios,
       estanones,
       movimientos,
+      gastoPorPlaca,
+      ordenesAceite,
       resumen,
       sedesGestion,
       capacidadEstandar: CAPACIDAD_ESTANON_LITROS,
@@ -535,7 +688,7 @@ router.get("/nuevo", async (req, res) => {
     }
 
     await ensureAceiteTables();
-    const sedesPermitidas = expandirSedesOperativasRepuestosAceites(getSedesPermitidas(req));
+    const sedesPermitidas = await getSedesPermitidasAceite(req);
 
     const [unidades] = await pool.query(
       "SELECT id, placa, sede FROM unidades WHERE sede IN (?) ORDER BY sede, placa",
@@ -557,7 +710,7 @@ router.post("/estanones", async (req, res) => {
     }
 
     await ensureAceiteTables();
-    const sedesPermitidas = expandirSedesOperativasRepuestosAceites(getSedesPermitidas(req));
+    const sedesPermitidas = await getSedesPermitidasAceite(req);
     const sede = sedeOperativaRepuestosAceites(req.body.sede);
     const fechaCompra = fechaValida(req.body.fecha_compra);
     const descripcion = String(req.body.descripcion || "").trim() || "Estañón de aceite 55 galones";
@@ -565,6 +718,9 @@ router.post("/estanones", async (req, res) => {
     const galonesIniciales = parseMonto(req.body.galones_iniciales || req.body.litros_iniciales) || galonesCapacidad;
     const litrosCapacidad = galonesALitros(galonesCapacidad);
     const litrosIniciales = galonesALitros(galonesIniciales);
+    const ordenCompraId = Number(req.body.orden_compra_id || 0);
+    let montoTotal = parseMonto(req.body.monto_total);
+    let ordenCompraNumero = null;
 
     if (!sede || !puedeUsarSede(sede, sedesPermitidas)) {
       req.session.error = "Seleccione una sede permitida para el estañón.";
@@ -576,14 +732,37 @@ router.post("/estanones", async (req, res) => {
       return res.redirect("/aceite");
     }
 
+    if (ordenCompraId > 0) {
+      const [[orden]] = await pool.query(
+        "SELECT id, po_numero, total FROM ordenes_compra WHERE id = ? LIMIT 1",
+        [ordenCompraId]
+      );
+      if (!orden) {
+        req.session.error = "La orden de aceite seleccionada no existe.";
+        return res.redirect("/aceite");
+      }
+      ordenCompraNumero = orden.po_numero || `OC-${orden.id}`;
+      if (montoTotal <= 0) montoTotal = parseMonto(orden.total);
+    }
+
     connection = await pool.getConnection();
     await connection.beginTransaction();
 
     const [result] = await connection.query(
       `INSERT INTO aceite_estanones
-       (sede, descripcion, fecha_compra, litros_capacidad, litros_restantes, creado_por)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      [sede, descripcion, fechaCompra, litrosCapacidad, litrosIniciales, req.session.user.id || null]
+       (sede, descripcion, fecha_compra, litros_capacidad, litros_restantes, monto_total, orden_compra_id, orden_compra_numero, creado_por)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        sede,
+        descripcion,
+        fechaCompra,
+        litrosCapacidad,
+        litrosIniciales,
+        montoTotal,
+        ordenCompraId > 0 ? ordenCompraId : null,
+        ordenCompraNumero,
+        req.session.user.id || null
+      ]
     );
 
     await connection.query(
@@ -619,6 +798,62 @@ router.post("/estanones", async (req, res) => {
   }
 });
 
+router.post("/estanones/:id/costo", async (req, res) => {
+  try {
+    if (!puedeGestionarAceite(req.session.user)) {
+      return res.status(403).send("No autorizado");
+    }
+
+    await ensureAceiteTables();
+    const id = Number(req.params.id);
+    const sedesPermitidas = await getSedesPermitidasAceite(req);
+    const montoTotal = parseMonto(req.body.monto_total);
+    const ordenCompraId = Number(req.body.orden_compra_id || 0);
+    let ordenCompraNumero = String(req.body.orden_compra_numero || "").trim().slice(0, 50) || null;
+
+    if (!Number.isInteger(id) || id <= 0) {
+      req.session.error = "Estañón no válido.";
+      return res.redirect("/aceite");
+    }
+
+    const [[estanon]] = await pool.query(
+      "SELECT id, sede FROM aceite_estanones WHERE id = ? LIMIT 1",
+      [id]
+    );
+    if (!estanon || !puedeUsarSede(estanon.sede, sedesPermitidas)) {
+      return res.status(403).send("No autorizado para ese estañón");
+    }
+
+    if (ordenCompraId > 0) {
+      const [[orden]] = await pool.query(
+        "SELECT id, po_numero FROM ordenes_compra WHERE id = ? LIMIT 1",
+        [ordenCompraId]
+      );
+      if (!orden) {
+        req.session.error = "La orden de compra indicada no existe.";
+        return res.redirect("/aceite");
+      }
+      ordenCompraNumero = orden.po_numero || `OC-${orden.id}`;
+    }
+
+    await pool.query(
+      `UPDATE aceite_estanones
+       SET monto_total = ?,
+           orden_compra_id = ?,
+           orden_compra_numero = ?
+       WHERE id = ?`,
+      [montoTotal, ordenCompraId > 0 ? ordenCompraId : null, ordenCompraNumero, id]
+    );
+
+    req.session.success = "Costo del estañón actualizado. El gasto por placa se recalculó.";
+    res.redirect("/aceite");
+  } catch (error) {
+    console.error("ERROR actualizando costo de estañón:", error);
+    req.session.error = "No se pudo actualizar el costo del estañón.";
+    res.redirect("/aceite");
+  }
+});
+
 router.post("/", async (req, res) => {
   const connection = await pool.getConnection();
   try {
@@ -630,7 +865,7 @@ router.post("/", async (req, res) => {
     const { unidad_id, km_actual, proximo_km, observaciones } = req.body;
     const galonesUsados = parseMonto(req.body.galones_usados || req.body.galones || req.body.litros_usados);
     const litrosUsados = galonesALitros(galonesUsados);
-    const sedesPermitidas = expandirSedesOperativasRepuestosAceites(getSedesPermitidas(req));
+    const sedesPermitidas = await getSedesPermitidasAceite(req);
 
     if (!unidad_id || !km_actual || !proximo_km || galonesUsados <= 0) {
       req.session.error = "Complete la unidad, kilometraje, próximo cambio y galones usados.";

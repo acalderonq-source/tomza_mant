@@ -193,6 +193,18 @@
       gap: .35rem;
       justify-content: flex-end;
     }
+    .placa-form {
+      align-items: center;
+      display: flex;
+      gap: .3rem;
+      min-width: 145px;
+    }
+    .placa-form .form-control {
+      font-size: .78rem;
+      font-weight: 800;
+      min-width: 92px;
+      text-transform: uppercase;
+    }
     .action-form .form-control {
       max-width: 138px;
     }
@@ -237,6 +249,10 @@
       .payment-actions {
         justify-content: stretch;
         width: 100%;
+      }
+      .placa-form {
+        justify-content: flex-end;
+        min-width: 0;
       }
       .action-form .form-control {
         max-width: 160px;
@@ -286,6 +302,7 @@
     const excelParams = new URLSearchParams();
     if (filtrosActuales.periodo_cierre) excelParams.set('periodo_cierre', filtrosActuales.periodo_cierre);
     const excelUrl = '/compras/facturas/pagos-proveedor/reporte/excel' + (excelParams.toString() ? `?${excelParams.toString()}` : '');
+    const returnToPagos = '/compras/facturas/pagos-proveedor' + (excelParams.toString() ? `?${excelParams.toString()}` : '');
     const maxProveedor = Math.max(...pagos.topProveedores.map(item => Number(item.total || 0)), 1);
     const chartColors = [
       'linear-gradient(180deg, #ef233c, #174ea6)',
@@ -484,7 +501,19 @@
                     <td data-label="Proveedor"><strong><%= pago.proveedor_nombre %></strong></td>
                     <td data-label="Concepto"><%= pago.concepto || '—' %></td>
                     <td data-label="Factura"><%= pago.numero_factura || '—' %></td>
-                    <td data-label="Placa"><%= pago.placa || '—' %></td>
+                    <td data-label="Placa">
+                      <% if (puedeImportar) { %>
+                        <form method="POST" action="/compras/facturas/pagos-proveedor/<%= pago.id %>/placa" class="placa-form">
+                          <input type="hidden" name="return_to" value="<%= returnToPagos %>">
+                          <input type="text" name="placa" class="form-control form-control-sm" value="<%= pago.placa || '' %>" placeholder="Placa" maxlength="50">
+                          <button class="btn btn-sm btn-outline-primary" title="Guardar placa">
+                            <i class="bi bi-check-lg"></i>
+                          </button>
+                        </form>
+                      <% } else { %>
+                        <%= pago.placa || '—' %>
+                      <% } %>
+                    </td>
                     <td data-label="Monto" class="text-end fw-bold"><%= moneda(pago.monto) %></td>
                     <td data-label="Pago" class="text-end">
                       <% if (puedeImportar) { %>
@@ -552,7 +581,19 @@
                     <td data-label="Proveedor"><strong><%= pago.proveedor_nombre %></strong></td>
                     <td data-label="Concepto"><%= pago.concepto || '—' %></td>
                     <td data-label="Factura"><%= pago.numero_factura || '—' %></td>
-                    <td data-label="Placa"><%= pago.placa || '—' %></td>
+                    <td data-label="Placa">
+                      <% if (puedeImportar) { %>
+                        <form method="POST" action="/compras/facturas/pagos-proveedor/<%= pago.id %>/placa" class="placa-form">
+                          <input type="hidden" name="return_to" value="<%= returnToPagos %>">
+                          <input type="text" name="placa" class="form-control form-control-sm" value="<%= pago.placa || '' %>" placeholder="Placa" maxlength="50">
+                          <button class="btn btn-sm btn-outline-primary" title="Guardar placa">
+                            <i class="bi bi-check-lg"></i>
+                          </button>
+                        </form>
+                      <% } else { %>
+                        <%= pago.placa || '—' %>
+                      <% } %>
+                    </td>
                     <td data-label="Monto" class="text-end fw-bold"><%= moneda(pago.monto) %></td>
                     <td data-label="Estado" class="text-end">
                       <% if (puedeImportar) { %>

@@ -495,6 +495,10 @@ async function ensurePagosProveedorTable() {
     await queryWithRetry("ALTER TABLE pagos_proveedor ADD COLUMN pagada TINYINT(1) NOT NULL DEFAULT 0 AFTER partida_presupuestaria");
   }
 
+  if (!(await columnExists("pagos_proveedor", "placa"))) {
+    await queryWithRetry("ALTER TABLE pagos_proveedor ADD COLUMN placa VARCHAR(50) NULL AFTER numero_factura");
+  }
+
   const [[montoColumn]] = await queryWithRetry(
     `SELECT NUMERIC_SCALE AS numeric_scale, NUMERIC_PRECISION AS numeric_precision
      FROM information_schema.COLUMNS
@@ -783,6 +787,16 @@ function normalizarEmpresaPago(value) {
   return "";
 }
 
+function normalizarPlacaPagoProveedor(value) {
+  const placa = String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, "")
+    .slice(0, 50);
+  return placa || null;
+}
+
 function parsePagoProveedorDataUrl(dataUrl) {
   const match = String(dataUrl || "").match(/^data:([^;]+);base64,(.+)$/);
   if (!match) throw new Error("Debe adjuntar un archivo Excel válido.");
@@ -863,7 +877,7 @@ async function leerPagosProveedorExcel(buffer) {
       const cuentaIban = textoCeldaExcel(row.getCell(headerMap.cuentaIban || 3));
       const concepto = textoCeldaExcel(row.getCell(headerMap.concepto || 4));
       const numeroFactura = textoCeldaExcel(row.getCell(headerMap.numeroFactura || 5));
-      const placa = normalizarPlaca(textoCeldaExcel(row.getCell(headerMap.placa || 6)));
+      const placa = normalizarPlacaPagoProveedor(textoCeldaExcel(row.getCell(headerMap.placa || 6)));
       const monto = parseMontoExcel(valorCeldaExcel(row.getCell(headerMap.monto || 7)));
       const partida = textoCeldaExcel(row.getCell(headerMap.partida || 8));
       const fechaPagoRaw = valorCeldaExcel(row.getCell(headerMap.fechaPago || 9));
@@ -919,6 +933,14 @@ function redirectFacturas(req, res) {
     return res.redirect(returnTo);
   }
   return res.redirect("/compras/facturas");
+}
+
+function redirectPagosProveedor(req, res) {
+  const returnTo = String(req.body.return_to || "");
+  if (returnTo.startsWith("/compras/facturas/pagos-proveedor")) {
+    return res.redirect(returnTo);
+  }
+  return res.redirect("/compras/facturas/pagos-proveedor");
 }
 
 async function obtenerOrdenesDisponiblesFactura() {
@@ -3518,6 +3540,34 @@ router.post("/facturas/pagos-proveedor/:id/estado", requireAuth, allowRoles(...R
     console.error("Error actualizando estado de pago de proveedor:", error);
     req.session.error = "Error actualizando el pago de proveedor.";
     res.redirect("/compras/facturas/pagos-proveedor");
+  }
+});
+
+router.post("/facturas/pagos-proveedor/:id/placa", requireAuth, allowRoles(...ROLES_GESTION_FACTURAS), async (req, res) => {
+  try {
+    await ensurePagosProveedorTable();
+    const id = Number(req.params.id);
+    const placa = normalizarPlacaPagoProveedor(req.body.placa);
+
+    if (!Number.isInteger(id) || id <= 0) {
+      req.session.error = "Pago de proveedor no válido.";
+      return redirectPagosProveedor(req, res);
+    }
+
+    const [result] = await queryWithRetry(
+      "UPDATE pagos_proveedor SET placa = ? WHERE id = ?",
+      [placa, id]
+    );
+
+    req.session[result.affectedRows ? "success" : "error"] = result.affectedRows
+      ? "Placa del pago de proveedor actualizada."
+      : "No se encontró el pago de proveedor.";
+
+    return redirectPagosProveedor(req, res);
+  } catch (error) {
+    console.error("Error actualizando placa de pago de proveedor:", error);
+    req.session.error = "Error actualizando la placa del pago de proveedor.";
+    return redirectPagosProveedor(req, res);
   }
 });
 

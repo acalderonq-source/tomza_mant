@@ -52,7 +52,7 @@
     .kpi-grid {
       display: grid;
       gap: .75rem;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
     }
     .kpi-card,
     .panel,
@@ -299,6 +299,38 @@
       border-radius: 10px;
       padding: 1rem;
     }
+    .plate-cost-table .plate-cell {
+      color: var(--dark);
+      font-size: .95rem;
+      font-weight: 950;
+      white-space: nowrap;
+    }
+    .plate-cost-table .cost-cell {
+      color: #14532d;
+      font-weight: 950;
+      white-space: nowrap;
+    }
+    .plate-cost-table .orders-cell {
+      max-width: 310px;
+      white-space: normal;
+    }
+    .cost-edit-form {
+      align-items: end;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      display: grid;
+      gap: .4rem;
+      grid-template-columns: minmax(90px, 1fr) minmax(90px, 1fr) auto;
+      margin-top: .7rem;
+      padding: .55rem;
+    }
+    .cost-edit-form label {
+      color: var(--muted);
+      font-size: .62rem;
+      font-weight: 900;
+      text-transform: uppercase;
+    }
     @media (max-width: 900px) {
       .kpi-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -319,6 +351,7 @@
 <%
   const factorGalon = Number(galonALitros || 3.78541);
   const formatoGalones = value => Number(value || 0).toLocaleString('es-CR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const moneda = value => `₡${Number(value || 0).toLocaleString('es-CR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
   const litrosAGalones = value => Number(value || 0) / factorGalon;
   const porcentajeEstanon = item => {
     const capacidad = Number(item.litros_capacidad || capacidadEstandar || 208.2);
@@ -384,9 +417,29 @@
             <input type="date" name="fecha_compra" class="form-control" value="<%= fechaHoy %>" required>
             <div class="form-text fw-semibold">Si es fecha anterior, rebaja cambios desde ese día.</div>
           </div>
+          <div class="col-md-4">
+            <label class="form-label fw-bold">Orden de aceite</label>
+            <select name="orden_compra_id" id="ordenAceiteSelect" class="form-select">
+              <option value="">Sin orden relacionada</option>
+              <% (ordenesAceite || []).forEach(orden => { %>
+                <option
+                  value="<%= orden.id %>"
+                  data-monto="<%= Number(orden.total || 0) %>"
+                  data-fecha="<%= orden.fecha ? new Date(orden.fecha).toISOString().slice(0, 10) : '' %>"
+                  data-descripcion="<%= `Estañón aceite · ${orden.po_numero || `OC-${orden.id}`} · ${orden.proveedor_nombre || ''}` %>">
+                  <%= orden.po_numero || `OC-${orden.id}` %> · <%= orden.fecha_formato %> · <%= orden.proveedor_nombre || 'Proveedor' %> · <%= moneda(orden.total) %>
+                </option>
+              <% }) %>
+            </select>
+            <div class="form-text fw-semibold">Si selecciona una orden, se usa para calcular costo por placa.</div>
+          </div>
+          <div class="col-md-2">
+            <label class="form-label fw-bold">Monto de aceite</label>
+            <input type="number" step="0.01" name="monto_total" id="montoAceiteEstanon" class="form-control" placeholder="0.00">
+          </div>
           <div class="col-md-3">
             <label class="form-label fw-bold">Descripción</label>
-            <input type="text" name="descripcion" class="form-control" value="Estañón de aceite 55 galones">
+            <input type="text" name="descripcion" id="descripcionAceiteEstanon" class="form-control" value="Estañón de aceite 55 galones">
           </div>
           <div class="col-md-2">
             <label class="form-label fw-bold">Capacidad galones</label>
@@ -420,6 +473,10 @@
     <div class="kpi-card">
       <div class="kpi-label">Alertas bajo 20%</div>
       <div class="kpi-value"><%= Number(resumen.bajos || 0).toLocaleString('es-CR') %></div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Gasto de aceite por placas</div>
+      <div class="kpi-value"><%= moneda(resumen.gastoAsignadoPlacas) %></div>
     </div>
   </section>
 
@@ -457,6 +514,12 @@
                 <div>
                   <div class="drum-title"><%= etiquetaSede(item.sede) %></div>
                   <div class="small muted"><%= item.descripcion || 'Estañón de aceite' %></div>
+                  <div class="small fw-bold mt-1">
+                    <%= moneda(item.monto_total) %>
+                    <% if (item.orden_compra_numero) { %>
+                      · <%= item.orden_compra_numero %>
+                    <% } %>
+                  </div>
                 </div>
                 <span class="badge text-bg-light"><%= item.estado %></span>
               </div>
@@ -470,11 +533,81 @@
                 <span><%= formatoGalones(litrosAGalones(item.litros_consumidos)) %> gal consumidos</span>
               </div>
               <div class="small muted mt-2"><%= Number(item.salidas || 0).toLocaleString('es-CR') %> rebajo(s) registrados</div>
+              <% if (puedeGestionar) { %>
+                <form method="POST" action="/aceite/estanones/<%= item.id %>/costo" class="cost-edit-form">
+                  <div>
+                    <label class="form-label mb-1">Monto</label>
+                    <input type="number" step="0.01" name="monto_total" class="form-control form-control-sm" value="<%= Number(item.monto_total || 0) || '' %>" placeholder="0.00">
+                  </div>
+                  <div>
+                    <label class="form-label mb-1">Orden / PO</label>
+                    <input type="text" name="orden_compra_numero" class="form-control form-control-sm" value="<%= item.orden_compra_numero || '' %>" placeholder="2026-000">
+                  </div>
+                  <button class="btn btn-sm btn-outline-primary fw-bold" title="Guardar costo">
+                    <i class="bi bi-check-lg"></i>
+                  </button>
+                </form>
+              <% } %>
             </div>
           </article>
         <% }) %>
       </div>
     <% } %>
+  </section>
+
+  <section class="panel mb-3">
+    <div class="panel-head">
+      <div>
+        <h2 class="panel-title">Gasto completo de aceite por placa</h2>
+        <p class="panel-copy">Suma el consumo real rebajado de estañones y lo convierte a costo por placa.</p>
+      </div>
+      <span class="badge text-bg-light"><%= moneda(resumen.gastoAsignadoPlacas) %></span>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0 plate-cost-table">
+        <thead>
+          <tr>
+            <th>Placa</th>
+            <th>Sede</th>
+            <th class="text-end">Cambios</th>
+            <th class="text-end">Galones usados</th>
+            <th class="text-end">Costo aceite</th>
+            <th class="text-end">Costo / galón</th>
+            <th>Orden / estañón</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% if (!(gastoPorPlaca || []).length) { %>
+            <tr>
+              <td colspan="7" class="text-center muted fw-bold py-4">
+                Todavía no hay salidas de aceite con costo asignado a placas.
+              </td>
+            </tr>
+          <% } %>
+          <% (gastoPorPlaca || []).forEach(item => {
+            const galones = litrosAGalones(item.litros);
+            const costo = Number(item.gasto || 0);
+            const costoGalon = galones > 0 ? costo / galones : 0;
+            const galonesSinCosto = litrosAGalones(item.litros_sin_costo || 0);
+          %>
+            <tr>
+              <td class="plate-cell"><%= item.placa %></td>
+              <td><%= etiquetaSede(item.sede) %></td>
+              <td class="text-end"><%= Number(item.cambios || 0).toLocaleString('es-CR') %></td>
+              <td class="text-end fw-bold"><%= formatoGalones(galones) %> gal</td>
+              <td class="text-end cost-cell"><%= moneda(costo) %></td>
+              <td class="text-end"><%= moneda(costoGalon) %></td>
+              <td class="orders-cell">
+                <%= item.ordenes || '—' %>
+                <% if (galonesSinCosto > 0) { %>
+                  <div class="small text-warning fw-bold"><%= formatoGalones(galonesSinCosto) %> gal sin monto de estañón</div>
+                <% } %>
+              </td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
   </section>
 
   <div class="row g-3">
@@ -573,6 +706,26 @@
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+  const ordenAceiteSelect = document.getElementById('ordenAceiteSelect');
+  const montoAceiteEstanon = document.getElementById('montoAceiteEstanon');
+  const descripcionAceiteEstanon = document.getElementById('descripcionAceiteEstanon');
+  const fechaCompraEstanon = document.querySelector('input[name="fecha_compra"]');
+
+  ordenAceiteSelect?.addEventListener('change', () => {
+    const option = ordenAceiteSelect.selectedOptions?.[0];
+    if (!option || !option.value) return;
+    if (montoAceiteEstanon && !montoAceiteEstanon.value) {
+      montoAceiteEstanon.value = option.dataset.monto || '';
+    }
+    if (descripcionAceiteEstanon) {
+      descripcionAceiteEstanon.value = option.dataset.descripcion || descripcionAceiteEstanon.value;
+    }
+    if (fechaCompraEstanon && option.dataset.fecha) {
+      fechaCompraEstanon.value = option.dataset.fecha;
+    }
+  });
+</script>
 <script src="/js/loading-guard.js"></script>
 </body>
 </html>
