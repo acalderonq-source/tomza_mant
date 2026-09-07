@@ -19,6 +19,22 @@
     .sheet-table .reporte-cell.important { color: #dc2626; font-weight: 700; }
     .sheet-table .mark-red,
     .rich-editor .mark-red { color: #dc2626; font-weight: 800; }
+    .report-count-badge {
+      background: #e0f2fe;
+      border-radius: 999px;
+      color: #075985;
+      display: inline-block;
+      font-size: 10px;
+      font-weight: 800;
+      margin-top: 2px;
+      padding: 1px 6px;
+    }
+    .report-detail-card {
+      border: 1px solid #dbe3ef;
+      border-radius: 10px;
+      padding: .75rem;
+    }
+    .report-detail-card + .report-detail-card { margin-top: .75rem; }
     .sheet-table .action-cell { width: 120px; text-align: center; }
     .sheet-table .detail-row td { background: #f8fafc; border-top: 0; padding: 0; }
     .sheet-table .detail-panel { padding: .75rem; }
@@ -78,6 +94,9 @@
     const excelGeneralUrl = `/reportes-supervisores/reporte/excel${excelGeneralParams.length ? `?${excelGeneralParams.join('&')}` : ''}`;
     const semanaNueva = semanaDefault || filtros.semana || '';
     const puedeCambiarSemanaReporte = typeof puedeElegirSemanaReporte !== 'undefined' ? puedeElegirSemanaReporte : puedeEditar;
+    const detallesReporte = reporte => Array.isArray(reporte.reportes_detalle) && reporte.reportes_detalle.length
+      ? reporte.reportes_detalle
+      : [reporte];
   %>
   <div class="page-heading">
     <div>
@@ -217,6 +236,9 @@
                   <td class="placa-cell">
                     <%= r.placa %>
                     <div class="meta"><%= r.tipo_mantenimiento || 'CORRECTIVO' %></div>
+                    <% if (Number(r.cantidad_reportes || 1) > 1) { %>
+                      <span class="report-count-badge"><%= Number(r.cantidad_reportes).toLocaleString('es-CR') %> reportes</span>
+                    <% } %>
                   </td>
                   <%
                     const reporteHtml = pintarReporte(r.descripcion_limpia || r.descripcion_original);
@@ -227,7 +249,7 @@
                   </td>
                   <% if (puedeEditar) { %>
                     <td class="action-cell">
-                      <button class="btn btn-outline-dark btn-sm py-0 px-2" type="button" data-bs-toggle="collapse" data-bs-target="#editReporte<%= r.id %>" aria-expanded="false">
+                      <button class="btn btn-outline-dark btn-sm py-0 px-2" type="button" data-bs-toggle="collapse" data-bs-target="#editReporte<%= r.grupo_id || r.id %>" aria-expanded="false">
                         Editar
                       </button>
                     </td>
@@ -236,64 +258,71 @@
                 <% if (puedeEditar) { %>
                   <tr class="detail-row">
                     <td colspan="3">
-                      <div class="collapse" id="editReporte<%= r.id %>">
+                      <div class="collapse" id="editReporte<%= r.grupo_id || r.id %>">
                         <div class="detail-panel">
-                          <div class="row g-3">
-                            <div class="col-lg-4">
-                              <div class="meta">Original</div>
-                              <div><%- pintarReporte(r.descripcion_original) %></div>
-                              <div class="meta mt-2">
-                                <%= r.supervisor_nombre || 'Supervisor' %> ·
-                                <%= r.fecha_reporte ? new Date(r.fecha_reporte).toLocaleString('es-CR') : '' %> ·
-                                Semana: <%= r.semana_reporte ? new Date(`${String(r.semana_reporte).slice(0, 10)}T12:00:00`).toLocaleDateString('es-CR') : 'Sin definir' %> ·
-                                <%= r.estado.replace('_', ' ') %>
+                          <% detallesReporte(r).forEach(detalle => { %>
+                            <%
+                              const detalleHtml = pintarReporte(detalle.descripcion_limpia || detalle.descripcion_original);
+                            %>
+                            <div class="report-detail-card">
+                              <div class="row g-3">
+                                <div class="col-lg-4">
+                                  <div class="meta">Original</div>
+                                  <div><%- pintarReporte(detalle.descripcion_original) %></div>
+                                  <div class="meta mt-2">
+                                    <%= detalle.supervisor_nombre || 'Supervisor' %> ·
+                                    <%= detalle.fecha_reporte ? new Date(detalle.fecha_reporte).toLocaleString('es-CR') : '' %> ·
+                                    Semana: <%= detalle.semana_reporte ? new Date(`${String(detalle.semana_reporte).slice(0, 10)}T12:00:00`).toLocaleDateString('es-CR') : 'Sin definir' %> ·
+                                    <%= String(detalle.estado || '').replace('_', ' ') %>
+                                  </div>
+                                </div>
+                                <div class="col-lg-8">
+                                  <form method="POST" action="/reportes-supervisores/<%= detalle.id %>/editar" class="rich-report-form">
+                                    <label class="form-label small fw-bold">Texto corregido</label>
+                                    <div class="format-toolbar">
+                                      <button type="button" class="btn btn-outline-danger btn-sm js-mark-red">Rojo</button>
+                                      <button type="button" class="btn btn-outline-secondary btn-sm js-remove-format">
+                                        Quitar formato
+                                      </button>
+                                      <span class="meta">Seleccione letras, palabra o frase y presione Rojo.</span>
+                                    </div>
+                                    <div class="rich-editor mb-2" contenteditable="true"><%- detalleHtml %></div>
+                                    <input type="hidden" name="descripcion_limpia" class="rich-editor-value" value="<%= detalleHtml %>">
+                                    <label class="form-label small fw-bold">Nota taller/admin</label>
+                                    <textarea name="nota_taller" class="form-control mb-2" rows="2"><%= detalle.nota_taller || '' %></textarea>
+                                    <div class="d-flex gap-2 flex-wrap align-items-center">
+                                      <label class="form-check mb-0">
+                                        <input class="form-check-input" type="checkbox" name="importante" value="1" <%= detalle.importante ? 'checked' : '' %>>
+                                        <span class="form-check-label">Marcar todo rojo</span>
+                                      </label>
+                                      <select name="tipo_mantenimiento" class="form-select form-select-sm" style="max-width: 180px;">
+                                        <option value="CORRECTIVO" <%= (detalle.tipo_mantenimiento || 'CORRECTIVO') === 'CORRECTIVO' ? 'selected' : '' %>>Correctivo</option>
+                                        <option value="PREVENTIVO" <%= detalle.tipo_mantenimiento === 'PREVENTIVO' ? 'selected' : '' %>>Preventivo</option>
+                                      </select>
+                                      <span class="meta" data-tipo-mantenimiento-detectado></span>
+                                      <select name="estado" class="form-select form-select-sm" style="max-width: 180px;">
+                                        <option value="PENDIENTE" <%= detalle.estado === 'PENDIENTE' ? 'selected' : '' %>>Pendiente</option>
+                                        <option value="EN_REVISION" <%= detalle.estado === 'EN_REVISION' ? 'selected' : '' %>>En revisión</option>
+                                      </select>
+                                      <button class="btn btn-primary btn-sm">Guardar</button>
+                                    </div>
+                                  </form>
+                                  <div class="d-flex gap-2 flex-wrap mt-2">
+                                    <form method="POST" action="/reportes-supervisores/<%= detalle.id %>/limpiar-ia">
+                                      <button class="btn btn-outline-primary btn-sm">Limpiar texto</button>
+                                    </form>
+                                    <form method="POST" action="/reportes-supervisores/<%= detalle.id %>/cerrar" class="d-flex gap-2">
+                                      <input type="text" name="motivo" class="form-control form-control-sm" placeholder="Motivo de cierre manual">
+                                      <button class="btn btn-outline-success btn-sm" onclick="return confirm('¿Mover al historial?')">Cerrar</button>
+                                    </form>
+                                    <form method="POST" action="/reportes-supervisores/<%= detalle.id %>/eliminar">
+                                      <button class="btn btn-outline-danger btn-sm" onclick="return confirm('¿Eliminar definitivamente este reporte? Esta acción no se puede deshacer.')">Eliminar</button>
+                                    </form>
+                                  </div>
+                                </div>
                               </div>
                             </div>
-                            <div class="col-lg-8">
-                              <form method="POST" action="/reportes-supervisores/<%= r.id %>/editar" class="rich-report-form">
-                                <label class="form-label small fw-bold">Texto corregido</label>
-                                <div class="format-toolbar">
-                                  <button type="button" class="btn btn-outline-danger btn-sm js-mark-red">Rojo</button>
-                                  <button type="button" class="btn btn-outline-secondary btn-sm js-remove-format">
-                                    Quitar formato
-                                  </button>
-                                  <span class="meta">Seleccione letras, palabra o frase y presione Rojo.</span>
-                                </div>
-                                <div class="rich-editor mb-2" contenteditable="true"><%- reporteHtml %></div>
-                                <input type="hidden" name="descripcion_limpia" class="rich-editor-value" value="<%= reporteHtml %>">
-                                <label class="form-label small fw-bold">Nota taller/admin</label>
-                                <textarea name="nota_taller" class="form-control mb-2" rows="2"><%= r.nota_taller || '' %></textarea>
-                                <div class="d-flex gap-2 flex-wrap align-items-center">
-                                  <label class="form-check mb-0">
-                                    <input class="form-check-input" type="checkbox" name="importante" value="1" <%= r.importante ? 'checked' : '' %>>
-                                    <span class="form-check-label">Marcar todo rojo</span>
-                                  </label>
-                                  <select name="tipo_mantenimiento" class="form-select form-select-sm" style="max-width: 180px;">
-                                    <option value="CORRECTIVO" <%= (r.tipo_mantenimiento || 'CORRECTIVO') === 'CORRECTIVO' ? 'selected' : '' %>>Correctivo</option>
-                                    <option value="PREVENTIVO" <%= r.tipo_mantenimiento === 'PREVENTIVO' ? 'selected' : '' %>>Preventivo</option>
-                                  </select>
-                                  <span class="meta" data-tipo-mantenimiento-detectado></span>
-                                  <select name="estado" class="form-select form-select-sm" style="max-width: 180px;">
-                                    <option value="PENDIENTE" <%= r.estado === 'PENDIENTE' ? 'selected' : '' %>>Pendiente</option>
-                                    <option value="EN_REVISION" <%= r.estado === 'EN_REVISION' ? 'selected' : '' %>>En revisión</option>
-                                  </select>
-                                  <button class="btn btn-primary btn-sm">Guardar</button>
-                                </div>
-                              </form>
-                              <div class="d-flex gap-2 flex-wrap mt-2">
-                                <form method="POST" action="/reportes-supervisores/<%= r.id %>/limpiar-ia">
-                                  <button class="btn btn-outline-primary btn-sm">Limpiar texto</button>
-                                </form>
-                                <form method="POST" action="/reportes-supervisores/<%= r.id %>/cerrar" class="d-flex gap-2">
-                                  <input type="text" name="motivo" class="form-control form-control-sm" placeholder="Motivo de cierre manual">
-                                  <button class="btn btn-outline-success btn-sm" onclick="return confirm('¿Mover al historial?')">Cerrar</button>
-                                </form>
-                                <form method="POST" action="/reportes-supervisores/<%= r.id %>/eliminar">
-                                  <button class="btn btn-outline-danger btn-sm" onclick="return confirm('¿Eliminar definitivamente este reporte? Esta acción no se puede deshacer.')">Eliminar</button>
-                                </form>
-                              </div>
-                            </div>
-                          </div>
+                          <% }) %>
                         </div>
                       </div>
                     </td>

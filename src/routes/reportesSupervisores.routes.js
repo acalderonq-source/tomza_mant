@@ -286,6 +286,88 @@ function tieneRojoReporte(value) {
   return /<span class="mark-red">/i.test(sanitizarReporteHtml(value));
 }
 
+function fechaReporteKey(value) {
+  if (!value) return "";
+  const texto = String(value);
+  if (/^\d{4}-\d{2}-\d{2}/.test(texto)) return texto.slice(0, 10);
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? "" : date.toISOString().slice(0, 10);
+}
+
+function normalizarClaveReporte(value) {
+  return htmlATextoPlano(value)
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function combinarTextosReportes(items, campo) {
+  const vistos = new Set();
+  const partes = [];
+
+  for (const item of items) {
+    const texto = String(item[campo] || "").trim();
+    const clave = normalizarClaveReporte(texto);
+    if (!texto || !clave || vistos.has(clave)) continue;
+    vistos.add(clave);
+    partes.push(texto);
+  }
+
+  return partes.join(" / ");
+}
+
+function agruparReportesPorPlaca(reportes = []) {
+  const grupos = new Map();
+
+  for (const reporte of reportes) {
+    const semana = fechaReporteKey(reporte.semana_reporte || reporte.fecha_reporte);
+    const sede = reporte.sede || reporte.unidad_sede || "Sin sede";
+    const placa = String(reporte.placa || "").trim().toUpperCase();
+    const tipo = String(reporte.tipo_mantenimiento || "CORRECTIVO").trim().toUpperCase();
+    const key = [semana, sede.toUpperCase(), placa].join("|");
+
+    if (!grupos.has(key)) {
+      grupos.set(key, {
+        ...reporte,
+        grupo_id: `grupo_${reporte.id}`,
+        sede,
+        placa,
+        tipo_mantenimiento: tipo,
+        reportes_detalle: [],
+        cantidad_reportes: 0,
+        _tipos: new Set()
+      });
+    }
+
+    const grupo = grupos.get(key);
+    grupo.reportes_detalle.push(reporte);
+    grupo.cantidad_reportes += 1;
+    grupo._tipos.add(tipo);
+    grupo.importante = Number(grupo.importante || 0) || Number(reporte.importante || 0);
+
+    if (reporte.estado === "EN_REVISION") grupo.estado = "EN_REVISION";
+    if (new Date(reporte.fecha_reporte || 0) > new Date(grupo.fecha_reporte || 0)) {
+      grupo.fecha_reporte = reporte.fecha_reporte;
+      grupo.supervisor_nombre = reporte.supervisor_nombre;
+    }
+  }
+
+  return [...grupos.values()].map(grupo => {
+    const tipos = [...grupo._tipos].filter(Boolean);
+    delete grupo._tipos;
+
+    return {
+      ...grupo,
+      tipo_mantenimiento: tipos.length ? tipos.join(" + ") : "CORRECTIVO",
+      descripcion_limpia: combinarTextosReportes(grupo.reportes_detalle, "descripcion_limpia") ||
+        combinarTextosReportes(grupo.reportes_detalle, "descripcion_original"),
+      descripcion_original: combinarTextosReportes(grupo.reportes_detalle, "descripcion_original")
+    };
+  });
+}
+
 async function consultarReportesPendientes(req, filtros = {}) {
   const sedesPermitidas = await obtenerSedesPermitidas(req);
   const { sede, placa, importante, semana_reporte } = filtros;
@@ -471,6 +553,7 @@ router.get("/", allowRoles(...ROLES_VER), async (req, res) => {
     const semana = String(req.query.semana || "").trim();
     const semanaReporteFecha = lunesDesdeSemanaInput(semana);
     const { reportes } = await consultarReportesPendientes(req, { sede, placa, importante, semana_reporte: semanaReporteFecha });
+    const reportesAgrupados = agruparReportesPorPlaca(reportes);
     const unidades = await cargarUnidades(req);
     const sugerencias = await obtenerSugerenciasPendientes(sedesPermitidas, correctivo_id || null);
     const success = req.session.success;
@@ -479,7 +562,7 @@ router.get("/", allowRoles(...ROLES_VER), async (req, res) => {
     delete req.session.error;
 
     res.render("reportes_supervisores", {
-      reportes,
+      reportes: reportesAgrupados,
       unidades,
       sugerencias,
       user: req.session.user,
@@ -505,7 +588,7 @@ router.get("/reporte/excel", allowRoles(...ROLES_VER), async (req, res) => {
     const semana = String(req.query.semana || "").trim();
     const semanaReporteFecha = lunesDesdeSemanaInput(semana);
     const { reportes } = await consultarReportesPendientes(req, { sede, placa, importante, semana_reporte: semanaReporteFecha });
-    const gruposSede = agruparPorSede(reportes);
+    const gruposSede = agruparPorSede(agruparReportesPorPlaca(reportes));
     const workbook = new ExcelJS.Workbook();
     workbook.creator = "Gas Tomza";
     workbook.created = new Date();
