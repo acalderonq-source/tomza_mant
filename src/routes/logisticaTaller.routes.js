@@ -90,7 +90,7 @@ async function sincronizarPrioridadesDelDia(fecha, req) {
   const sedesFiltro = await obtenerSedesFiltro(req);
   const condiciones = [
     "tp.estado = 'PENDIENTE'",
-    "COALESCE(tp.fecha_prioridad, DATE(tp.creado_en)) = ?"
+    "COALESCE(tp.fecha_prioridad, DATE(tp.creado_en)) <= ?"
   ];
   const params = [fecha];
 
@@ -157,8 +157,10 @@ async function sincronizarPrioridadesDelDia(fecha, req) {
 
 async function obtenerRegistros(req, fecha) {
   const sedesFiltro = await obtenerSedesFiltro(req);
-  const condiciones = ["lt.fecha = ?"];
-  const params = [fecha];
+  const condiciones = [
+    "(lt.fecha = ? OR (lt.fecha <= ? AND lt.estado IN ('PENDIENTE','EN_PROCESO')))"
+  ];
+  const params = [fecha, fecha];
   aplicarFiltroSedes(condiciones, params, sedesFiltro, "lt");
 
   const [registros] = await pool.query(

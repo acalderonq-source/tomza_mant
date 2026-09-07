@@ -765,7 +765,7 @@ router.get("/dashboard", async (req, res) => {
       LEFT JOIN usuarios usr ON usr.id = tp.creado_por
       LEFT JOIN unidades un ON UPPER(TRIM(un.placa)) = UPPER(TRIM(tp.placa))
       WHERE tp.estado = 'PENDIENTE'
-        AND COALESCE(tp.fecha_prioridad, DATE(tp.creado_en)) = ?
+        AND COALESCE(tp.fecha_prioridad, DATE(tp.creado_en)) <= ?
     `;
     let prioridadesParams = [fechaPrioridadHoy, fechaPrioridadHoy];
     if (sedesPermitidas.length > 0 && !esUsuarioPesados(req.session.user)) {
@@ -781,12 +781,12 @@ router.get("/dashboard", async (req, res) => {
             THEN 0
             ELSE 1
           END,
+          COALESCE(tp.fecha_prioridad, DATE(tp.creado_en)) ASC,
           tp.creado_en DESC,
           tp.id DESC
-        LIMIT 20
       `;
     } else {
-      prioridadesSql += " ORDER BY tp.creado_en DESC, tp.id DESC LIMIT 20";
+      prioridadesSql += " ORDER BY COALESCE(tp.fecha_prioridad, DATE(tp.creado_en)) ASC, tp.creado_en DESC, tp.id DESC";
     }
     const [prioridadesTodas] = await pool.query(prioridadesSql, prioridadesParams);
     const prioridadesPesadosTodas = prioridadesTodas.filter(p =>
