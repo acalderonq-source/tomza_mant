@@ -9,6 +9,7 @@ const { generarPDFOrden } = require('../utils/pdfOrdenCompra');
 const { agregarFiltroPlacaSql, normalizarPlaca: normalizarPlacaSistema } = require("../utils/placas");
 const { ensureTipoMantenimientoColumns, normalizarTipoMantenimiento, detectarTipoMantenimiento } = require("../utils/tipoMantenimiento");
 const { construirResumenFinanciero } = require("../utils/resumenFinanciero");
+const { esSedeTransportadoraDetalle } = require("../utils/sedes");
 
 // ===================== MIDDLEWARES =====================
 function requireAuth(req, res, next) {
@@ -175,7 +176,7 @@ function clasificarPlacaCompra(placa, sede) {
   if (placaLimpia === "GENERALES TALLER" || ["GENERAL", "GENERALES", "GENERAL TALLER", "GENERALES TALLER"].includes(sedeUpper)) return "General taller";
   if (placaLimpia === "SIN PLACA") return "Sin placa / revisar";
   if (esSedeGranelDashboard(sedeLimpia)) return "Graneles";
-  if (sedeUpper === "TRANSPORTADORA" || /^S\d{5,6}$/.test(placaLimpia) || /^EE\d{5,6}$/.test(placaLimpia)) return "Transportadora";
+  if (sedeUpper === "TRANSPORTADORA" || esSedeTransportadoraDetalle(sedeLimpia) || /^S\d{5,6}$/.test(placaLimpia) || /^EE\d{5,6}$/.test(placaLimpia)) return "Transportadora";
   if (/^C[L]?\d{5,6}$/.test(placaLimpia) && !["TALLER", "TECNICOS"].includes(sedeUpper)) return "Cilindreros";
   return "Otros";
 }

@@ -5,12 +5,14 @@ const pool = require("../db");
 const {
   agregarTallerParaMecanico,
   esSedeGranel,
+  esSedeTransportadoraDetalle,
   esSedeTransporte,
   esUsuarioPesados,
   esUsuarioTodasSedes,
   expandirSedesEquivalentes,
+  obtenerTodasSedes,
   obtenerSedesTransporte,
-  TODAS_SEDES,
+  sedeCanonicaVisible,
   sedeGranelDesdeUsuario
 } = require("../utils/sedes");
 const { agregarFiltroPlacaSql } = require("../utils/placas");
@@ -117,7 +119,7 @@ async function obtenerSedesPermitidas(req) {
     if (req.session.sedeSeleccionada && req.session.sedeSeleccionada !== "TODAS") {
       return expandirSedesEquivalentes(req.session.sedeSeleccionada);
     }
-    return expandirSedesEquivalentes(TODAS_SEDES);
+    return expandirSedesEquivalentes(await obtenerTodasSedes(pool));
   }
 
   if (sedeGranelUsuario) {
@@ -259,7 +261,7 @@ function negocioLlanta(solicitud) {
   const placa = String(solicitud.placa || "").trim().toUpperCase();
 
   if (esSedeGranel(sede)) return "Granel";
-  if (sede.toUpperCase() === "TRANSPORTADORA" || /^S\d{5,6}$/.test(placa) || /^EE\d{5,6}$/.test(placa)) return "Transportadora";
+  if (sede.toUpperCase() === "TRANSPORTADORA" || esSedeTransportadoraDetalle(sede) || /^S\d{5,6}$/.test(placa) || /^EE\d{5,6}$/.test(placa)) return "Transportadora";
   if (["TALLER", "TECNICOS"].includes(sede.toUpperCase())) return "Otros";
   return "Cilindros";
 }
@@ -488,6 +490,7 @@ router.get("/", async (req, res) => {
     await ensureTables();
 
     const sedesPermitidas = await obtenerSedesPermitidas(req);
+    const sedesVisibles = [...new Set(sedesPermitidas.map(sedeCanonicaVisible).filter(Boolean))];
     const { sede, estado, placa } = req.query;
     const { where, params } = construirFiltrosSolicitudes(sedesPermitidas, { sede, estado, placa });
     const [solicitudes] = await pool.query(`
@@ -527,6 +530,7 @@ router.get("/", async (req, res) => {
       solicitudes,
       unidades,
       sedesPermitidas,
+      sedesVisibles,
       estados: ESTADOS,
       filtros: { sede, estado, placa },
       puedeGestionar: puedeGestionar(req.session.user),

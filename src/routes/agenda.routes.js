@@ -28,6 +28,25 @@ function siguienteDiaHabil(fechaBase) {
   return f.toISOString().slice(0, 10);
 }
 
+function sumarDias(fechaBase, dias) {
+  const f = new Date(`${fechaBase}T00:00:00`);
+  f.setDate(f.getDate() + dias);
+  return f.toISOString().slice(0, 10);
+}
+
+function lunesDeSemana(fechaBase = hoy()) {
+  const f = new Date(`${fechaBase}T00:00:00`);
+  const dia = f.getDay();
+  const diferencia = dia === 0 ? -6 : 1 - dia;
+  f.setDate(f.getDate() + diferencia);
+  return f.toISOString().slice(0, 10);
+}
+
+function fechaValida(value, fallback = hoy()) {
+  const fecha = String(value || "").trim();
+  return /^\d{4}-\d{2}-\d{2}$/.test(fecha) ? fecha : fallback;
+}
+
 // ================= SEDES =================
 
 async function obtenerSedesPermitidas(req) {
@@ -218,6 +237,79 @@ router.get("/manana", async (req, res) => {
     });
   } catch (err) {
     console.error("🔥 ERROR AGENDA MAÑANA:", err);
+    res.status(500).send("Error interno");
+  }
+});
+
+// =====================================================
+// AGENDA SEMANAL (preventivos + correctivos)
+// =====================================================
+router.get("/semana", async (req, res) => {
+  try {
+    if (!req.session.user) return res.redirect("/login");
+
+    const inicioSemana = lunesDeSemana(fechaValida(req.query.inicio, hoy()));
+    const finSemana = sumarDias(inicioSemana, 4);
+    const sedesPermitidas = await obtenerSedesPermitidas(req);
+    const sedeFiltro = obtenerSedeFiltro(req, sedesPermitidas);
+
+    let sql = `
+      SELECT
+        'PREVENTIVO' AS tipo_registro,
+        m.id AS id,
+        u.placa,
+        u.sede,
+        m.tipo AS subtipo,
+        m.estado,
+        m.plan AS descripcion,
+        m.fecha_programada AS fecha_orden,
+        DATE_FORMAT(m.fecha_programada, '%d/%m/%Y') AS fecha_mostrar
+      FROM mantenimientos m
+      JOIN unidades u ON u.id = m.unidad_id
+      WHERE m.fecha_programada BETWEEN ? AND ?
+        AND m.tipo = 'PREVENTIVO'
+    `;
+    const params = [inicioSemana, finSemana];
+
+    sql = aplicarFiltroSedesConsulta(sql, params, req, sedeFiltro, sedesPermitidas);
+
+    sql += `
+      UNION ALL
+      SELECT
+        'CORRECTIVO' AS tipo_registro,
+        c.id AS id,
+        u.placa,
+        u.sede,
+        NULL AS subtipo,
+        'REALIZADO' AS estado,
+        c.trabajo_realizado AS descripcion,
+        DATE(c.fecha) AS fecha_orden,
+        DATE_FORMAT(c.fecha, '%d/%m/%Y') AS fecha_mostrar
+      FROM correctivos c
+      JOIN unidades u ON u.id = c.unidad_id
+      WHERE DATE(c.fecha) BETWEEN ? AND ?
+    `;
+    params.push(inicioSemana, finSemana);
+
+    sql = aplicarFiltroSedesConsulta(sql, params, req, sedeFiltro, sedesPermitidas);
+
+    sql += " ORDER BY fecha_orden ASC, sede ASC, placa ASC";
+
+    const [agenda] = await pool.query(sql, params);
+
+    res.render("agenda", {
+      agenda,
+      fecha: inicioSemana,
+      fechaFin: finSemana,
+      semanaAnterior: sumarDias(inicioSemana, -7),
+      semanaSiguiente: sumarDias(inicioSemana, 7),
+      user: req.session.user,
+      vista: "semana",
+      sedeSeleccionada: sedeFiltro || "TODAS",
+      sedesPermitidas
+    });
+  } catch (err) {
+    console.error("🔥 ERROR AGENDA SEMANAL:", err);
     res.status(500).send("Error interno");
   }
 });

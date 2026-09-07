@@ -145,6 +145,10 @@ function semanaDefaultReporte() {
   return semanaInputValue(base);
 }
 
+function puedeElegirSemanaReporte(user) {
+  return ROLES_EDITAR.includes(user?.rol);
+}
+
 function agruparPorSede(reportes) {
   return Array.from(reportes.reduce((map, reporte) => {
     const sedeReporte = reporte.sede || "Sin sede";
@@ -481,6 +485,7 @@ router.get("/", allowRoles(...ROLES_VER), async (req, res) => {
       user: req.session.user,
       filtros: { sede, placa, importante, correctivo_id, semana },
       semanaDefault: semanaDefaultReporte(),
+      puedeElegirSemanaReporte: puedeElegirSemanaReporte(req.session.user),
       puedeCrear: ROLES_CREAR.includes(req.session.user.rol),
       puedeEditar: ROLES_EDITAR.includes(req.session.user.rol),
       renderReporteHtml,
@@ -633,7 +638,11 @@ router.post("/", allowRoles(...ROLES_CREAR), async (req, res) => {
       req.body.tipo_mantenimiento,
       detectarTipoMantenimiento(req.body.descripcion_original, { origen: "REPORTE" })
     );
-    const semanaReporte = lunesDesdeSemanaInput(req.body.semana_reporte) || lunesDesdeSemanaInput(semanaDefaultReporte());
+    const semanaActual = lunesDesdeSemanaInput(semanaDefaultReporte());
+    const semanaManual = lunesDesdeSemanaInput(req.body.semana_reporte);
+    const semanaReporte = puedeElegirSemanaReporte(req.session.user)
+      ? (semanaManual || semanaActual)
+      : semanaActual;
     if (!unidad_id || !String(descripcion_original || "").trim()) {
       req.session.error = "Debe seleccionar unidad y escribir el reporte.";
       return res.redirect("/reportes-supervisores");

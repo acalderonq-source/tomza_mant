@@ -6,6 +6,7 @@ const {
   esUsuarioPesados,
   esUsuarioTodasSedes,
   obtenerSedesTransporte,
+  sedeCanonicaVisible,
   sedeGranelDesdeUsuario
 } = require("../utils/sedes");
 
@@ -24,7 +25,8 @@ router.post("/cambiar-sede", async (req, res) => {
       return res.redirect("/login");
     }
 
-    const { sede } = req.body;
+    const sedeSolicitada = String(req.body.sede || "").trim();
+    const sede = sedeSolicitada === "TODAS" ? "TODAS" : (sedeCanonicaVisible(sedeSolicitada) || sedeSolicitada);
 
     const user = req.session.user;
 
@@ -84,7 +86,8 @@ router.post("/cambiar-sede", async (req, res) => {
       return res.redirect("/dashboard");
     }
 
-    if (!sedesPermitidas.includes(sede)) {
+    const sedesPermitidasVisibles = sedesPermitidas.map(sedeCanonicaVisible);
+    if (!sedesPermitidas.includes(sede) && !sedesPermitidasVisibles.includes(sede)) {
 
       return res
         .status(403)

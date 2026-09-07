@@ -3,6 +3,12 @@ const router = express.Router();
 const pool = require("../db");
 const { ensureNumeroMantenimientoColumn, asignarNumeroMantenimiento } = require("../utils/mantenimientosNumero");
 
+const SEDES_REPARTO_SEMANAL = new Set(["NICOYA", "RIO_CLARO"]);
+const CUPOS_PREVENTIVOS_POR_DIA = {
+  CARTAGO: 5,
+  LA_CRUZ: 2
+};
+
 // devuelve siguiente día hábil (sin sábado ni domingo)
 function siguienteDiaHabil(fecha) {
   const f = new Date(fecha);
@@ -12,22 +18,69 @@ function siguienteDiaHabil(fecha) {
   return f.toISOString().slice(0, 10);
 }
 
+function normalizarSedeAgenda(sede) {
+  return String(sede || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toUpperCase()
+    .replace(/\s+/g, "_")
+    .trim();
+}
+
+function esDiaHabil(fecha) {
+  const dia = new Date(fecha).getDay();
+  return dia !== 0 && dia !== 6;
+}
+
+function primerDiaHabil(fecha) {
+  return esDiaHabil(fecha) ? fecha : siguienteDiaHabil(fecha);
+}
+
+function obtenerDiasHabiles(fechaInicio, cantidad) {
+  const dias = [primerDiaHabil(fechaInicio)];
+  while (dias.length < cantidad) {
+    dias.push(siguienteDiaHabil(dias[dias.length - 1]));
+  }
+  return dias;
+}
+
+function fechaProgramadaPreventivo({ sede, indice, total, fechaInicio }) {
+  const sedeNormalizada = normalizarSedeAgenda(sede);
+
+  if (SEDES_REPARTO_SEMANAL.has(sedeNormalizada)) {
+    const diasSemana = obtenerDiasHabiles(fechaInicio, 5);
+    const cupoSemana = Math.max(1, Math.ceil(total / diasSemana.length));
+    const indiceDia = Math.min(diasSemana.length - 1, Math.floor(indice / cupoSemana));
+    return diasSemana[indiceDia];
+  }
+
+  const cupoDiario = CUPOS_PREVENTIVOS_POR_DIA[sedeNormalizada] || 1;
+  const saltoDias = Math.floor(indice / cupoDiario);
+  return obtenerDiasHabiles(fechaInicio, saltoDias + 1)[saltoDias];
+}
+
 router.post("/admin/regenerar-agenda", async (req, res) => {
   try {
     if (!req.session.user || req.session.user.rol !== "ADMIN") {
       return res.status(403).send("No autorizado");
     }
 
-    const sedeAdmin = req.session.user.sede || null;
+    const sedeSeleccionada = req.session.sedeSeleccionada && req.session.sedeSeleccionada !== "TODAS"
+      ? req.session.sedeSeleccionada
+      : null;
+    const sedeAdmin = req.session.user.sede && req.session.user.sede !== "TODAS"
+      ? req.session.user.sede
+      : null;
+    const sedeObjetivo = sedeSeleccionada || sedeAdmin;
 
     // 1) BORRAR SOLO PENDIENTES DE SU SEDE (o todos si es super admin)
-    if (sedeAdmin) {
+    if (sedeObjetivo) {
       await pool.query(`
         DELETE m FROM mantenimientos m
         JOIN unidades u ON u.id = m.unidad_id
         WHERE m.estado != 'CERRADO'
           AND u.sede = ?
-      `, [sedeAdmin]);
+      `, [sedeObjetivo]);
     } else {
       await pool.query(`
         DELETE FROM mantenimientos
@@ -35,84 +88,53 @@ router.post("/admin/regenerar-agenda", async (req, res) => {
       `);
     }
 
-    // 2) TRAER SOLO UNIDADES DE SU SEDE (o todas)
-    let whereSede = "";
-    let params = [];
-
-    if (sedeAdmin) {
-      whereSede = "AND sede = ?";
-      params.push(sedeAdmin);
+    let unidadesSql = `
+      SELECT id, sede
+      FROM unidades
+      WHERE sede IS NOT NULL
+        AND TRIM(sede) <> ''
+    `;
+    const unidadesParams = [];
+    if (sedeObjetivo) {
+      unidadesSql += " AND sede = ?";
+      unidadesParams.push(sedeObjetivo);
     }
-
-   // sede que se va a programar
-const sede =
-  req.session.sedeSeleccionada ||
-  req.session.user.sede;
-
-// obtener solo unidades de esa sede
-const [unidades] = await pool.query(
-  `
-  SELECT id, sede
-  FROM unidades
-  WHERE sede = ?
-  ORDER BY id
-  `,
-  [sede]
-);
-
+    unidadesSql += " ORDER BY sede, id";
+    const [unidades] = await pool.query(unidadesSql, unidadesParams);
 
     // fecha inicio = hoy CR
     const hoy = new Date();
     hoy.setHours(hoy.getHours() - 6);
     const fechaInicio = hoy.toISOString().slice(0, 10);
 
-    // fechas independientes por sede
-    let fechaCartago = fechaInicio;
-    let fechaLaCruz  = fechaInicio;
-
-    let contCartago = 0;
-    let contLaCruz  = 0;
-
     await ensureNumeroMantenimientoColumn(pool);
 
-    for (const unidad of unidades) {
-      let fechaProgramada;
+    const unidadesPorSede = unidades.reduce((acc, unidad) => {
+      const sede = unidad.sede || "Sin sede";
+      if (!acc.has(sede)) acc.set(sede, []);
+      acc.get(sede).push(unidad);
+      return acc;
+    }, new Map());
 
-      if (unidad.sede === "Cartago") {
-        // 5 por día
-        fechaProgramada = fechaCartago;
-        contCartago++;
+    for (const [sede, unidadesSede] of unidadesPorSede.entries()) {
+      for (const [indice, unidad] of unidadesSede.entries()) {
+        const fechaProgramada = fechaProgramadaPreventivo({
+          sede,
+          indice,
+          total: unidadesSede.length,
+          fechaInicio
+        });
 
-        if (contCartago === 5) {
-          fechaCartago = siguienteDiaHabil(fechaCartago);
-          contCartago = 0;
-        }
-
-      } else if (unidad.sede === "La Cruz") {
-        // 2 por día
-        fechaProgramada = fechaLaCruz;
-        contLaCruz++;
-
-        if (contLaCruz === 2) {
-          fechaLaCruz = siguienteDiaHabil(fechaLaCruz);
-          contLaCruz = 0;
-        }
-
-      } else {
-        // otras sedes: 1 por día
-        fechaProgramada = fechaCartago;
-        fechaCartago = siguienteDiaHabil(fechaCartago);
+        const [result] = await pool.query(`
+          INSERT INTO mantenimientos
+            (unidad_id, sede, tipo, estado, prioridad, fecha_programada)
+          VALUES (?, ?, 'PREVENTIVO', 'PROGRAMADO', 'MEDIA', ?)
+        `, [unidad.id, sede, fechaProgramada]);
+        await asignarNumeroMantenimiento(pool, result.insertId);
       }
-
-      const [result] = await pool.query(`
-        INSERT INTO mantenimientos
-          (unidad_id, tipo, estado, prioridad, fecha_programada)
-        VALUES (?, 'PREVENTIVO', 'PROGRAMADO', 'MEDIA', ?)
-      `, [unidad.id, fechaProgramada]);
-      await asignarNumeroMantenimiento(pool, result.insertId);
     }
 
-    res.redirect("/agenda");
+    res.redirect("/agenda/semana");
 
   } catch (error) {
     console.error("❌ Error regenerando agenda:", error);

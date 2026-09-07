@@ -77,6 +77,7 @@
     if (filtros.semana) excelGeneralParams.push(`semana=${encodeURIComponent(filtros.semana)}`);
     const excelGeneralUrl = `/reportes-supervisores/reporte/excel${excelGeneralParams.length ? `?${excelGeneralParams.join('&')}` : ''}`;
     const semanaNueva = semanaDefault || filtros.semana || '';
+    const puedeCambiarSemanaReporte = typeof puedeElegirSemanaReporte !== 'undefined' ? puedeElegirSemanaReporte : puedeEditar;
   %>
   <div class="page-heading">
     <div>
@@ -105,11 +106,20 @@
             <div data-placa-selected></div>
           </div>
         </div>
-        <div class="col-lg-3">
-          <label class="form-label">Semana del reporte</label>
-          <input type="week" name="semana_reporte" class="form-control" value="<%= semanaNueva %>" required>
-          <div class="form-text">Si se sube viernes, por defecto queda para la semana siguiente.</div>
-        </div>
+        <% if (puedeCambiarSemanaReporte) { %>
+          <div class="col-lg-3">
+            <label class="form-label">Semana del reporte</label>
+            <input type="week" name="semana_reporte" class="form-control" value="<%= semanaNueva %>" required>
+            <div class="form-text">Si se sube viernes, por defecto queda para la semana siguiente.</div>
+          </div>
+        <% } else { %>
+          <div class="col-lg-3">
+            <label class="form-label">Semana del reporte</label>
+            <input type="hidden" name="semana_reporte" value="<%= semanaNueva %>">
+            <div class="form-control bg-light"><%= semanaNueva || 'Semana actual' %></div>
+            <div class="form-text">Los supervisores siempre registran en la semana actual de trabajo.</div>
+          </div>
+        <% } %>
         <div class="col-lg-2">
           <label class="form-label">Tipo</label>
           <select name="tipo_mantenimiento" class="form-select" required>

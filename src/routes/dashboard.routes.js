@@ -5,6 +5,7 @@ const {
   agregarTallerParaMecanico,
   expandirSedesEquivalentes,
   etiquetaSede: etiquetaSedeTomza,
+  esSedeTransportadoraDetalle,
   esUsuarioPesados,
   esUsuarioTodasSedes,
   obtenerTodasSedes,
@@ -535,8 +536,9 @@ function clasificarNegocioGasto(item) {
     item.proveedor,
     item.sede
   ].filter(Boolean).join(" "));
-  const esDetalleTransportadora = ["cabezales", "cisternas", "carretas", "tandem", "tamden"]
-    .some(valor => sedeNormalizada.includes(valor));
+  const esDetalleTransportadora = esSedeTransportadoraDetalle(item.sede) ||
+    ["cabezales", "cisternas", "carretas", "tandem", "tamden"]
+      .some(valor => sedeNormalizada.includes(valor));
   const textoTransportadora = contienePalabras(texto, [
     "transportadora", "cabezal", "cabezales", "cisterna", "cisternas", "carreta", "carretas",
     "freightliner", "cascadia", "columbia", "century", "andrea rv", "ortega y rojas",

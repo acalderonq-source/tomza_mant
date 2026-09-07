@@ -148,11 +148,18 @@ function esSedeGranelCartago(sede) {
   return SEDES_GRANEL_CARTAGO_EQUIVALENTES.some(valor => normalizarSede(valor) === sedeNormalizada);
 }
 
+function esSedeTransportadoraDetalle(sede) {
+  const sedeNormalizada = normalizarSede(sede);
+  return SEDES_TRANSPORTADORA_DETALLE.some(valor => normalizarSede(valor) === sedeNormalizada) ||
+    sedeNormalizada === "TAMDEN";
+}
+
 function expandirSedeEquivalente(sede) {
   const sedeLimpia = limpiarSede(sede);
   if (!sedeLimpia) return [];
   const sedeNormalizada = normalizarSede(sedeLimpia);
   if (sedeNormalizada === "TRANSPORTADORA") return ["Transportadora", ...SEDES_TRANSPORTADORA_DETALLE];
+  if (esSedeTransportadoraDetalle(sedeLimpia)) return ["Transportadora", ...SEDES_TRANSPORTADORA_DETALLE];
   if (sedeNormalizada === "TANDEM" || sedeNormalizada === "TAMDEN") return ["Tandem", "Tándem"];
   if (esSedeGranelCartago(sedeLimpia)) return SEDES_GRANEL_CARTAGO_EQUIVALENTES;
   return [sedeLimpia];
@@ -212,6 +219,7 @@ function unirSedes(...listas) {
 function sedeCanonicaVisible(sede) {
   const sedeLimpia = limpiarSede(sede);
   if (!sedeLimpia) return "";
+  if (esSedeTransportadoraDetalle(sedeLimpia)) return "Transportadora";
   if (esSedeGranelCartago(sedeLimpia)) return "granel_cartago";
 
   const sedeNormalizada = normalizarSede(sedeLimpia);
@@ -313,7 +321,7 @@ function getSedesPermitidas(req) {
       req.session.sedeSeleccionada !== "TODAS"
     ) {
 
-      sedes = [req.session.sedeSeleccionada];
+      sedes = [sedeCanonicaVisible(req.session.sedeSeleccionada)];
 
     } else {
 
@@ -345,7 +353,7 @@ function getSedesPermitidas(req) {
       esSedeTransporte(req.session.sedeSeleccionada)
     ) {
 
-      sedes = [req.session.sedeSeleccionada];
+      sedes = [sedeCanonicaVisible(req.session.sedeSeleccionada)];
 
     } else {
 
@@ -380,6 +388,7 @@ module.exports = {
   etiquetaSedeOperativa,
   esSedeGranelCartago,
   esSedeGranel,
+  esSedeTransportadoraDetalle,
   esSedeTransporte,
   clasificarSubgrupoTransportadora,
   expandirSedeEquivalente,
@@ -387,6 +396,7 @@ module.exports = {
   expandirSedeOperativaRepuestosAceites,
   expandirSedesOperativasRepuestosAceites,
   sedeOperativaRepuestosAceites,
+  sedeCanonicaVisible,
   sedesOperativasVisibles,
   esUsuarioMecanico,
   esUsuarioProveeduria,

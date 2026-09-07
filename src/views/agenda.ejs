@@ -58,6 +58,11 @@
   <a href="/logout" class="btn btn-warning btn-sm">Salir</a>
 </nav>
 
+<%
+  const esSemana = vista === "semana";
+  const formatoFechaAgenda = (value) => String(value || "").split("-").reverse().join("/");
+%>
+
 <div class="container mt-4">
 
   <!-- Selector de sede -->
@@ -79,15 +84,26 @@
   </div>
 
   <h4 class="text-warning mb-3">
-    Agenda – <%= fecha.split("-").reverse().join("/") %>
+    <% if (esSemana) { %>
+      Agenda semanal – <%= formatoFechaAgenda(fecha) %> al <%= formatoFechaAgenda(fechaFin) %>
+    <% } else { %>
+      Agenda – <%= formatoFechaAgenda(fecha) %>
+    <% } %>
     <% if (vista === "hoy") { %>
       <span class="badge bg-success ms-2">HOY</span>
+    <% } else if (esSemana) { %>
+      <span class="badge bg-primary ms-2">SEMANA</span>
     <% } %>
   </h4>
 
-  <div class="mb-3">
-    <a href="/agenda" class="btn btn-outline-warning btn-sm me-2">Hoy</a>
-    <a href="/agenda/manana" class="btn btn-outline-warning btn-sm">Mañana</a>
+  <div class="mb-3 d-flex flex-wrap gap-2">
+    <a href="/agenda" class="btn <%= vista === 'hoy' ? 'btn-warning' : 'btn-outline-warning' %> btn-sm">Hoy</a>
+    <a href="/agenda/manana" class="btn <%= vista === 'manana' ? 'btn-warning' : 'btn-outline-warning' %> btn-sm">Mañana</a>
+    <a href="/agenda/semana" class="btn <%= esSemana ? 'btn-warning' : 'btn-outline-warning' %> btn-sm">Semana</a>
+    <% if (esSemana) { %>
+      <a href="/agenda/semana?inicio=<%= semanaAnterior %>" class="btn btn-outline-light btn-sm">Semana anterior</a>
+      <a href="/agenda/semana?inicio=<%= semanaSiguiente %>" class="btn btn-outline-light btn-sm">Semana siguiente</a>
+    <% } %>
   </div>
 
   <!-- Botón nuevo mantenimiento preventivo -->
@@ -103,6 +119,9 @@
     <table class="table table-light align-middle rounded overflow-hidden">
       <thead class="table-dark">
         <tr>
+          <% if (esSemana) { %>
+            <th>Fecha</th>
+          <% } %>
           <th>Placa</th>
           <th>Tipo</th>
           <th>Descripción / Plan</th>
@@ -114,6 +133,9 @@
       <tbody>
         <% agenda.forEach(item => { %>
           <tr>
+            <% if (esSemana) { %>
+              <td data-label="Fecha"><strong><%= item.fecha_mostrar || '—' %></strong></td>
+            <% } %>
             <td data-label="Placa"><strong><%= item.placa %></strong></td>
             <td data-label="Tipo">
               <span class="badge bg-info">
@@ -140,7 +162,7 @@
           </tr>
         <% }) %>
         <% if (agenda.length === 0) { %>
-          <tr><td colspan="6" class="text-center text-muted">No hay registros para esta fecha y sede</td></tr>
+          <tr><td colspan="<%= esSemana ? 7 : 6 %>" class="text-center text-muted">No hay registros para esta fecha y sede</td></tr>
         <% } %>
       </tbody>
     </table>

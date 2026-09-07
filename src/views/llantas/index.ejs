@@ -437,7 +437,7 @@
         <label class="form-label small">Sede</label>
         <select name="sede" class="form-select form-select-sm">
           <option value="">Todas permitidas</option>
-          <% sedesPermitidas.forEach(sede => { %>
+          <% (typeof sedesVisibles !== 'undefined' ? sedesVisibles : sedesPermitidas).forEach(sede => { %>
             <option value="<%= sede %>" <%= filtros.sede === sede ? 'selected' : '' %>><%= sede %></option>
           <% }) %>
         </select>
