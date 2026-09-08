@@ -576,6 +576,12 @@
           <div><div class="module-title">Bodega taller</div><p class="module-copy">Inventario, entregas, entradas y herramientas.</p></div>
         </a>
       <% } %>
+      <% if (puedeVerAceite && !puedeVerOperaciones) { %>
+        <a href="/aceite" class="module-card">
+          <span class="module-icon icon-amber"><i class="bi bi-droplet-half"></i></span>
+          <div><div class="module-title">Aceite</div><p class="module-copy">Estañones, galones por sede y cambios.</p></div>
+        </a>
+      <% } %>
       <% if (puedeVerRepuestos && !puedeVerOperaciones) { %>
         <a href="/repuestos" class="module-card">
           <span class="module-icon icon-amber"><i class="bi bi-box-seam"></i></span>
