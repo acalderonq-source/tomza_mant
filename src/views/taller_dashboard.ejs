@@ -658,11 +658,14 @@
                               data-bs-target="#editarPrioridadModal<%= p.id %>">
                               <i class="bi bi-pencil"></i>
                             </button>
-                            <form method="POST" action="/taller/prioridades/<%= p.id %>/atendida">
-                              <button class="btn btn-sm btn-success py-0 px-2" title="Marcar salida de taller" onclick="return confirm('¿Marcar que esta unidad ya salió de taller?')">
-                                <i class="bi bi-check"></i>
-                              </button>
-                            </form>
+                            <button
+                              type="button"
+                              class="btn btn-sm btn-success py-0 px-2"
+                              title="Marcar salida de taller"
+                              data-bs-toggle="modal"
+                              data-bs-target="#salidaPrioridadModal<%= p.id %>">
+                              <i class="bi bi-check"></i>
+                            </button>
                           </div>
                         <% } %>
                       </article>
@@ -706,11 +709,14 @@
                               data-bs-target="#editarPrioridadModal<%= p.id %>">
                               <i class="bi bi-pencil"></i>
                             </button>
-                            <form method="POST" action="/taller/prioridades/<%= p.id %>/atendida">
-                              <button class="btn btn-sm btn-success py-0 px-2" title="Marcar salida de taller" onclick="return confirm('¿Marcar que esta unidad ya salió de taller?')">
-                                <i class="bi bi-check"></i>
-                              </button>
-                            </form>
+                            <button
+                              type="button"
+                              class="btn btn-sm btn-success py-0 px-2"
+                              title="Marcar salida de taller"
+                              data-bs-toggle="modal"
+                              data-bs-target="#salidaPrioridadModal<%= p.id %>">
+                              <i class="bi bi-check"></i>
+                            </button>
                           </div>
                         <% } %>
                       </article>
@@ -767,9 +773,10 @@
 
 <% if (puedeEditarPrioridades) { %>
   <%
-    const prioridadesEdicion = Array.from(
+  const prioridadesEdicion = Array.from(
       new Map(prioridadesVisiblesLista.map(p => [String(p.id), p])).values()
     );
+    const fechaSalidaModal = typeof fechaSalidaDefault !== 'undefined' && fechaSalidaDefault ? fechaSalidaDefault : '';
   %>
   <div class="modal fade priority-modal" id="agregarPrioridadModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
@@ -835,6 +842,33 @@
             <div class="modal-footer">
               <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
               <button class="btn btn-danger"><i class="bi bi-save"></i> Guardar cambios</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal fade priority-modal" id="salidaPrioridadModal<%= p.id %>" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <form method="POST" action="/taller/prioridades/<%= p.id %>/atendida">
+            <div class="modal-header">
+              <div>
+                <h5 class="modal-title fw-bold mb-0"><i class="bi bi-check-circle me-1"></i> Salida de taller</h5>
+                <div class="small opacity-75"><%= p.placa %> · <%= p.sede || 'Sin sede' %></div>
+              </div>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body">
+              <label class="form-label fw-bold">Fecha y hora en que salió</label>
+              <input type="datetime-local" name="fecha_salida" class="form-control" value="<%= fechaSalidaModal %>" required>
+              <div class="form-text">Esta fecha queda guardada en el historial de prioridades.</div>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+              <button class="btn btn-success" onclick="return confirm('¿Marcar que esta unidad ya salió de taller?')">
+                <i class="bi bi-check"></i> Confirmar salida
+              </button>
             </div>
           </form>
         </div>

@@ -14,7 +14,8 @@ const SEDES_TRANSPORTADORA_DETALLE = [
   "Gruas",
   "Grúas",
   "Tandem",
-  "Tándem"
+  "Tándem",
+  "Tamden"
 ];
 
 const SEDES_TRANSPORTE = ["Transportadora", ...SEDES_TRANSPORTADORA_DETALLE, ...SEDES_GRANEL];

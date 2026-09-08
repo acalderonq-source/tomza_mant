@@ -97,6 +97,11 @@
     const detallesReporte = reporte => Array.isArray(reporte.reportes_detalle) && reporte.reportes_detalle.length
       ? reporte.reportes_detalle
       : [reporte];
+    const fechaHoraReporte = value => {
+      if (!value) return '-';
+      const date = new Date(value);
+      return Number.isNaN(date.getTime()) ? '-' : date.toLocaleString('es-CR');
+    };
   %>
   <div class="page-heading">
     <div>
@@ -236,6 +241,10 @@
                   <td class="placa-cell">
                     <%= r.placa %>
                     <div class="meta"><%= r.tipo_mantenimiento || 'CORRECTIVO' %></div>
+                    <div class="meta">
+                      <%= Number(r.cantidad_reportes || 1) > 1 ? 'Último reporte' : 'Reportado' %>:
+                      <%= fechaHoraReporte(r.fecha_reporte) %>
+                    </div>
                     <% if (Number(r.cantidad_reportes || 1) > 1) { %>
                       <span class="report-count-badge"><%= Number(r.cantidad_reportes).toLocaleString('es-CR') %> reportes</span>
                     <% } %>

@@ -40,6 +40,41 @@ function fechaCostaRica(offsetDays = 0) {
   }).format(date);
 }
 
+function fechaHoraCostaRicaInput() {
+  const partes = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Costa_Rica",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23"
+  }).formatToParts(new Date());
+  const valor = tipo => partes.find(parte => parte.type === tipo)?.value || "00";
+  return `${valor("year")}-${valor("month")}-${valor("day")}T${valor("hour")}:${valor("minute")}`;
+}
+
+function normalizarFechaHoraSalida(value) {
+  const texto = String(value || "").trim();
+  const match = texto.match(/^(\d{4})-(\d{2})-(\d{2})[T\s](\d{2}):(\d{2})(?::(\d{2}))?$/);
+  if (!match) return null;
+
+  const [, year, month, day, hour, minute, second = "00"] = match;
+  const fecha = new Date(Number(year), Number(month) - 1, Number(day), Number(hour), Number(minute), Number(second));
+  if (
+    Number.isNaN(fecha.getTime()) ||
+    fecha.getFullYear() !== Number(year) ||
+    fecha.getMonth() !== Number(month) - 1 ||
+    fecha.getDate() !== Number(day) ||
+    fecha.getHours() !== Number(hour) ||
+    fecha.getMinutes() !== Number(minute)
+  ) {
+    return null;
+  }
+
+  return `${year}-${month}-${day} ${hour}:${minute}:${second}`;
+}
+
 function puedeVerTaller(user) {
   return ROLES_VER_TALLER.includes(user.rol) || esUsuarioMecanico(user);
 }
@@ -869,6 +904,7 @@ router.get("/dashboard", async (req, res) => {
       etiquetaEstadoRepuesto,
       fechaPrioridadHoy,
       fechaPrioridadDefault,
+      fechaSalidaDefault: fechaHoraCostaRicaInput(),
       sedeSeleccionada: sedesPermitidas.length > 1 && sedesPermitidas.some(sede => SEDES_TRANSPORTE.includes(sede))
         ? "Transportadora + Granel"
         : req.session.sedeSeleccionada || "TODAS",
@@ -1158,10 +1194,10 @@ router.post("/prioridades/:id/atendida", async (req, res) => {
       `UPDATE taller_prioridades
        SET estado = 'ATENDIDA',
            atendido_por = ?,
-           atendido_en = NOW()
+           atendido_en = COALESCE(?, NOW())
        WHERE id = ?
          AND estado = 'PENDIENTE'`,
-      [req.session.user.id, id]
+      [req.session.user.id, normalizarFechaHoraSalida(req.body.fecha_salida), id]
     );
 
     req.session[result.affectedRows ? "success" : "error"] = result.affectedRows

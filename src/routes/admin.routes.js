@@ -3,10 +3,13 @@ const router = express.Router();
 const pool = require("../db");
 const { ensureNumeroMantenimientoColumn, asignarNumeroMantenimiento } = require("../utils/mantenimientosNumero");
 
-const SEDES_REPARTO_SEMANAL = new Set(["NICOYA", "RIO_CLARO"]);
 const CUPOS_PREVENTIVOS_POR_DIA = {
   CARTAGO: 5,
-  LA_CRUZ: 2
+  GUAPILES: 2,
+  LA_CRUZ: 2,
+  PEREZ_ZELEDON: 2,
+  RIO_CLARO: 2,
+  NICOYA: 2
 };
 
 // devuelve siguiente día hábil (sin sábado ni domingo)
@@ -46,13 +49,6 @@ function obtenerDiasHabiles(fechaInicio, cantidad) {
 
 function fechaProgramadaPreventivo({ sede, indice, total, fechaInicio }) {
   const sedeNormalizada = normalizarSedeAgenda(sede);
-
-  if (SEDES_REPARTO_SEMANAL.has(sedeNormalizada)) {
-    const diasSemana = obtenerDiasHabiles(fechaInicio, 5);
-    const cupoSemana = Math.max(1, Math.ceil(total / diasSemana.length));
-    const indiceDia = Math.min(diasSemana.length - 1, Math.floor(indice / cupoSemana));
-    return diasSemana[indiceDia];
-  }
 
   const cupoDiario = CUPOS_PREVENTIVOS_POR_DIA[sedeNormalizada] || 1;
   const saltoDias = Math.floor(indice / cupoDiario);

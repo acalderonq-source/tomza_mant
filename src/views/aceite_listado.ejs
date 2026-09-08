@@ -351,6 +351,7 @@
 <%
   const factorGalon = Number(galonALitros || 3.78541);
   const formatoGalones = value => Number(value || 0).toLocaleString('es-CR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const etiquetaInventario = typeof etiquetaSedeInventario === 'function' ? etiquetaSedeInventario : etiquetaSede;
   const moneda = value => `₡${Number(value || 0).toLocaleString('es-CR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
   const litrosAGalones = value => Number(value || 0) / factorGalon;
   const porcentajeEstanon = item => {
@@ -512,7 +513,7 @@
             <div>
               <div class="d-flex justify-content-between gap-2">
                 <div>
-                  <div class="drum-title"><%= etiquetaSede(item.sede) %></div>
+                  <div class="drum-title"><%= etiquetaInventario(item.sede) %></div>
                   <div class="small muted"><%= item.descripcion || 'Estañón de aceite' %></div>
                   <div class="small fw-bold mt-1">
                     <%= moneda(item.monto_total) %>
@@ -692,7 +693,7 @@
                 <tr>
                   <td><%= m.fecha_formato %></td>
                   <td><span class="badge-soft <%= m.tipo === 'ENTRADA' ? 'badge-entrada' : 'badge-salida' %>"><%= m.tipo %></span></td>
-                  <td><%= etiquetaSede(m.sede) %></td>
+                  <td><%= etiquetaInventario(m.sede) %></td>
                   <td><strong><%= m.placa || '' %></strong><div class="small muted"><%= m.descripcion || '—' %></div></td>
                   <td><strong><%= formatoGalones(litrosAGalones(m.litros)) %> gal</strong></td>
                 </tr>

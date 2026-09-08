@@ -41,7 +41,9 @@ const CONFIG = {
   Cartago: 5,
   Guapiles: 2,
   "La Cruz": 2,
-  "Perez Zeledon": 2
+  "Perez Zeledon": 2,
+  "Rio Claro": 2,
+  Nicoya: 2
 };
 
 /* ================== SCRIPT ================== */

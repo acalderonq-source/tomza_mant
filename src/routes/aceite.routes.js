@@ -7,6 +7,7 @@ const {
   expandirSedesOperativasRepuestosAceites,
   getSedesPermitidas,
   obtenerTodasSedes,
+  SEDES_TRANSPORTADORA_DETALLE,
   sedeOperativaRepuestosAceites,
   sedesOperativasVisibles
 } = require("../utils/sedes");
@@ -127,13 +128,25 @@ function claveSedeAceite(sede) {
     .replace(/[^A-Z0-9]/g, "");
 }
 
+const SEDES_ACEITE_TRANSPORTADORA = ["Transportadora", ...SEDES_TRANSPORTADORA_DETALLE];
+
+function esSedeAceiteTransportadora(sede) {
+  const clave = claveSedeAceite(sede);
+  return SEDES_ACEITE_TRANSPORTADORA.some(valor => claveSedeAceite(valor) === clave) ||
+    clave === "TAMDEN";
+}
+
 function sedeInventarioAceite(sede) {
   const operativa = sedeOperativaRepuestosAceites(sede);
+  if (esSedeAceiteTransportadora(operativa)) return "Transportadora";
   return claveSedeAceite(operativa) === "SANCARLOS" ? "Guapiles" : operativa;
 }
 
 function expandirSedeInventarioAceite(sede) {
   const inventario = sedeInventarioAceite(sede);
+  if (esSedeAceiteTransportadora(inventario)) {
+    return unirSedesAceite(SEDES_ACEITE_TRANSPORTADORA, ["Tamden"]);
+  }
   const sedes = expandirSedeOperativaRepuestosAceites(inventario);
   if (claveSedeAceite(inventario) === "GUAPILES") {
     return unirSedesAceite(sedes, ["San Carlos"]);
@@ -142,6 +155,9 @@ function expandirSedeInventarioAceite(sede) {
 }
 
 function etiquetaSedeInventarioAceite(sede) {
+  if (esSedeAceiteTransportadora(sede)) {
+    return "Transportadora";
+  }
   return claveSedeAceite(sedeInventarioAceite(sede)) === "GUAPILES"
     ? "Guapiles / San Carlos"
     : etiquetaSedeOperativa(sede);
@@ -704,6 +720,7 @@ router.get("/", async (req, res) => {
       fechaHoy: fechaCostaRica(),
       puedeGestionar: puedeGestionarAceite(req.session.user),
       etiquetaSede: etiquetaSedeOperativa,
+      etiquetaSedeInventario: etiquetaSedeInventarioAceite,
       success,
       error,
       user: req.session.user
