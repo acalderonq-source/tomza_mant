@@ -12,7 +12,7 @@ const {
   sedesOperativasVisibles
 } = require("../utils/sedes");
 
-const ROLES_GESTION_ACEITE = ["ADMIN", "TALLER", "MECANICO"];
+const ROLES_GESTION_ACEITE = ["ADMIN", "TALLER", "MECANICO", "BODEGA", "BODEGUERO"];
 const CAPACIDAD_ESTANON_GALONES = 55;
 const GALON_A_LITROS = 3.78541;
 const CAPACIDAD_ESTANON_LITROS = CAPACIDAD_ESTANON_GALONES * GALON_A_LITROS;
@@ -64,6 +64,10 @@ function sedesAceitePorUsuario(user) {
 
 async function getSedesPermitidasAceite(req) {
   const user = req.session.user || {};
+  if (["BODEGA", "BODEGUERO"].includes(user.rol)) {
+    return expandirSedesOperativasRepuestosAceites(await obtenerTodasSedes(pool));
+  }
+
   const sedesUsuario = sedesAceitePorUsuario(user);
   if (sedesUsuario.length) {
     return expandirSedesOperativasRepuestosAceites(sedesUsuario);

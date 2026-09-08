@@ -304,7 +304,7 @@
   const puedeVerCompras = !esMecanicoLimitado && ['ADMIN', 'TALLER', 'PROVEEDURIA_TALLER', 'CONTABILIDAD'].includes(user.rol);
   const puedeVerOperaciones = user.rol !== 'CONTABILIDAD' && !esMensajeroDashboard && !esBodegaDashboard;
   const puedeVerReportesSupervisores = !esMecanicoLimitado && ['ADMIN', 'TALLER', 'MECANICO', 'SUPERVISOR', 'SUPERVISOR_PESADO'].includes(user.rol);
-  const puedeVerAceite = esMecanicoLimitado || ['ADMIN', 'MECANICO'].includes(user.rol)
+  const puedeVerAceite = esMecanicoLimitado || ['ADMIN', 'MECANICO', 'BODEGA', 'BODEGUERO'].includes(user.rol)
     || usuarioDashboardLower === 'supervisor_rio_claro';
   const puedeVerAires = !esMecanicoLimitado && ['ADMIN', 'TALLER', 'MECANICO'].includes(user.rol);
   const puedeVerRevisionRuta = esMecanicoLimitado || ['ADMIN', 'TALLER', 'MECANICO', 'SUPERVISOR', 'SUPERVISOR_PESADO'].includes(user.rol);
