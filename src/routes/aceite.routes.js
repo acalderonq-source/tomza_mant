@@ -299,7 +299,7 @@ function puedeUsarSede(sede, sedesPermitidas) {
   return sedesPermitidas.length === 0 || sedesPermitidas.includes(sedeOperativaRepuestosAceites(sede));
 }
 
-async function consumirAceitePorSede(connection, { sede, litros, cambioAceiteId, unidadId, placa, userId }) {
+async function consumirAceitePorSede(connection, { sede, litros, cambioAceiteId = null, unidadId, placa, userId, descripcion = null }) {
   const sedeInventario = sedeInventarioAceite(sede);
   const sedesBusqueda = expandirSedeInventarioAceite(sede);
   const [estanones] = await connection.query(
@@ -342,7 +342,7 @@ async function consumirAceitePorSede(connection, { sede, litros, cambioAceiteId,
         cambioAceiteId,
         sedeInventario,
         consumo,
-        `Cambio de aceite ${placa}`,
+        descripcion || `Cambio de aceite ${placa}`,
         unidadId,
         placa,
         userId
@@ -902,6 +902,62 @@ router.post("/estanones/:id/costo", async (req, res) => {
     console.error("ERROR actualizando costo de estañón:", error);
     req.session.error = "No se pudo actualizar el costo del estañón.";
     res.redirect("/aceite");
+  }
+});
+
+router.post("/rellenos", async (req, res) => {
+  const connection = await pool.getConnection();
+  try {
+    if (!puedeGestionarAceite(req.session.user)) {
+      return res.status(403).send("No autorizado");
+    }
+
+    await ensureAceiteTables();
+    const { unidad_id, observaciones } = req.body;
+    const galonesUsados = parseMonto(req.body.galones_usados || req.body.galones || req.body.litros_usados);
+    const litrosUsados = galonesALitros(galonesUsados);
+    const sedesPermitidas = await getSedesPermitidasAceite(req);
+
+    if (!unidad_id || galonesUsados <= 0) {
+      req.session.error = "Seleccione la placa y coloque los galones usados para el relleno.";
+      return res.redirect("/aceite");
+    }
+
+    const [[unidad]] = await pool.query(
+      "SELECT id, placa, sede FROM unidades WHERE id = ?",
+      [unidad_id]
+    );
+
+    if (!unidad || !puedeUsarSede(unidad.sede, sedesPermitidas)) {
+      return res.status(403).send("No autorizado para esa unidad");
+    }
+
+    const detalle = String(observaciones || "").trim();
+    const descripcion = detalle
+      ? `Relleno de aceite ${unidad.placa} - ${detalle.slice(0, 180)}`
+      : `Relleno de aceite ${unidad.placa}`;
+
+    await connection.beginTransaction();
+    await consumirAceitePorSede(connection, {
+      sede: sedeOperativaRepuestosAceites(unidad.sede),
+      litros: litrosUsados,
+      cambioAceiteId: null,
+      unidadId: unidad.id,
+      placa: unidad.placa,
+      userId: req.session.user.id || null,
+      descripcion
+    });
+    await connection.commit();
+
+    req.session.success = `Relleno registrado para ${unidad.placa}. Se rebajaron ${galonesUsados.toFixed(2)} galones de ${etiquetaSedeInventarioAceite(unidad.sede)} sin crear cambio de aceite.`;
+    res.redirect("/aceite");
+  } catch (error) {
+    await connection.rollback().catch(() => {});
+    console.error("ERROR guardar relleno de aceite:", error);
+    req.session.error = error.message || "Error interno al guardar el relleno de aceite.";
+    res.redirect("/aceite");
+  } finally {
+    connection.release();
   }
 });
 
