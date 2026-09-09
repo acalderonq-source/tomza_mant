@@ -265,6 +265,10 @@ function esUsuarioPesados(user) {
     usuario.includes("pesado");
 }
 
+function esUsuarioBodega(user) {
+  return ["BODEGA", "BODEGUERO"].includes(user?.rol);
+}
+
 function esUsuarioTodasSedes(user) {
   return ["ADMIN", "TALLER", "TRAMITES"].includes(user?.rol) || esUsuarioProveeduria(user);
 }
@@ -315,7 +319,11 @@ function getSedesPermitidas(req) {
   const sedeGranelUsuario = sedeGranelDesdeUsuario(user);
   let sedes = [];
 
-  if (esUsuarioTodasSedes(user)) {
+  if (esUsuarioBodega(user)) {
+
+    sedes = TODAS_SEDES;
+
+  } else if (esUsuarioTodasSedes(user)) {
 
     if (
       req.session.sedeSeleccionada &&
@@ -402,6 +410,7 @@ module.exports = {
   esUsuarioMecanico,
   esUsuarioProveeduria,
   esUsuarioPesados,
+  esUsuarioBodega,
   esUsuarioTodasSedes,
   sedesEspecialesPorUsuario,
   sedeGranelDesdeUsuario,

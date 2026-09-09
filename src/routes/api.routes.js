@@ -23,6 +23,10 @@ function requireAuth(req, res, next) {
 async function sedesPermitidasUsuario(req) {
   const user = req.session.user;
 
+  if (["BODEGA", "BODEGUERO"].includes(user?.rol)) {
+    return [];
+  }
+
   if (esUsuarioTodasSedes(user)) {
     if (req.session.sedeSeleccionada && req.session.sedeSeleccionada !== "TODAS") {
       return expandirSedesEquivalentes(req.session.sedeSeleccionada);
