@@ -8,6 +8,7 @@ const {
   getSedesPermitidas,
   obtenerTodasSedes,
   SEDES_TRANSPORTADORA_DETALLE,
+  TODAS_SEDES,
   sedeOperativaRepuestosAceites,
   sedesOperativasVisibles
 } = require("../utils/sedes");
@@ -65,7 +66,20 @@ function sedesAceitePorUsuario(user) {
 async function getSedesPermitidasAceite(req) {
   const user = req.session.user || {};
   if (["BODEGA", "BODEGUERO"].includes(user.rol)) {
-    return expandirSedesOperativasRepuestosAceites(await obtenerTodasSedes(pool));
+    const [sedesDb] = await pool.query(`
+      SELECT DISTINCT sede FROM unidades WHERE sede IS NOT NULL AND TRIM(sede) <> ''
+      UNION
+      SELECT DISTINCT sede FROM aceite_estanones WHERE sede IS NOT NULL AND TRIM(sede) <> ''
+      UNION
+      SELECT DISTINCT sede FROM usuarios_sedes WHERE sede IS NOT NULL AND TRIM(sede) <> ''
+    `);
+    const sedesReales = sedesDb.map(row => row.sede);
+    return unirSedesAceite(
+      TODAS_SEDES,
+      SEDES_TRANSPORTADORA_DETALLE,
+      sedesReales,
+      expandirSedesOperativasRepuestosAceites(unirSedesAceite(TODAS_SEDES, sedesReales))
+    );
   }
 
   const sedesUsuario = sedesAceitePorUsuario(user);
