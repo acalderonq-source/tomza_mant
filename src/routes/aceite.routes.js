@@ -708,14 +708,19 @@ router.get("/", async (req, res) => {
     const resumen = estanones.reduce((acc, item) => {
       const capacidad = Number(item.litros_capacidad || CAPACIDAD_ESTANON_LITROS);
       const restantes = Number(item.litros_restantes || 0);
-      acc.capacidad += capacidad;
-      acc.restantes += restantes;
-      acc.consumidos += Number(item.litros_consumidos || 0);
-      acc.costoRegistrado += Number(item.monto_total || 0);
-      if (item.estado === "ACTIVO") acc.activos += 1;
-      if (restantes <= capacidad * 0.2 && item.estado === "ACTIVO") acc.bajos += 1;
+      const activo = item.estado === "ACTIVO" && restantes > 0.001;
+      if (activo) {
+        acc.capacidad += capacidad;
+        acc.restantes += restantes;
+        acc.consumidos += Number(item.litros_consumidos || 0);
+        acc.costoRegistrado += Number(item.monto_total || 0);
+        acc.activos += 1;
+        if (restantes <= capacidad * 0.2) acc.bajos += 1;
+      } else {
+        acc.historial += 1;
+      }
       return acc;
-    }, { capacidad: 0, restantes: 0, consumidos: 0, costoRegistrado: 0, activos: 0, bajos: 0 });
+    }, { capacidad: 0, restantes: 0, consumidos: 0, costoRegistrado: 0, activos: 0, bajos: 0, historial: 0 });
 
     resumen.gastoAsignadoPlacas = gastoPorPlaca.reduce((sum, item) => sum + Number(item.gasto || 0), 0);
 
@@ -920,6 +925,47 @@ router.post("/estanones/:id/costo", async (req, res) => {
     console.error("ERROR actualizando costo de estañón:", error);
     req.session.error = "No se pudo actualizar el costo del estañón.";
     res.redirect("/aceite");
+  }
+});
+
+router.post("/estanones/:id/eliminar", async (req, res) => {
+  let connection;
+  try {
+    if (req.session.user?.rol !== "ADMIN") {
+      return res.status(403).send("Solo ADMIN puede eliminar estañones.");
+    }
+
+    await ensureAceiteTables();
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id) || id <= 0) {
+      req.session.error = "Estañón no válido.";
+      return res.redirect("/aceite");
+    }
+
+    const [[estanon]] = await pool.query(
+      "SELECT id, descripcion, sede FROM aceite_estanones WHERE id = ? LIMIT 1",
+      [id]
+    );
+    if (!estanon) {
+      req.session.error = "El estañón ya no existe.";
+      return res.redirect("/aceite");
+    }
+
+    connection = await pool.getConnection();
+    await connection.beginTransaction();
+    await connection.query("DELETE FROM aceite_movimientos WHERE estanon_id = ?", [id]);
+    await connection.query("DELETE FROM aceite_estanones WHERE id = ?", [id]);
+    await connection.commit();
+
+    req.session.success = `Estañón eliminado de ${etiquetaSedeInventarioAceite(estanon.sede)}. Los movimientos de ese estañón también fueron eliminados.`;
+    res.redirect("/aceite");
+  } catch (error) {
+    if (connection) await connection.rollback().catch(() => {});
+    console.error("ERROR eliminando estañón:", error);
+    req.session.error = "No se pudo eliminar el estañón.";
+    res.redirect("/aceite");
+  } finally {
+    if (connection) connection.release();
   }
 });
 

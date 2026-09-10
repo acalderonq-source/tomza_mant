@@ -331,6 +331,21 @@
       font-weight: 900;
       text-transform: uppercase;
     }
+    .drum-actions {
+      align-items: center;
+      display: flex;
+      flex-wrap: wrap;
+      gap: .45rem;
+      margin-top: .7rem;
+    }
+    .history-table td,
+    .history-table th {
+      white-space: nowrap;
+    }
+    .history-table .history-detail {
+      max-width: 280px;
+      white-space: normal;
+    }
     @media (max-width: 900px) {
       .kpi-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -366,6 +381,9 @@
     if (porcentaje <= 20) return 'low';
     return '';
   };
+  const estanonesActivos = (estanones || []).filter(item => item.estado === 'ACTIVO' && Number(item.litros_restantes || 0) > 0.001);
+  const estanonesHistorial = (estanones || []).filter(item => !(item.estado === 'ACTIVO' && Number(item.litros_restantes || 0) > 0.001));
+  const puedeEliminarEstanones = user && user.rol === 'ADMIN';
 %>
 
 <nav class="navbar navbar-dark navbar-aceite px-3">
@@ -505,6 +523,10 @@
       <div class="kpi-value"><%= Number(resumen.bajos || 0).toLocaleString('es-CR') %></div>
     </div>
     <div class="kpi-card">
+      <div class="kpi-label">Historial estañones</div>
+      <div class="kpi-value"><%= Number(resumen.historial || 0).toLocaleString('es-CR') %></div>
+    </div>
+    <div class="kpi-card">
       <div class="kpi-label">Gasto de aceite por placas</div>
       <div class="kpi-value"><%= moneda(resumen.gastoAsignadoPlacas) %></div>
     </div>
@@ -514,15 +536,15 @@
     <div class="panel-head">
       <div>
         <h2 class="panel-title">Aceite disponible por sede</h2>
-        <p class="panel-copy">La imagen del estañón baja conforme se registran cambios o rellenos de aceite.</p>
+        <p class="panel-copy">Solo se muestran estañones activos con aceite disponible.</p>
       </div>
     </div>
 
-    <% if (!estanones.length) { %>
-      <div class="p-4 text-center muted fw-bold">Todavía no hay estañones registrados.</div>
+    <% if (!estanonesActivos.length) { %>
+      <div class="p-4 text-center muted fw-bold">No hay estañones activos con aceite disponible.</div>
     <% } else { %>
       <div class="drum-grid">
-        <% estanones.forEach(item => {
+        <% estanonesActivos.forEach(item => {
           const porcentaje = porcentajeEstanon(item);
           const nivelTop = Math.max(4, Math.min(166, 170 - (porcentaje * 1.7)));
           const clase = estadoClase(item);
@@ -578,11 +600,79 @@
                   </button>
                 </form>
               <% } %>
+              <% if (puedeEliminarEstanones) { %>
+                <div class="drum-actions">
+                  <form method="POST" action="/aceite/estanones/<%= item.id %>/eliminar" onsubmit="return confirm('¿Eliminar este estañón y todos sus movimientos? Esta acción afecta el gasto de aceite por placas.');">
+                    <button class="btn btn-sm btn-outline-danger fw-bold"><i class="bi bi-trash"></i> Eliminar</button>
+                  </form>
+                </div>
+              <% } %>
             </div>
           </article>
         <% }) %>
       </div>
     <% } %>
+  </section>
+
+  <section class="panel mb-3">
+    <div class="panel-head">
+      <div>
+        <h2 class="panel-title">Historial de estañones</h2>
+        <p class="panel-copy">Estañones agotados o cerrados. No se muestran como aceite disponible.</p>
+      </div>
+      <span class="badge text-bg-light"><%= Number(estanonesHistorial.length || 0).toLocaleString('es-CR') %></span>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0 history-table">
+        <thead>
+          <tr>
+            <th>Sede</th>
+            <th>Detalle</th>
+            <th>Compra</th>
+            <th>Estado</th>
+            <th class="text-end">Capacidad</th>
+            <th class="text-end">Consumido</th>
+            <th class="text-end">Restante</th>
+            <th class="text-end">Rebajos</th>
+            <% if (puedeEliminarEstanones) { %><th class="text-end">Acción</th><% } %>
+          </tr>
+        </thead>
+        <tbody>
+          <% if (!estanonesHistorial.length) { %>
+            <tr>
+              <td colspan="<%= puedeEliminarEstanones ? 9 : 8 %>" class="text-center muted fw-bold py-4">Sin estañones en historial.</td>
+            </tr>
+          <% } %>
+          <% estanonesHistorial.forEach(item => { %>
+            <% const estadoHistorial = Number(item.litros_restantes || 0) <= 0.001 ? 'AGOTADO' : item.estado; %>
+            <tr>
+              <td class="fw-bold"><%= etiquetaInventario(item.sede) %></td>
+              <td class="history-detail">
+                <strong><%= item.descripcion || 'Estañón de aceite' %></strong>
+                <% if (item.orden_compra_numero) { %>
+                  <div class="small muted"><%= item.orden_compra_numero %> · <%= moneda(item.monto_total) %></div>
+                <% } else if (Number(item.monto_total || 0) > 0) { %>
+                  <div class="small muted"><%= moneda(item.monto_total) %></div>
+                <% } %>
+              </td>
+              <td><%= item.fecha_compra_formato %></td>
+              <td><span class="badge text-bg-secondary"><%= estadoHistorial %></span></td>
+              <td class="text-end"><%= formatoGalones(litrosAGalones(item.litros_capacidad)) %> gal</td>
+              <td class="text-end fw-bold"><%= formatoGalones(litrosAGalones(item.litros_consumidos)) %> gal</td>
+              <td class="text-end"><%= formatoGalones(litrosAGalones(item.litros_restantes)) %> gal</td>
+              <td class="text-end"><%= Number(item.salidas || 0).toLocaleString('es-CR') %></td>
+              <% if (puedeEliminarEstanones) { %>
+                <td class="text-end">
+                  <form method="POST" action="/aceite/estanones/<%= item.id %>/eliminar" onsubmit="return confirm('¿Eliminar este estañón histórico y todos sus movimientos? Esta acción afecta el gasto de aceite por placas.');">
+                    <button class="btn btn-sm btn-outline-danger fw-bold"><i class="bi bi-trash"></i></button>
+                  </form>
+                </td>
+              <% } %>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
   </section>
 
   <section class="panel mb-3">
