@@ -109,6 +109,22 @@
           <div class="detail-label">Observaciones</div>
           <div class="detail-value"><%= orden.observaciones || '—' %></div>
         </div>
+        <div class="detail-item">
+          <div class="detail-label">Clave electrónica</div>
+          <div class="detail-value"><%= orden.factura_clave_electronica || '—' %></div>
+        </div>
+        <div class="detail-item">
+          <div class="detail-label">Consecutivo electrónico</div>
+          <div class="detail-value"><%= orden.factura_consecutivo_electronico || '—' %></div>
+        </div>
+        <div class="detail-item">
+          <div class="detail-label">Estado Hacienda</div>
+          <div class="detail-value">
+            <span class="badge <%= orden.factura_estado_hacienda === 'ACEPTADA' ? 'bg-success' : 'bg-warning text-dark' %>">
+              <%= orden.factura_estado_hacienda || 'PENDIENTE' %>
+            </span>
+          </div>
+        </div>
       </div>
     </div>
   </div>

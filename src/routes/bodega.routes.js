@@ -2,6 +2,8 @@ const express = require("express");
 const router = express.Router();
 const pool = require("../db");
 const { normalizarPlaca } = require("../utils/placas");
+const { ensureGastosOperativosTables, registrarAuditoriaSistema, registrarGastoOperativo } = require("../utils/gastosOperativos");
+const { enviarNotificacionAdmins } = require("../utils/notificacionesPush");
 
 const ROLES_BODEGA = ["ADMIN", "TALLER", "PROVEEDURIA_TALLER", "BODEGA", "BODEGUERO"];
 const ROLES_AJUSTE = ["ADMIN", "TALLER"];
@@ -595,11 +597,14 @@ router.post("/suministros", async (req, res) => {
 
 router.post("/entregar", async (req, res) => {
   const conn = await pool.getConnection();
+  let notificacionRetiro = null;
   try {
     await ensureBodegaTables();
+    await ensureGastosOperativosTables();
     const placa = normalizarPlaca(req.body.placa) || upper(req.body.placa);
     const mecanico = limpiar(req.body.mecanico);
     const tipoTrabajo = TIPOS_TRABAJO.includes(upper(req.body.tipo_trabajo)) ? upper(req.body.tipo_trabajo) : "MANTENIMIENTO";
+    const observacion = limpiar(req.body.observacion) || null;
     const articuloIds = toArray(req.body.articulo_id);
     const cantidades = toArray(req.body.cantidad);
     const origenes = toArray(req.body.origen_salida);
@@ -617,11 +622,16 @@ router.post("/entregar", async (req, res) => {
     }
 
     await conn.beginTransaction();
+    const [[unidadEntrega]] = await conn.query(
+      "SELECT sede FROM unidades WHERE REPLACE(UPPER(TRIM(placa)), ' ', '') = ? LIMIT 1",
+      [placa]
+    );
     const [entregaResult] = await conn.query(
       "INSERT INTO bodega_entregas (placa, mecanico, tipo_trabajo, observacion, creado_por) VALUES (?, ?, ?, ?, ?)",
-      [placa, mecanico, tipoTrabajo, limpiar(req.body.observacion) || null, req.session.user.id]
+      [placa, mecanico, tipoTrabajo, observacion, req.session.user.id]
     );
     const entregaId = entregaResult.insertId;
+    const articulosNotificacion = [];
 
     for (const linea of lineas) {
       const articulo = await articuloParaMovimiento(conn, linea.id);
@@ -640,12 +650,12 @@ router.post("/entregar", async (req, res) => {
           `INSERT INTO bodega_prestamos_herramientas
             (articulo_id, mecanico, placa, cantidad, observacion, creado_por)
            VALUES (?, ?, ?, ?, ?, ?)`,
-          [articulo.id, mecanico, placa, linea.cantidad, limpiar(req.body.observacion) || null, req.session.user.id]
+          [articulo.id, mecanico, placa, linea.cantidad, observacion, req.session.user.id]
         );
         prestamoId = prestamoResult.insertId;
       }
 
-      await conn.query(
+      const [movimientoResult] = await conn.query(
         `INSERT INTO bodega_movimientos (
           articulo_id, entrega_id, prestamo_id, tipo_movimiento, origen_inventario, cantidad, existencia_anterior, existencia_nueva,
           placa, mecanico, tipo_trabajo, precio_unitario, motivo, creado_por
@@ -663,13 +673,88 @@ router.post("/entregar", async (req, res) => {
           mecanico,
           tipoTrabajo,
           Number(articulo.precio_unitario || 0),
-          limpiar(req.body.observacion) || null,
+          observacion,
           req.session.user.id
         ]
       );
+      const movimientoId = movimientoResult.insertId;
+
+      await registrarGastoOperativo({
+        fuente: "BODEGA",
+        fuente_id: movimientoId,
+        detalle_id: articulo.id,
+        fecha: new Date(),
+        placa,
+        sede: unidadEntrega?.sede || "",
+        rubro: "",
+        categoria: articulo.categoria || "",
+        tipo_trabajo: tipoTrabajo,
+        proveedor: articulo.proveedor_nombre || articulo.proveedor_consignacion || "",
+        descripcion: articulo.nombre,
+        cantidad: linea.cantidad,
+        precio_unitario: Number(articulo.precio_unitario || 0),
+        monto: Number(linea.cantidad || 0) * Number(articulo.precio_unitario || 0),
+        creado_por: req.session.user.id,
+        metadata: {
+          entrega_id: entregaId,
+          articulo_id: articulo.id,
+          codigo_taller: articulo.codigo_taller || "",
+          codigo_proveedor: articulo.codigo || "",
+          origen_inventario: origenSalida,
+          tipo_movimiento: tipoMovimiento,
+          mecanico
+        }
+      }, conn, { ensure: false });
+
+      articulosNotificacion.push({
+        codigo_taller: articulo.codigo_taller || "",
+        nombre: articulo.nombre,
+        cantidad: linea.cantidad,
+        unidad_medida: articulo.unidad_medida || "",
+        origen: origenSalida,
+        tipo_movimiento: tipoMovimiento
+      });
     }
 
+    await registrarAuditoriaSistema({
+      modulo: "Bodega",
+      tabla: "bodega_entregas",
+      registro_id: entregaId,
+      accion: "CREAR",
+      resumen: `Retiro de ${articulosNotificacion.length} articulo(s) para ${placa}`,
+      despues: {
+        placa,
+        mecanico,
+        tipo_trabajo: tipoTrabajo,
+        observacion,
+        articulos: articulosNotificacion
+      },
+      usuario_id: req.session.user.id,
+      usuario_nombre: req.session.user.usuario
+    }, conn, { ensure: false });
+
     await conn.commit();
+    const resumenArticulos = articulosNotificacion
+      .slice(0, 3)
+      .map(item => `${item.codigo_taller ? `${item.codigo_taller} · ` : ""}${item.nombre} (${Number(item.cantidad).toLocaleString("es-CR")} ${item.unidad_medida || ""})`)
+      .join("; ");
+    const extras = articulosNotificacion.length > 3 ? ` +${articulosNotificacion.length - 3} más` : "";
+    notificacionRetiro = {
+      title: "Retiro de material en bodega",
+      body: `${placa} · ${mecanico} · ${resumenArticulos}${extras}`,
+      icon: "/img/app-icon.svg",
+      badge: "/img/app-icon.svg",
+      url: "/bodega/movimientos",
+      tag: `bodega-retiro-${entregaId}`,
+      data: {
+        url: "/bodega/movimientos",
+        entregaId,
+        placa,
+        mecanico,
+        tipoTrabajo,
+        creadoPor: req.session.user.usuario || req.session.user.id || null
+      }
+    };
     req.session.success = "Entrega registrada y stock actualizado.";
   } catch (error) {
     await conn.rollback();
@@ -677,6 +762,11 @@ router.post("/entregar", async (req, res) => {
     req.session.error = error.message || "No se pudo registrar la entrega.";
   } finally {
     conn.release();
+  }
+  if (notificacionRetiro) {
+    enviarNotificacionAdmins(notificacionRetiro).catch(error => {
+      console.warn("No se pudo enviar notificación de retiro de bodega:", error.code || error.message);
+    });
   }
   redirectBodega(req, res);
 });

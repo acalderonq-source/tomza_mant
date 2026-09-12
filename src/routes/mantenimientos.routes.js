@@ -12,6 +12,7 @@ const {
   SEDES_TRANSPORTE,
   clasificarSubgrupoTransportadora,
   esUsuarioPesados,
+  esUsuarioMecanicoSede,
   esUsuarioTodasSedes,
   etiquetaSede,
   expandirSedesEquivalentes,
@@ -45,6 +46,7 @@ function puedeTrabajarComoMecanico(user) {
 // =====================================================
 function obtenerSedeFiltro(req) {
   if (!req.session.user) return null;
+  if (esUsuarioMecanicoSede(req.session.user)) return null;
   if (esUsuarioTodasSedes(req.session.user) || esUsuarioPesados(req.session.user)) {
     if (req.session.sedeSeleccionada && req.session.sedeSeleccionada !== "TODAS")
       return req.session.sedeSeleccionada;
@@ -58,7 +60,7 @@ function obtenerSedeFiltro(req) {
 
 function obtenerSedesFiltroUsuario(req, sedeFiltro = obtenerSedeFiltro(req)) {
   if (sedeFiltro) return expandirSedesEquivalentes(sedeFiltro);
-  if (esUsuarioPesados(req.session.user)) {
+  if (esUsuarioPesados(req.session.user) || esUsuarioMecanicoSede(req.session.user)) {
     return getSedesPermitidas(req).filter(Boolean);
   }
   return [];

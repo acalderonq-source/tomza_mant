@@ -10,6 +10,7 @@ const {
   SEDES_TRANSPORTADORA_DETALLE,
   TODAS_SEDES,
   sedeOperativaRepuestosAceites,
+  sedesEspecialesPorUsuario,
   sedesOperativasVisibles
 } = require("../utils/sedes");
 
@@ -46,12 +47,18 @@ function unirSedesAceite(...listas) {
 function sedesAceitePorUsuario(user) {
   const usuario = String(user?.usuario || "").trim().toLowerCase();
   const sedesPorUsuario = {
-    mecanico_guapiles: ["Guapiles", "San Carlos"],
-    mecanicos_guapiles: ["Guapiles", "San Carlos"],
-    mecanico_la_cruz: ["La Cruz"],
-    mecanicos_la_cruz: ["La Cruz"],
-    mecanico_perez_zeledon: ["Perez Zeledon"],
-    mecanicos_perez_zeledon: ["Perez Zeledon"],
+    mecanico_guapiles: ["Guapiles", "San Carlos", "granel_guapiles"],
+    mecanicos_guapiles: ["Guapiles", "San Carlos", "granel_guapiles"],
+    mecanico_lacruz: ["La Cruz", "granel_la_cruz"],
+    mecanicos_lacruz: ["La Cruz", "granel_la_cruz"],
+    mecanico_la_cruz: ["La Cruz", "granel_la_cruz"],
+    mecanicos_la_cruz: ["La Cruz", "granel_la_cruz"],
+    mecanico_pz: ["Perez Zeledon", "granel_perez_zeledon"],
+    mecanicos_pz: ["Perez Zeledon", "granel_perez_zeledon"],
+    mecanico_perez_zeledon: ["Perez Zeledon", "granel_perez_zeledon"],
+    mecanicos_perez_zeledon: ["Perez Zeledon", "granel_perez_zeledon"],
+    mecanico_alajuela: ["Alajuela", "granel_alajuela"],
+    mecanicos_alajuela: ["Alajuela", "granel_alajuela"],
     mecanico_rio_claro: ["Rio Claro"],
     mecanicos_rio_claro: ["Rio Claro"],
     mecanico_nicoya: ["Nicoya"],
@@ -60,7 +67,7 @@ function sedesAceitePorUsuario(user) {
     mecanicos_limon: ["Transportadora", "Cabezales", "Cisternas", "Carretas", "Tandem", "Tándem"]
   };
 
-  return sedesPorUsuario[usuario] || [];
+  return sedesPorUsuario[usuario] || sedesEspecialesPorUsuario(user);
 }
 
 async function getSedesPermitidasAceite(req) {

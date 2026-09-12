@@ -6,11 +6,13 @@ const {
   clasificarSubgrupoTransportadora,
   etiquetaSede,
   esSedeTransporte,
+  esUsuarioMecanicoSede,
   esUsuarioTodasSedes,
   expandirSedesEquivalentes,
   obtenerTodasSedes,
   obtenerSedesTransporte,
-  sedeGranelDesdeUsuario
+  sedeGranelDesdeUsuario,
+  sedesEspecialesPorUsuario
 } = require("../utils/sedes");
 const { agregarFiltroPlacaSql } = require("../utils/placas");
 
@@ -131,9 +133,15 @@ async function obtenerSedesPermitidas(req) {
   );
 
   const sedesExtras = extras.map(e => e.sede);
-  const todasLasSedes = agregarTallerParaMecanico(user, [user.sede, ...sedesExtras]);
+  const usuarioMecanicoSede = esUsuarioMecanicoSede(user);
+  const todasLasSedes = agregarTallerParaMecanico(user, [
+    user.sede,
+    ...sedesExtras,
+    ...sedesEspecialesPorUsuario(user)
+  ]);
 
   if (
+    !usuarioMecanicoSede &&
     req.session.sedeSeleccionada &&
     todasLasSedes.includes(req.session.sedeSeleccionada)
   ) {

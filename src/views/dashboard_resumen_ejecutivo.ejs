@@ -1104,6 +1104,105 @@
     .control-ok { color: #166534; }
     .control-warn { color: #991b1b; }
 
+    .quality-card {
+      background: linear-gradient(135deg, #071a44 0%, #0b3b82 58%, #123f78 100%);
+      border-radius: 18px;
+      box-shadow: 0 18px 40px rgba(15, 23, 42, .14);
+      color: #fff;
+      overflow: hidden;
+    }
+
+    .quality-main {
+      display: grid;
+      gap: 1rem;
+      grid-template-columns: minmax(220px, .75fr) minmax(0, 1fr);
+      padding: 1rem;
+    }
+
+    .quality-score {
+      align-items: center;
+      background: rgba(255, 255, 255, .1);
+      border: 1px solid rgba(255, 255, 255, .18);
+      border-radius: 16px;
+      display: flex;
+      gap: .9rem;
+      padding: .95rem;
+    }
+
+    .quality-ring {
+      align-items: center;
+      background:
+        radial-gradient(circle at center, #071a44 0 55%, transparent 56%),
+        conic-gradient(#22c55e calc(var(--score, 0) * 1%), rgba(255,255,255,.18) 0);
+      border-radius: 999px;
+      display: flex;
+      flex: 0 0 84px;
+      height: 84px;
+      justify-content: center;
+      width: 84px;
+    }
+
+    .quality-ring strong {
+      font-size: 1.05rem;
+      font-weight: 950;
+    }
+
+    .quality-title {
+      font-size: .95rem;
+      font-weight: 950;
+      margin: 0 0 .2rem;
+    }
+
+    .quality-copy {
+      color: rgba(255, 255, 255, .78);
+      font-size: .76rem;
+      font-weight: 750;
+      line-height: 1.35;
+      margin: 0;
+    }
+
+    .quality-grid {
+      display: grid;
+      gap: .65rem;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+
+    .quality-metric {
+      background: rgba(255, 255, 255, .1);
+      border: 1px solid rgba(255, 255, 255, .16);
+      border-radius: 14px;
+      padding: .8rem;
+    }
+
+    .quality-label {
+      color: rgba(255, 255, 255, .7);
+      font-size: .66rem;
+      font-weight: 950;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+    }
+
+    .quality-value {
+      font-size: 1.05rem;
+      font-weight: 950;
+      margin-top: .16rem;
+    }
+
+    .quality-foot {
+      background: rgba(255, 255, 255, .08);
+      border-top: 1px solid rgba(255, 255, 255, .14);
+      display: grid;
+      gap: .5rem;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      padding: .75rem 1rem;
+    }
+
+    .quality-action {
+      color: rgba(255, 255, 255, .86);
+      font-size: .75rem;
+      font-weight: 800;
+    }
+
     .rules-grid {
       display: grid;
       gap: 1rem;
@@ -1323,7 +1422,10 @@
       .detail-hub-head { align-items: flex-start; flex-direction: column; }
       .detail-grid { grid-template-columns: 1fr; }
       .control-strip,
+      .quality-main,
+      .quality-foot,
       .rules-grid { grid-template-columns: 1fr; }
+      .quality-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       canvas { max-height: 280px; }
     }
 
@@ -1411,6 +1513,7 @@
   const costoUnidad = data.costoUnidad || {};
   const resumenFinanciero = data.resumenFinanciero || {};
   const auditoriaFinanciera = data.auditoriaFinanciera || {};
+  const calidadDatos = data.calidadDatos || {};
   const reglasClasificacion = safe(data.reglasClasificacion);
   const familiasClasificacion = safe(data.familiasClasificacion);
   const puedeAdministrarReglas = ['ADMIN', 'TALLER'].includes(user.rol);
@@ -1522,6 +1625,45 @@
       <div class="control-value <%= diferenciasOk ? 'control-ok' : 'control-warn' %>" id="controlEstado">
         <%= diferenciasOk ? 'Cuadrado' : `Diferencia ₡${money(diferenciaControl)}` %>
       </div>
+    </div>
+  </section>
+
+  <section class="quality-card mb-4" id="calidadDatosPanel">
+    <div class="quality-main">
+      <div class="quality-score">
+        <div class="quality-ring" id="qualityRing" style="--score:<%= Number(calidadDatos.porcentajeCalidad || 0) %>">
+          <strong id="qualityScore"><%= Number(calidadDatos.porcentajeCalidad || 0) %>%</strong>
+        </div>
+        <div>
+          <h2 class="quality-title">Control profesional del dato</h2>
+          <p class="quality-copy" id="qualityCopy">
+            <%= calidadDatos.consistente ? 'Los totales principales cuadran entre negocio y rubro.' : 'Hay diferencias o datos incompletos que conviene revisar antes de presentar.' %>
+          </p>
+        </div>
+      </div>
+      <div class="quality-grid">
+        <div class="quality-metric">
+          <div class="quality-label">Gasto gerencial</div>
+          <div class="quality-value" id="qualityMontoGerencial">₡<%= money(calidadDatos.montoGerencial || 0) %></div>
+        </div>
+        <div class="quality-metric">
+          <div class="quality-label">Fuera del resumen</div>
+          <div class="quality-value" id="qualityMontoExcluido">₡<%= money(calidadDatos.montoExcluido || 0) %></div>
+        </div>
+        <div class="quality-metric">
+          <div class="quality-label">Sin placa</div>
+          <div class="quality-value" id="qualitySinPlaca"><%= Number(calidadDatos.sinPlaca || 0).toLocaleString('es-CR') %></div>
+        </div>
+        <div class="quality-metric">
+          <div class="quality-label">Sin sede</div>
+          <div class="quality-value" id="qualitySinSede"><%= Number(calidadDatos.sinSede || 0).toLocaleString('es-CR') %></div>
+        </div>
+      </div>
+    </div>
+    <div class="quality-foot" id="qualityActions">
+      <% safe(calidadDatos.acciones).slice(0, 4).forEach(accion => { %>
+        <div class="quality-action"><i class="bi bi-check2-circle me-1"></i><%= accion %></div>
+      <% }) %>
     </div>
   </section>
 
@@ -2380,6 +2522,11 @@
     if (element) element.textContent = value;
   };
 
+  const setHtml = (id, value) => {
+    const element = document.getElementById(id);
+    if (element) element.innerHTML = value;
+  };
+
   const renderClassificationForm = (mov = {}) => {
     if (!puedeAdministrarClasificacion || !mov.fuente || !mov.id) return '';
     const current = String(mov.familia_clave || '').toLowerCase();
@@ -2920,6 +3067,7 @@
   const updateKpis = (data) => {
     const resumenFinanciero = data.resumenFinanciero || {};
     const auditoria = data.auditoriaFinanciera || {};
+    const calidad = data.calidadDatos || {};
     const costoUnidad = data.costoUnidad || {};
     const categorias = (data.categorias || []).filter(item => !isHiddenCategory(item.nombre));
     const totalCategorias = categorias.reduce((sum, item) => sum + Number(item.total || 0), 0);
@@ -2945,6 +3093,20 @@
     setText('controlTotalPeriodo', formatMoney(auditoria.totalGastos ?? data.totalGastos ?? 0));
     setText('controlTotalNegocios', formatMoney(auditoria.totalNegocios || 0));
     setText('controlTotalRubros', formatMoney(auditoria.totalRubros || 0));
+    setText('qualityScore', `${Number(calidad.porcentajeCalidad || 0)}%`);
+    setText('qualityCopy', calidad.consistente
+      ? 'Los totales principales cuadran entre negocio y rubro.'
+      : 'Hay diferencias o datos incompletos que conviene revisar antes de presentar.');
+    setText('qualityMontoGerencial', formatMoney(calidad.montoGerencial || 0));
+    setText('qualityMontoExcluido', formatMoney(calidad.montoExcluido || 0));
+    setText('qualitySinPlaca', formatNumber(calidad.sinPlaca || 0));
+    setText('qualitySinSede', formatNumber(calidad.sinSede || 0));
+
+    const qualityRing = document.getElementById('qualityRing');
+    if (qualityRing) qualityRing.style.setProperty('--score', Number(calidad.porcentajeCalidad || 0));
+    setHtml('qualityActions', (calidad.acciones || []).slice(0, 4).map(accion => `
+      <div class="quality-action"><i class="bi bi-check2-circle me-1"></i>${escapeHtml(accion)}</div>
+    `).join(''));
 
     const controlEstado = document.getElementById('controlEstado');
     if (controlEstado) {

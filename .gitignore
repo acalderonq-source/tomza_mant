@@ -8,3 +8,4 @@ android/app/build/
 android/build/
 *.jks
 *.keystore
+.tomza-vapid-keys.json

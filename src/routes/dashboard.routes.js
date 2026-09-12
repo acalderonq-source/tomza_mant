@@ -6,11 +6,13 @@ const {
   expandirSedesEquivalentes,
   etiquetaSede: etiquetaSedeTomza,
   esSedeTransportadoraDetalle,
+  esUsuarioMecanicoSede,
   esUsuarioPesados,
   esUsuarioTodasSedes,
   obtenerTodasSedes,
   obtenerSedesTransporte,
-  sedeGranelDesdeUsuario
+  sedeGranelDesdeUsuario,
+  sedesEspecialesPorUsuario
 } = require("../utils/sedes");
 const { extraerPlacasTexto, normalizarPlaca } = require("../utils/placas");
 const { ensureNumeroMantenimientoColumn } = require("../utils/mantenimientosNumero");
@@ -484,6 +486,53 @@ function clasificarGastoOperativo(item, reglasClasificacion = [], clasificacione
   return clasificarTexto(`${item.descripcion} ${item.proveedor}`, FAMILIAS_GASTO_OPERATIVO, "general");
 }
 
+function construirCalidadDatosGerenciales({ gastos = [], gastosGerenciales = [], gastosExcluidosGenerales = [], auditoriaFinanciera = {} }) {
+  const totalMonto = gastos.reduce((sum, item) => sum + Number(item.monto || 0), 0);
+  const totalGerencial = gastosGerenciales.reduce((sum, item) => sum + Number(item.monto || 0), 0);
+  const totalExcluido = gastosExcluidosGenerales.reduce((sum, item) => sum + Number(item.monto || 0), 0);
+  const requierePlaca = item => !["aceites", "generales"].includes(item.negocioInfo?.clave);
+  const sinPlaca = gastosGerenciales.filter(item => requierePlaca(item) && !item.tienePlacaReal);
+  const sinSede = gastosGerenciales.filter(item => requierePlaca(item) && !item.tieneSedeReal);
+  const sinRubro = gastosGerenciales.filter(item => !item.familia || item.familia.clave === "general");
+  const montoSinPlaca = sinPlaca.reduce((sum, item) => sum + Number(item.monto || 0), 0);
+  const montoSinSede = sinSede.reduce((sum, item) => sum + Number(item.monto || 0), 0);
+  const montoSinRubro = sinRubro.reduce((sum, item) => sum + Number(item.monto || 0), 0);
+  const montoProblema = montoSinPlaca + montoSinSede + montoSinRubro + totalExcluido +
+    Math.abs(Number(auditoriaFinanciera.diferenciaNegocios || 0)) +
+    Math.abs(Number(auditoriaFinanciera.diferenciaRubros || 0));
+  const baseCalidad = totalMonto || totalGerencial || 1;
+  const porcentajeCalidad = Math.max(0, Math.min(100, Math.round(100 - ((montoProblema / baseCalidad) * 100))));
+
+  const acciones = [];
+  if (sinPlaca.length) acciones.push(`Asignar placa a ${sinPlaca.length.toLocaleString("es-CR")} movimiento(s).`);
+  if (sinSede.length) acciones.push(`Corregir sede en ${sinSede.length.toLocaleString("es-CR")} movimiento(s).`);
+  if (sinRubro.length) acciones.push(`Reclasificar ${sinRubro.length.toLocaleString("es-CR")} movimiento(s) sin rubro gerencial.`);
+  if (gastosExcluidosGenerales.length) acciones.push(`Revisar ${gastosExcluidosGenerales.length.toLocaleString("es-CR")} movimiento(s) fuera del resumen gerencial.`);
+  if (!acciones.length) acciones.push("El resumen está listo para presentación gerencial.");
+
+  return {
+    porcentajeCalidad,
+    totalMovimientos: gastos.length,
+    movimientosGerenciales: gastosGerenciales.length,
+    movimientosExcluidos: gastosExcluidosGenerales.length,
+    montoTotal: totalMonto,
+    montoGerencial: totalGerencial,
+    montoExcluido: totalExcluido,
+    sinPlaca: sinPlaca.length,
+    montoSinPlaca,
+    sinSede: sinSede.length,
+    montoSinSede,
+    sinRubro: sinRubro.length,
+    montoSinRubro,
+    acciones,
+    consistente: Boolean(auditoriaFinanciera.consistenteNegocios && auditoriaFinanciera.consistenteRubros),
+    movimientosCriticos: [...sinPlaca, ...sinSede, ...sinRubro, ...gastosExcluidosGenerales]
+      .sort((a, b) => Number(b.monto || 0) - Number(a.monto || 0))
+      .slice(0, 10)
+      .map(item => movimientoParaRevisionPlaca(item))
+  };
+}
+
 function clasificarDetalleTransportadora(item) {
   const placa = normalizarPlacaLocal(item.placa || item.placa_registrada || item.codigo || item.placa_unidad);
   const texto = normalizarTexto([
@@ -844,6 +893,7 @@ async function resolverSedesUsuario(req) {
 
   const usuarioPesados = esUsuarioPesados(req.session.user);
   const usuarioTodasSedes = esUsuarioTodasSedes(req.session.user);
+  const usuarioMecanicoSede = esUsuarioMecanicoSede(req.session.user);
   const sedeGranelUsuario = sedeGranelDesdeUsuario(req.session.user);
   const sedesPermitidas = usuarioTodasSedes
     ? await obtenerTodasSedes(pool)
@@ -853,7 +903,8 @@ async function resolverSedesUsuario(req) {
     ? await obtenerSedesTransporte(pool)
     : agregarTallerParaMecanico(req.session.user, [
         req.session.user.sede,
-        ...extras.map(e => e.sede)
+        ...extras.map(e => e.sede),
+        ...sedesEspecialesPorUsuario(req.session.user)
       ]);
 
   let sedeFiltro = null;
@@ -866,6 +917,8 @@ async function resolverSedesUsuario(req) {
     } else if (req.session.sedeSeleccionada && req.session.sedeSeleccionada !== "TODAS" && sedesPermitidas.includes(req.session.sedeSeleccionada)) {
       sedeFiltro = req.session.sedeSeleccionada;
     }
+  } else if (usuarioMecanicoSede) {
+    sedeFiltro = null;
   } else if (req.query.sede && sedesPermitidas.includes(req.query.sede)) {
     sedeFiltro = req.query.sede;
   } else if (req.session.sedeSeleccionada && sedesPermitidas.includes(req.session.sedeSeleccionada)) {
@@ -877,9 +930,10 @@ async function resolverSedesUsuario(req) {
   return {
     usuarioTodasSedes,
     usuarioPesados,
+    usuarioMecanicoSede,
     sedesPermitidas,
     sedeFiltro,
-    sedesFiltro: !sedeFiltro && usuarioPesados ? expandirSedesEquivalentes(sedesPermitidas) : expandirSedeFiltro(sedeFiltro),
+    sedesFiltro: !sedeFiltro && (usuarioPesados || usuarioMecanicoSede) ? expandirSedesEquivalentes(sedesPermitidas) : expandirSedeFiltro(sedeFiltro),
     sedeSeleccionadaVista: etiquetaSede(sedeFiltro)
   };
 }
@@ -1745,6 +1799,12 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro, pe
     negocios: negociosGasto,
     rubros: categorias
   });
+  const calidadDatos = construirCalidadDatosGerenciales({
+    gastos,
+    gastosGerenciales,
+    gastosExcluidosGenerales,
+    auditoriaFinanciera
+  });
   const totalGastoConUnidad = Array.from(porPlaca.values()).reduce((sum, item) => sum + Number(item.total || 0), 0);
   const unidadesConGasto = porPlaca.size;
   const [flotaRow] = await safeQuery(
@@ -1799,6 +1859,7 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro, pe
     totalMantenimientos: mantenimientos.length,
     resumenFinanciero,
     auditoriaFinanciera,
+    calidadDatos,
     reglasClasificacion: reglasClasificacion.slice(0, 80),
     familiasClasificacion: familiasClasificacionEditables().map(({ clave, nombre, color }) => ({ clave, nombre, color })),
     gastosMantenimientoPorTipo,
@@ -2126,6 +2187,7 @@ router.get("/", async (req, res) => {
     // =========================
     const usuarioPesados = esUsuarioPesados(req.session.user);
     const usuarioTodasSedes = esUsuarioTodasSedes(req.session.user);
+    const usuarioMecanicoSede = esUsuarioMecanicoSede(req.session.user);
     const sedeGranelUsuario = sedeGranelDesdeUsuario(req.session.user);
     const sedesPermitidas = usuarioTodasSedes
       ? await obtenerTodasSedes(pool)
@@ -2135,7 +2197,8 @@ router.get("/", async (req, res) => {
       ? await obtenerSedesTransporte(pool)
       : agregarTallerParaMecanico(req.session.user, [
           req.session.user.sede,
-          ...extras.map(e => e.sede)
+          ...extras.map(e => e.sede),
+          ...sedesEspecialesPorUsuario(req.session.user)
         ]);
 
     // =========================
@@ -2151,6 +2214,8 @@ router.get("/", async (req, res) => {
       if (req.session.sedeSeleccionada && req.session.sedeSeleccionada !== "TODAS" && sedesPermitidas.includes(req.session.sedeSeleccionada)) {
         sedeFiltro = req.session.sedeSeleccionada;
       }
+    } else if (usuarioMecanicoSede) {
+      sedeFiltro = null;
     } else {
       // MULTI-SEDE
       if (req.session.sedeSeleccionada && sedesPermitidas.includes(req.session.sedeSeleccionada)) {
@@ -2160,7 +2225,7 @@ router.get("/", async (req, res) => {
       }
     }
 
-    const sedesFiltro = !sedeFiltro && usuarioPesados ? expandirSedesEquivalentes(sedesPermitidas) : expandirSedeFiltro(sedeFiltro);
+    const sedesFiltro = !sedeFiltro && (usuarioPesados || usuarioMecanicoSede) ? expandirSedesEquivalentes(sedesPermitidas) : expandirSedeFiltro(sedeFiltro);
     const sedeSeleccionadaVista = etiquetaSede(sedeFiltro);
 
     console.log("👤 Usuario:", req.session.user.usuario);

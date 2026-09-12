@@ -9,9 +9,11 @@ const {
 const {
   agregarTallerParaMecanico,
   esSedeTransporte,
+  esUsuarioMecanicoSede,
   esUsuarioPesados,
   expandirSedesEquivalentes,
-  obtenerSedesTransporte
+  obtenerSedesTransporte,
+  sedesEspecialesPorUsuario
 } = require("../utils/sedes");
 const { agregarFiltroPlacaSql } = require("../utils/placas");
 const { normalizarTipoMantenimiento, detectarTipoMantenimiento } = require("../utils/tipoMantenimiento");
@@ -54,9 +56,14 @@ async function obtenerSedesPermitidas(req) {
   }
 
   const [extras] = await pool.query("SELECT sede FROM usuarios_sedes WHERE usuario_id = ?", [user.id]);
-  const sedes = agregarTallerParaMecanico(user, [user.sede, ...extras.map(e => e.sede)]);
+  const usuarioMecanicoSede = esUsuarioMecanicoSede(user);
+  const sedes = agregarTallerParaMecanico(user, [
+    user.sede,
+    ...extras.map(e => e.sede),
+    ...sedesEspecialesPorUsuario(user)
+  ]);
 
-  if (req.session.sedeSeleccionada && sedes.includes(req.session.sedeSeleccionada)) {
+  if (!usuarioMecanicoSede && req.session.sedeSeleccionada && sedes.includes(req.session.sedeSeleccionada)) {
     return expandirSedesEquivalentes(req.session.sedeSeleccionada);
   }
 

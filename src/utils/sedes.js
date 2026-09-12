@@ -269,6 +269,14 @@ function esUsuarioBodega(user) {
   return ["BODEGA", "BODEGUERO"].includes(user?.rol);
 }
 
+function esUsuarioMecanicoSede(user) {
+  const usuario = limpiarSede(user?.usuario).toLowerCase();
+  if (!user || user.rol !== "MECANICO") return false;
+  if (usuario === "mecanico" || usuario === "mecanicos" || usuario === "pesados") return false;
+  if (esUsuarioPesados(user)) return false;
+  return usuario.startsWith("mecanico") || usuario.startsWith("mecanicos");
+}
+
 function esUsuarioTodasSedes(user) {
   return ["ADMIN", "TALLER", "TRAMITES"].includes(user?.rol) || esUsuarioProveeduria(user);
 }
@@ -276,11 +284,44 @@ function esUsuarioTodasSedes(user) {
 function sedesEspecialesPorUsuario(user) {
   const usuario = limpiarSede(user?.usuario).toLowerCase();
   const sedesPorUsuario = {
-    mecanico_guapiles: ["Guapiles", "San Carlos"],
-    mecanicos_guapiles: ["Guapiles", "San Carlos"]
+    mecanico_guapiles: ["Guapiles", "San Carlos", "granel_guapiles"],
+    mecanicos_guapiles: ["Guapiles", "San Carlos", "granel_guapiles"],
+    mecanico_pz: ["Perez Zeledon", "granel_perez_zeledon"],
+    mecanicos_pz: ["Perez Zeledon", "granel_perez_zeledon"],
+    mecanico_perez_zeledon: ["Perez Zeledon", "granel_perez_zeledon"],
+    mecanicos_perez_zeledon: ["Perez Zeledon", "granel_perez_zeledon"],
+    mecanico_lacruz: ["La Cruz", "granel_la_cruz"],
+    mecanicos_lacruz: ["La Cruz", "granel_la_cruz"],
+    mecanico_la_cruz: ["La Cruz", "granel_la_cruz"],
+    mecanicos_la_cruz: ["La Cruz", "granel_la_cruz"],
+    mecanico_alajuela: ["Alajuela", "granel_alajuela"],
+    mecanicos_alajuela: ["Alajuela", "granel_alajuela"],
+    mecanico_rio_claro: ["Rio Claro"],
+    mecanicos_rio_claro: ["Rio Claro"],
+    mecanico_nicoya: ["Nicoya"],
+    mecanicos_nicoya: ["Nicoya"]
   };
 
-  return sedesPorUsuario[usuario] || [];
+  if (sedesPorUsuario[usuario]) return sedesPorUsuario[usuario];
+  if (!esUsuarioMecanicoSede(user)) return [];
+
+  const sede = limpiarSede(user?.sede);
+  const sedeClave = claveSede(sede);
+  const granelPorSede = {
+    CARTAGO: ["Cartago", "Granel", "granel_cartago"],
+    ALAJUELA: ["Alajuela", "granel_alajuela"],
+    GUAPILES: ["Guapiles", "San Carlos", "granel_guapiles"],
+    SAN_CARLOS: ["San Carlos", "Guapiles", "granel_guapiles"],
+    LA_CRUZ: ["La Cruz", "granel_la_cruz"],
+    LACRUZ: ["La Cruz", "granel_la_cruz"],
+    PEREZ_ZELEDON: ["Perez Zeledon", "granel_perez_zeledon"],
+    PEREZZELEDON: ["Perez Zeledon", "granel_perez_zeledon"],
+    RIO_CLARO: ["Rio Claro"],
+    RIOCLARO: ["Rio Claro"],
+    NICOYA: ["Nicoya"]
+  };
+
+  return unirSedes(granelPorSede[sedeClave] || [sede]);
 }
 
 function agregarTallerParaMecanico(user, sedes) {
@@ -372,8 +413,10 @@ function getSedesPermitidas(req) {
 
   } else {
 
+    const usuarioMecanicoSede = esUsuarioMecanicoSede(user);
     const sedesUsuario = unirSedes([user.sede], sedesEspecialesPorUsuario(user));
     if (
+      !usuarioMecanicoSede &&
       req.session.sedeSeleccionada &&
       req.session.sedeSeleccionada !== "TODAS" &&
       sedesUsuario.includes(req.session.sedeSeleccionada)
@@ -408,6 +451,7 @@ module.exports = {
   sedeCanonicaVisible,
   sedesOperativasVisibles,
   esUsuarioMecanico,
+  esUsuarioMecanicoSede,
   esUsuarioProveeduria,
   esUsuarioPesados,
   esUsuarioBodega,

@@ -1,4 +1,8 @@
 const pool = require("../db");
+const fs = require("fs");
+const path = require("path");
+
+const VAPID_KEYS_PATH = path.join(__dirname, "..", "..", ".tomza-vapid-keys.json");
 
 let webPush = null;
 try {
@@ -20,8 +24,26 @@ function getVapidKeys() {
   }
 
   if (!global.__tomzaVapidKeys) {
+    try {
+      if (fs.existsSync(VAPID_KEYS_PATH)) {
+        const storedKeys = JSON.parse(fs.readFileSync(VAPID_KEYS_PATH, "utf8"));
+        if (storedKeys.publicKey && storedKeys.privateKey) {
+          global.__tomzaVapidKeys = storedKeys;
+        }
+      }
+    } catch (error) {
+      console.warn("No se pudieron leer las llaves VAPID guardadas:", error.code || error.message);
+    }
+  }
+
+  if (!global.__tomzaVapidKeys) {
     global.__tomzaVapidKeys = webPush.generateVAPIDKeys();
-    console.warn("VAPID_PUBLIC_KEY/VAPID_PRIVATE_KEY no configuradas. Se generaron llaves temporales para esta ejecución.");
+    try {
+      fs.writeFileSync(VAPID_KEYS_PATH, JSON.stringify(global.__tomzaVapidKeys, null, 2));
+      console.warn("VAPID_PUBLIC_KEY/VAPID_PRIVATE_KEY no configuradas. Se generaron y guardaron llaves locales estables.");
+    } catch (error) {
+      console.warn("No se pudieron guardar las llaves VAPID; se usaran solo durante esta ejecución:", error.code || error.message);
+    }
   }
 
   return global.__tomzaVapidKeys;
@@ -130,12 +152,33 @@ async function enviarPush(subscription, payload) {
     await webPush.sendNotification(pushSubscription, JSON.stringify(payload));
     return { ok: true };
   } catch (error) {
-    if (error.statusCode === 404 || error.statusCode === 410) {
+    if ([400, 401, 403, 404, 410].includes(error.statusCode)) {
       await queryWithRetry("UPDATE push_subscriptions SET activo = 0 WHERE id = ?", [subscription.id]);
     }
     console.warn("No se pudo enviar push:", error.statusCode || error.message);
     return { ok: false, reason: error.message };
   }
+}
+
+async function enviarNotificacionAdmins(payload) {
+  await ensurePushTables();
+
+  const [subscriptions] = await queryWithRetry(
+    `SELECT *
+     FROM push_subscriptions
+     WHERE activo = 1
+       AND (UPPER(COALESCE(rol, '')) = 'ADMIN' OR LOWER(COALESCE(usuario, '')) = 'admin')`
+  );
+
+  let enviados = 0;
+  let fallidos = 0;
+  for (const subscription of subscriptions) {
+    const result = await enviarPush(subscription, payload);
+    if (result.ok) enviados++;
+    else fallidos++;
+  }
+
+  return { suscripciones: subscriptions.length, enviados, fallidos };
 }
 
 async function enviarRecordatoriosMantenimientos(fechaObjetivo = null) {
@@ -196,6 +239,7 @@ async function enviarRecordatoriosMantenimientos(fechaObjetivo = null) {
 
 module.exports = {
   configurarWebPush,
+  enviarNotificacionAdmins,
   enviarRecordatoriosMantenimientos,
   ensurePushTables,
   getVapidKeys,

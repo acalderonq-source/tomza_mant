@@ -27,6 +27,16 @@
     return outputArray;
   }
 
+  function sameApplicationServerKey(currentKey, expectedKey) {
+    if (!currentKey || !expectedKey) return false;
+    const current = currentKey instanceof Uint8Array ? currentKey : new Uint8Array(currentKey);
+    if (current.length !== expectedKey.length) return false;
+    for (let index = 0; index < current.length; index += 1) {
+      if (current[index] !== expectedKey[index]) return false;
+    }
+    return true;
+  }
+
   async function getServiceWorkerRegistration() {
     if (!("serviceWorker" in navigator)) return null;
     if (!swRegistrationPromise) {
@@ -108,6 +118,16 @@
     const applicationServerKey = urlBase64ToUint8Array(keyData.publicKey);
 
     let subscription = await registration.pushManager.getSubscription();
+    if (
+      subscription &&
+      subscription.options &&
+      subscription.options.applicationServerKey &&
+      !sameApplicationServerKey(subscription.options.applicationServerKey, applicationServerKey)
+    ) {
+      await subscription.unsubscribe();
+      subscription = null;
+    }
+
     if (!subscription) {
       subscription = await registration.pushManager.subscribe({
         userVisibleOnly: true,
@@ -127,7 +147,7 @@
     }
 
     removeNotificationButton();
-    if (!silent) alert("Notificaciones activadas. Recibirá avisos de mantenimientos pendientes un día antes.");
+    if (!silent) alert("Notificaciones activadas. Recibirá avisos de mantenimientos, retiros de bodega y alertas del sistema.");
   }
 
   function createNotificationButton() {
@@ -137,7 +157,7 @@
     notificationButton = document.createElement("button");
     notificationButton.type = "button";
     notificationButton.textContent = "Activar notificaciones";
-    notificationButton.setAttribute("aria-label", "Activar notificaciones de mantenimientos");
+    notificationButton.setAttribute("aria-label", "Activar notificaciones del sistema");
     notificationButton.style.cssText = [
       "position:fixed",
       "right:16px",

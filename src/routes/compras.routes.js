@@ -334,6 +334,7 @@ async function ensureFacturasSchema() {
       await ensurePeriodoCierreColumns();
       await ensureNotaCreditoColumns();
       await ensureAbonoColumns();
+      await ensureFacturacionElectronicaSchema();
       ensureFacturasState.ready = true;
     })().finally(() => {
       ensureFacturasState.promise = null;
@@ -461,6 +462,74 @@ async function ensureFacturaRecepcionColumns() {
   for (const [column, definition] of facturaColumns) {
     if (!(await columnExists("facturas", column))) {
       await queryWithRetry(`ALTER TABLE facturas ADD COLUMN ${column} ${definition}`);
+    }
+  }
+}
+
+async function ensureFacturacionElectronicaSchema() {
+  await queryWithRetry(`
+    CREATE TABLE IF NOT EXISTS facturas_electronicas_cruce (
+      id BIGINT AUTO_INCREMENT PRIMARY KEY,
+      fecha_emision DATETIME NULL,
+      clave VARCHAR(80) NOT NULL,
+      consecutivo VARCHAR(40) NULL,
+      cedula_emisor VARCHAR(30) NULL,
+      nombre_emisor VARCHAR(180) NULL,
+      codigo_documento_fe VARCHAR(60) NULL,
+      numero_factura VARCHAR(100) NULL,
+      estado_hacienda VARCHAR(40) NOT NULL DEFAULT 'ACEPTADA',
+      monto_total DECIMAL(14,4) NOT NULL DEFAULT 0,
+      moneda VARCHAR(10) NULL,
+      detalle_resumen TEXT NULL,
+      codigos_producto TEXT NULL,
+      fuente_archivo VARCHAR(255) NULL,
+      criterio_cruce VARCHAR(120) NULL,
+      orden_compra_id INT NULL,
+      factura_id INT NULL,
+      creado_por INT NULL,
+      creado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      actualizado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      UNIQUE KEY uq_facturas_electronicas_clave (clave),
+      INDEX idx_facturas_electronicas_consecutivo (consecutivo),
+      INDEX idx_facturas_electronicas_numero (numero_factura),
+      INDEX idx_facturas_electronicas_estado (estado_hacienda),
+      INDEX idx_facturas_electronicas_orden (orden_compra_id),
+      INDEX idx_facturas_electronicas_factura (factura_id)
+    )
+  `);
+
+  const ordenColumns = [
+    ["factura_clave_electronica", "VARCHAR(80) NULL"],
+    ["factura_consecutivo_electronico", "VARCHAR(40) NULL"],
+    ["factura_estado_hacienda", "VARCHAR(40) NOT NULL DEFAULT 'PENDIENTE'"],
+    ["factura_fecha_aceptacion", "DATETIME NULL"]
+  ];
+  const facturaColumns = [
+    ["clave_electronica", "VARCHAR(80) NULL"],
+    ["consecutivo_electronico", "VARCHAR(40) NULL"],
+    ["estado_hacienda", "VARCHAR(40) NOT NULL DEFAULT 'PENDIENTE'"],
+    ["fecha_aceptacion", "DATETIME NULL"]
+  ];
+
+  for (const [column, definition] of ordenColumns) {
+    if (!(await columnExists("ordenes_compra", column))) {
+      await queryWithRetry(`ALTER TABLE ordenes_compra ADD COLUMN ${column} ${definition}`);
+    }
+  }
+
+  for (const [column, definition] of facturaColumns) {
+    if (!(await columnExists("facturas", column))) {
+      await queryWithRetry(`ALTER TABLE facturas ADD COLUMN ${column} ${definition}`);
+    }
+  }
+
+  const cruceColumns = [
+    ["codigos_producto", "TEXT NULL"],
+    ["criterio_cruce", "VARCHAR(120) NULL"]
+  ];
+  for (const [column, definition] of cruceColumns) {
+    if (!(await columnExists("facturas_electronicas_cruce", column))) {
+      await queryWithRetry(`ALTER TABLE facturas_electronicas_cruce ADD COLUMN ${column} ${definition}`);
     }
   }
 }
@@ -781,6 +850,521 @@ function parseMontoExcel(value) {
   return Number.isFinite(monto) ? monto : 0;
 }
 
+function limpiarTextoFacturaElectronica(value) {
+  return String(value || "")
+    .replace(/^\uFEFF/, "")
+    .replace(/^'+/, "")
+    .replace(/\u00a0/g, " ")
+    .trim();
+}
+
+function limpiarValorOpcionalFacturaElectronica(value) {
+  const texto = limpiarTextoFacturaElectronica(value);
+  if (!texto || ["-", "N/A", "NA", "NULL"].includes(texto.toUpperCase())) return "";
+  return texto;
+}
+
+function normalizarHeaderFacturaElectronica(value) {
+  return limpiarTextoFacturaElectronica(value)
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+function normalizarEstadoFacturaElectronica(value, fallback = "ACEPTADA") {
+  const texto = normalizarTextoCompra(value || fallback);
+  if (texto.includes("RECHAZ")) return "RECHAZADA";
+  if (texto.includes("ANUL")) return "ANULADA";
+  if (texto.includes("PEND")) return "PENDIENTE";
+  if (texto.includes("ACEPT")) return "ACEPTADA";
+  return fallback || "ACEPTADA";
+}
+
+function normalizarCodigoCruce(value) {
+  return limpiarTextoFacturaElectronica(value)
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, "")
+    .trim();
+}
+
+function normalizarNombreCruce(value) {
+  return normalizarTextoCompra(value)
+    .replace(/\b(SOCIEDAD|ANONIMA|S A|SA|SRL|S R L|LIMITADA|RESPONSABILIDAD|DE|DEL|LA|EL|Y)\b/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function tokensNombreCruce(value) {
+  return normalizarNombreCruce(value)
+    .split(" ")
+    .map(token => token.trim())
+    .filter(token => token.length >= 4);
+}
+
+function fechaSoloSql(value) {
+  if (!value) return null;
+  const texto = String(value);
+  const match = texto.match(/^(\d{4}-\d{2}-\d{2})/);
+  if (match) return match[1];
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString().slice(0, 10);
+}
+
+function diasEntreFechas(a, b) {
+  const fechaA = fechaSoloSql(a);
+  const fechaB = fechaSoloSql(b);
+  if (!fechaA || !fechaB) return null;
+  const timeA = new Date(`${fechaA}T00:00:00`).getTime();
+  const timeB = new Date(`${fechaB}T00:00:00`).getTime();
+  if (Number.isNaN(timeA) || Number.isNaN(timeB)) return null;
+  return Math.abs(Math.round((timeA - timeB) / 86400000));
+}
+
+function calcularCoincidenciaProveedor(nombreDocumento, nombreProveedor, cedulaDocumento, cedulaProveedor) {
+  const cedulaDoc = normalizarCodigoCruce(cedulaDocumento);
+  const cedulaProv = normalizarCodigoCruce(cedulaProveedor);
+  if (cedulaDoc && cedulaProv && cedulaDoc === cedulaProv) return 45;
+
+  const tokensDoc = tokensNombreCruce(nombreDocumento);
+  const tokensProv = new Set(tokensNombreCruce(nombreProveedor));
+  if (!tokensDoc.length || !tokensProv.size) return 0;
+
+  const coincidencias = tokensDoc.filter(token => tokensProv.has(token)).length;
+  const ratio = coincidencias / Math.max(tokensDoc.length, 1);
+  if (ratio >= 0.75) return 40;
+  if (ratio >= 0.5) return 30;
+  if (coincidencias >= 1) return 15;
+  return 0;
+}
+
+function calcularCoincidenciaMonto(montoDocumento, montoOrden) {
+  const doc = parseMonto(montoDocumento);
+  const orden = parseMonto(montoOrden);
+  if (doc <= 0 || orden <= 0) return 0;
+
+  const diferencia = Math.abs(doc - orden);
+  const ratio = diferencia / Math.max(doc, orden);
+  if (diferencia <= 1) return 30;
+  if (diferencia <= 10) return 26;
+  if (ratio <= 0.01) return 22;
+  if (ratio <= 0.03) return 14;
+  if (ratio <= 0.05) return 8;
+  return 0;
+}
+
+function calcularCoincidenciaFecha(fechaDocumento, fechaOrden) {
+  const dias = diasEntreFechas(fechaDocumento, fechaOrden);
+  if (dias === null) return 0;
+  if (dias <= 3) return 15;
+  if (dias <= 15) return 10;
+  if (dias <= 45) return 6;
+  if (dias <= 90) return 3;
+  return 0;
+}
+
+function calcularCoincidenciaDetalle(documento, textoOrden) {
+  const texto = normalizarCodigoCruce(textoOrden);
+  const codigos = Array.isArray(documento.codigos_producto) ? documento.codigos_producto : [];
+  const codigosValidos = codigos.map(normalizarCodigoCruce).filter(codigo => codigo.length >= 4);
+  const coincidenciasCodigo = codigosValidos.filter(codigo => texto.includes(codigo)).length;
+  if (coincidenciasCodigo >= 2) return 20;
+  if (coincidenciasCodigo === 1) return 14;
+
+  const tokensDetalle = tokensNombreCruce(documento.detalle_resumen)
+    .filter(token => token.length >= 5)
+    .slice(0, 10);
+  if (!tokensDetalle.length) return 0;
+
+  const textoOrdenNormalizado = normalizarNombreCruce(textoOrden);
+  const coincidenciasDetalle = tokensDetalle.filter(token => textoOrdenNormalizado.includes(token)).length;
+  if (coincidenciasDetalle >= 3) return 12;
+  if (coincidenciasDetalle >= 2) return 8;
+  if (coincidenciasDetalle === 1) return 4;
+  return 0;
+}
+
+function numeroFacturaDesdeDocumento(documento) {
+  return limpiarValorOpcionalFacturaElectronica(documento.consecutivo || documento.numero_factura || documento.codigo_documento_fe || documento.clave).slice(0, 100);
+}
+
+function clavesDocumentoCruce(documento) {
+  return [
+    documento.numero_factura,
+    documento.consecutivo,
+    documento.codigo_documento_fe,
+    documento.clave
+  ].map(normalizarClaveCierre).filter(Boolean);
+}
+
+function desplazarFechaSql(fechaSql, dias) {
+  const fecha = fechaSoloSql(fechaSql);
+  if (!fecha) return null;
+  const date = new Date(`${fecha}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return null;
+  date.setDate(date.getDate() + dias);
+  return date.toISOString().slice(0, 10);
+}
+
+function rangoFechasDocumentosCruce(documentos = []) {
+  const fechas = documentos
+    .map(documento => fechaSoloSql(documento.fecha_emision))
+    .filter(Boolean)
+    .sort();
+  if (!fechas.length) return { desde: null, hasta: null };
+  return {
+    desde: desplazarFechaSql(fechas[0], -120),
+    hasta: desplazarFechaSql(fechas[fechas.length - 1], 7)
+  };
+}
+
+function insertarClavesCruce(map, row, columns = []) {
+  for (const column of columns) {
+    const clave = normalizarClaveCierre(row[column]);
+    if (clave && !map.has(clave)) map.set(clave, row);
+  }
+}
+
+async function construirIndiceCruceFacturas(connection, documentos = []) {
+  const claves = [...new Set(documentos.flatMap(clavesDocumentoCruce))];
+  const exactasOrden = new Map();
+
+  if (claves.length) {
+    const [ordenesExactas] = await connection.query(
+      `SELECT id, factura, factura_consecutivo_electronico, factura_clave_electronica
+       FROM ordenes_compra
+       WHERE (
+         REPLACE(REPLACE(REPLACE(UPPER(COALESCE(factura, '')), '-', ''), ' ', ''), '.', '') IN (?)
+         OR REPLACE(REPLACE(REPLACE(UPPER(COALESCE(factura_consecutivo_electronico, '')), '-', ''), ' ', ''), '.', '') IN (?)
+         OR REPLACE(REPLACE(REPLACE(UPPER(COALESCE(factura_clave_electronica, '')), '-', ''), ' ', ''), '.', '') IN (?)
+       )
+       ORDER BY facturada DESC, id DESC`,
+      [claves, claves, claves]
+    );
+    ordenesExactas.forEach(row => insertarClavesCruce(exactasOrden, row, ["factura", "factura_consecutivo_electronico", "factura_clave_electronica"]));
+  }
+
+  const rango = rangoFechasDocumentosCruce(documentos);
+  const params = [];
+  let whereFecha = "";
+  if (rango.desde && rango.hasta) {
+    whereFecha = "AND o.fecha BETWEEN ? AND ?";
+    params.push(rango.desde, rango.hasta);
+  }
+
+  const [ordenesPendientes] = await connection.query(
+    `SELECT
+       o.id,
+       o.po_numero,
+       o.fecha,
+       o.total,
+       o.factura,
+       o.facturada,
+       p.nombre AS proveedor_nombre,
+       p.cedula_juridica,
+       GROUP_CONCAT(CONCAT_WS(' ', od.codigo, od.codigo_producto, od.descripcion) SEPARATOR ' ') AS texto_detalle
+     FROM ordenes_compra o
+     JOIN proveedores p ON p.id = o.proveedor_id
+     LEFT JOIN ordenes_compra_detalle od ON od.orden_compra_id = o.id
+     WHERE COALESCE(o.facturada, 0) = 0
+       AND (o.factura IS NULL OR TRIM(o.factura) = '')
+       ${whereFecha}
+     GROUP BY o.id, o.po_numero, o.fecha, o.total, o.factura, o.facturada, p.nombre, p.cedula_juridica
+     ORDER BY o.fecha DESC, o.id DESC
+     LIMIT 2500`,
+    params
+  );
+
+  return {
+    exactasOrden,
+    ordenesPendientes,
+    ordenesUsadas: new Set()
+  };
+}
+
+function buscarFacturaInternaEnIndice(documento, indice) {
+  const claves = clavesDocumentoCruce(documento);
+  for (const clave of claves) {
+    const orden = indice.exactasOrden.get(clave);
+    if (orden) return { tipo: "orden", id: orden.id, criterio: "Cruce exacto por factura/consecutivo/clave" };
+  }
+
+  let mejor = null;
+  for (const orden of indice.ordenesPendientes) {
+    if (indice.ordenesUsadas.has(orden.id)) continue;
+    const puntosProveedor = calcularCoincidenciaProveedor(
+      documento.nombre_emisor,
+      orden.proveedor_nombre,
+      documento.cedula_emisor,
+      orden.cedula_juridica
+    );
+    const puntosMonto = calcularCoincidenciaMonto(documento.monto_total, orden.total);
+    const puntosFecha = calcularCoincidenciaFecha(documento.fecha_emision, orden.fecha);
+    const puntosDetalle = calcularCoincidenciaDetalle(documento, orden.texto_detalle || "");
+    const puntaje = puntosProveedor + puntosMonto + puntosFecha + puntosDetalle;
+
+    if (!mejor || puntaje > mejor.puntaje) {
+      mejor = {
+        tipo: "orden",
+        id: orden.id,
+        puntaje,
+        puntosProveedor,
+        puntosMonto,
+        puntosFecha,
+        puntosDetalle,
+        criterio: `proveedor ${puntosProveedor}, monto ${puntosMonto}, fecha ${puntosFecha}, codigo ${puntosDetalle}`
+      };
+    }
+  }
+
+  if (
+    mejor &&
+    mejor.puntaje >= 70 &&
+    mejor.puntosProveedor >= 30 &&
+    mejor.puntosMonto >= 22 &&
+    (mejor.puntosDetalle > 0 || mejor.puntosFecha >= 6)
+  ) {
+    return mejor;
+  }
+
+  return mejor
+    ? { tipo: null, id: null, puntaje: mejor.puntaje, criterio: `Sin enlace seguro: ${mejor.criterio}` }
+    : { tipo: null, id: null, criterio: "Sin candidato compatible" };
+}
+
+function fechaHoraFacturaElectronicaToSql(value) {
+  const texto = limpiarTextoFacturaElectronica(value);
+  if (!texto) return null;
+
+  const local = texto.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
+  if (local) {
+    return [
+      `${local[3]}-${local[2].padStart(2, "0")}-${local[1].padStart(2, "0")}`,
+      `${String(local[4] || "00").padStart(2, "0")}:${String(local[5] || "00").padStart(2, "0")}:${String(local[6] || "00").padStart(2, "0")}`
+    ].join(" ");
+  }
+
+  const iso = texto.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T\s](\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
+  if (iso) {
+    return [
+      `${iso[1]}-${iso[2]}-${iso[3]}`,
+      `${String(iso[4] || "00").padStart(2, "0")}:${String(iso[5] || "00").padStart(2, "0")}:${String(iso[6] || "00").padStart(2, "0")}`
+    ].join(" ");
+  }
+
+  return null;
+}
+
+function detectarSeparadorFacturaElectronica(linea) {
+  const candidatos = ["\t", ";", ","];
+  return candidatos
+    .map(separador => ({ separador, partes: linea.split(separador).length }))
+    .sort((a, b) => b.partes - a.partes)[0].separador;
+}
+
+function obtenerValorFacturaElectronica(row, headerMap, opciones = []) {
+  for (const opcion of opciones) {
+    const key = normalizarHeaderFacturaElectronica(opcion);
+    if (headerMap.has(key)) return limpiarTextoFacturaElectronica(row[headerMap.get(key)]);
+  }
+  return "";
+}
+
+function parseFacturasElectronicasTexto(texto, estadoDefault = "ACEPTADA") {
+  const lineas = String(texto || "")
+    .replace(/\r\n/g, "\n")
+    .replace(/\r/g, "\n")
+    .split("\n")
+    .filter(linea => linea.trim());
+
+  if (!lineas.length) return [];
+
+  const separador = detectarSeparadorFacturaElectronica(lineas[0]);
+  const headers = lineas[0].split(separador).map(normalizarHeaderFacturaElectronica);
+  const headerMap = new Map(headers.map((header, index) => [header, index]));
+  const documentos = new Map();
+
+  for (const linea of lineas.slice(1)) {
+    const row = linea.split(separador);
+    const clave = limpiarTextoFacturaElectronica(obtenerValorFacturaElectronica(row, headerMap, ["clave"]));
+    const consecutivo = limpiarTextoFacturaElectronica(obtenerValorFacturaElectronica(row, headerMap, ["consecutivo"]));
+    if (!clave && !consecutivo) continue;
+
+    const docKey = clave || consecutivo;
+    const detalle = obtenerValorFacturaElectronica(row, headerMap, ["detalle"]);
+    const esTotalDocumento = normalizarHeaderFacturaElectronica(detalle) === "total documento";
+    const codigoComercial = normalizarCodigoCruce(obtenerValorFacturaElectronica(row, headerMap, ["codigo comercial", "código comercial"]));
+    const cabys = normalizarCodigoCruce(obtenerValorFacturaElectronica(row, headerMap, ["cabys"]));
+    const montoTotalLinea = parseMontoExcel(obtenerValorFacturaElectronica(row, headerMap, ["monto total linea", "monto total línea"]));
+    const montoTotal = parseMontoExcel(obtenerValorFacturaElectronica(row, headerMap, ["monto total"]));
+    const estado = obtenerValorFacturaElectronica(row, headerMap, [
+      "estado hacienda",
+      "estado",
+      "estado comprobante",
+      "aceptada",
+      "aceptacion",
+      "aceptación"
+    ]);
+    const numeroFactura = limpiarValorOpcionalFacturaElectronica(obtenerValorFacturaElectronica(row, headerMap, [
+      "numero factura",
+      "n factura",
+      "no factura",
+      "factura",
+      "referencia personalizada"
+    ]));
+
+    const existente = documentos.get(docKey) || {
+      fecha_emision: fechaHoraFacturaElectronicaToSql(obtenerValorFacturaElectronica(row, headerMap, ["fecha"])),
+      clave,
+      consecutivo,
+      cedula_emisor: obtenerValorFacturaElectronica(row, headerMap, ["cedula emisor", "cédula emisor"]).slice(0, 30),
+      nombre_emisor: obtenerValorFacturaElectronica(row, headerMap, ["nombre emisor"]).slice(0, 180),
+      codigo_documento_fe: obtenerValorFacturaElectronica(row, headerMap, ["codigodocumentofe", "codigo documento fe", "código documento fe"]).slice(0, 60),
+      numero_factura: numeroFactura.slice(0, 100) || null,
+      estado_hacienda: normalizarEstadoFacturaElectronica(estado, estadoDefault),
+      monto_total: 0,
+      moneda: obtenerValorFacturaElectronica(row, headerMap, ["moneda"]).slice(0, 10) || null,
+      detalle_resumen: "",
+      codigosSet: new Set(),
+      tiene_total_documento: false
+    };
+
+    if (numeroFactura && !existente.numero_factura) existente.numero_factura = numeroFactura.slice(0, 100);
+    if (estado) existente.estado_hacienda = normalizarEstadoFacturaElectronica(estado, estadoDefault);
+    if (detalle && !esTotalDocumento && !existente.detalle_resumen) existente.detalle_resumen = detalle.slice(0, 500);
+    if (!esTotalDocumento) {
+      if (codigoComercial) existente.codigosSet.add(codigoComercial);
+      if (cabys) existente.codigosSet.add(cabys);
+      normalizarTextoCompra(detalle)
+        .split(/\s+/)
+        .map(normalizarCodigoCruce)
+        .filter(token => token.length >= 5 && /\d/.test(token))
+        .slice(0, 8)
+        .forEach(token => existente.codigosSet.add(token));
+    }
+
+    if (esTotalDocumento) {
+      existente.monto_total = montoTotalLinea || montoTotal || existente.monto_total;
+      existente.tiene_total_documento = true;
+    } else if (!existente.tiene_total_documento) {
+      existente.monto_total += montoTotalLinea || montoTotal || 0;
+    }
+
+    documentos.set(docKey, existente);
+  }
+
+  return Array.from(documentos.values()).map(doc => {
+    doc.codigos_producto = Array.from(doc.codigosSet || []).slice(0, 60);
+    delete doc.codigosSet;
+    delete doc.tiene_total_documento;
+    return doc;
+  });
+}
+
+async function buscarFacturaInternaParaCruce(connection, documento) {
+  const candidatos = [
+    documento.numero_factura,
+    documento.consecutivo,
+    documento.codigo_documento_fe
+  ].map(normalizarClaveCierre).filter(Boolean);
+  const claves = [...new Set(candidatos)];
+
+  if (!claves.length) return { tipo: null, id: null };
+
+  const [ordenes] = await connection.query(
+    `SELECT id
+     FROM ordenes_compra
+     WHERE facturada = 1
+       AND (
+         REPLACE(REPLACE(REPLACE(UPPER(COALESCE(factura, '')), '-', ''), ' ', ''), '.', '') IN (?)
+         OR REPLACE(REPLACE(REPLACE(UPPER(COALESCE(factura_consecutivo_electronico, '')), '-', ''), ' ', ''), '.', '') IN (?)
+         OR REPLACE(REPLACE(REPLACE(UPPER(COALESCE(factura_clave_electronica, '')), '-', ''), ' ', ''), '.', '') IN (?)
+       )
+     ORDER BY id DESC
+     LIMIT 1`,
+    [claves, claves, claves]
+  );
+  if (ordenes.length) return { tipo: "orden", id: ordenes[0].id };
+
+  const [facturas] = await connection.query(
+    `SELECT id
+     FROM facturas
+     WHERE REPLACE(REPLACE(REPLACE(UPPER(COALESCE(numero_factura, '')), '-', ''), ' ', ''), '.', '') IN (?)
+        OR REPLACE(REPLACE(REPLACE(UPPER(COALESCE(consecutivo_electronico, '')), '-', ''), ' ', ''), '.', '') IN (?)
+        OR REPLACE(REPLACE(REPLACE(UPPER(COALESCE(clave_electronica, '')), '-', ''), ' ', ''), '.', '') IN (?)
+     ORDER BY id DESC
+     LIMIT 1`,
+    [claves, claves, claves]
+  );
+  if (facturas.length) return { tipo: "independiente", id: facturas[0].id };
+
+  const fechaDocumento = fechaSoloSql(documento.fecha_emision);
+  const [ordenesSinFactura] = await connection.query(
+    `SELECT
+       o.id,
+       o.fecha,
+       o.total,
+       o.factura,
+       o.facturada,
+       p.nombre AS proveedor_nombre,
+       p.cedula_juridica,
+       GROUP_CONCAT(CONCAT_WS(' ', od.codigo, od.codigo_producto, od.descripcion) SEPARATOR ' ') AS texto_detalle
+     FROM ordenes_compra o
+     JOIN proveedores p ON p.id = o.proveedor_id
+     LEFT JOIN ordenes_compra_detalle od ON od.orden_compra_id = o.id
+     WHERE COALESCE(o.facturada, 0) = 0
+       AND (o.factura IS NULL OR TRIM(o.factura) = '')
+       AND (? IS NULL OR o.fecha <= DATE_ADD(?, INTERVAL 7 DAY))
+       AND (? IS NULL OR o.fecha >= DATE_SUB(?, INTERVAL 120 DAY))
+     GROUP BY o.id, o.fecha, o.total, o.factura, o.facturada, p.nombre, p.cedula_juridica
+     ORDER BY o.fecha DESC, o.id DESC
+     LIMIT 350`,
+    [fechaDocumento, fechaDocumento, fechaDocumento, fechaDocumento]
+  );
+
+  let mejor = null;
+  for (const orden of ordenesSinFactura) {
+    const puntosProveedor = calcularCoincidenciaProveedor(
+      documento.nombre_emisor,
+      orden.proveedor_nombre,
+      documento.cedula_emisor,
+      orden.cedula_juridica
+    );
+    const puntosMonto = calcularCoincidenciaMonto(documento.monto_total, orden.total);
+    const puntosFecha = calcularCoincidenciaFecha(documento.fecha_emision, orden.fecha);
+    const puntosDetalle = calcularCoincidenciaDetalle(documento, orden.texto_detalle || "");
+    const puntaje = puntosProveedor + puntosMonto + puntosFecha + puntosDetalle;
+
+    if (!mejor || puntaje > mejor.puntaje) {
+      mejor = {
+        tipo: "orden",
+        id: orden.id,
+        puntaje,
+        puntosProveedor,
+        puntosMonto,
+        puntosFecha,
+        puntosDetalle,
+        criterio: `proveedor ${puntosProveedor}, monto ${puntosMonto}, fecha ${puntosFecha}, codigo ${puntosDetalle}`
+      };
+    }
+  }
+
+  if (
+    mejor &&
+    mejor.puntaje >= 70 &&
+    mejor.puntosProveedor >= 30 &&
+    mejor.puntosMonto >= 22 &&
+    (mejor.puntosDetalle > 0 || mejor.puntosFecha >= 6)
+  ) {
+    return mejor;
+  }
+
+  return mejor
+    ? { tipo: null, id: null, puntaje: mejor.puntaje, criterio: `Sin enlace seguro: ${mejor.criterio}` }
+    : { tipo: null, id: null };
+}
+
 function normalizarEmpresaPago(value) {
   const texto = String(value || "").toUpperCase();
   if (texto.includes("SUPER")) return "SUPER GAS";
@@ -930,10 +1514,43 @@ function calcularMontoPagadoCierre(saldos, pagada = 0, montoPagadoCierre = null)
 
 function redirectFacturas(req, res) {
   const returnTo = String(req.body.return_to || "");
-  if (returnTo.startsWith("/compras/facturas")) {
+  if (returnTo.startsWith("/compras/facturas") || returnTo.startsWith("/compras/ordenes")) {
     return res.redirect(returnTo);
   }
   return res.redirect("/compras/facturas");
+}
+
+function redirectCruceOrdenes(req, res) {
+  const returnTo = String(req.body.return_to || "");
+  if (returnTo.startsWith("/compras/ordenes")) {
+    return res.redirect(returnTo);
+  }
+  return res.redirect("/compras/ordenes");
+}
+
+async function obtenerCrucesFacturacionElectronicaRecientes() {
+  const [facturasElectronicasRecientes] = await queryWithRetry(`
+      SELECT
+        fe.*,
+        o.po_numero,
+        COALESCE(o.factura, fe.numero_factura) AS factura_interna,
+        COALESCE(p.nombre, fe.nombre_emisor) AS proveedor_interno
+      FROM facturas_electronicas_cruce fe
+      LEFT JOIN ordenes_compra o ON o.id = fe.orden_compra_id
+      LEFT JOIN proveedores p ON p.id = o.proveedor_id
+      ORDER BY COALESCE(fe.fecha_emision, fe.creado_en) DESC, fe.id DESC
+      LIMIT 30
+    `);
+  const [[resumenElectronico]] = await queryWithRetry(`
+      SELECT
+        COUNT(*) AS total,
+        SUM(CASE WHEN orden_compra_id IS NOT NULL THEN 1 ELSE 0 END) AS enlazadas,
+        SUM(CASE WHEN estado_hacienda = 'ACEPTADA' THEN 1 ELSE 0 END) AS aceptadas,
+        SUM(CASE WHEN orden_compra_id IS NULL THEN 1 ELSE 0 END) AS pendientes
+      FROM facturas_electronicas_cruce
+    `);
+
+  return { facturasElectronicasRecientes, resumenElectronico };
 }
 
 function redirectPagosProveedor(req, res) {
@@ -1565,6 +2182,10 @@ function construirConsultaFacturas(filtros = {}, modo = "full") {
       o.factura_observacion,
       o.factura_foto_producto,
       o.factura_placa_producto,
+      o.factura_clave_electronica AS clave_electronica,
+      o.factura_consecutivo_electronico AS consecutivo_electronico,
+      o.factura_estado_hacienda AS estado_hacienda,
+      o.factura_fecha_aceptacion AS fecha_aceptacion,
       o.nota_credito_numero,
       o.nota_credito_fecha,
       o.nota_credito_monto,
@@ -1597,6 +2218,10 @@ function construirConsultaFacturas(filtros = {}, modo = "full") {
       f.factura_observacion,
       f.factura_foto_producto,
       f.factura_placa_producto,
+      f.clave_electronica,
+      f.consecutivo_electronico,
+      f.estado_hacienda,
+      f.fecha_aceptacion,
       f.nota_credito_numero,
       f.nota_credito_fecha,
       f.nota_credito_monto,
@@ -2537,6 +3162,7 @@ router.get("/ordenes", requireAuth, allowRoles(...ROLES_VER_ORDENES), async (req
     await ensureOrdenPlacaColumn();
     await ensureOrdenDetalleCodigoProductoColumn();
     await ensureOrdenCotizacionColumns();
+    await ensureFacturasSchema();
     const { proveedor_id, fecha_desde, fecha_hasta, po_numero, placa_unidad, estado, facturada } = req.query;
     const { sql, params } = construirConsultaOrdenes({ proveedor_id, fecha_desde, fecha_hasta, po_numero, placa_unidad, estado, facturada });
 
@@ -2547,6 +3173,7 @@ router.get("/ordenes", requireAuth, allowRoles(...ROLES_VER_ORDENES), async (req
 
     let totalFiltrado = 0;
     ordenes.forEach(o => totalFiltrado += parseFloat(o.total) || 0);
+    const { facturasElectronicasRecientes, resumenElectronico } = await obtenerCrucesFacturacionElectronicaRecientes();
     const success = req.session.success;
     const error = req.session.error;
     delete req.session.success;
@@ -2559,6 +3186,8 @@ router.get("/ordenes", requireAuth, allowRoles(...ROLES_VER_ORDENES), async (req
       estados,
       filtros: { proveedor_id, fecha_desde, fecha_hasta, po_numero, placa_unidad, estado, facturada },
       totalFiltrado,
+      facturasElectronicasRecientes,
+      resumenElectronico,
       success,
       error,
       hoy: new Date().toISOString().slice(0, 10)
@@ -2961,6 +3590,9 @@ router.get("/ordenes/reporte/excel", requireAuth, allowRoles("ADMIN", "TALLER", 
       { header: "Proveedor", key: "proveedor", width: 30 },
       { header: "Estado orden", key: "estado", width: 18 },
       { header: "Factura", key: "factura", width: 18 },
+      { header: "Clave electronica", key: "clave_electronica", width: 55 },
+      { header: "Consecutivo electronico", key: "consecutivo_electronico", width: 24 },
+      { header: "Estado Hacienda", key: "estado_hacienda", width: 18 },
       { header: "Placa orden", key: "placa_orden", width: 17 },
       { header: "Placa línea", key: "codigo", width: 18 },
       { header: "Código", key: "codigo_producto", width: 18 },
@@ -2982,6 +3614,9 @@ router.get("/ordenes/reporte/excel", requireAuth, allowRoles("ADMIN", "TALLER", 
           proveedor: orden.proveedor_nombre,
           estado: String(orden.estado || "").replaceAll("_", " "),
           factura: orden.factura || estadoFacturaOrden(orden),
+          clave_electronica: orden.factura_clave_electronica || "-",
+          consecutivo_electronico: orden.factura_consecutivo_electronico || "-",
+          estado_hacienda: orden.factura_estado_hacienda || "PENDIENTE",
           placa_orden: orden.placa_visual || orden.placa_unidad || "-",
           codigo: linea.codigo || "-",
           codigo_producto: linea.codigo_producto || "-",
@@ -2993,14 +3628,14 @@ router.get("/ordenes/reporte/excel", requireAuth, allowRoles("ADMIN", "TALLER", 
           observaciones: orden.observaciones || "-"
         });
         row.getCell(2).numFmt = "yyyy-mm-dd";
-        [11, 12, 13].forEach(col => {
+        [14, 15, 16].forEach(col => {
           row.getCell(col).numFmt = '"CRC" #,##0.00';
         });
-        row.getCell(9).alignment = { wrapText: true, vertical: "top" };
-        row.getCell(14).alignment = { wrapText: true, vertical: "top" };
+        row.getCell(12).alignment = { wrapText: true, vertical: "top" };
+        row.getCell(17).alignment = { wrapText: true, vertical: "top" };
       });
     });
-    wsDetalle.autoFilter = { from: "A1", to: "N1" };
+    wsDetalle.autoFilter = { from: "A1", to: "Q1" };
 
     [wsProductos, wsOrdenes, wsCompleto, resumen, wsDetalle].forEach(worksheet => {
       aplicarBordesWorksheet(worksheet);
@@ -3022,6 +3657,7 @@ router.get("/ordenes/:id/detalle", requireAuth, allowRoles(...ROLES_VER_ORDENES)
     await ensureOrdenPlacaColumn();
     await ensureOrdenDetalleCodigoProductoColumn();
     await ensureOrdenCotizacionColumns();
+    await ensureFacturasSchema();
     const id = req.params.id;
     const [[orden]] = await pool.query("SELECT * FROM ordenes_compra WHERE id = ?", [id]);
     if (!orden) return res.status(404).send("Orden no encontrada");
@@ -3234,8 +3870,16 @@ router.post("/ordenes/:id/factura", requireAuth, allowRoles(...ROLES_REGISTRAR_F
       po_numero,
       placa_unidad,
       estado,
-      facturada
+      facturada,
+      clave_electronica,
+      consecutivo_electronico,
+      estado_hacienda,
+      fecha_aceptacion
     } = req.body;
+    const claveElectronica = limpiarTextoFacturaElectronica(clave_electronica).slice(0, 80) || null;
+    const consecutivoElectronico = limpiarTextoFacturaElectronica(consecutivo_electronico).slice(0, 40) || null;
+    const estadoHacienda = normalizarEstadoFacturaElectronica(estado_hacienda || "PENDIENTE", "PENDIENTE");
+    const fechaAceptacionFinal = fecha_aceptacion ? fechaHoraFacturaElectronicaToSql(fecha_aceptacion) : null;
 
     const queryParams = [];
     if (proveedor_id) queryParams.push(`proveedor_id=${encodeURIComponent(proveedor_id)}`);
@@ -3280,7 +3924,11 @@ router.post("/ordenes/:id/factura", requireAuth, allowRoles(...ROLES_REGISTRAR_F
            factura_recibido_por = ?,
            factura_producto_recibido = 1,
            factura_observacion = ?,
-           factura_foto_producto = ?
+           factura_foto_producto = ?,
+           factura_clave_electronica = ?,
+           factura_consecutivo_electronico = ?,
+           factura_estado_hacienda = ?,
+           factura_fecha_aceptacion = ?
        WHERE id = ?`,
       [
         factura || null,
@@ -3292,6 +3940,10 @@ router.post("/ordenes/:id/factura", requireAuth, allowRoles(...ROLES_REGISTRAR_F
         recibido_por || req.session.user.usuario || null,
         observacion_recepcion || null,
         fotoProductoPath,
+        claveElectronica,
+        consecutivoElectronico,
+        estadoHacienda,
+        fechaAceptacionFinal,
         id
       ]
     );
@@ -3320,8 +3972,16 @@ router.post("/facturas/agregar", requireAuth, allowRoles(...ROLES_RECEPCION_FACT
       observacion_recepcion,
       foto_producto_data,
       monto,
-      proveedor_id
+      proveedor_id,
+      clave_electronica,
+      consecutivo_electronico,
+      estado_hacienda,
+      fecha_aceptacion
     } = req.body;
+    const claveElectronica = limpiarTextoFacturaElectronica(clave_electronica).slice(0, 80) || null;
+    const consecutivoElectronico = limpiarTextoFacturaElectronica(consecutivo_electronico).slice(0, 40) || null;
+    const estadoHacienda = normalizarEstadoFacturaElectronica(estado_hacienda || "PENDIENTE", "PENDIENTE");
+    const fechaAceptacionFinal = fecha_aceptacion ? fechaHoraFacturaElectronicaToSql(fecha_aceptacion) : null;
 
     if (!factura || !fecha_factura) {
       req.session.error = "Debe completar número de factura y fecha.";
@@ -3360,7 +4020,11 @@ router.post("/facturas/agregar", requireAuth, allowRoles(...ROLES_RECEPCION_FACT
                factura_recibido_por = ?,
                factura_producto_recibido = 1,
                factura_observacion = ?,
-               factura_foto_producto = ?
+               factura_foto_producto = ?,
+               factura_clave_electronica = ?,
+               factura_consecutivo_electronico = ?,
+               factura_estado_hacienda = ?,
+               factura_fecha_aceptacion = ?
            WHERE id = ?`,
           [
             factura,
@@ -3372,6 +4036,10 @@ router.post("/facturas/agregar", requireAuth, allowRoles(...ROLES_RECEPCION_FACT
             recibido_por || req.session.user.usuario || null,
             observacion_recepcion || null,
             fotoProductoPath,
+            claveElectronica,
+            consecutivoElectronico,
+            estadoHacienda,
+            fechaAceptacionFinal,
             orden.id
           ]
         );
@@ -3400,9 +4068,10 @@ router.post("/facturas/agregar", requireAuth, allowRoles(...ROLES_RECEPCION_FACT
       `INSERT INTO facturas (
         numero_factura, fecha, monto, proveedor_id, proveedor_nombre, pagada, creado_por,
         factura_fecha_recepcion, factura_tipo_entrega, factura_entregado_por,
-        factura_recibido_por, factura_producto_recibido, factura_observacion, factura_foto_producto
+        factura_recibido_por, factura_producto_recibido, factura_observacion, factura_foto_producto,
+        clave_electronica, consecutivo_electronico, estado_hacienda, fecha_aceptacion
        )
-       VALUES (?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         factura,
         fecha_factura,
@@ -3416,7 +4085,11 @@ router.post("/facturas/agregar", requireAuth, allowRoles(...ROLES_RECEPCION_FACT
         recibido_por || req.session.user.usuario || null,
         producto_recibido === "1" ? 1 : 0,
         observacion_recepcion || null,
-        fotoProductoPath
+        fotoProductoPath,
+        claveElectronica,
+        consecutivoElectronico,
+        estadoHacienda,
+        fechaAceptacionFinal
       ]
     );
     req.session.success = `Factura independiente ${factura} agregada correctamente.`;
@@ -3968,6 +4641,135 @@ router.post("/facturas/reintegro-gastos", requireAuth, allowRoles(...ROLES_GESTI
   }
 });
 
+router.post("/ordenes/electronicas/importar", requireAuth, allowRoles(...ROLES_GESTION_FACTURAS), async (req, res) => {
+  const connection = await pool.getConnection();
+  try {
+    await ensureFacturasSchema();
+    const texto = String(req.body.facturas_electronicas_texto || "").trim();
+    const estadoDefault = normalizarEstadoFacturaElectronica(req.body.estado_default || "ACEPTADA", "ACEPTADA");
+    const fuenteArchivo = String(req.body.fuente_archivo || "Exportacion facturacion electronica").trim().slice(0, 255);
+
+    if (!texto) {
+      req.session.error = "Pegue el contenido exportado del otro sistema para cruzar las facturas.";
+      return redirectCruceOrdenes(req, res);
+    }
+
+    const documentos = parseFacturasElectronicasTexto(texto, estadoDefault);
+    if (!documentos.length) {
+      req.session.error = "No encontré documentos con clave o consecutivo en el texto pegado.";
+      return redirectCruceOrdenes(req, res);
+    }
+
+    const indiceCruce = await construirIndiceCruceFacturas(connection, documentos);
+    await connection.beginTransaction();
+    let enlazadas = 0;
+    let ordenesFacturadas = 0;
+    let sinEnlace = 0;
+
+    for (const documento of documentos) {
+      const match = buscarFacturaInternaEnIndice(documento, indiceCruce);
+      const numeroFacturaDocumento = numeroFacturaDesdeDocumento(documento);
+      const fechaFacturaDocumento = fechaSoloSql(documento.fecha_emision);
+      const fechaVencimientoDocumento = fechaFacturaDocumento
+        ? (() => {
+            const fecha = new Date(`${fechaFacturaDocumento}T00:00:00`);
+            fecha.setDate(fecha.getDate() + 30);
+            return fecha.toISOString().slice(0, 10);
+          })()
+        : null;
+
+      if (match.tipo === "orden") {
+        enlazadas += 1;
+        const [resultOrden] = await connection.query(
+          `UPDATE ordenes_compra
+           SET factura = ?,
+               factura_fecha = COALESCE(factura_fecha, ?),
+               facturada = 1,
+               estado = 'RECIBIDA_TOTAL',
+               fecha_vencimiento_factura = COALESCE(fecha_vencimiento_factura, ?),
+               factura_fecha_recepcion = COALESCE(factura_fecha_recepcion, CURDATE()),
+               factura_producto_recibido = 1,
+               factura_clave_electronica = ?,
+               factura_consecutivo_electronico = ?,
+               factura_estado_hacienda = ?,
+               factura_fecha_aceptacion = CASE WHEN ? = 'ACEPTADA' THEN COALESCE(factura_fecha_aceptacion, NOW()) ELSE factura_fecha_aceptacion END
+           WHERE id = ?`,
+          [
+            numeroFacturaDocumento || null,
+            fechaFacturaDocumento,
+            fechaVencimientoDocumento,
+            documento.clave || null,
+            documento.consecutivo || null,
+            documento.estado_hacienda,
+            documento.estado_hacienda,
+            match.id
+          ]
+        );
+        if (resultOrden.affectedRows) ordenesFacturadas += 1;
+        indiceCruce.ordenesUsadas.add(match.id);
+      } else {
+        sinEnlace += 1;
+      }
+
+      await connection.query(
+        `INSERT INTO facturas_electronicas_cruce (
+          fecha_emision, clave, consecutivo, cedula_emisor, nombre_emisor, codigo_documento_fe,
+          numero_factura, estado_hacienda, monto_total, moneda, detalle_resumen, codigos_producto, fuente_archivo, criterio_cruce,
+          orden_compra_id, factura_id, creado_por
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON DUPLICATE KEY UPDATE
+          fecha_emision = VALUES(fecha_emision),
+          consecutivo = VALUES(consecutivo),
+          cedula_emisor = VALUES(cedula_emisor),
+          nombre_emisor = VALUES(nombre_emisor),
+          codigo_documento_fe = VALUES(codigo_documento_fe),
+          numero_factura = VALUES(numero_factura),
+          estado_hacienda = VALUES(estado_hacienda),
+          monto_total = VALUES(monto_total),
+          moneda = VALUES(moneda),
+          detalle_resumen = VALUES(detalle_resumen),
+          codigos_producto = VALUES(codigos_producto),
+          fuente_archivo = VALUES(fuente_archivo),
+          criterio_cruce = VALUES(criterio_cruce),
+          orden_compra_id = COALESCE(VALUES(orden_compra_id), orden_compra_id),
+          factura_id = COALESCE(VALUES(factura_id), factura_id),
+          actualizado_en = CURRENT_TIMESTAMP`,
+        [
+          documento.fecha_emision,
+          documento.clave || documento.consecutivo,
+          documento.consecutivo || null,
+          documento.cedula_emisor || null,
+          documento.nombre_emisor || null,
+          documento.codigo_documento_fe || null,
+          numeroFacturaDocumento || null,
+          documento.estado_hacienda,
+          documento.monto_total || 0,
+          documento.moneda || "CRC",
+          documento.detalle_resumen || null,
+          (documento.codigos_producto || []).join(", "),
+          fuenteArchivo,
+          match.criterio || (match.tipo ? "Cruce por factura/consecutivo/clave" : "Sin enlace"),
+          match.tipo === "orden" ? match.id : null,
+          null,
+          req.session.user.id
+        ]
+      );
+    }
+
+    await connection.commit();
+    req.session.success = `Cruce importado: ${documentos.length} documento(s), ${enlazadas} enlazado(s), ${ordenesFacturadas} orden(es) facturada(s) y ${sinEnlace} pendiente(s) de revisar.`;
+    return redirectCruceOrdenes(req, res);
+  } catch (error) {
+    await connection.rollback();
+    console.error("Error importando cruce de facturacion electronica:", error);
+    req.session.error = error.message || "Error interno al importar facturación electrónica.";
+    return redirectCruceOrdenes(req, res);
+  } finally {
+    connection.release();
+  }
+});
+
 // ===================== LISTADO DE FACTURAS (unificado) =====================
 router.get("/facturas", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER", "CONTABILIDAD"), async (req, res) => {
   try {
@@ -4285,10 +5087,13 @@ router.get("/facturas/reporte/excel", requireAuth, allowRoles("ADMIN", "TALLER",
       { header: "Saldo", key: "saldo", width: 15 },
       { header: "Periodo cierre", key: "periodo_cierre", width: 16 },
       { header: "Estado", key: "estado", width: 13 },
+      { header: "Clave electronica", key: "clave_electronica", width: 55 },
+      { header: "Consecutivo electronico", key: "consecutivo_electronico", width: 24 },
+      { header: "Estado Hacienda", key: "estado_hacienda", width: 18 },
       { header: "Observación", key: "observacion", width: 42 }
     ];
 
-    worksheet.mergeCells("A1:M1");
+    worksheet.mergeCells("A1:P1");
     worksheet.getCell("A1").value = metaReporte.titulo;
     worksheet.getCell("A1").font = { bold: true, size: 16, color: { argb: "FFFFFFFF" } };
     worksheet.getCell("A1").alignment = { vertical: "middle", horizontal: "center" };
@@ -4341,7 +5146,7 @@ router.get("/facturas/reporte/excel", requireAuth, allowRoles("ADMIN", "TALLER",
     gruposProveedor.forEach(grupo => {
       const providerRow = worksheet.getRow(rowNumber++);
       providerRow.getCell(1).value = `${grupo.proveedor} (${grupo.facturas.length} factura${grupo.facturas.length === 1 ? "" : "s"})`;
-      worksheet.mergeCells(providerRow.number, 1, providerRow.number, 13);
+      worksheet.mergeCells(providerRow.number, 1, providerRow.number, 16);
       providerRow.font = { bold: true, color: { argb: "FF111827" } };
       providerRow.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE5E7EB" } };
 
@@ -4360,6 +5165,9 @@ router.get("/facturas/reporte/excel", requireAuth, allowRoles("ADMIN", "TALLER",
           parseMonto(f.saldo),
           f.periodo_cierre || "-",
           f.pagada || f.cubierta_por_nc ? "Pagada" : (f.vencida ? "Vencida" : "Pendiente"),
+          f.clave_electronica || "-",
+          f.consecutivo_electronico || "-",
+          f.estado_hacienda || "PENDIENTE",
           f.factura_observacion || f.abono_observacion || f.nota_credito_motivo || f.observacion || "-"
         ];
         row.getCell(3).numFmt = "yyyy-mm-dd";
@@ -4369,7 +5177,8 @@ router.get("/facturas/reporte/excel", requireAuth, allowRoles("ADMIN", "TALLER",
         });
         const estadoPagado = f.pagada || f.cubierta_por_nc;
         row.getCell(12).font = { bold: true, color: { argb: estadoPagado ? "FF14532D" : (f.vencida ? "FF991B1B" : "FF92400E") } };
-        row.getCell(13).alignment = { wrapText: true, vertical: "top" };
+        row.getCell(15).font = { bold: true, color: { argb: f.estado_hacienda === "ACEPTADA" ? "FF14532D" : "FF92400E" } };
+        row.getCell(16).alignment = { wrapText: true, vertical: "top" };
       });
 
       const subtotalRow = worksheet.getRow(rowNumber++);
@@ -4381,7 +5190,7 @@ router.get("/facturas/reporte/excel", requireAuth, allowRoles("ADMIN", "TALLER",
         grupo.totales.abonos,
         grupo.totales.pagado,
         grupo.totales.saldo,
-        "", "", ""
+        "", "", "", "", "", ""
       ];
       worksheet.mergeCells(subtotalRow.number, 1, subtotalRow.number, 5);
       subtotalRow.font = { bold: true };
@@ -4400,7 +5209,7 @@ router.get("/facturas/reporte/excel", requireAuth, allowRoles("ADMIN", "TALLER",
       totales.abonos,
       totales.pagado,
       totales.saldo,
-      "", "", ""
+      "", "", "", "", "", ""
     ];
     worksheet.mergeCells(totalRow.number, 1, totalRow.number, 5);
     totalRow.font = { bold: true, color: { argb: "FF14532D" } };
@@ -4529,6 +5338,10 @@ router.post("/facturas/:id/editar", requireAuth, allowRoles(...ROLES_GESTION_FAC
       producto_recibido,
       placa_producto,
       observacion_recepcion,
+      clave_electronica,
+      consecutivo_electronico,
+      estado_hacienda,
+      fecha_aceptacion,
       foto_producto_data
     } = req.body;
 
@@ -4542,6 +5355,10 @@ router.post("/facturas/:id/editar", requireAuth, allowRoles(...ROLES_GESTION_FAC
     const periodoCierreFinal = pagadaValue ? normalizarPeriodoCierre(periodo_cierre, fechaPagoFinal) : null;
     const fechaNcFinal = notaCreditoMonto > 0 ? (fecha_nc || new Date().toISOString().slice(0, 10)) : null;
     const fechaAbonoFinal = abonoMonto > 0 ? (fecha_abono || new Date().toISOString().slice(0, 10)) : null;
+    const claveElectronica = limpiarTextoFacturaElectronica(clave_electronica).slice(0, 80) || null;
+    const consecutivoElectronico = limpiarTextoFacturaElectronica(consecutivo_electronico).slice(0, 40) || null;
+    const estadoHacienda = normalizarEstadoFacturaElectronica(estado_hacienda || "PENDIENTE", "PENDIENTE");
+    const fechaAceptacionFinal = fecha_aceptacion ? fechaHoraFacturaElectronicaToSql(fecha_aceptacion) : null;
     const fotoProductoPath = guardarFotoProducto(foto_producto_data, req.session.user.id);
 
     if (!["orden", "independiente"].includes(tipo)) {
@@ -4589,6 +5406,10 @@ router.post("/facturas/:id/editar", requireAuth, allowRoles(...ROLES_GESTION_FAC
             factura_producto_recibido = ?,
             factura_placa_producto = ?,
             factura_observacion = ?,
+            factura_clave_electronica = ?,
+            factura_consecutivo_electronico = ?,
+            factura_estado_hacienda = ?,
+            factura_fecha_aceptacion = ?,
             facturada = 1,
             estado = 'RECIBIDA_TOTAL'
       `;
@@ -4613,7 +5434,11 @@ router.post("/facturas/:id/editar", requireAuth, allowRoles(...ROLES_GESTION_FAC
         recibido_por || null,
         producto_recibido === "1" ? 1 : 0,
         normalizarPlaca(placa_producto),
-        observacion_recepcion || null
+        observacion_recepcion || null,
+        claveElectronica,
+        consecutivoElectronico,
+        estadoHacienda,
+        fechaAceptacionFinal
       ];
 
       if (fotoProductoPath) {
@@ -4664,7 +5489,11 @@ router.post("/facturas/:id/editar", requireAuth, allowRoles(...ROLES_GESTION_FAC
             factura_recibido_por = ?,
             factura_producto_recibido = ?,
             factura_placa_producto = ?,
-            factura_observacion = ?
+            factura_observacion = ?,
+            clave_electronica = ?,
+            consecutivo_electronico = ?,
+            estado_hacienda = ?,
+            fecha_aceptacion = ?
       `;
       const params = [
         facturaNumero,
@@ -4688,7 +5517,11 @@ router.post("/facturas/:id/editar", requireAuth, allowRoles(...ROLES_GESTION_FAC
         recibido_por || null,
         producto_recibido === "1" ? 1 : 0,
         normalizarPlaca(placa_producto),
-        observacion_recepcion || null
+        observacion_recepcion || null,
+        claveElectronica,
+        consecutivoElectronico,
+        estadoHacienda,
+        fechaAceptacionFinal
       ];
 
       if (fotoProductoPath) {
@@ -4751,7 +5584,11 @@ router.post("/facturas/:id/eliminar", requireAuth, allowRoles(...ROLES_GESTION_F
              factura_producto_recibido = 0,
              factura_placa_producto = NULL,
              factura_observacion = NULL,
-             factura_foto_producto = NULL
+             factura_foto_producto = NULL,
+             factura_clave_electronica = NULL,
+             factura_consecutivo_electronico = NULL,
+             factura_estado_hacienda = 'PENDIENTE',
+             factura_fecha_aceptacion = NULL
          WHERE id = ? AND facturada = 1`,
         [id]
       );

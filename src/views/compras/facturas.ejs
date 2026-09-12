@@ -47,6 +47,31 @@
     .badge-pagada { background-color: #198754; }
     .badge-pendiente { background-color: #ffc107; color: #000; }
     .badge-nc { background-color: #0ea5e9; color: #fff; }
+    .badge-electronica { background-color: #e0f2fe; color: #075985; border: 1px solid #bae6fd; }
+    .badge-electronica-ok { background-color: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
+    .electronica-panel {
+      background: #fff;
+      border: 1px solid #dbe3ef;
+      border-radius: 18px;
+      box-shadow: 0 8px 20px rgba(15,23,42,0.04);
+      margin-bottom: 1.25rem;
+      overflow: hidden;
+    }
+    .electronica-head {
+      align-items: center;
+      background: linear-gradient(135deg, #082f49, #075985);
+      color: #fff;
+      display: flex;
+      gap: 1rem;
+      justify-content: space-between;
+      padding: 1rem 1.15rem;
+    }
+    .electronica-body { padding: 1rem 1.15rem; }
+    .electronica-textarea {
+      font-family: Consolas, 'Courier New', monospace;
+      min-height: 180px;
+      white-space: pre;
+    }
     .total-seleccion { font-size: 1.2rem; font-weight: bold; margin-top: 1rem; text-align: right; }
     .amount-stack { display: grid; gap: .2rem; }
     .amount-original { color: #64748b; font-size: .78rem; text-decoration: line-through; }
@@ -599,6 +624,7 @@
               <th>Fecha</th>
               <th>Recepción</th>
               <th>N° Factura</th>
+              <th>Factura electrónica</th>
               <th>Monto</th>
               <th>Fecha Vencimiento</th>
               <th>Estado</th>
@@ -637,6 +663,17 @@
                 </td>
                 <td data-label="N° Factura">
                   <strong><%= f.numero_factura %></strong>
+                </td>
+                <td data-label="Factura electrónica">
+                  <% if (f.clave_electronica || f.consecutivo_electronico) { %>
+                    <span class="badge <%= f.estado_hacienda === 'ACEPTADA' ? 'badge-electronica-ok' : 'badge-electronica' %>">
+                      <%= f.estado_hacienda || 'PENDIENTE' %>
+                    </span>
+                    <div class="small fw-semibold mt-1"><%= f.consecutivo_electronico || '-' %></div>
+                    <div class="small text-muted text-truncate" style="max-width: 220px;" title="<%= f.clave_electronica || '' %>"><%= f.clave_electronica || '-' %></div>
+                  <% } else { %>
+                    <span class="badge badge-electronica">Sin cruce</span>
+                  <% } %>
                 </td>
                 <td data-label="Monto" class="monto-factura money" data-val="<%= f.saldo ?? f.monto %>">
                   <div class="amount-stack">
@@ -720,6 +757,10 @@
                         data-producto-recibido="<%= f.factura_producto_recibido ? '1' : '0' %>"
                         data-placa-producto="<%= f.factura_placa_producto || '' %>"
                         data-observacion-recepcion="<%= f.factura_observacion || '' %>"
+                        data-clave-electronica="<%= f.clave_electronica || '' %>"
+                        data-consecutivo-electronico="<%= f.consecutivo_electronico || '' %>"
+                        data-estado-hacienda="<%= f.estado_hacienda || 'PENDIENTE' %>"
+                        data-fecha-aceptacion="<%= fechaInput(f.fecha_aceptacion) %>"
                         data-foto-producto="<%= f.factura_foto_producto || '' %>">
                         <i class="bi bi-pencil-square"></i> Editar
                       </button>
@@ -790,7 +831,7 @@
               </tr>
             <% }) %>
             <% if (facturas.length === 0) { %>
-              <tr><td colspan="<%= puedeModificarCompras ? 10 : 9 %>" class="text-center py-4">No hay facturas con los filtros seleccionados</td></tr>
+              <tr><td colspan="<%= puedeModificarCompras ? 11 : 10 %>" class="text-center py-4">No hay facturas con los filtros seleccionados</td></tr>
             <% } %>
           </tbody>
         </table>
@@ -921,6 +962,32 @@
             <div class="col-md-4" id="editarVencimientoWrap">
               <label class="form-label">Vencimiento</label>
               <input type="date" name="fecha_vencimiento_factura" id="editarVencimientoFactura" class="form-control">
+            </div>
+          </div>
+
+          <hr>
+          <h6 class="fw-bold">Factura electrónica / Hacienda</h6>
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label">Clave electrónica</label>
+              <input type="text" name="clave_electronica" id="editarClaveElectronica" class="form-control" maxlength="80" placeholder="506...">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Consecutivo</label>
+              <input type="text" name="consecutivo_electronico" id="editarConsecutivoElectronico" class="form-control" maxlength="40" placeholder="0010000101...">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Estado Hacienda</label>
+              <select name="estado_hacienda" id="editarEstadoHacienda" class="form-select">
+                <option value="PENDIENTE">PENDIENTE</option>
+                <option value="ACEPTADA">ACEPTADA</option>
+                <option value="RECHAZADA">RECHAZADA</option>
+                <option value="ANULADA">ANULADA</option>
+              </select>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Fecha aceptación</label>
+              <input type="date" name="fecha_aceptacion" id="editarFechaAceptacion" class="form-control">
             </div>
           </div>
 
@@ -1212,6 +1279,23 @@
               <label class="form-label">Fecha de factura</label>
               <input type="date" name="fecha_factura" class="form-control" value="<%= hoy %>" required>
             </div>
+            <div class="col-md-6">
+              <label class="form-label">Clave electrónica</label>
+              <input type="text" name="clave_electronica" class="form-control" maxlength="80" placeholder="Opcional">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Consecutivo</label>
+              <input type="text" name="consecutivo_electronico" class="form-control" maxlength="40" placeholder="Opcional">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Estado Hacienda</label>
+              <select name="estado_hacienda" class="form-select">
+                <option value="PENDIENTE">PENDIENTE</option>
+                <option value="ACEPTADA">ACEPTADA</option>
+                <option value="RECHAZADA">RECHAZADA</option>
+                <option value="ANULADA">ANULADA</option>
+              </select>
+            </div>
           </div>
 
           <div class="row g-3 mt-1">
@@ -1319,6 +1403,10 @@
       setValue('editarProductoRecibido', data.productoRecibido || '0');
       setValue('editarPlacaProducto', data.placaProducto);
       setValue('editarObservacionRecepcion', data.observacionRecepcion);
+      setValue('editarClaveElectronica', data.claveElectronica);
+      setValue('editarConsecutivoElectronico', data.consecutivoElectronico);
+      setValue('editarEstadoHacienda', data.estadoHacienda || 'PENDIENTE');
+      setValue('editarFechaAceptacion', data.fechaAceptacion);
 
       document.getElementById('editarProveedorReadonlyWrap')?.classList.toggle('d-none', esIndependiente);
       document.getElementById('editarProveedorSelectWrap')?.classList.toggle('d-none', !esIndependiente);

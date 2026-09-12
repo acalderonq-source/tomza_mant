@@ -375,7 +375,7 @@
     </div>
   </section>
 
-  <% if (!esBodegaDashboard && (usuarioTodasSedes || sedes.length > 1) && sedes.length) { %>
+  <% if (!esBodegaDashboard && !esMecanicoLimitado && (usuarioTodasSedes || sedes.length > 1) && sedes.length) { %>
     <section class="plain-card p-2 mb-2">
       <h2 class="section-title">Cambiar sede</h2>
       <div class="sede-selector">

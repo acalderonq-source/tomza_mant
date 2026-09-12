@@ -198,7 +198,7 @@ function injectPageAssets(html, csrfToken) {
   <meta name="apple-mobile-web-app-title" content="Tomza Taller">
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" href="/img/app-icon.svg" type="image/svg+xml">`;
-  const pwaScript = `\n<script src="/js/pwa.js" defer></script>`;
+  const pwaScript = `\n<script src="/js/pwa.js?v=20260911-1" defer></script>`;
   const placaSearchScript = `\n<script src="/js/placa-search.js?v=20260806-1" defer></script>`;
   const loadingGuardScript = `\n<script src="/js/loading-guard.js?v=20260824-1" defer></script>`;
 

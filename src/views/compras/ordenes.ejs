@@ -79,6 +79,18 @@
       padding: 0.3em 0.6em;
       border-radius: 30px;
     }
+    .badge-fe {
+      background: #e0f2fe;
+      border: 1px solid #bae6fd;
+      color: #075985;
+      font-size: 0.68rem;
+      font-weight: 700;
+    }
+    .badge-fe-ok {
+      background: #dcfce7;
+      border-color: #bbf7d0;
+      color: #166534;
+    }
     .acciones-col {
       width: 1%;
       text-align: right;
@@ -111,6 +123,54 @@
     }
     .input-factura {
       font-size: 0.78rem;
+    }
+    .electronica-panel {
+      border: 1px solid #bae6fd;
+      border-radius: 18px;
+      background: #f8fcff;
+      box-shadow: 0 12px 28px rgba(14, 165, 233, 0.08);
+      margin-bottom: 1.6rem;
+      overflow: hidden;
+    }
+    .electronica-head {
+      background: linear-gradient(135deg, #0f172a, #075985);
+      color: white;
+      padding: 1rem 1.25rem;
+    }
+    .electronica-head h5 {
+      margin: 0;
+      font-weight: 800;
+    }
+    .electronica-head p {
+      margin: 0.25rem 0 0;
+      color: #dbeafe;
+      font-size: 0.86rem;
+    }
+    .electronica-body {
+      padding: 1.25rem;
+    }
+    .electronica-textarea {
+      min-height: 210px;
+      font-family: Consolas, 'Courier New', monospace;
+      font-size: 0.78rem;
+      white-space: pre;
+    }
+    .electronica-stat {
+      border: 1px solid #dbeafe;
+      border-radius: 14px;
+      background: white;
+      padding: 0.85rem;
+    }
+    .electronica-stat span {
+      display: block;
+      color: #64748b;
+      font-size: 0.72rem;
+      font-weight: 800;
+      text-transform: uppercase;
+    }
+    .electronica-stat strong {
+      color: #0f172a;
+      font-size: 1.35rem;
     }
     @media (max-width: 768px) {
       .table-ordenes {
@@ -188,6 +248,7 @@
     if (filtros.facturada !== undefined && filtros.facturada !== '') reporteParams.set('facturada', filtros.facturada);
     const reporteOrdenesUrl = '/compras/ordenes/reporte/pdf' + (reporteParams.toString() ? `?${reporteParams.toString()}` : '');
     const reporteOrdenesExcelUrl = '/compras/ordenes/reporte/excel' + (reporteParams.toString() ? `?${reporteParams.toString()}` : '');
+    const returnToOrdenes = '/compras/ordenes' + (reporteParams.toString() ? `?${reporteParams.toString()}` : '');
   %>
   <div class="page-heading">
     <div>
@@ -198,6 +259,9 @@
       <a href="/compras/ordenes/nueva" class="btn btn-dark btn-sm">
         <i class="bi bi-plus-lg"></i> Nueva orden
       </a>
+      <button type="button" class="btn btn-outline-info btn-sm" data-bs-toggle="collapse" data-bs-target="#panelFacturacionElectronica" aria-expanded="false" aria-controls="panelFacturacionElectronica">
+        <i class="bi bi-shuffle"></i> Cruzar facturación electrónica
+      </button>
       <a href="/ordenes-motor" class="btn btn-outline-danger btn-sm">
         <i class="bi bi-gear-wide-connected"></i> Órdenes motor
       </a>
@@ -265,6 +329,127 @@
       </div>
     </form>
   </div>
+
+  <% if (puedeModificarCompras) { %>
+    <%
+      const electronicasRecientes = Array.isArray(facturasElectronicasRecientes) ? facturasElectronicasRecientes : [];
+      const resumenFE = resumenElectronico || { total: 0, enlazadas: 0, aceptadas: 0, pendientes: 0 };
+    %>
+    <div class="collapse" id="panelFacturacionElectronica">
+      <div class="electronica-panel">
+        <div class="electronica-head d-flex justify-content-between align-items-start gap-3 flex-wrap">
+          <div>
+            <h5><i class="bi bi-shuffle me-2"></i>Cruce contra órdenes de compra</h5>
+            <p>Pegue el reporte del otro sistema. Se compara proveedor, fecha, monto y códigos para colocar el consecutivo en N° Factura.</p>
+          </div>
+          <span class="badge bg-light text-dark">Órdenes</span>
+        </div>
+        <div class="electronica-body">
+          <div class="row g-3 mb-3">
+            <div class="col-md-3">
+              <div class="electronica-stat">
+                <span>Documentos cargados</span>
+                <strong><%= Number(resumenFE.total || 0).toLocaleString('es-CR') %></strong>
+              </div>
+            </div>
+            <div class="col-md-3">
+              <div class="electronica-stat">
+                <span>Enlazados</span>
+                <strong><%= Number(resumenFE.enlazadas || 0).toLocaleString('es-CR') %></strong>
+              </div>
+            </div>
+            <div class="col-md-3">
+              <div class="electronica-stat">
+                <span>Aceptados Hacienda</span>
+                <strong><%= Number(resumenFE.aceptadas || 0).toLocaleString('es-CR') %></strong>
+              </div>
+            </div>
+            <div class="col-md-3">
+              <div class="electronica-stat">
+                <span>Pendientes de revisar</span>
+                <strong><%= Number(resumenFE.pendientes || 0).toLocaleString('es-CR') %></strong>
+              </div>
+            </div>
+          </div>
+
+          <form method="POST" action="/compras/ordenes/electronicas/importar" class="mb-4">
+            <input type="hidden" name="return_to" value="<%= returnToOrdenes %>">
+            <div class="row g-3">
+              <div class="col-lg-8">
+                <label class="form-label small fw-semibold text-secondary">Datos del otro sistema</label>
+                <textarea name="facturas_electronicas_texto" class="form-control electronica-textarea" placeholder="Pegue aquí las filas con Fecha, Clave, Consecutivo, Nombre emisor, Código Comercial, Detalle, Monto total línea..." required></textarea>
+              </div>
+              <div class="col-lg-4">
+                <label class="form-label small fw-semibold text-secondary">Nombre del archivo o referencia</label>
+                <input type="text" name="fuente_archivo" class="form-control form-control-sm mb-3" placeholder="Ej: Reporte Creatica septiembre">
+
+                <label class="form-label small fw-semibold text-secondary">Estado Hacienda por defecto</label>
+                <select name="estado_default" class="form-select form-select-sm mb-3">
+                  <option value="ACEPTADA">ACEPTADA</option>
+                  <option value="PENDIENTE">PENDIENTE</option>
+                  <option value="RECHAZADA">RECHAZADA</option>
+                  <option value="ANULADA">ANULADA</option>
+                </select>
+
+                <div class="alert alert-info small mb-3">
+                  El consecutivo se guarda como <strong>N° Factura</strong> de la orden. La clave queda guardada aparte para trazabilidad.
+                </div>
+
+                <button type="submit" class="btn btn-primary w-100">
+                  <i class="bi bi-lightning-charge"></i> Cruzar y actualizar órdenes
+                </button>
+              </div>
+            </div>
+          </form>
+
+          <div class="table-responsive">
+            <table class="table table-sm align-middle mb-0">
+              <thead>
+                <tr>
+                  <th>Fecha</th>
+                  <th>Proveedor otro sistema</th>
+                  <th>Orden interna</th>
+                  <th>N° Factura</th>
+                  <th>Consecutivo</th>
+                  <th>Criterio</th>
+                  <th>Estado</th>
+                  <th class="text-end">Monto</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% electronicasRecientes.forEach(fe => { %>
+                  <tr>
+                    <td><%= fe.fecha_emision ? new Date(fe.fecha_emision).toLocaleDateString('es-CR') : '—' %></td>
+                    <td>
+                      <strong><%= fe.nombre_emisor || 'Sin proveedor' %></strong>
+                      <% if (fe.cedula_emisor) { %>
+                        <div class="small text-muted"><%= fe.cedula_emisor %></div>
+                      <% } %>
+                    </td>
+                    <td><%= fe.po_numero || 'Sin cruce' %></td>
+                    <td><%= fe.factura_interna || fe.numero_factura || '—' %></td>
+                    <td class="small"><%= fe.consecutivo || '—' %></td>
+                    <td><span class="badge bg-light text-dark"><%= fe.criterio_cruce || (fe.orden_compra_id ? 'CRUCE' : 'PENDIENTE') %></span></td>
+                    <td>
+                      <span class="badge <%= fe.estado_hacienda === 'ACEPTADA' ? 'bg-success' : fe.estado_hacienda === 'RECHAZADA' ? 'bg-danger' : 'bg-secondary' %>">
+                        <%= fe.estado_hacienda || 'PENDIENTE' %>
+                      </span>
+                    </td>
+                    <td class="text-end fw-semibold">₡<%= parseFloat(fe.monto_total || 0).toLocaleString('es-CR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %></td>
+                  </tr>
+                <% }) %>
+                <% if (!electronicasRecientes.length) { %>
+                  <tr>
+                    <td colspan="8" class="text-center text-muted py-3">Todavía no hay cruces de facturación electrónica.</td>
+                  </tr>
+                <% } %>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  <% } %>
 
   <%
     const ordenesFacturadas = ordenes.filter(o => o.facturada || o.factura).length;
@@ -334,6 +519,7 @@
             <th>Total</th>
             <th>Cotización</th>
             <th>Factura</th>
+            <th>FE</th>
             <th>Estado</th>
             <th class="acciones-col">Acciones</th>
           </tr>
@@ -367,6 +553,14 @@
                 <% } %>
               </td>
               <td data-label="Factura"><%= orden.factura || '—' %></td>
+              <td data-label="FE">
+                <% if (orden.factura_clave_electronica || orden.factura_consecutivo_electronico) { %>
+                  <span class="badge badge-fe <%= orden.factura_estado_hacienda === 'ACEPTADA' ? 'badge-fe-ok' : '' %>"><%= orden.factura_estado_hacienda || 'PENDIENTE' %></span>
+                  <div class="small text-muted"><%= orden.factura_consecutivo_electronico || '' %></div>
+                <% } else { %>
+                  <span class="badge badge-fe">Sin cruce</span>
+                <% } %>
+              </td>
               <td data-label="Estado">
                 <span class="badge badge-estado <%= 
                   orden.estado === 'BORRADOR' ? 'bg-secondary' :
@@ -401,6 +595,17 @@
                           <input type="text" name="factura" class="form-control form-control-sm input-factura mb-2" placeholder="N° factura" required>
                           <label>Fecha de factura</label>
                           <input type="date" name="fecha_factura" class="form-control form-control-sm mb-2" value="<%= hoy || '' %>" required>
+                          <label>Clave electrónica</label>
+                          <input type="text" name="clave_electronica" class="form-control form-control-sm input-factura mb-2" placeholder="Opcional">
+                          <label>Consecutivo</label>
+                          <input type="text" name="consecutivo_electronico" class="form-control form-control-sm input-factura mb-2" placeholder="Opcional">
+                          <label>Estado Hacienda</label>
+                          <select name="estado_hacienda" class="form-select form-select-sm mb-2">
+                            <option value="PENDIENTE">PENDIENTE</option>
+                            <option value="ACEPTADA">ACEPTADA</option>
+                            <option value="RECHAZADA">RECHAZADA</option>
+                            <option value="ANULADA">ANULADA</option>
+                          </select>
                           <label>Observación</label>
                           <textarea name="observacion_recepcion" class="form-control form-control-sm mb-2" rows="2" placeholder="Opcional"></textarea>
                           <input type="hidden" name="fecha_recepcion" value="<%= hoy || '' %>">
@@ -460,7 +665,7 @@
             </tr>
           <% }) %>
           <% if (ordenes.length === 0) { %>
-            <tr><td colspan="10" class="text-center text-muted py-4">No hay órdenes con los filtros seleccionados</td></tr>
+            <tr><td colspan="11" class="text-center text-muted py-4">No hay órdenes con los filtros seleccionados</td></tr>
           <% } %>
         </tbody>
       </table>
