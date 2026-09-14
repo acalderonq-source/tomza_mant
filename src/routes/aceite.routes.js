@@ -510,6 +510,7 @@ async function sincronizarCambiosPendientesAceite(sedesPermitidas, userId) {
          ca.id,
          ca.unidad_id,
          u.placa,
+         u.sede AS unidad_sede,
          ca.sede,
          ca.fecha,
          GREATEST(
@@ -520,15 +521,16 @@ async function sincronizarCambiosPendientesAceite(sedesPermitidas, userId) {
        JOIN unidades u ON u.id = ca.unidad_id
        LEFT JOIN aceite_movimientos am ON am.cambio_aceite_id = ca.id
        WHERE ca.sede IN (?)
-       GROUP BY ca.id, ca.unidad_id, u.placa, ca.sede, ca.fecha, ca.litros_usados, ca.galones
+       GROUP BY ca.id, ca.unidad_id, u.placa, u.sede, ca.sede, ca.fecha, ca.litros_usados, ca.galones
        HAVING litros_pendientes > 0.001
        ORDER BY ca.fecha ASC, ca.id ASC`,
       [GALON_A_LITROS, sedesPermitidas]
     );
 
     for (const pendiente of pendientes) {
-      const sedeInventario = sedeInventarioAceite(pendiente.sede);
-      const sedesBusqueda = expandirSedeInventarioAceite(pendiente.sede);
+      const sedeBaseInventario = pendiente.unidad_sede || pendiente.sede;
+      const sedeInventario = sedeInventarioAceite(sedeBaseInventario);
+      const sedesBusqueda = expandirSedeInventarioAceite(sedeBaseInventario);
       const [estanones] = await connection.query(
         `SELECT id, litros_restantes
          FROM aceite_estanones
@@ -1020,7 +1022,7 @@ router.post("/rellenos", async (req, res) => {
 
     await connection.beginTransaction();
     await consumirAceitePorSede(connection, {
-      sede: sedeOperativaRepuestosAceites(unidad.sede),
+      sede: unidad.sede,
       litros: litrosUsados,
       cambioAceiteId: null,
       unidadId: unidad.id,
@@ -1096,7 +1098,7 @@ router.post("/", async (req, res) => {
         fecha = CURRENT_TIMESTAMP`,
       [
         unidad_id,
-        sedeOperativaRepuestosAceites(unidad.sede),
+        unidad.sede,
         km_actual,
         galonesUsados,
         litrosUsados,
@@ -1107,7 +1109,7 @@ router.post("/", async (req, res) => {
     );
 
     await consumirAceitePorSede(connection, {
-      sede: sedeOperativaRepuestosAceites(unidad.sede),
+      sede: unidad.sede,
       litros: litrosUsados,
       cambioAceiteId: result.insertId,
       unidadId: unidad.id,
