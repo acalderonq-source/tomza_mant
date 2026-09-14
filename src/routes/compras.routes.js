@@ -964,24 +964,53 @@ function calcularCoincidenciaFecha(fechaDocumento, fechaOrden) {
   return 0;
 }
 
+function normalizarDetalleCruce(value) {
+  return normalizarNombreCruce(value)
+    .replace(/\b(UND|UNIDAD|UNIDADES|SERVICIO|SERVICIOS|REPUESTO|REPUESTOS|COMPRA)\b/g, " ")
+    .replace(/[^A-Z0-9]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function detallesDocumentoCruce(documento) {
+  const detalles = Array.isArray(documento.detalles_producto) ? documento.detalles_producto : [];
+  const base = detalles.length ? detalles : String(documento.detalle_resumen || "").split(/\r?\n|;|\|/g);
+  return [...new Set(
+    base
+      .map(normalizarDetalleCruce)
+      .filter(detalle => detalle.length >= 5)
+  )];
+}
+
 function calcularCoincidenciaDetalle(documento, textoOrden) {
   const texto = normalizarCodigoCruce(textoOrden);
+  const textoOrdenDetalle = normalizarDetalleCruce(textoOrden);
   const codigos = Array.isArray(documento.codigos_producto) ? documento.codigos_producto : [];
   const codigosValidos = codigos.map(normalizarCodigoCruce).filter(codigo => codigo.length >= 4);
   const coincidenciasCodigo = codigosValidos.filter(codigo => texto.includes(codigo)).length;
-  if (coincidenciasCodigo >= 2) return 20;
-  if (coincidenciasCodigo === 1) return 14;
+  if (coincidenciasCodigo >= 2) return 32;
+  if (coincidenciasCodigo === 1) return 24;
 
-  const tokensDetalle = tokensNombreCruce(documento.detalle_resumen)
+  const detallesDoc = detallesDocumentoCruce(documento);
+  const coincidenciasExactas = detallesDoc.filter(detalle => {
+    if (!detalle || !textoOrdenDetalle) return false;
+    return textoOrdenDetalle.includes(detalle) || detalle.includes(textoOrdenDetalle);
+  }).length;
+  if (coincidenciasExactas >= 2) return 35;
+  if (coincidenciasExactas === 1) return 28;
+
+  const tokensDetalle = detallesDoc.join(" ")
+    .split(/\s+/)
     .filter(token => token.length >= 5)
-    .slice(0, 10);
+    .slice(0, 16);
   if (!tokensDetalle.length) return 0;
 
-  const textoOrdenNormalizado = normalizarNombreCruce(textoOrden);
-  const coincidenciasDetalle = tokensDetalle.filter(token => textoOrdenNormalizado.includes(token)).length;
-  if (coincidenciasDetalle >= 3) return 12;
-  if (coincidenciasDetalle >= 2) return 8;
-  if (coincidenciasDetalle === 1) return 4;
+  const coincidenciasDetalle = tokensDetalle.filter(token => textoOrdenDetalle.includes(token)).length;
+  const ratio = coincidenciasDetalle / Math.max(tokensDetalle.length, 1);
+  if (coincidenciasDetalle >= 5 && ratio >= 0.45) return 22;
+  if (coincidenciasDetalle >= 3) return 16;
+  if (coincidenciasDetalle >= 2) return 10;
+  if (coincidenciasDetalle === 1) return 5;
   return 0;
 }
 
@@ -1134,6 +1163,7 @@ async function construirIndiceCruceFacturas(connection, documentos = []) {
 
 function buscarFacturaInternaEnIndice(documento, indice) {
   const claves = clavesDocumentoCruce(documento);
+  const tieneDetalleDocumento = detallesDocumentoCruce(documento).length > 0;
   for (const clave of claves) {
     const orden = indice.exactasOrden.get(clave);
     if (orden) return { tipo: "orden", id: orden.id, criterio: "Cruce exacto por factura/consecutivo/clave" };
@@ -1164,7 +1194,7 @@ function buscarFacturaInternaEnIndice(documento, indice) {
         puntosMonto,
         puntosFecha,
         puntosDetalle,
-        criterio: `consecutivo termina en factura ${facturaCortaDesdeOrden(orden)}, proveedor ${puntosProveedor}, monto ${puntosMonto}, fecha ${puntosFecha}, codigo ${puntosDetalle}`
+        criterio: `consecutivo termina en factura ${facturaCortaDesdeOrden(orden)}, proveedor ${puntosProveedor}, monto ${puntosMonto}, fecha ${puntosFecha}, detalle ${puntosDetalle}`
       };
     }
   }
@@ -1173,7 +1203,8 @@ function buscarFacturaInternaEnIndice(documento, indice) {
     mejorSufijo &&
     mejorSufijo.puntosProveedor >= 30 &&
     mejorSufijo.puntosMonto >= 22 &&
-    mejorSufijo.puntosFecha >= 6
+    mejorSufijo.puntosFecha >= 6 &&
+    (!tieneDetalleDocumento || mejorSufijo.puntosDetalle >= 10)
   ) {
     return mejorSufijo;
   }
@@ -1201,7 +1232,7 @@ function buscarFacturaInternaEnIndice(documento, indice) {
         puntosMonto,
         puntosFecha,
         puntosDetalle,
-        criterio: `proveedor ${puntosProveedor}, monto ${puntosMonto}, fecha ${puntosFecha}, codigo ${puntosDetalle}`
+        criterio: `proveedor ${puntosProveedor}, monto ${puntosMonto}, fecha ${puntosFecha}, detalle ${puntosDetalle}`
       };
     }
   }
@@ -1211,7 +1242,7 @@ function buscarFacturaInternaEnIndice(documento, indice) {
     mejor.puntaje >= 70 &&
     mejor.puntosProveedor >= 30 &&
     mejor.puntosMonto >= 22 &&
-    (mejor.puntosDetalle > 0 || mejor.puntosFecha >= 6)
+    (!tieneDetalleDocumento || mejor.puntosDetalle >= 10 || mejor.puntosFecha >= 10)
   ) {
     return mejor;
   }
@@ -1314,13 +1345,17 @@ function parseFacturasElectronicasTexto(texto, estadoDefault = "ACEPTADA") {
       monto_total: 0,
       moneda: obtenerValorFacturaElectronica(row, headerMap, ["moneda"]).slice(0, 10) || null,
       detalle_resumen: "",
+      detallesSet: new Set(),
       codigosSet: new Set(),
       tiene_total_documento: false
     };
 
     if (numeroFactura && !existente.numero_factura) existente.numero_factura = numeroFactura.slice(0, 100);
     if (estado) existente.estado_hacienda = normalizarEstadoFacturaElectronica(estado, estadoDefault);
-    if (detalle && !esTotalDocumento && !existente.detalle_resumen) existente.detalle_resumen = detalle.slice(0, 500);
+    if (detalle && !esTotalDocumento) {
+      existente.detallesSet.add(detalle.slice(0, 500));
+      if (!existente.detalle_resumen) existente.detalle_resumen = detalle.slice(0, 500);
+    }
     if (!esTotalDocumento) {
       if (codigoComercial) existente.codigosSet.add(codigoComercial);
       if (cabys) existente.codigosSet.add(cabys);
@@ -1343,7 +1378,11 @@ function parseFacturasElectronicasTexto(texto, estadoDefault = "ACEPTADA") {
   }
 
   return Array.from(documentos.values()).map(doc => {
+    const detalles = Array.from(doc.detallesSet || []).slice(0, 25);
+    if (detalles.length) doc.detalle_resumen = detalles.join(" | ").slice(0, 2000);
+    doc.detalles_producto = detalles;
     doc.codigos_producto = Array.from(doc.codigosSet || []).slice(0, 60);
+    delete doc.detallesSet;
     delete doc.codigosSet;
     delete doc.tiene_total_documento;
     return doc;
@@ -1443,7 +1482,7 @@ async function buscarFacturaInternaParaCruce(connection, documento) {
     mejor.puntaje >= 70 &&
     mejor.puntosProveedor >= 30 &&
     mejor.puntosMonto >= 22 &&
-    (mejor.puntosDetalle > 0 || mejor.puntosFecha >= 6)
+    (mejor.puntosDetalle >= 10 || mejor.puntosFecha >= 10)
   ) {
     return mejor;
   }
