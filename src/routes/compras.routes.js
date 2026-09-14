@@ -998,6 +998,28 @@ function clavesDocumentoCruce(documento) {
   ].map(normalizarClaveCierre).filter(Boolean);
 }
 
+function digitosCruce(value) {
+  return String(value || "").replace(/\D/g, "");
+}
+
+function facturaCortaDesdeOrden(orden) {
+  return digitosCruce(orden?.factura).replace(/^0+/, "");
+}
+
+function documentoTieneSufijoFactura(documento, facturaOrden) {
+  const factura = digitosCruce(facturaOrden).replace(/^0+/, "");
+  if (!factura || factura.length < 3) return false;
+  return [
+    documento.numero_factura,
+    documento.consecutivo,
+    documento.codigo_documento_fe,
+    documento.clave
+  ].some(value => {
+    const digitos = digitosCruce(value);
+    return digitos.length > factura.length && digitos.endsWith(factura);
+  });
+}
+
 function desplazarFechaSql(fechaSql, dias) {
   const fecha = fechaSoloSql(fechaSql);
   if (!fecha) return null;
@@ -1076,8 +1098,35 @@ async function construirIndiceCruceFacturas(connection, documentos = []) {
     params
   );
 
+  const [ordenesConFacturaCorta] = await connection.query(
+    `SELECT
+       o.id,
+       o.po_numero,
+       o.fecha,
+       o.total,
+       o.factura,
+       o.facturada,
+       o.factura_consecutivo_electronico,
+       o.factura_clave_electronica,
+       p.nombre AS proveedor_nombre,
+       p.cedula_juridica,
+       GROUP_CONCAT(CONCAT_WS(' ', od.codigo, od.codigo_producto, od.descripcion) SEPARATOR ' ') AS texto_detalle
+     FROM ordenes_compra o
+     JOIN proveedores p ON p.id = o.proveedor_id
+     LEFT JOIN ordenes_compra_detalle od ON od.orden_compra_id = o.id
+     WHERE o.factura IS NOT NULL
+       AND TRIM(o.factura) <> ''
+       AND (o.factura_consecutivo_electronico IS NULL OR TRIM(o.factura_consecutivo_electronico) = '')
+       ${whereFecha}
+     GROUP BY o.id, o.po_numero, o.fecha, o.total, o.factura, o.facturada, o.factura_consecutivo_electronico, o.factura_clave_electronica, p.nombre, p.cedula_juridica
+     ORDER BY o.fecha DESC, o.id DESC
+     LIMIT 5000`,
+    params
+  );
+
   return {
     exactasOrden,
+    ordenesConFacturaCorta,
     ordenesPendientes,
     ordenesUsadas: new Set()
   };
@@ -1088,6 +1137,45 @@ function buscarFacturaInternaEnIndice(documento, indice) {
   for (const clave of claves) {
     const orden = indice.exactasOrden.get(clave);
     if (orden) return { tipo: "orden", id: orden.id, criterio: "Cruce exacto por factura/consecutivo/clave" };
+  }
+
+  let mejorSufijo = null;
+  for (const orden of indice.ordenesConFacturaCorta || []) {
+    if (indice.ordenesUsadas.has(orden.id)) continue;
+    if (!documentoTieneSufijoFactura(documento, orden.factura)) continue;
+
+    const puntosProveedor = calcularCoincidenciaProveedor(
+      documento.nombre_emisor,
+      orden.proveedor_nombre,
+      documento.cedula_emisor,
+      orden.cedula_juridica
+    );
+    const puntosMonto = calcularCoincidenciaMonto(documento.monto_total, orden.total);
+    const puntosFecha = calcularCoincidenciaFecha(documento.fecha_emision, orden.fecha);
+    const puntosDetalle = calcularCoincidenciaDetalle(documento, orden.texto_detalle || "");
+    const puntaje = 45 + puntosProveedor + puntosMonto + puntosFecha + puntosDetalle;
+
+    if (!mejorSufijo || puntaje > mejorSufijo.puntaje) {
+      mejorSufijo = {
+        tipo: "orden",
+        id: orden.id,
+        puntaje,
+        puntosProveedor,
+        puntosMonto,
+        puntosFecha,
+        puntosDetalle,
+        criterio: `consecutivo termina en factura ${facturaCortaDesdeOrden(orden)}, proveedor ${puntosProveedor}, monto ${puntosMonto}, fecha ${puntosFecha}, codigo ${puntosDetalle}`
+      };
+    }
+  }
+
+  if (
+    mejorSufijo &&
+    mejorSufijo.puntosProveedor >= 30 &&
+    mejorSufijo.puntosMonto >= 22 &&
+    mejorSufijo.puntosFecha >= 6
+  ) {
+    return mejorSufijo;
   }
 
   let mejor = null;
