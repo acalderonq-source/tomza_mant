@@ -1070,10 +1070,12 @@ function rangoFechasDocumentosCruce(documentos = []) {
   };
 }
 
-function insertarClavesCruce(map, row, columns = []) {
+function insertarCandidatoExactoCruce(map, row, columns = []) {
   for (const column of columns) {
     const clave = normalizarClaveCierre(row[column]);
-    if (clave && !map.has(clave)) map.set(clave, row);
+    if (!clave) continue;
+    if (!map.has(clave)) map.set(clave, []);
+    map.get(clave).push(row);
   }
 }
 
@@ -1083,17 +1085,31 @@ async function construirIndiceCruceFacturas(connection, documentos = []) {
 
   if (claves.length) {
     const [ordenesExactas] = await connection.query(
-      `SELECT id, factura, factura_consecutivo_electronico, factura_clave_electronica
-       FROM ordenes_compra
+      `SELECT
+         o.id,
+         o.po_numero,
+         o.fecha,
+         o.total,
+         o.factura,
+         o.facturada,
+         o.factura_consecutivo_electronico,
+         o.factura_clave_electronica,
+         p.nombre AS proveedor_nombre,
+         p.cedula_juridica,
+         GROUP_CONCAT(CONCAT_WS(' ', od.codigo, od.codigo_producto, od.descripcion) SEPARATOR ' ') AS texto_detalle
+       FROM ordenes_compra o
+       JOIN proveedores p ON p.id = o.proveedor_id
+       LEFT JOIN ordenes_compra_detalle od ON od.orden_compra_id = o.id
        WHERE (
-         REPLACE(REPLACE(REPLACE(UPPER(COALESCE(factura, '')), '-', ''), ' ', ''), '.', '') IN (?)
-         OR REPLACE(REPLACE(REPLACE(UPPER(COALESCE(factura_consecutivo_electronico, '')), '-', ''), ' ', ''), '.', '') IN (?)
-         OR REPLACE(REPLACE(REPLACE(UPPER(COALESCE(factura_clave_electronica, '')), '-', ''), ' ', ''), '.', '') IN (?)
+         REPLACE(REPLACE(REPLACE(UPPER(COALESCE(o.factura, '')), '-', ''), ' ', ''), '.', '') IN (?)
+         OR REPLACE(REPLACE(REPLACE(UPPER(COALESCE(o.factura_consecutivo_electronico, '')), '-', ''), ' ', ''), '.', '') IN (?)
+         OR REPLACE(REPLACE(REPLACE(UPPER(COALESCE(o.factura_clave_electronica, '')), '-', ''), ' ', ''), '.', '') IN (?)
        )
-       ORDER BY facturada DESC, id DESC`,
+       GROUP BY o.id, o.po_numero, o.fecha, o.total, o.factura, o.facturada, o.factura_consecutivo_electronico, o.factura_clave_electronica, p.nombre, p.cedula_juridica
+       ORDER BY o.facturada DESC, o.id DESC`,
       [claves, claves, claves]
     );
-    ordenesExactas.forEach(row => insertarClavesCruce(exactasOrden, row, ["factura", "factura_consecutivo_electronico", "factura_clave_electronica"]));
+    ordenesExactas.forEach(row => insertarCandidatoExactoCruce(exactasOrden, row, ["factura", "factura_consecutivo_electronico", "factura_clave_electronica"]));
   }
 
   const rango = rangoFechasDocumentosCruce(documentos);
@@ -1164,9 +1180,48 @@ async function construirIndiceCruceFacturas(connection, documentos = []) {
 function buscarFacturaInternaEnIndice(documento, indice) {
   const claves = clavesDocumentoCruce(documento);
   const tieneDetalleDocumento = detallesDocumentoCruce(documento).length > 0;
+  let mejorExacto = null;
   for (const clave of claves) {
-    const orden = indice.exactasOrden.get(clave);
-    if (orden) return { tipo: "orden", id: orden.id, criterio: "Cruce exacto por factura/consecutivo/clave" };
+    const ordenes = indice.exactasOrden.get(clave) || [];
+    for (const orden of ordenes) {
+      if (indice.ordenesUsadas.has(orden.id)) continue;
+      const puntosProveedor = calcularCoincidenciaProveedor(
+        documento.nombre_emisor,
+        orden.proveedor_nombre,
+        documento.cedula_emisor,
+        orden.cedula_juridica
+      );
+      const puntosMonto = calcularCoincidenciaMonto(documento.monto_total, orden.total);
+      const puntosFecha = calcularCoincidenciaFecha(documento.fecha_emision, orden.fecha);
+      const puntosDetalle = calcularCoincidenciaDetalle(documento, orden.texto_detalle || "");
+      const puntaje = 100 + puntosProveedor + puntosMonto + puntosFecha + puntosDetalle;
+
+      if (!mejorExacto || puntaje > mejorExacto.puntaje) {
+        mejorExacto = {
+          tipo: "orden",
+          id: orden.id,
+          puntaje,
+          puntosProveedor,
+          puntosMonto,
+          puntosFecha,
+          puntosDetalle,
+          criterio: `consecutivo exacto, proveedor ${puntosProveedor}, monto ${puntosMonto}, fecha ${puntosFecha}, detalle ${puntosDetalle}`
+        };
+      }
+    }
+  }
+
+  if (
+    mejorExacto &&
+    mejorExacto.puntosProveedor >= 30 &&
+    mejorExacto.puntosMonto >= 22 &&
+    (
+      tieneDetalleDocumento
+        ? (mejorExacto.puntosDetalle >= 10 || (mejorExacto.puntosMonto >= 26 && mejorExacto.puntosFecha >= 10))
+        : (mejorExacto.puntosMonto >= 26 && mejorExacto.puntosFecha >= 6)
+    )
+  ) {
+    return mejorExacto;
   }
 
   let mejorSufijo = null;
@@ -4859,7 +4914,10 @@ router.post("/ordenes/electronicas/importar", requireAuth, allowRoles(...ROLES_G
           codigos_producto = VALUES(codigos_producto),
           fuente_archivo = VALUES(fuente_archivo),
           criterio_cruce = VALUES(criterio_cruce),
-          orden_compra_id = COALESCE(VALUES(orden_compra_id), orden_compra_id),
+          orden_compra_id = CASE
+            WHEN VALUES(orden_compra_id) IS NOT NULL THEN VALUES(orden_compra_id)
+            ELSE orden_compra_id
+          END,
           factura_id = COALESCE(VALUES(factura_id), factura_id),
           actualizado_en = CURRENT_TIMESTAMP`,
         [
