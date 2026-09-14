@@ -27,6 +27,7 @@ const ROLES_GESTION = ["ADMIN", "TALLER", ...ROLES_PROVEEDURIA];
 const SEDE_RECOPE_LIMON = "RECOPE_LIMON";
 const SEDE_RECOPE_UNIDADES = "Transportadora";
 const GRUPOS_RECOPE_LIMON = new Set(["GENERALES-LIMON", "MUEBLE-LIMON"]);
+const GRUPOS_FUERA_PEDIDO_CEDIS = new Set(["MUEBLE", "GENERAL-TALLER", "GENERALES-TALLER", "SOLICITUD-DE-HERRAMIENTA"]);
 
 function requireAuth(req, res, next) {
   if (!req.session.user) return res.redirect("/login");
@@ -221,20 +222,22 @@ function excluirDePedidoCedis(item) {
   const solicitud = textoComparable(item.solicitud);
   const marcado = textoComparable(item.marcado_rojo);
   const noCompra = textoComparable(item.no_compra);
-  const excluidos = new Set(["MUEBLE", "GENERAL-TALLER", "GENERALES-TALLER"]);
 
   return item.estado === "NO_COMPRA" ||
-    excluidos.has(placa) ||
-    excluidos.has(sede) ||
+    GRUPOS_FUERA_PEDIDO_CEDIS.has(placa) ||
+    GRUPOS_FUERA_PEDIDO_CEDIS.has(sede) ||
     solicitud.includes("GENERAL-TALLER") ||
     solicitud.includes("GENERALES-TALLER") ||
     solicitud.includes("MUEBLE") ||
+    solicitud.includes("SOLICITUD-DE-HERRAMIENTA") ||
     marcado.includes("GENERAL-TALLER") ||
     marcado.includes("GENERALES-TALLER") ||
     marcado.includes("MUEBLE") ||
+    marcado.includes("SOLICITUD-DE-HERRAMIENTA") ||
     noCompra.includes("GENERAL-TALLER") ||
     noCompra.includes("GENERALES-TALLER") ||
-    noCompra.includes("MUEBLE");
+    noCompra.includes("MUEBLE") ||
+    noCompra.includes("SOLICITUD-DE-HERRAMIENTA");
 }
 
 async function sedesDisponibles(req) {
@@ -303,7 +306,7 @@ async function resolverSedePorPlaca(req, placa, sedeFallback = "") {
 
   if (!sede || (sedes.length && !sedes.includes(sede))) {
     return {
-      error: "Para grupos como GENERALES, MUEBLE o LLANTAS, primero filtre una sede para asignarla automáticamente. GENERALES-LIMON y MUEBLE-LIMON van directo a RECOPE_LIMON.",
+      error: "Para grupos como GENERALES, MUEBLE, LLANTAS o SOLICITUD DE HERRAMIENTA, primero filtre una sede para asignarla automáticamente. GENERALES-LIMON y MUEBLE-LIMON van directo a RECOPE_LIMON.",
       sedes
     };
   }

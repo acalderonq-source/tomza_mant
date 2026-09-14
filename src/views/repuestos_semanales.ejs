@@ -445,6 +445,7 @@
   const textoSeguroData = value => String(value || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   const textoComparableVista = value => String(value || '').trim().toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[_\s]+/g, '-');
   const textoSetVista = value => new Set(String(value || '').split(/\r?\n|,+/g).map(textoComparableVista).filter(Boolean));
+  const gruposFueraPedidoCedis = ['MUEBLE', 'GENERAL-TALLER', 'GENERALES-TALLER', 'SOLICITUD-DE-HERRAMIENTA'];
   const dividirPedidoVista = item => {
     if (typeof dividirRepuestosSeleccionables === 'function') {
       return dividirRepuestosSeleccionables(item).filter(Boolean);
@@ -458,18 +459,21 @@
     const solicitud = textoComparableVista(item.solicitud);
     const marcado = textoComparableVista(item.marcado_rojo);
     const noCompra = textoComparableVista(item.no_compra);
-    return ['MUEBLE', 'GENERAL-TALLER', 'GENERALES-TALLER'].includes(placa) ||
-      ['MUEBLE', 'GENERAL-TALLER', 'GENERALES-TALLER'].includes(sede) ||
+    return gruposFueraPedidoCedis.includes(placa) ||
+      gruposFueraPedidoCedis.includes(sede) ||
       item.estado === 'NO_COMPRA' ||
       solicitud.includes('MUEBLE') ||
       solicitud.includes('GENERAL-TALLER') ||
       solicitud.includes('GENERALES-TALLER') ||
+      solicitud.includes('SOLICITUD-DE-HERRAMIENTA') ||
       marcado.includes('MUEBLE') ||
       marcado.includes('GENERAL-TALLER') ||
       marcado.includes('GENERALES-TALLER') ||
+      marcado.includes('SOLICITUD-DE-HERRAMIENTA') ||
       noCompra.includes('MUEBLE') ||
       noCompra.includes('GENERAL-TALLER') ||
-      noCompra.includes('GENERALES-TALLER');
+      noCompra.includes('GENERALES-TALLER') ||
+      noCompra.includes('SOLICITUD-DE-HERRAMIENTA');
   };
   const sedesConPedido = [...new Set(lista.map(item => item.sede).filter(Boolean))];
   const pedidoSeleccionData = lista.map(item => {
@@ -766,7 +770,7 @@
           <div class="modal-header">
             <div>
               <h5 class="modal-title fw-bold mb-0"><i class="bi bi-calendar-plus me-1"></i> Agregar repuesto semanal</h5>
-              <div class="small opacity-75">Puede usar placa normal o grupos como GENERALES, MUEBLE, LLANTAS, GENERALES-LIMON y MUEBLE-LIMON.</div>
+              <div class="small opacity-75">Puede usar placa normal o grupos como GENERALES, MUEBLE, LLANTAS, SOLICITUD DE HERRAMIENTA, GENERALES-LIMON y MUEBLE-LIMON.</div>
             </div>
             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
           </div>
@@ -784,7 +788,7 @@
                 <label class="form-label mb-1">Sede automática</label>
                 <input type="hidden" name="sede" id="sedeNuevaSemanal" value="<%= filtros.sede || '' %>">
                 <input type="text" id="sedeNuevaSemanalTexto" class="form-control" value="<%= filtros.sede ? mostrarSede(filtros.sede) : '' %>" placeholder="Se llena al seleccionar la placa" readonly>
-                <div class="form-text">GENERALES-LIMON y MUEBLE-LIMON van directo a RECOPE_LIMON. Los otros grupos usan la sede filtrada.</div>
+                <div class="form-text">GENERALES-LIMON y MUEBLE-LIMON van directo a RECOPE_LIMON. Los otros grupos, incluida SOLICITUD DE HERRAMIENTA, usan la sede filtrada.</div>
               </div>
               <div>
                 <label class="form-label mb-1">Placa / grupo</label>
@@ -800,6 +804,7 @@
                   <option value="MUEBLE-LIMON">MUEBLE-LIMON</option>
                   <option value="LLANTAS">LLANTAS</option>
                   <option value="SUMINISTRO LIMPIEZA">SUMINISTRO LIMPIEZA</option>
+                  <option value="SOLICITUD DE HERRAMIENTA">SOLICITUD DE HERRAMIENTA</option>
                 </datalist>
               </div>
               <div>
