@@ -7,11 +7,11 @@ const {
   expandirSedesOperativasRepuestosAceites,
   getSedesPermitidas,
   obtenerTodasSedes,
+  SEDES_GRANEL,
   SEDES_TRANSPORTADORA_DETALLE,
   TODAS_SEDES,
   sedeOperativaRepuestosAceites,
-  sedesEspecialesPorUsuario,
-  sedesOperativasVisibles
+  sedesEspecialesPorUsuario
 } = require("../utils/sedes");
 
 const ROLES_GESTION_ACEITE = ["ADMIN", "TALLER", "MECANICO", "BODEGA", "BODEGUERO"];
@@ -153,7 +153,7 @@ function claveSedeAceite(sede) {
     .replace(/[^A-Z0-9]/g, "");
 }
 
-const SEDES_ACEITE_TRANSPORTADORA = ["Transportadora", ...SEDES_TRANSPORTADORA_DETALLE];
+const SEDES_ACEITE_TRANSPORTADORA = ["Transportadora", ...SEDES_TRANSPORTADORA_DETALLE, ...SEDES_GRANEL];
 
 function esSedeAceiteTransportadora(sede) {
   const clave = claveSedeAceite(sede);
@@ -162,6 +162,7 @@ function esSedeAceiteTransportadora(sede) {
 }
 
 function sedeInventarioAceite(sede) {
+  if (esSedeAceiteTransportadora(sede)) return "Transportadora";
   const operativa = sedeOperativaRepuestosAceites(sede);
   if (esSedeAceiteTransportadora(operativa)) return "Transportadora";
   return claveSedeAceite(operativa) === "SANCARLOS" ? "Guapiles" : operativa;
@@ -181,7 +182,7 @@ function expandirSedeInventarioAceite(sede) {
 
 function etiquetaSedeInventarioAceite(sede) {
   if (esSedeAceiteTransportadora(sede)) {
-    return "Transportadora";
+    return "Transportadora / Granel";
   }
   return claveSedeAceite(sedeInventarioAceite(sede)) === "GUAPILES"
     ? "Guapiles / San Carlos"
@@ -321,7 +322,11 @@ async function ensureAceiteTables() {
 }
 
 function puedeUsarSede(sede, sedesPermitidas) {
-  return sedesPermitidas.length === 0 || sedesPermitidas.includes(sedeOperativaRepuestosAceites(sede));
+  if (!sedesPermitidas.length) return true;
+  const operativa = sedeOperativaRepuestosAceites(sede);
+  if (sedesPermitidas.includes(operativa)) return true;
+  const inventario = sedeInventarioAceite(sede);
+  return inventario === "Transportadora" && sedesPermitidas.some(esSedeAceiteTransportadora);
 }
 
 async function consumirAceitePorSede(connection, { sede, litros, cambioAceiteId = null, unidadId, placa, userId, descripcion = null }) {
@@ -649,7 +654,11 @@ router.get("/", async (req, res) => {
     await ensureAceiteTables();
     const sedesPermitidas = await getSedesPermitidasAceite(req);
     const sedesInventario = expandirSedesInventarioAceite(sedesPermitidas);
-    const sedesGestion = sedesOperativasVisibles((await obtenerTodasSedes(pool)).filter(sede => puedeUsarSede(sede, sedesPermitidas)));
+    const sedesGestion = unirSedesAceite(
+      (await obtenerTodasSedes(pool))
+        .filter(sede => puedeUsarSede(sede, sedesPermitidas))
+        .map(sedeInventarioAceite)
+    );
     await sincronizarCambiosPendientesAceite(sedesPermitidas, req.session.user.id || null);
 
     const [cambios] = await pool.query(
@@ -749,7 +758,7 @@ router.get("/", async (req, res) => {
       galonALitros: GALON_A_LITROS,
       fechaHoy: fechaCostaRica(),
       puedeGestionar: puedeGestionarAceite(req.session.user),
-      etiquetaSede: etiquetaSedeOperativa,
+      etiquetaSede: etiquetaSedeInventarioAceite,
       etiquetaSedeInventario: etiquetaSedeInventarioAceite,
       success,
       error,
@@ -791,8 +800,9 @@ router.post("/estanones", async (req, res) => {
 
     await ensureAceiteTables();
     const sedesPermitidas = await getSedesPermitidasAceite(req);
-    const sedeSolicitada = sedeOperativaRepuestosAceites(req.body.sede);
-    const sede = sedeInventarioAceite(sedeSolicitada);
+    const sedeInput = String(req.body.sede || "").trim();
+    const sedeSolicitada = sedeOperativaRepuestosAceites(sedeInput);
+    const sede = sedeInventarioAceite(sedeInput || sedeSolicitada);
     const fechaCompra = fechaValida(req.body.fecha_compra);
     const descripcion = String(req.body.descripcion || "").trim() || "Estañón de aceite 55 galones";
     const galonesCapacidad = parseMonto(req.body.galones_capacidad || req.body.litros_capacidad) || CAPACIDAD_ESTANON_GALONES;
