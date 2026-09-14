@@ -101,7 +101,7 @@
       font-size: 0.78rem;
     }
     .acciones-menu {
-      min-width: 240px;
+      min-width: 280px;
       border: none;
       border-radius: 14px;
       box-shadow: 0 16px 35px rgba(15, 23, 42, 0.16);
@@ -123,6 +123,23 @@
     }
     .input-factura {
       font-size: 0.78rem;
+    }
+    .enlace-fe-mini select {
+      max-width: 100%;
+      font-size: 0.76rem;
+    }
+    .electronica-pendientes {
+      border: 1px solid #dbeafe;
+      border-radius: 14px;
+      background: white;
+      overflow: hidden;
+    }
+    .electronica-pendientes .table {
+      margin-bottom: 0;
+    }
+    .detalle-fe {
+      max-width: 420px;
+      white-space: normal;
     }
     .electronica-panel {
       border: 1px solid #bae6fd;
@@ -249,6 +266,9 @@
     const reporteOrdenesUrl = '/compras/ordenes/reporte/pdf' + (reporteParams.toString() ? `?${reporteParams.toString()}` : '');
     const reporteOrdenesExcelUrl = '/compras/ordenes/reporte/excel' + (reporteParams.toString() ? `?${reporteParams.toString()}` : '');
     const returnToOrdenes = '/compras/ordenes' + (reporteParams.toString() ? `?${reporteParams.toString()}` : '');
+    const electronicasRecientes = Array.isArray(facturasElectronicasRecientes) ? facturasElectronicasRecientes : [];
+    const electronicasPendientes = Array.isArray(facturasElectronicasPendientes) ? facturasElectronicasPendientes : [];
+    const resumenFE = resumenElectronico || { total: 0, enlazadas: 0, aceptadas: 0, pendientes: 0, ignoradas_gasotica: 0 };
   %>
   <div class="page-heading">
     <div>
@@ -331,10 +351,6 @@
   </div>
 
   <% if (puedeModificarCompras) { %>
-    <%
-      const electronicasRecientes = Array.isArray(facturasElectronicasRecientes) ? facturasElectronicasRecientes : [];
-      const resumenFE = resumenElectronico || { total: 0, enlazadas: 0, aceptadas: 0, pendientes: 0 };
-    %>
     <div class="collapse" id="panelFacturacionElectronica">
       <div class="electronica-panel">
         <div class="electronica-head d-flex justify-content-between align-items-start gap-3 flex-wrap">
@@ -366,11 +382,18 @@
             </div>
             <div class="col-md-3">
               <div class="electronica-stat">
-                <span>Pendientes de revisar</span>
+                <span>Pendientes por enlazar</span>
                 <strong><%= Number(resumenFE.pendientes || 0).toLocaleString('es-CR') %></strong>
               </div>
             </div>
           </div>
+          <% if (Number(resumenFE.ignoradas_gasotica || 0) > 0) { %>
+            <div class="alert alert-warning small py-2 mb-3">
+              <i class="bi bi-fuel-pump me-1"></i>
+              <strong><%= Number(resumenFE.ignoradas_gasotica || 0).toLocaleString('es-CR') %></strong>
+              factura(s) de Gasotica quedan fuera del enlace de órdenes.
+            </div>
+          <% } %>
 
           <form method="POST" action="/compras/ordenes/electronicas/importar" class="mb-4">
             <input type="hidden" name="return_to" value="<%= returnToOrdenes %>">
@@ -401,6 +424,47 @@
               </div>
             </div>
           </form>
+
+          <div class="mb-4">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <h6 class="fw-bold mb-0">Facturas pendientes para enlazar manual</h6>
+              <span class="badge bg-primary-subtle text-primary"><%= electronicasPendientes.length %> visible(s)</span>
+            </div>
+            <div class="electronica-pendientes table-responsive">
+              <table class="table table-sm align-middle">
+                <thead>
+                  <tr>
+                    <th>Fecha</th>
+                    <th>Proveedor</th>
+                    <th>Consecutivo</th>
+                    <th>Detalle</th>
+                    <th class="text-end">Monto</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <% electronicasPendientes.slice(0, 25).forEach(fe => { %>
+                    <tr>
+                      <td><%= fe.fecha_emision ? new Date(fe.fecha_emision).toLocaleDateString('es-CR') : '—' %></td>
+                      <td>
+                        <strong><%= fe.nombre_emisor || 'Sin proveedor' %></strong>
+                        <% if (fe.cedula_emisor) { %>
+                          <div class="small text-muted"><%= fe.cedula_emisor %></div>
+                        <% } %>
+                      </td>
+                      <td class="small"><%= fe.consecutivo || fe.numero_factura || '—' %></td>
+                      <td class="small text-muted detalle-fe"><%= fe.detalle_resumen || fe.criterio_cruce || 'Sin detalle' %></td>
+                      <td class="text-end fw-semibold">₡<%= parseFloat(fe.monto_total || 0).toLocaleString('es-CR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %></td>
+                    </tr>
+                  <% }) %>
+                  <% if (!electronicasPendientes.length) { %>
+                    <tr>
+                      <td colspan="5" class="text-center text-muted py-3">No hay facturas pendientes por enlazar.</td>
+                    </tr>
+                  <% } %>
+                </tbody>
+              </table>
+            </div>
+          </div>
 
           <div class="table-responsive">
             <table class="table table-sm align-middle mb-0">
@@ -584,6 +648,28 @@
 
                     <% if (puedeModificarCompras) { %>
                       <a href="/compras/ordenes/<%= orden.id %>/editar" class="dropdown-item"><i class="bi bi-pencil"></i> Editar orden</a>
+                    <% } %>
+
+                    <% if (puedeModificarCompras && !(orden.factura_clave_electronica || orden.factura_consecutivo_electronico)) { %>
+                      <div class="dropdown-divider"></div>
+                      <form method="POST" action="/compras/ordenes/<%= orden.id %>/electronica/enlazar" class="enlace-fe-mini px-2 py-1">
+                        <input type="hidden" name="return_to" value="<%= returnToOrdenes %>">
+                        <label class="small text-secondary fw-bold mb-1">Enlazar factura pendiente</label>
+                        <select name="factura_electronica_id" class="form-select form-select-sm mb-2" required>
+                          <option value="">Seleccionar pendiente</option>
+                          <% electronicasPendientes.forEach(fe => { %>
+                            <option value="<%= fe.id %>">
+                              <%= fe.fecha_emision ? new Date(fe.fecha_emision).toLocaleDateString('es-CR') : 'Sin fecha' %> ·
+                              ₡<%= parseFloat(fe.monto_total || 0).toLocaleString('es-CR', { maximumFractionDigits: 0 }) %> ·
+                              <%= fe.consecutivo || fe.numero_factura || 'Sin consecutivo' %> ·
+                              <%= fe.nombre_emisor || 'Sin proveedor' %>
+                            </option>
+                          <% }) %>
+                        </select>
+                        <button type="submit" class="btn btn-outline-primary btn-sm w-100" <%= electronicasPendientes.length ? '' : 'disabled' %> onclick="return confirm('¿Enlazar esta factura electrónica a la orden <%= orden.po_numero %>?')">
+                          <i class="bi bi-link-45deg"></i> Enlazar
+                        </button>
+                      </form>
                     <% } %>
 
                     <% if (puedeRegistrarFacturaOrden) { %>

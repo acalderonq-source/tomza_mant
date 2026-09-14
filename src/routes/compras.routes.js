@@ -1014,6 +1014,11 @@ function calcularCoincidenciaDetalle(documento, textoOrden) {
   return 0;
 }
 
+function esFacturaElectronicaExcluidaOrdenes(documento) {
+  const proveedor = normalizarNombreCruce(documento?.nombre_emisor || "");
+  return proveedor.includes("GASOTICA");
+}
+
 function numeroFacturaDesdeDocumento(documento) {
   return limpiarValorOpcionalFacturaElectronica(documento.consecutivo || documento.numero_factura || documento.codigo_documento_fe || documento.clave).slice(0, 100);
 }
@@ -1178,6 +1183,10 @@ async function construirIndiceCruceFacturas(connection, documentos = []) {
 }
 
 function buscarFacturaInternaEnIndice(documento, indice) {
+  if (esFacturaElectronicaExcluidaOrdenes(documento)) {
+    return { tipo: null, id: null, criterio: "No se adjunta: Gasotica" };
+  }
+
   const claves = clavesDocumentoCruce(documento);
   const tieneDetalleDocumento = detallesDocumentoCruce(documento).length > 0;
   let mejorExacto = null;
@@ -1723,16 +1732,36 @@ async function obtenerCrucesFacturacionElectronicaRecientes() {
       ORDER BY COALESCE(fe.fecha_emision, fe.creado_en) DESC, fe.id DESC
       LIMIT 30
     `);
+  const [facturasElectronicasPendientes] = await queryWithRetry(`
+      SELECT
+        fe.id,
+        fe.fecha_emision,
+        fe.consecutivo,
+        fe.numero_factura,
+        fe.clave,
+        fe.cedula_emisor,
+        fe.nombre_emisor,
+        fe.estado_hacienda,
+        fe.monto_total,
+        fe.detalle_resumen,
+        fe.criterio_cruce
+      FROM facturas_electronicas_cruce fe
+      WHERE fe.orden_compra_id IS NULL
+        AND UPPER(COALESCE(fe.nombre_emisor, '')) NOT LIKE '%GASOTICA%'
+      ORDER BY COALESCE(fe.fecha_emision, fe.creado_en) DESC, fe.id DESC
+      LIMIT 150
+    `);
   const [[resumenElectronico]] = await queryWithRetry(`
       SELECT
         COUNT(*) AS total,
         SUM(CASE WHEN orden_compra_id IS NOT NULL THEN 1 ELSE 0 END) AS enlazadas,
         SUM(CASE WHEN estado_hacienda = 'ACEPTADA' THEN 1 ELSE 0 END) AS aceptadas,
-        SUM(CASE WHEN orden_compra_id IS NULL THEN 1 ELSE 0 END) AS pendientes
+        SUM(CASE WHEN orden_compra_id IS NULL AND UPPER(COALESCE(nombre_emisor, '')) NOT LIKE '%GASOTICA%' THEN 1 ELSE 0 END) AS pendientes,
+        SUM(CASE WHEN orden_compra_id IS NULL AND UPPER(COALESCE(nombre_emisor, '')) LIKE '%GASOTICA%' THEN 1 ELSE 0 END) AS ignoradas_gasotica
       FROM facturas_electronicas_cruce
     `);
 
-  return { facturasElectronicasRecientes, resumenElectronico };
+  return { facturasElectronicasRecientes, facturasElectronicasPendientes, resumenElectronico };
 }
 
 function redirectPagosProveedor(req, res) {
@@ -3355,7 +3384,7 @@ router.get("/ordenes", requireAuth, allowRoles(...ROLES_VER_ORDENES), async (req
 
     let totalFiltrado = 0;
     ordenes.forEach(o => totalFiltrado += parseFloat(o.total) || 0);
-    const { facturasElectronicasRecientes, resumenElectronico } = await obtenerCrucesFacturacionElectronicaRecientes();
+    const { facturasElectronicasRecientes, facturasElectronicasPendientes, resumenElectronico } = await obtenerCrucesFacturacionElectronicaRecientes();
     const success = req.session.success;
     const error = req.session.error;
     delete req.session.success;
@@ -3369,6 +3398,7 @@ router.get("/ordenes", requireAuth, allowRoles(...ROLES_VER_ORDENES), async (req
       filtros: { proveedor_id, fecha_desde, fecha_hasta, po_numero, placa_unidad, estado, facturada },
       totalFiltrado,
       facturasElectronicasRecientes,
+      facturasElectronicasPendientes,
       resumenElectronico,
       success,
       error,
@@ -4820,6 +4850,120 @@ router.post("/facturas/reintegro-gastos", requireAuth, allowRoles(...ROLES_GESTI
     console.error("Error guardando reintegro de gastos:", error);
     req.session.error = "No se pudo guardar el reintegro de gastos.";
     res.redirect("/compras/facturas/reintegro-gastos");
+  }
+});
+
+router.post("/ordenes/:id/electronica/enlazar", requireAuth, allowRoles(...ROLES_GESTION_FACTURAS), async (req, res) => {
+  const connection = await pool.getConnection();
+  try {
+    await ensureFacturasSchema();
+
+    const ordenId = Number(req.params.id);
+    const facturaElectronicaId = Number(req.body.factura_electronica_id);
+    if (!Number.isInteger(ordenId) || ordenId <= 0 || !Number.isInteger(facturaElectronicaId) || facturaElectronicaId <= 0) {
+      req.session.error = "Debe seleccionar una factura electrónica válida para enlazar.";
+      return redirectCruceOrdenes(req, res);
+    }
+
+    await connection.beginTransaction();
+
+    const [[orden]] = await connection.query(
+      `SELECT id, po_numero, factura_consecutivo_electronico, factura_clave_electronica
+       FROM ordenes_compra
+       WHERE id = ?
+       FOR UPDATE`,
+      [ordenId]
+    );
+    if (!orden) {
+      await connection.rollback();
+      req.session.error = "No encontré la orden seleccionada.";
+      return redirectCruceOrdenes(req, res);
+    }
+    if (orden.factura_consecutivo_electronico || orden.factura_clave_electronica) {
+      await connection.rollback();
+      req.session.error = `La orden ${orden.po_numero} ya tiene factura electrónica enlazada.`;
+      return redirectCruceOrdenes(req, res);
+    }
+
+    const [[facturaElectronica]] = await connection.query(
+      `SELECT *
+       FROM facturas_electronicas_cruce
+       WHERE id = ?
+       FOR UPDATE`,
+      [facturaElectronicaId]
+    );
+    if (!facturaElectronica) {
+      await connection.rollback();
+      req.session.error = "No encontré la factura electrónica seleccionada.";
+      return redirectCruceOrdenes(req, res);
+    }
+    if (facturaElectronica.orden_compra_id) {
+      await connection.rollback();
+      req.session.error = "Esa factura electrónica ya está enlazada a otra orden.";
+      return redirectCruceOrdenes(req, res);
+    }
+    if (esFacturaElectronicaExcluidaOrdenes(facturaElectronica)) {
+      await connection.rollback();
+      req.session.error = "Las facturas de Gasotica no se adjuntan a órdenes de compra.";
+      return redirectCruceOrdenes(req, res);
+    }
+
+    const numeroFacturaDocumento = numeroFacturaDesdeDocumento(facturaElectronica);
+    const fechaFacturaDocumento = fechaSoloSql(facturaElectronica.fecha_emision);
+    const fechaVencimientoDocumento = fechaFacturaDocumento
+      ? (() => {
+          const fecha = new Date(`${fechaFacturaDocumento}T00:00:00`);
+          fecha.setDate(fecha.getDate() + 30);
+          return fecha.toISOString().slice(0, 10);
+        })()
+      : null;
+
+    await connection.query(
+      `UPDATE ordenes_compra
+       SET factura = ?,
+           factura_fecha = COALESCE(factura_fecha, ?),
+           facturada = 1,
+           estado = 'RECIBIDA_TOTAL',
+           fecha_vencimiento_factura = COALESCE(fecha_vencimiento_factura, ?),
+           factura_fecha_recepcion = COALESCE(factura_fecha_recepcion, CURDATE()),
+           factura_producto_recibido = 1,
+           factura_clave_electronica = ?,
+           factura_consecutivo_electronico = ?,
+           factura_estado_hacienda = ?,
+           factura_fecha_aceptacion = CASE WHEN ? = 'ACEPTADA' THEN COALESCE(factura_fecha_aceptacion, NOW()) ELSE factura_fecha_aceptacion END
+       WHERE id = ?`,
+      [
+        numeroFacturaDocumento || null,
+        fechaFacturaDocumento,
+        fechaVencimientoDocumento,
+        facturaElectronica.clave || null,
+        facturaElectronica.consecutivo || null,
+        facturaElectronica.estado_hacienda || "PENDIENTE",
+        facturaElectronica.estado_hacienda || "PENDIENTE",
+        ordenId
+      ]
+    );
+
+    await connection.query(
+      `UPDATE facturas_electronicas_cruce
+       SET orden_compra_id = ?,
+           factura_id = NULL,
+           criterio_cruce = 'Enlace manual desde orden',
+           actualizado_en = CURRENT_TIMESTAMP
+       WHERE id = ?`,
+      [ordenId, facturaElectronicaId]
+    );
+
+    await connection.commit();
+    req.session.success = `Factura electrónica ${numeroFacturaDocumento || facturaElectronica.consecutivo} enlazada a la orden ${orden.po_numero}.`;
+    return redirectCruceOrdenes(req, res);
+  } catch (error) {
+    await connection.rollback();
+    console.error("Error enlazando factura electrónica a orden:", error);
+    req.session.error = "No se pudo enlazar la factura electrónica a la orden.";
+    return redirectCruceOrdenes(req, res);
+  } finally {
+    connection.release();
   }
 });
 
