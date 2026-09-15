@@ -49,6 +49,47 @@
     .badge-nc { background-color: #0ea5e9; color: #fff; }
     .badge-electronica { background-color: #e0f2fe; color: #075985; border: 1px solid #bae6fd; }
     .badge-electronica-ok { background-color: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
+    .badge-negocio {
+      border-radius: 999px;
+      display: inline-flex;
+      font-size: .68rem;
+      font-weight: 900;
+      letter-spacing: .02em;
+      padding: .28rem .55rem;
+      text-transform: uppercase;
+    }
+    .badge-negocio.cilindrero { background: #dbeafe; color: #1e40af; }
+    .badge-negocio.transportadora { background: #ede9fe; color: #6d28d9; }
+    .badge-negocio.granel { background: #dcfce7; color: #166534; }
+    .badge-negocio.otros { background: #f1f5f9; color: #475569; }
+    .recepcion-business-grid {
+      display: grid;
+      gap: .75rem;
+      grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+      margin-bottom: 1.25rem;
+    }
+    .recepcion-business-card {
+      background: #fff;
+      border: 1px solid #dbe3ef;
+      border-left: 5px solid #64748b;
+      border-radius: 16px;
+      box-shadow: 0 8px 20px rgba(15,23,42,0.04);
+      padding: .9rem 1rem;
+    }
+    .recepcion-business-card.cilindrero { border-left-color: #2563eb; }
+    .recepcion-business-card.transportadora { border-left-color: #7c3aed; }
+    .recepcion-business-card.granel { border-left-color: #16a34a; }
+    .recepcion-business-card .label {
+      color: #475569;
+      font-size: .72rem;
+      font-weight: 900;
+      text-transform: uppercase;
+    }
+    .recepcion-business-card .amount {
+      color: #0f172a;
+      font-size: 1.2rem;
+      font-weight: 900;
+    }
     .electronica-panel {
       background: #fff;
       border: 1px solid #dbe3ef;
@@ -525,6 +566,23 @@
     const facturasPagadas = facturas.filter(f => f.pagada || f.cubierta_por_nc).length;
     const facturasPendientes = facturas.filter(f => !f.pagada && (parseFloat(f.saldo ?? f.monto) > 0)).length;
     const facturasVencidas = facturas.filter(f => f.vencida).length;
+    const claseNegocioRecepcion = negocio => {
+      const texto = String(negocio || '').toLowerCase();
+      if (texto.includes('cilindrero')) return 'cilindrero';
+      if (texto.includes('transportadora')) return 'transportadora';
+      if (texto.includes('granel')) return 'granel';
+      return 'otros';
+    };
+    const negociosRecepcion = ['Cilindrero', 'Transportadora', 'Granel'];
+    const resumenRecepcion = negociosRecepcion.map(nombre => {
+      const items = facturas.filter(f => f.negocio_recepcion === nombre);
+      return {
+        nombre,
+        clase: claseNegocioRecepcion(nombre),
+        facturas: items.length,
+        total: items.reduce((sum, f) => sum + (parseFloat(f.monto_original ?? f.monto) || 0), 0)
+      };
+    });
     const reporteParams = new URLSearchParams();
     if (filtros.proveedor_id) reporteParams.set('proveedor_id', filtros.proveedor_id);
     if (filtros.fecha_desde) reporteParams.set('fecha_desde', filtros.fecha_desde);
@@ -535,6 +593,7 @@
     if (filtros.orden) reporteParams.set('orden', filtros.orden);
     const reporteFacturasUrl = '/compras/facturas/reporte/pdf' + (reporteParams.toString() ? `?${reporteParams.toString()}` : '');
     const reporteFacturasExcelUrl = '/compras/facturas/reporte/excel' + (reporteParams.toString() ? `?${reporteParams.toString()}` : '');
+    const asientoPasivosExcelUrl = '/compras/facturas/asiento-pasivos/excel' + (reporteParams.toString() ? `?${reporteParams.toString()}` : '');
     const listaParams = new URLSearchParams(reporteParams);
     if (filtros.pagada) listaParams.set('pagada', filtros.pagada);
     if (paginacionFacturas.porPagina) listaParams.set('por_pagina', paginacionFacturas.porPagina);
@@ -576,6 +635,16 @@
     </div>
   </div>
 
+  <div class="recepcion-business-grid">
+    <% resumenRecepcion.forEach(item => { %>
+      <div class="recepcion-business-card <%= item.clase %>">
+        <div class="label">Recepción <%= item.nombre %></div>
+        <div class="amount">₡<%= item.total.toLocaleString('es-CR', { maximumFractionDigits: 0 }) %></div>
+        <div class="small text-muted"><%= item.facturas %> factura(s) en esta página</div>
+      </div>
+    <% }) %>
+  </div>
+
   <!-- Botón para agregar factura manual y listado -->
   <div class="card facturas-list-card p-3 p-lg-4">
     <div class="d-flex justify-content-between align-items-center flex-wrap gap-3 facturas-list-toolbar">
@@ -607,6 +676,9 @@
         </a>
         <a href="<%= reporteFacturasExcelUrl %>" class="btn btn-outline-success btn-sm">
           <i class="bi bi-file-earmark-excel"></i> Excel facturas
+        </a>
+        <a href="<%= asientoPasivosExcelUrl %>" class="btn btn-success btn-sm">
+          <i class="bi bi-table"></i> Asiento pasivos 01
         </a>
       </div>
     </div>
@@ -646,6 +718,15 @@
                 <td data-label="Fecha"><%= new Date(f.fecha).toLocaleDateString('es-CR') %></td>
                 <td data-label="Recepción">
                   <div class="small">
+                    <div class="mb-1">
+                      <span class="badge-negocio <%= claseNegocioRecepcion(f.negocio_recepcion) %>"><%= f.negocio_recepcion || 'Por clasificar' %></span>
+                    </div>
+                    <% if (f.placa_recepcion || f.sede_recepcion) { %>
+                      <div class="text-muted mb-1">
+                        <%= f.placa_recepcion || 'Sin placa' %>
+                        <% if (f.sede_recepcion) { %> · <%= f.sede_recepcion %><% } %>
+                      </div>
+                    <% } %>
                     <% if (f.factura_foto_producto) { %>
                       <div>
                         <a href="<%= f.factura_foto_producto %>" target="_blank" class="btn btn-sm btn-outline-secondary">

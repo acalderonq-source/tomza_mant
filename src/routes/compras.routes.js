@@ -181,6 +181,17 @@ function clasificarPlacaCompra(placa, sede) {
   return "Otros";
 }
 
+function etiquetaNegocioFactura(placa, sede) {
+  const categoria = clasificarPlacaCompra(placa, sede);
+  if (categoria === "Cilindreros") return "Cilindrero";
+  if (categoria === "Graneles") return "Granel";
+  if (categoria === "Transportadora") return "Transportadora";
+  if (categoria === "Aceites") return "Aceites";
+  if (categoria === "General taller") return "General / taller";
+  if (categoria === "Generales de gastos") return "Gastos generales";
+  return "Por clasificar";
+}
+
 function agruparGastosPorPlaca(gastos = []) {
   const ordenCategorias = ["Cilindreros", "Graneles", "Transportadora", "Aceites", "General taller", "Generales de gastos", "Otros", "Sin placa / revisar"];
   const grupos = ordenCategorias.map(nombre => ({
@@ -2393,6 +2404,8 @@ function construirConsultaFacturas(filtros = {}, modo = "full") {
       o.factura_observacion,
       o.factura_foto_producto,
       o.factura_placa_producto,
+      o.placa_unidad AS placa_orden,
+      o.observaciones AS orden_observaciones,
       o.factura_clave_electronica AS clave_electronica,
       o.factura_consecutivo_electronico AS consecutivo_electronico,
       o.factura_estado_hacienda AS estado_hacienda,
@@ -2429,6 +2442,8 @@ function construirConsultaFacturas(filtros = {}, modo = "full") {
       f.factura_observacion,
       f.factura_foto_producto,
       f.factura_placa_producto,
+      NULL AS placa_orden,
+      NULL AS orden_observaciones,
       f.clave_electronica,
       f.consecutivo_electronico,
       f.estado_hacienda,
@@ -2538,12 +2553,68 @@ async function obtenerFacturasCompras(filtros = {}) {
   }
 
   const [facturasUnidas] = await queryWithRetry(finalSql, queryParams);
+  const ordenesFacturaIds = [...new Set(facturasUnidas
+    .filter(f => f.tipo === "orden")
+    .map(f => Number(f.id))
+    .filter(id => Number.isInteger(id) && id > 0)
+  )];
+  const lineasPorOrdenFactura = new Map();
+  if (ordenesFacturaIds.length) {
+    const [lineasFactura] = await queryWithRetry(
+      `SELECT orden_compra_id, codigo, codigo_producto, descripcion
+       FROM ordenes_compra_detalle
+       WHERE orden_compra_id IN (?)`,
+      [ordenesFacturaIds]
+    );
+    lineasFactura.forEach(linea => {
+      if (!lineasPorOrdenFactura.has(linea.orden_compra_id)) lineasPorOrdenFactura.set(linea.orden_compra_id, []);
+      lineasPorOrdenFactura.get(linea.orden_compra_id).push(linea);
+    });
+  }
+  const placasFacturas = [...new Set(facturasUnidas
+    .map(f => normalizarPlaca(
+      f.factura_placa_producto ||
+      resolverPlacaOrdenCompra({
+        placa_unidad: f.placa_orden,
+        proveedor_nombre: f.proveedor_nombre,
+        observaciones: f.orden_observaciones,
+        lineas: f.tipo === "orden" ? lineasPorOrdenFactura.get(f.id) || [] : []
+      })
+    ))
+    .filter(Boolean)
+  )];
+  const sedePorPlacaFactura = new Map();
+  if (placasFacturas.length) {
+    const [unidadesFactura] = await queryWithRetry(
+      "SELECT placa, sede FROM unidades WHERE REPLACE(REPLACE(UPPER(placa), '-', ''), ' ', '') IN (?)",
+      [placasFacturas]
+    );
+    unidadesFactura.forEach(unidad => {
+      const placa = normalizarPlaca(unidad.placa);
+      if (placa) sedePorPlacaFactura.set(placa, unidad.sede || "");
+    });
+  }
 
   const facturasConEstado = facturasUnidas.map(f => {
     const saldos = calcularSaldoFactura(f.monto, f.nota_credito_monto, f.abono_monto, f.pagada);
     const montoPagado = calcularMontoPagadoCierre(saldos, f.pagada, f.monto_pagado_cierre);
+    const placaRecepcion = normalizarPlaca(
+      f.factura_placa_producto ||
+      resolverPlacaOrdenCompra({
+        placa_unidad: f.placa_orden,
+        proveedor_nombre: f.proveedor_nombre,
+        observaciones: f.orden_observaciones,
+        lineas: f.tipo === "orden" ? lineasPorOrdenFactura.get(f.id) || [] : []
+      })
+    );
+    const sedeRecepcion = sedePorPlacaFactura.get(placaRecepcion) || "";
+    const sedeClasificacion = sedeRecepcion || f.placa_orden || f.factura_placa_producto || "";
+    const negocioRecepcion = etiquetaNegocioFactura(placaRecepcion, sedeClasificacion);
     return {
       ...f,
+      placa_recepcion: placaRecepcion,
+      sede_recepcion: sedeRecepcion,
+      negocio_recepcion: negocioRecepcion,
       monto_original: saldos.montoOriginal,
       nota_credito_monto: saldos.notaCreditoMonto,
       abono_monto: saldos.abonoMonto,
@@ -2771,6 +2842,434 @@ async function generarPDFFacturasPendientes({ gruposProveedor, facturas, filtros
   };
 
   return pdfStreamToBuffer(printer.createPdfKitDocument(docDefinition));
+}
+
+const ASIENTO_PASIVOS_TEMPLATE_PATHS = [
+  process.env.ASIENTO_PASIVOS_TEMPLATE_PATH,
+  path.join(process.env.USERPROFILE || "", "Downloads", "08. Asiento de Pasivos Agosto 2026 Prueba.xlsx")
+].filter(Boolean);
+
+function normalizarClaveAsiento(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, "");
+}
+
+function textoAsiento(value, fallback = "") {
+  const texto = String(value || "").replace(/\s+/g, " ").trim();
+  return texto || fallback;
+}
+
+function clonarExcelProp(value) {
+  if (!value) return value;
+  return JSON.parse(JSON.stringify(value));
+}
+
+function tituloAsiento(value) {
+  return textoAsiento(value)
+    .toLocaleLowerCase("es-CR")
+    .replace(/(^|\s|\.|-)([a-záéíóúñ])/g, (_, sep, letra) => `${sep}${letra.toLocaleUpperCase("es-CR")}`);
+}
+
+function fechaAsientoExcel(value) {
+  const sql = fechaSoloSql(value);
+  if (!sql) return null;
+  const date = new Date(`${sql}T00:00:00`);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function fechaAsientoTexto(value) {
+  const sql = fechaSoloSql(value);
+  if (!sql) return "";
+  const [year, month, day] = sql.split("-");
+  return `${day}/${month}/${year}`;
+}
+
+function montoAsientoFactura(factura) {
+  const montoOriginal = parseMonto(factura.monto_original ?? factura.monto);
+  const notaCredito = parseMonto(factura.nota_credito_monto);
+  return Math.max(montoOriginal - notaCredito, 0);
+}
+
+async function cargarCatalogoAsientoPasivos() {
+  const archivo = ASIENTO_PASIVOS_TEMPLATE_PATHS.find(filePath => filePath && fs.existsSync(filePath));
+  const resultado = {
+    cuentasPorTexto: [],
+    contrapartidaPorCuenta: new Map(),
+    archivo
+  };
+
+  if (!archivo) return resultado;
+
+  try {
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.readFile(archivo);
+    const worksheet = workbook.getWorksheet("Cuentas con placas Gas Tomza");
+    if (!worksheet) return resultado;
+
+    worksheet.eachRow({ includeEmpty: false }, (row, rowNumber) => {
+      if (rowNumber === 1) return;
+
+      const placa = textoAsiento(textoCeldaExcel(row.getCell(1)));
+      const cuentaPlaca = textoAsiento(textoCeldaExcel(row.getCell(2)));
+      const detallePlaca = textoAsiento(textoCeldaExcel(row.getCell(3)));
+      const contraPlaca = textoAsiento(textoCeldaExcel(row.getCell(4)));
+      if (cuentaPlaca && contraPlaca && !resultado.contrapartidaPorCuenta.has(cuentaPlaca)) {
+        resultado.contrapartidaPorCuenta.set(cuentaPlaca, contraPlaca);
+      }
+      [placa, detallePlaca].filter(Boolean).forEach(texto => {
+        const clave = normalizarClaveAsiento(texto);
+        if (clave && cuentaPlaca) {
+          resultado.cuentasPorTexto.push({ clave, cuenta: cuentaPlaca });
+        }
+      });
+
+      const nombreCatalogo = textoAsiento(textoCeldaExcel(row.getCell(7)));
+      const cuentaCatalogo = textoAsiento(textoCeldaExcel(row.getCell(9)));
+      const contraCatalogo = textoAsiento(textoCeldaExcel(row.getCell(10)));
+      if (cuentaCatalogo && contraCatalogo && !resultado.contrapartidaPorCuenta.has(cuentaCatalogo)) {
+        resultado.contrapartidaPorCuenta.set(cuentaCatalogo, contraCatalogo);
+      }
+      const claveCatalogo = normalizarClaveAsiento(nombreCatalogo);
+      if (claveCatalogo && cuentaCatalogo) {
+        resultado.cuentasPorTexto.push({ clave: claveCatalogo, cuenta: cuentaCatalogo });
+      }
+    });
+  } catch (error) {
+    console.warn("No se pudo leer el catálogo del asiento de pasivos:", error.message);
+  }
+
+  resultado.cuentasPorTexto.sort((a, b) => b.clave.length - a.clave.length);
+  return resultado;
+}
+
+function resolverCuentaAsiento(descripcion, catalogo) {
+  const clave = normalizarClaveAsiento(descripcion);
+  if (!clave || !catalogo || !Array.isArray(catalogo.cuentasPorTexto)) return "";
+
+  const exacta = catalogo.cuentasPorTexto.find(item => item.clave === clave);
+  if (exacta) return exacta.cuenta;
+
+  const parcial = catalogo.cuentasPorTexto.find(item =>
+    item.clave.includes(clave) || clave.includes(item.clave)
+  );
+  return parcial ? parcial.cuenta : "";
+}
+
+async function cargarWorksheetPlantillaAsiento() {
+  const archivo = ASIENTO_PASIVOS_TEMPLATE_PATHS.find(filePath => filePath && fs.existsSync(filePath));
+  if (!archivo) return null;
+
+  try {
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.readFile(archivo);
+    return workbook.getWorksheet("01") || null;
+  } catch (error) {
+    console.warn("No se pudo leer la hoja 01 del asiento de pasivos:", error.message);
+    return null;
+  }
+}
+
+function copiarEstiloCelda(origen, destino) {
+  if (!origen || !destino) return;
+  destino.style = clonarExcelProp(origen.style) || {};
+  if (origen.numFmt) destino.numFmt = origen.numFmt;
+  if (origen.font) destino.font = clonarExcelProp(origen.font);
+  if (origen.alignment) destino.alignment = clonarExcelProp(origen.alignment);
+  if (origen.border) destino.border = clonarExcelProp(origen.border);
+  if (origen.fill) destino.fill = clonarExcelProp(origen.fill);
+  if (origen.protection) destino.protection = clonarExcelProp(origen.protection);
+}
+
+function copiarFormatoFilaAsiento(templateWorksheet, worksheet, targetRowNumber, sourceRowNumber) {
+  const targetRow = worksheet.getRow(targetRowNumber);
+  if (!templateWorksheet) {
+    targetRow.height = 15;
+    return targetRow;
+  }
+
+  const sourceRow = templateWorksheet.getRow(sourceRowNumber);
+  targetRow.height = sourceRow.height || 15;
+  targetRow.style = clonarExcelProp(sourceRow.style) || {};
+  for (let col = 1; col <= 17; col += 1) {
+    copiarEstiloCelda(sourceRow.getCell(col), targetRow.getCell(col));
+  }
+  return targetRow;
+}
+
+function aplicarFormatoPlantillaAsiento(templateWorksheet, worksheet, ultimaFila) {
+  if (!templateWorksheet) {
+    worksheet.columns = [
+      { width: 13 },
+      { width: 16.6640625 },
+      { width: 14.88671875 },
+      { width: 18.109375 },
+      { width: 10.6640625 },
+      { width: 94.5546875 },
+      { width: 9.109375 },
+      { width: 8.33203125 },
+      { width: 18 },
+      { width: 31.6640625 },
+      { width: 10.33203125 },
+      { width: 66.44140625 },
+      { width: 40.21875 },
+      { width: 11.44140625 },
+      { width: 11.44140625 },
+      { width: 13.44140625 },
+      { width: 11.44140625 }
+    ];
+    worksheet.views = [{ state: "frozen", ySplit: 1, topLeftCell: "A2", showGridLines: false, zoomScale: 80, zoomScaleNormal: 80 }];
+    worksheet.properties.defaultRowHeight = 15;
+    return;
+  }
+
+  worksheet.properties = clonarExcelProp(templateWorksheet.properties) || worksheet.properties;
+  worksheet.views = clonarExcelProp(templateWorksheet.views) || worksheet.views;
+  worksheet.pageSetup = clonarExcelProp(templateWorksheet.pageSetup) || worksheet.pageSetup;
+  worksheet.headerFooter = clonarExcelProp(templateWorksheet.headerFooter) || worksheet.headerFooter;
+
+  for (let col = 1; col <= 17; col += 1) {
+    const sourceColumn = templateWorksheet.getColumn(col);
+    const targetColumn = worksheet.getColumn(col);
+    targetColumn.width = sourceColumn.width;
+    targetColumn.hidden = sourceColumn.hidden;
+    targetColumn.style = clonarExcelProp(sourceColumn.style) || {};
+  }
+
+  for (let row = 1; row <= ultimaFila; row += 1) {
+    const sourceRow = row <= 31 ? row : 2;
+    copiarFormatoFilaAsiento(templateWorksheet, worksheet, row, sourceRow);
+  }
+}
+
+function descripcionOrdenAsiento(factura, lineas = []) {
+  const detalleLineas = lineas
+    .map(linea => textoAsiento(linea.descripcion))
+    .filter(Boolean);
+  if (detalleLineas.length) return [...new Set(detalleLineas)].join(", ");
+  return textoAsiento(
+    factura.factura_observacion ||
+    factura.orden_observaciones ||
+    factura.abono_observacion ||
+    factura.nota_credito_motivo ||
+    factura.po_numero,
+    "Factura"
+  );
+}
+
+function agregarFilaAsiento(filas, factura, datos = {}) {
+  const monto = Number(datos.monto || 0);
+  if (monto <= 0) return;
+
+  const proveedor = textoAsiento(factura.proveedor_nombre, "Sin proveedor").toUpperCase();
+  const facturaNumero = textoAsiento(factura.consecutivo_electronico || factura.numero_factura || factura.po_numero);
+  const comentario = textoAsiento(datos.comentario || descripcionOrdenAsiento(factura, datos.lineas), "Factura");
+  const descripcion = textoAsiento(datos.descripcion || factura.placa_recepcion || factura.factura_placa_producto || factura.placa_orden || factura.negocio_recepcion || "GENERAL");
+
+  filas.push({
+    fecha: fechaAsientoExcel(factura.fecha),
+    monto: Number(monto.toFixed(2)),
+    tipo: "CXP",
+    comentario_generado: tituloAsiento(`${proveedor} Fact ${facturaNumero} ${comentario}`),
+    cc: 1,
+    porcentaje: 100,
+    asiento: 1,
+    proveedor,
+    factura: facturaNumero,
+    comentario,
+    descripcion
+  });
+}
+
+function construirFilasAsientoPasivos(facturas = [], lineasPorOrden = new Map()) {
+  const filas = [];
+
+  facturas.forEach(factura => {
+    const montoFactura = montoAsientoFactura(factura);
+    if (montoFactura <= 0) return;
+
+    const lineas = factura.tipo === "orden" ? lineasPorOrden.get(Number(factura.id)) || [] : [];
+    const lineasConMonto = lineas
+      .map(linea => ({
+        ...linea,
+        subtotal_asiento: parseMonto(linea.subtotal) || (parseMonto(linea.cantidad) * parseMonto(linea.precio_unitario))
+      }))
+      .filter(linea => linea.subtotal_asiento > 0);
+
+    if (!lineasConMonto.length) {
+      agregarFilaAsiento(filas, factura, {
+        monto: montoFactura,
+        comentario: descripcionOrdenAsiento(factura, lineas),
+        descripcion: factura.placa_recepcion || factura.factura_placa_producto || factura.placa_orden || factura.negocio_recepcion || "GENERAL"
+      });
+      return;
+    }
+
+    const gruposPorPlaca = new Map();
+    lineasConMonto.forEach(linea => {
+      const placaLinea = normalizarPlaca(linea.codigo) || factura.placa_recepcion || factura.factura_placa_producto || factura.placa_orden || factura.negocio_recepcion || "GENERAL";
+      const clave = placaLinea || "GENERAL";
+      if (!gruposPorPlaca.has(clave)) {
+        gruposPorPlaca.set(clave, { placa: clave, subtotal: 0, comentarios: [] });
+      }
+      const grupo = gruposPorPlaca.get(clave);
+      grupo.subtotal += linea.subtotal_asiento;
+      const detalle = textoAsiento(linea.descripcion);
+      if (detalle) grupo.comentarios.push(detalle);
+    });
+
+    const grupos = Array.from(gruposPorPlaca.values());
+    const subtotalOrden = grupos.reduce((sum, grupo) => sum + grupo.subtotal, 0);
+    let acumulado = 0;
+    grupos.forEach((grupo, index) => {
+      const monto = index === grupos.length - 1
+        ? montoFactura - acumulado
+        : Number((montoFactura * (grupo.subtotal / subtotalOrden)).toFixed(2));
+      acumulado += monto;
+      agregarFilaAsiento(filas, factura, {
+        monto,
+        comentario: [...new Set(grupo.comentarios)].join(", ") || descripcionOrdenAsiento(factura, lineas),
+        descripcion: grupo.placa
+      });
+    });
+  });
+
+  return filas;
+}
+
+async function obtenerLineasOrdenesFacturadas(facturas = []) {
+  const ids = [...new Set(facturas
+    .filter(factura => factura.tipo === "orden")
+    .map(factura => Number(factura.id))
+    .filter(id => Number.isInteger(id) && id > 0)
+  )];
+  if (!ids.length) return new Map();
+
+  const [lineas] = await queryWithRetry(
+    `SELECT orden_compra_id, codigo, codigo_producto, descripcion, cantidad, precio_unitario, subtotal
+     FROM ordenes_compra_detalle
+     WHERE orden_compra_id IN (?)
+     ORDER BY orden_compra_id, id`,
+    [ids]
+  );
+
+  return lineas.reduce((map, linea) => {
+    const ordenId = Number(linea.orden_compra_id);
+    if (!map.has(ordenId)) map.set(ordenId, []);
+    map.get(ordenId).push(linea);
+    return map;
+  }, new Map());
+}
+
+async function generarExcelAsientoPasivos({ facturas = [], filtros = {} } = {}) {
+  const catalogo = await cargarCatalogoAsientoPasivos();
+  const templateWorksheet = await cargarWorksheetPlantillaAsiento();
+  const lineasPorOrden = await obtenerLineasOrdenesFacturadas(facturas);
+  const filas = construirFilasAsientoPasivos(facturas, lineasPorOrden);
+
+  filas.forEach(fila => {
+    fila.cuenta = resolverCuentaAsiento(fila.descripcion, catalogo);
+    fila.contrapartida = catalogo.contrapartidaPorCuenta.get(fila.cuenta) || "";
+  });
+  filas.sort((a, b) => {
+    const anulaA = /ANULA|NOTA CREDITO|\bNC\b/i.test(`${a.comentario} ${a.comentario_generado}`);
+    const anulaB = /ANULA|NOTA CREDITO|\bNC\b/i.test(`${b.comentario} ${b.comentario_generado}`);
+    if (anulaA !== anulaB) return anulaA ? 1 : -1;
+    const fechaA = a.fecha instanceof Date ? a.fecha.getTime() : 0;
+    const fechaB = b.fecha instanceof Date ? b.fecha.getTime() : 0;
+    return fechaA - fechaB || a.proveedor.localeCompare(b.proveedor, "es");
+  });
+
+  const workbook = new ExcelJS.Workbook();
+  workbook.creator = "Gas Tomza";
+  workbook.created = new Date();
+  workbook.modified = new Date();
+  workbook.views = [{ activeTab: 0 }];
+
+  const dataEndRow = Math.max(filas.length + 1, 25);
+  const controlRow = Math.max(dataEndRow + 3, 28);
+  const ultimaFila = controlRow + 3;
+  const worksheet = workbook.addWorksheet("01");
+  aplicarFormatoPlantillaAsiento(templateWorksheet, worksheet, ultimaFila);
+
+  const encabezados = [
+    "Fecha documento",
+    "Cuenta",
+    "Contrapartida",
+    "Monto",
+    "Tipo",
+    "Comentario",
+    "CC",
+    "%",
+    "N. ASIENTO ",
+    "Proveedor",
+    "Factura",
+    "Comentario",
+    "Descripción"
+  ];
+  encabezados.forEach((header, index) => {
+    worksheet.getCell(1, index + 1).value = header;
+  });
+
+  for (let rowNumber = 2; rowNumber <= dataEndRow; rowNumber += 1) {
+    const row = worksheet.getRow(rowNumber);
+    for (let col = 1; col <= 17; col += 1) {
+      row.getCell(col).value = null;
+    }
+  }
+
+  filas.forEach((fila, index) => {
+    const rowNumber = index + 2;
+    const row = worksheet.getRow(rowNumber);
+    row.getCell(1).value = fechaAsientoTexto(fila.fecha);
+    row.getCell(2).value = fila.cuenta;
+    row.getCell(3).value = fila.contrapartida;
+    row.getCell(4).value = fila.monto;
+    row.getCell(5).value = fila.tipo;
+    row.getCell(6).value = { formula: `PROPER(J${rowNumber}&" "&"fact"&" "&K${rowNumber}&"   "&L${rowNumber})`, result: fila.comentario_generado };
+    row.getCell(7).value = fila.cc;
+    row.getCell(8).value = fila.porcentaje;
+    row.getCell(9).value = fila.asiento;
+    row.getCell(10).value = fila.proveedor;
+    row.getCell(11).value = fila.factura;
+    row.getCell(12).value = fila.comentario;
+    row.getCell(13).value = fila.descripcion;
+  });
+
+  const cuentasControl = [...new Set([
+    ...filas.map(fila => fila.contrapartida),
+    ...filas.map(fila => fila.cuenta)
+  ].filter(Boolean))].slice(0, Math.max(controlRow - 2, 0));
+  for (let rowNumber = 2; rowNumber < controlRow; rowNumber += 1) {
+    worksheet.getCell(`O${rowNumber}`).value = null;
+    worksheet.getCell(`P${rowNumber}`).value = null;
+    worksheet.getCell(`Q${rowNumber}`).value = null;
+  }
+
+  cuentasControl.forEach((cuenta, index) => {
+    const rowNumber = index + 2;
+    worksheet.getCell(`O${rowNumber}`).value = cuenta;
+    worksheet.getCell(`P${rowNumber}`).value = { formula: `+SUMIF(C:C,O${rowNumber},D:D)` };
+    worksheet.getCell(`Q${rowNumber}`).value = { formula: `+SUMIF(B:B,O${rowNumber},D:D)` };
+  });
+
+  const primerAnulacionIndex = filas.findIndex(fila => /ANULA|NOTA CREDITO|\bNC\b/i.test(`${fila.comentario} ${fila.comentario_generado}`));
+  const primeraFilaAnulacion = primerAnulacionIndex >= 0 ? primerAnulacionIndex + 2 : null;
+  const ultimaFilaDatos = filas.length ? filas.length + 1 : 1;
+  const normalEndRow = primeraFilaAnulacion ? Math.max(primeraFilaAnulacion - 1, 1) : ultimaFilaDatos;
+  worksheet.getCell(`D${controlRow}`).value = { formula: normalEndRow >= 2 ? `SUM(D2:D${normalEndRow})` : "0" };
+  worksheet.getCell(`D${controlRow + 1}`).value = { formula: primeraFilaAnulacion ? `SUM(D${primeraFilaAnulacion}:D${ultimaFilaDatos})` : "0" };
+  worksheet.getCell(`D${controlRow + 2}`).value = { formula: `SUM(D${controlRow}:D${controlRow + 1})` };
+  worksheet.getCell(`D${controlRow + 3}`).value = "Conclick";
+
+  worksheet.autoFilter = {
+    from: "A1",
+    to: `M${dataEndRow}`
+  };
+
+  return workbook.xlsx.writeBuffer();
 }
 
 // ===================== FUNCIÓN PARA GENERAR NÚMERO DE PO =====================
@@ -5571,6 +6070,43 @@ router.get("/facturas/reporte/excel", requireAuth, allowRoles("ADMIN", "TALLER",
   } catch (error) {
     console.error("Error descargando Excel de facturas:", error);
     res.status(500).send("Error descargando Excel");
+  }
+});
+
+router.get("/facturas/asiento-pasivos/excel", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER", "CONTABILIDAD"), async (req, res) => {
+  try {
+    await ensureFacturasSchema();
+
+    const { proveedor_id, fecha_desde, fecha_hasta, vencida, periodo_cierre } = req.query;
+    const pagada = normalizarFiltroPagadaReporte(req.query.pagada);
+    const orden = req.query.orden === "desc" ? "desc" : "asc";
+    const filtros = {
+      proveedor_id,
+      fecha_desde,
+      fecha_hasta,
+      pagada,
+      vencida,
+      periodo_cierre: normalizarPeriodoCierre(periodo_cierre),
+      orden
+    };
+
+    let facturas = await obtenerFacturasCompras(filtros);
+    if (pagada === "0") {
+      facturas = facturas.filter(factura => parseMonto(factura.saldo) > 0 && !factura.cubierta_por_nc);
+    }
+
+    const buffer = await generarExcelAsientoPasivos({ facturas, filtros });
+    const desdeArchivo = fecha_desde || filtros.periodo_cierre || "inicio";
+    const hastaArchivo = fecha_hasta || filtros.periodo_cierre || "hoy";
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename=asiento_pasivos_${desdeArchivo}_${hastaArchivo}_${new Date().toISOString().slice(0, 19).replace(/:/g, "-")}.xlsx`
+    );
+    res.send(Buffer.from(buffer));
+  } catch (error) {
+    console.error("Error generando asiento de pasivos:", error);
+    res.status(500).send("Error generando asiento de pasivos");
   }
 });
 

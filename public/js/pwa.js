@@ -109,12 +109,32 @@
       return;
     }
 
-    const keyResponse = await fetch("/notificaciones/public-key");
+    const keyResponse = await fetch("/notificaciones/public-key", {
+      headers: { Accept: "application/json" }
+    });
     if (!keyResponse.ok) {
-      if (!silent) alert("Las notificaciones no están configuradas en el servidor.");
+      let message = "No se pudieron preparar las notificaciones.";
+      try {
+        const errorData = await keyResponse.json();
+        if (errorData && errorData.error) message = errorData.error;
+      } catch (_) {
+        // Mantener el mensaje general si el servidor no responde JSON.
+      }
+
+      if (keyResponse.status === 401) {
+        message = "Debe iniciar sesión para activar las notificaciones.";
+      } else if (keyResponse.status === 403) {
+        message = "Su usuario no tiene permiso para activar notificaciones.";
+      }
+
+      if (!silent) alert(message);
       return;
     }
     const keyData = await keyResponse.json();
+    if (!keyData.publicKey) {
+      if (!silent) alert("El servidor no devolvió la llave pública de notificaciones.");
+      return;
+    }
     const applicationServerKey = urlBase64ToUint8Array(keyData.publicKey);
 
     let subscription = await registration.pushManager.getSubscription();

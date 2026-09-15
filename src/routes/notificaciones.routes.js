@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const {
+  configurarWebPush,
   enviarRecordatoriosMantenimientos,
   ensurePushTables,
   getVapidKeys,
@@ -13,11 +14,24 @@ function requireAuth(req, res, next) {
 }
 
 router.get("/public-key", requireAuth, async (req, res) => {
-  const keys = getVapidKeys();
-  if (!keys.publicKey) {
-    return res.status(503).json({ ok: false, error: "Notificaciones no configuradas" });
+  try {
+    const configurado = configurarWebPush();
+    const keys = getVapidKeys();
+    if (!configurado || !keys.publicKey) {
+      return res.status(503).json({
+        ok: false,
+        error: "Notificaciones no configuradas",
+        detalle: "El servidor no pudo cargar web-push o las llaves VAPID."
+      });
+    }
+    res.json({ ok: true, publicKey: keys.publicKey });
+  } catch (error) {
+    console.error("Error preparando notificaciones push:", error);
+    return res.status(500).json({
+      ok: false,
+      error: "No se pudieron preparar las notificaciones"
+    });
   }
-  res.json({ ok: true, publicKey: keys.publicKey });
 });
 
 router.post("/suscribir", requireAuth, async (req, res) => {
