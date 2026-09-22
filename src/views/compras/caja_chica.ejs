@@ -1,276 +1,73 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Caja chica</title>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-  <style>
-    body { background: #eef2f7; color: #0f172a; font-family: 'Segoe UI', Roboto, sans-serif; }
-    .page-wrap { max-width: 1300px; }
-    .topbar {
-      background: linear-gradient(135deg, #0f172a, #123b80);
-      border-bottom: 4px solid #f59e0b;
-      color: #fff;
-    }
-    .hero {
-      background: linear-gradient(135deg, #111827, #f59e0b);
-      border-radius: 18px;
-      color: #fff;
-      padding: 1.2rem;
-    }
-    .hero h1 { font-size: 1.6rem; font-weight: 900; margin: 0; }
-    .hero p { color: rgba(255,255,255,.84); margin: .35rem 0 0; }
-    .stat-grid {
-      display: grid;
-      gap: .85rem;
-      grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
-      margin: 1rem 0;
-    }
-    .stat-card {
-      background: #fff;
-      border: 1px solid #dbe3ef;
-      border-radius: 14px;
-      box-shadow: 0 8px 18px rgba(15,23,42,.05);
-      padding: .95rem;
-    }
-    .stat-label { color: #64748b; font-size: .76rem; font-weight: 900; text-transform: uppercase; }
-    .stat-value { font-size: 1.55rem; font-weight: 900; line-height: 1.1; }
-    .panel {
-      background: #fff;
-      border: 1px solid #dbe3ef;
-      border-radius: 18px;
-      box-shadow: 0 8px 20px rgba(15,23,42,.05);
-      overflow: hidden;
-    }
-    .panel-head {
-      align-items: center;
-      border-bottom: 1px solid #e2e8f0;
-      display: flex;
-      gap: 1rem;
-      justify-content: space-between;
-      padding: 1rem;
-    }
-    .panel-title { font-size: 1rem; font-weight: 900; margin: 0; }
-    .form-box {
-      background: #fffbeb;
-      border: 1px dashed #f59e0b;
-      border-radius: 16px;
-      padding: 1rem;
-    }
-    .month-chart {
-      display: grid;
-      gap: .55rem;
-    }
-    .month-row {
-      display: grid;
-      gap: .35rem;
-    }
-    .month-row-head {
-      display: flex;
-      font-size: .82rem;
-      justify-content: space-between;
-    }
-    .month-track {
-      background: #e2e8f0;
-      border-radius: 999px;
-      height: 14px;
-      overflow: hidden;
-    }
-    .month-bar {
-      background: linear-gradient(90deg, #f59e0b, #dc2626);
-      border-radius: 999px;
-      height: 100%;
-      min-width: 4%;
-    }
-    .table-wrap {
-      max-height: calc(100vh - 360px);
-      overflow: auto;
-    }
-    .history-table { font-size: .9rem; margin: 0; }
-    .history-table th {
-      background: #f8fafc;
-      color: #334155;
-      font-size: .72rem;
-      position: sticky;
-      text-transform: uppercase;
-      top: 0;
-      z-index: 1;
-    }
-    @media (max-width: 768px) {
-      .hero h1 { font-size: 1.3rem; }
-      .panel-head { align-items: stretch; flex-direction: column; }
-      .table-wrap { max-height: none; }
-    }
-  </style>
-</head>
-<body>
-<nav class="topbar px-3 py-2">
-  <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
-    <div class="fw-black"><i class="bi bi-wallet2 me-2"></i>Caja chica</div>
-    <div class="d-flex align-items-center gap-2 flex-wrap">
-      <span class="small"><%= user.usuario %> (<%= user.rol %>)</span>
-      <a href="/compras/facturas" class="btn btn-sm btn-outline-light">Facturas</a>
-      <a href="/compras/facturas/pagos-proveedor" class="btn btn-sm btn-outline-light">Pago proveedor</a>
-      <a href="/compras/facturas/dashboard" class="btn btn-sm btn-outline-light">Dashboard facturas</a>
-      <a href="/dashboard" class="btn btn-sm btn-outline-light">Dashboard</a>
-      <a href="/logout" class="btn btn-sm btn-warning">Salir</a>
-    </div>
-  </div>
-</nav>
-
-<main class="container-fluid page-wrap py-4">
-  <%
-    const data = cajaChica || { resumen: {}, porMes: [], historial: [] };
-    const puedeRegistrar = ['ADMIN', 'TALLER', 'PROVEEDURIA_TALLER'].includes(user.rol);
-    const moneda = value => `₡${Number(value || 0).toLocaleString('es-CR', { maximumFractionDigits: 0 })}`;
-    const fecha = value => {
-      if (!value) return '—';
-      const date = new Date(value);
-      return Number.isNaN(date.getTime()) ? '—' : date.toLocaleDateString('es-CR');
-    };
-    const maxMes = Math.max(...data.porMes.map(item => Number(item.total || 0)), 1);
-  %>
-
-  <section class="hero">
-    <div class="d-flex justify-content-between gap-3 flex-wrap">
-      <div>
-        <h1>Reintegros de caja chica</h1>
-        <p>Registra manualmente la fecha y el monto del reintegro. Todo queda guardado como historial.</p>
-      </div>
-      <div class="text-end">
-        <div class="small text-white-50">Total histórico</div>
-        <div class="fs-3 fw-black"><%= moneda(data.resumen.total) %></div>
-      </div>
-    </div>
-  </section>
-
-  <% if (success) { %>
-    <div class="alert alert-success alert-dismissible fade show mt-3">
-      <%= success %>
-      <button class="btn-close" data-bs-dismiss="alert"></button>
-    </div>
-  <% } %>
-  <% if (error) { %>
-    <div class="alert alert-danger alert-dismissible fade show mt-3">
-      <%= error %>
-      <button class="btn-close" data-bs-dismiss="alert"></button>
-    </div>
-  <% } %>
-
-  <div class="stat-grid">
-    <div class="stat-card">
-      <div class="stat-label">Registros</div>
-      <div class="stat-value"><%= Number(data.resumen.registros || 0).toLocaleString('es-CR') %></div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-label">Total mes actual</div>
-      <div class="stat-value"><%= moneda(data.resumen.total_mes) %></div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-label">Total histórico</div>
-      <div class="stat-value"><%= moneda(data.resumen.total) %></div>
-    </div>
-  </div>
-
-  <div class="row g-3">
-    <div class="col-lg-4">
-      <section class="panel">
-        <div class="panel-head">
-          <h2 class="panel-title">Nuevo reintegro</h2>
-        </div>
-        <div class="p-3">
-          <% if (puedeRegistrar) { %>
-            <form method="POST" action="/compras/facturas/caja-chica" class="form-box">
-              <div class="mb-3">
-                <label class="form-label fw-bold">Fecha</label>
-                <input type="date" name="fecha" class="form-control" value="<%= hoy %>" required>
-              </div>
-              <div class="mb-3">
-                <label class="form-label fw-bold">Monto del reintegro</label>
-                <input type="number" name="monto" class="form-control" min="1" step="0.01" placeholder="Ej: 50000" required>
-              </div>
-              <div class="mb-3">
-                <label class="form-label fw-bold">Observación</label>
-                <textarea name="observacion" class="form-control" rows="3" placeholder="Opcional"></textarea>
-              </div>
-              <button class="btn btn-warning w-100 fw-bold">
-                <i class="bi bi-check2-circle"></i> Guardar reintegro
-              </button>
-            </form>
-          <% } else { %>
-            <div class="alert alert-info mb-0">Contabilidad puede ver caja chica, pero no registrar reintegros.</div>
-          <% } %>
-        </div>
-      </section>
-
-      <section class="panel mt-3">
-        <div class="panel-head">
-          <h2 class="panel-title">Por mes</h2>
-        </div>
-        <div class="p-3 month-chart">
-          <% if (data.porMes.length) { %>
-            <% data.porMes.forEach(item => { %>
-              <div class="month-row">
-                <div class="month-row-head">
-                  <strong><%= item.mes %></strong>
-                  <span><%= moneda(item.total) %></span>
-                </div>
-                <div class="month-track">
-                  <div class="month-bar" style="width: <%= Math.max(4, Math.round((Number(item.total || 0) / maxMes) * 100)) %>%"></div>
-                </div>
-              </div>
-            <% }) %>
-          <% } else { %>
-            <div class="text-muted">Sin reintegros registrados.</div>
-          <% } %>
-        </div>
-      </section>
-    </div>
-
-    <div class="col-lg-8">
-      <section class="panel">
-        <div class="panel-head">
-          <div>
-            <h2 class="panel-title">Historial de caja chica</h2>
-            <div class="small text-muted">Últimos 300 reintegros registrados.</div>
-          </div>
-          <a href="/compras/facturas" class="btn btn-sm btn-outline-secondary">Volver a facturas</a>
-        </div>
-        <div class="table-wrap">
-          <table class="table table-hover align-middle history-table">
-            <thead>
-              <tr>
-                <th>Fecha</th>
-                <th>Monto</th>
-                <th>Observación</th>
-                <th>Registrado por</th>
-              </tr>
-            </thead>
-            <tbody>
-              <% if (data.historial.length) { %>
-                <% data.historial.forEach(item => { %>
-                  <tr>
-                    <td><strong><%= fecha(item.fecha) %></strong></td>
-                    <td class="fw-bold"><%= moneda(item.monto) %></td>
-                    <td><%= item.observacion || '—' %></td>
-                    <td><%= item.creado_por_usuario || '—' %></td>
-                  </tr>
-                <% }) %>
-              <% } else { %>
-                <tr>
-                  <td colspan="4" class="text-center text-muted py-4">Todavía no hay reintegros registrados.</td>
-                </tr>
-              <% } %>
-            </tbody>
-          </table>
-        </div>
-      </section>
-    </div>
-  </div>
-</main>
-
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-</body>
-</html>
+<!DOCTYPE html><html lang="es"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Caja chica</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+<style>
+body{background:#f5f6f8;color:#18232b;font-family:'Segoe UI',sans-serif}nav.topbar{background:#153e36;color:white}main{max-width:1500px;margin:auto;padding:24px 20px}h1{font-size:26px;font-weight:700}h2{font-size:19px}.metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:20px 0}.metric{background:white;border:1px solid #dce1e5;border-radius:6px;padding:14px}.metric span{display:block;font-size:13px;color:#56626b}.metric strong{font-size:22px;overflow-wrap:anywhere}.toolbar{display:flex;align-items:end;gap:12px;flex-wrap:wrap;margin:20px 0}.toolbar .search{flex:1;min-width:180px}.table-wrap{overflow:auto;background:white;border:1px solid #dce1e5;border-radius:6px}.table{font-size:13px;margin:0}.table th{background:#edf2f0;white-space:nowrap;padding:12px}.table td{padding:10px 12px;vertical-align:middle}.amount{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}.muted{color:#56626b;font-size:12px}.identity{max-width:260px;overflow-wrap:anywhere}.detail{max-width:260px;font-size:12px}.actions{white-space:nowrap}.section-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:20px 0 12px}.nav-tabs{flex-wrap:nowrap;overflow-x:auto}.nav-link{white-space:nowrap;color:#246b5c}.cash-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px}.form-label{font-size:13px;font-weight:600}.form-section{border-top:1px solid #dce1e5;padding-top:20px;margin-top:24px}.btn-primary{background:#17634f;border-color:#17634f}.btn-primary:hover{background:#124e3f;border-color:#124e3f}.form-control,.form-select{border-radius:4px}.modal-content{border-radius:8px}.summary-strip{padding:14px;background:#e6f3ed;display:flex;flex-wrap:wrap;gap:24px;margin:12px 0}@media(max-width:700px){main{padding:18px 12px}.metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.metric strong{font-size:18px}}
+</style></head><body>
+<%
+const data=cajaChica;
+const puedeRegistrar=['ADMIN','TALLER','PROVEEDURIA_TALLER'].includes(user.rol);
+const money=v=>Number(v||0).toLocaleString('es-CR',{style:'currency',currency:'CRC'});
+const iso=v=>v?(v instanceof Date?[v.getFullYear(),String(v.getMonth()+1).padStart(2,'0'),String(v.getDate()).padStart(2,'0')].join('-'):String(v).slice(0,10)):'';
+const fecha=v=>iso(v).split('-').reverse().join('/')||'—';
+const pageUrl=pagina=>'/compras/facturas/caja-chica?'+new URLSearchParams({...data.filtros,pagina}).toString();
+const denominaciones=[20000,10000,5000,2000,1000,500,100,50,25,10,5];
+%>
+<nav class="topbar px-3 py-2 d-flex justify-content-between align-items-center flex-wrap gap-2"><strong>Caja chica</strong><div class="d-flex gap-2 align-items-center flex-wrap"><span class="small"><%= user.usuario %></span><a href="/compras/facturas" class="btn btn-sm btn-outline-light">Facturas</a><a href="/compras/ordenes" class="btn btn-sm btn-outline-light">Órdenes</a><a href="/dashboard" class="btn btn-sm btn-outline-light">Inicio</a></div></nav>
+<main>
+<div class="section-heading"><div><h1 class="mb-1">Caja chica</h1><div class="text-secondary">Gas Tomza y Súper Gas</div></div><% if(puedeRegistrar){ %><button class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#importar">Importar reporte electrónico</button><% } %></div>
+<% if(success){ %><div class="alert alert-success" role="status"><%= success %></div><% } %>
+<% if(error){ %><div class="alert alert-danger" role="alert"><%= error %></div><% } %>
+<div class="metrics"><div class="metric"><span>Por confirmar · filtros actuales</span><strong><%= data.flujoResumen.facturas_pendientes %></strong></div><div class="metric"><span>Confirmadas · Gas Tomza</span><strong><%= money(data.flujoResumen.monto_gas_tomza) %></strong></div><div class="metric"><span>Confirmadas · Súper Gas</span><strong><%= money(data.flujoResumen.monto_super_gas) %></strong></div><div class="metric"><span>Reintegros del mes</span><strong><%= money(data.resumen.total_mes) %></strong></div></div>
+<ul class="nav nav-tabs" role="tablist"><% [['recibidas','1. Confirmar facturas'],['preparar','2. Preparar caja'],['cortes','3. Archivos e historial']].forEach(([id,label],i)=>{ %><li class="nav-item" role="presentation"><button id="tab-<%= id %>" class="nav-link <%= i===0?'active':'' %>" data-bs-toggle="tab" data-bs-target="#<%= id %>" role="tab" aria-controls="<%= id %>" aria-selected="<%= i===0 %>"><%= label %></button></li><% }) %></ul>
+<div class="tab-content">
+<section id="recibidas" class="tab-pane fade show active" role="tabpanel" aria-labelledby="tab-recibidas">
+<form method="GET" class="toolbar"><div class="search"><label for="q" class="form-label">Proveedor, factura o clave</label><input id="q" name="q" class="form-control" value="<%= data.filtros.q %>"></div><div><label for="desde" class="form-label">Desde</label><input id="desde" type="date" name="desde" class="form-control" value="<%= data.filtros.desde %>"></div><div><label for="hasta" class="form-label">Hasta</label><input id="hasta" type="date" name="hasta" class="form-control" value="<%= data.filtros.hasta %>"></div><button class="btn btn-primary">Buscar</button><a href="/compras/facturas/caja-chica" class="btn btn-outline-secondary">Limpiar</a></form>
+<p class="muted">Facturas electrónicas aceptadas, sin orden ni caja asignada. La confirmación registra que usted recibió y revisó el comprobante.</p>
+<div class="table-wrap"><table class="table"><thead><tr><th>Fecha</th><th>Proveedor / consecutivo</th><th>Detalle</th><th class="amount">Monto</th><th>Recepción</th></tr></thead><tbody>
+<% data.facturasElectronicasPendientes.forEach(fe=>{ %><tr><td><%= fecha(fe.fecha_emision) %></td><td class="identity"><strong><%= fe.nombre_emisor %></strong><div><%= fe.consecutivo||fe.numero_factura %></div><details class="muted"><summary>Clave</summary><%= fe.clave %></details></td><td class="detail"><%= fe.detalle_resumen||'Sin detalle' %></td><td class="amount"><%= fe.moneda||'Sin moneda' %> <%= Number(fe.monto_total).toLocaleString('es-CR',{minimumFractionDigits:2,maximumFractionDigits:2}) %></td><td><% if(puedeRegistrar){ %><button type="button" class="btn btn-sm btn-primary" data-mode="confirmar" data-id="<%= fe.id %>" data-fecha="<%= iso(fe.fecha_emision) %>" data-numero="<%= fe.consecutivo||fe.numero_factura||'' %>" data-proveedor="<%= fe.nombre_emisor||'' %>" data-monto="<%= Number(fe.monto_total).toFixed(2) %>" data-tipo="ELECTRONICA" data-bs-toggle="modal" data-bs-target="#documento">Confirmar recibida</button><% }else{ %>Pendiente<% } %></td></tr><% }) %>
+<% if(!data.facturasElectronicasPendientes.length){ %><tr><td colspan="5" class="text-center text-secondary py-4">No hay facturas pendientes con estos filtros.</td></tr><% } %>
+</tbody></table></div>
+<nav class="d-flex justify-content-between align-items-center my-3" aria-label="Páginas de facturas"><span class="small">Página <%= data.filtros.pagina %> de <%= data.filtros.paginas %></span><div class="d-flex gap-2"><% if(data.filtros.pagina>1){ %><a class="btn btn-sm btn-outline-secondary" href="<%= pageUrl(data.filtros.pagina-1) %>">Anterior</a><% } %><% if(data.filtros.pagina<data.filtros.paginas){ %><a class="btn btn-sm btn-outline-secondary" href="<%= pageUrl(data.filtros.pagina+1) %>">Siguiente</a><% } %></div></nav>
+</section>
+<section id="preparar" class="tab-pane fade" role="tabpanel" aria-labelledby="tab-preparar">
+<div class="section-heading"><h2 class="mb-0">Facturas confirmadas</h2><% if(puedeRegistrar){ %><button class="btn btn-outline-secondary btn-sm" data-mode="manual" data-tipo="SIMPLIFICADO" data-bs-toggle="modal" data-bs-target="#documento">Agregar factura simplificada</button><% } %></div>
+<div class="toolbar"><div class="search"><label for="buscar-listas" class="form-label">Buscar en confirmadas</label><input id="buscar-listas" type="search" class="form-control"></div><div><label for="empresa-listas" class="form-label">Empresa</label><select id="empresa-listas" class="form-select"><option value="">Ambas</option><option>GAS TOMZA</option><option>SUPER GAS</option></select></div></div>
+<% if(Number(data.flujoResumen.documentos_listos)>500){ %><p class="text-secondary">Se muestran las primeras 500 facturas. Las restantes estarán disponibles después del corte.</p><% } %>
+<form method="POST" action="/compras/facturas/caja-chica/cortes" id="form-corte">
+<div class="table-wrap"><table class="table"><thead><tr><th><input type="checkbox" id="seleccionar-todas" class="form-check-input" aria-label="Seleccionar las facturas visibles" <%= puedeRegistrar?'':'disabled' %>></th><th>Empresa / fecha</th><th>Factura / proveedor</th><th>Unidad / concepto</th><th class="amount">Monto</th><th>Acciones</th></tr></thead><tbody>
+<% data.documentosListos.forEach(d=>{ %><tr class="ready-row" data-empresa="<%= d.empresa %>"><td><input class="form-check-input js-seleccion" type="checkbox" name="documento_ids" value="<%= d.id %>" data-monto="<%= d.monto %>" data-empresa="<%= d.empresa %>" aria-label="Seleccionar factura <%= d.numero_factura %>" <%= puedeRegistrar?'':'disabled' %>></td><td><%= d.empresa %><div class="muted"><%= fecha(d.fecha) %></div></td><td class="identity"><strong><%= d.numero_factura %></strong><div><%= d.proveedor %></div><span class="muted"><%= d.tipo_factura %> · Confirmada por <%= d.confirmado_por_usuario||'—' %></span></td><td><%= d.unidad %><div class="muted"><%= d.concepto %></div></td><td class="amount"><%= money(d.monto) %></td><td class="actions"><% if(puedeRegistrar){ %>
+<button type="button" class="btn btn-sm btn-outline-secondary" title="Editar factura" aria-label="Editar factura" data-mode="editar" data-id="<%= d.id %>" data-fecha="<%= iso(d.fecha) %>" data-numero="<%= d.numero_factura %>" data-proveedor="<%= d.proveedor %>" data-monto="<%= d.monto %>" data-tipo="<%= d.tipo_factura %>" data-empresa="<%= d.empresa %>" data-cuenta="<%= d.cuenta_contable||'' %>" data-unidad="<%= d.unidad||'' %>" data-concepto="<%= d.concepto %>" data-bs-toggle="modal" data-bs-target="#documento"><i class="bi bi-pencil"></i></button><button type="button" class="btn btn-sm btn-outline-danger js-retirar" data-id="<%= d.id %>" title="Retirar de la preparación" aria-label="Retirar de la preparación"><i class="bi bi-x-lg"></i></button><% } %></td></tr><% }) %>
+<% if(!data.documentosListos.length){ %><tr><td colspan="6" class="text-center text-secondary py-4">Confirme las facturas recibidas para preparar la caja.</td></tr><% } %>
+</tbody></table></div>
+<% if(puedeRegistrar){ %>
+<div class="summary-strip" aria-live="polite"><span>Seleccionadas: <strong id="cantidad-seleccion">0</strong></span><span>Gas Tomza: <strong id="monto-tomza">₡0,00</strong></span><span>Súper Gas: <strong id="monto-super">₡0,00</strong></span><span>Total: <strong id="monto-total">₡0,00</strong></span></div>
+<div class="form-section"><h2>Arqueo y cierre</h2><div class="row g-3"><div class="col-md-3"><label for="fecha-corte" class="form-label">Fecha del corte</label><input id="fecha-corte" type="date" name="fecha" value="<%= hoy %>" required class="form-control"></div><div class="col-md-3"><label for="base-caja" class="form-label">Base de caja (₡)</label><input id="base-caja" type="number" min="0.01" max="9999999999.99" step="0.01" name="base_caja" value="900000" required class="form-control js-arqueo"></div><div class="col-md-3"><label for="vales" class="form-label">Vales pendientes (₡)</label><input id="vales" type="number" min="0" max="9999999999.99" step="0.01" name="vales_total" value="0" required class="form-control js-arqueo"></div></div>
+<h3 class="fs-6 mt-4">Efectivo en caja</h3><div class="cash-grid"><% denominaciones.forEach(n=>{ %><div><label for="efectivo-<%= n %>" class="form-label">₡<%= n.toLocaleString('es-CR') %></label><input id="efectivo-<%= n %>" name="efectivo_<%= n %>" type="number" min="0" max="100000" step="1" value="0" class="form-control js-efectivo" data-denominacion="<%= n %>" aria-label="Cantidad de denominación <%= n %>"></div><% }) %></div>
+<div class="summary-strip mt-3"><span>Efectivo: <strong id="monto-efectivo">₡0,00</strong></span><span>Total en caja: <strong id="total-caja">₡0,00</strong></span><span>Diferencia: <strong id="diferencia">₡900.000,00</strong></span></div>
+<label for="observacion-corte" class="form-label">Observación</label><textarea id="observacion-corte" name="observacion" rows="2" maxlength="2000" class="form-control"></textarea><div class="d-flex justify-content-end my-3"><button id="generar-corte" class="btn btn-primary" disabled><i class="bi bi-check2-circle"></i> Cerrar caja y preparar Excel</button></div></div>
+<% } %></form></section>
+<section id="cortes" class="tab-pane fade" role="tabpanel" aria-labelledby="tab-cortes">
+<div class="section-heading"><h2>Cortes guardados</h2><span class="muted">Últimos 100 cortes</span></div><div class="table-wrap"><table class="table"><thead><tr><th>Corte / fecha</th><th>Facturas</th><th class="amount">Gas Tomza</th><th class="amount">Súper Gas</th><th class="amount">Total</th><th>Archivos</th></tr></thead><tbody>
+<% data.cortes.forEach(c=>{ %><tr><td><strong>#<%= c.id %> · <%= fecha(c.fecha) %></strong><div class="muted"><%= c.creado_por_usuario||'—' %></div><% if(c.observacion){ %><div class="detail"><%= c.observacion %></div><% } %></td><td><%= c.documentos %></td><td class="amount"><%= money(c.total_gas_tomza) %></td><td class="amount"><%= money(c.total_super_gas) %></td><td class="amount"><strong><%= money(c.total_documentos) %></strong></td><td><div class="d-flex gap-2 flex-wrap"><a class="btn btn-sm btn-outline-success" href="/compras/facturas/caja-chica/cortes/<%= c.id %>/excel/gas-tomza"><i class="bi bi-download"></i> Gas Tomza</a><a class="btn btn-sm btn-outline-success" href="/compras/facturas/caja-chica/cortes/<%= c.id %>/excel/super-gas"><i class="bi bi-download"></i> Súper Gas</a></div></td></tr><% }) %>
+<% if(!data.cortes.length){ %><tr><td colspan="6" class="text-center text-secondary py-4">Todavía no hay cortes guardados.</td></tr><% } %></tbody></table></div>
+<details class="form-section"><summary class="fw-semibold mb-3">Historial de reintegros</summary><p class="muted">Últimos 300 reintegros. Total histórico: <%= money(data.resumen.total) %></p><div class="table-wrap"><table class="table"><thead><tr><th>Fecha</th><th class="amount">Monto</th><th>Observación</th><th>Registrado por</th></tr></thead><tbody><% data.historial.forEach(h=>{ %><tr><td><%= fecha(h.fecha) %></td><td class="amount"><%= money(h.monto) %></td><td><%= h.observacion||'—' %></td><td><%= h.creado_por_usuario||'—' %></td></tr><% }) %></tbody></table></div></details>
+</section></div></main>
+<% if(puedeRegistrar){ %>
+<form id="retirar-documento" method="POST" hidden></form>
+<div class="modal fade" id="documento" tabindex="-1" aria-labelledby="documento-titulo" aria-hidden="true"><div class="modal-dialog modal-lg"><div class="modal-content"><form id="form-documento" method="POST"><div class="modal-header"><h2 id="documento-titulo" class="modal-title fs-5">Factura recibida</h2><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button></div><div class="modal-body"><div class="row g-3">
+<div class="col-md-6"><label for="doc-empresa" class="form-label">Empresa</label><select id="doc-empresa" name="empresa" class="form-select" required><option value="">Seleccione la empresa</option><option>GAS TOMZA</option><option>SUPER GAS</option></select></div>
+<div class="col-md-6"><label for="doc-fecha" class="form-label">Fecha de factura</label><input id="doc-fecha" name="fecha" type="date" class="form-control" required></div>
+<div class="col-md-6"><label for="doc-numero" class="form-label">N° factura / consecutivo</label><input id="doc-numero" name="numero_factura" class="form-control" maxlength="100" required></div>
+<div class="col-md-6"><label for="doc-proveedor" class="form-label">Proveedor</label><input id="doc-proveedor" name="proveedor" class="form-control" maxlength="180" required></div>
+<div class="col-md-4"><label for="doc-monto" class="form-label">Monto a reintegrar (₡)</label><input id="doc-monto" name="monto" type="number" min="0.01" max="9999999999.99" step="0.01" class="form-control" required></div>
+<div class="col-md-4"><label for="doc-unidad" class="form-label">Unidad / placa</label><input id="doc-unidad" name="unidad" class="form-control" maxlength="60" placeholder="Sin unidad: -"></div>
+<div class="col-md-4"><label for="doc-cuenta" class="form-label">Cuenta contable</label><input id="doc-cuenta" name="cuenta_contable" class="form-control" maxlength="80"></div>
+<div class="col-md-6"><label for="doc-concepto" class="form-label">Concepto</label><input id="doc-concepto" name="concepto" class="form-control" list="conceptos" maxlength="80" required><datalist id="conceptos"><option value="REPUESTOS"><option value="VIATICOS"><option value="SUMINISTROS"><option value="PEAJES"><option value="COMBUSTIBLE"><option value="SERVICIOS"></datalist></div>
+<div class="col-md-6"><label for="doc-tipo" class="form-label">Tipo de factura</label><input id="doc-tipo" name="tipo_factura" class="form-control" readonly></div>
+</div></div><div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button><button class="btn btn-primary" id="guardar-documento">Confirmar recibida</button></div></form></div></div></div>
+<div class="modal fade" id="importar" tabindex="-1" aria-labelledby="importar-titulo" aria-hidden="true"><div class="modal-dialog modal-lg"><div class="modal-content"><form method="POST" action="/compras/facturas/caja-chica/importar"><input type="hidden" name="return_to" value="/compras/facturas/caja-chica"><div class="modal-header"><h2 class="modal-title fs-5" id="importar-titulo">Importar facturas electrónicas</h2><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button></div><div class="modal-body"><label for="reporte-fe" class="form-label">Reporte del otro sistema, con encabezados</label><textarea id="reporte-fe" name="facturas_electronicas_texto" rows="9" class="form-control" required placeholder="Fecha, Clave, Consecutivo, Nombre emisor, Monto..."></textarea><div class="row g-3 mt-1"><div class="col-md-6"><label for="fuente-fe" class="form-label">Referencia del reporte</label><input id="fuente-fe" name="fuente_archivo" maxlength="255" class="form-control"></div><div class="col-md-6"><label for="estado-fe" class="form-label">Estado cuando el reporte no lo incluya</label><select id="estado-fe" name="estado_default" class="form-select"><option value="PENDIENTE">Pendiente de verificar</option><option value="ACEPTADA">Aceptada, verificada en el sistema electrónico</option></select></div></div></div><div class="modal-footer"><button class="btn btn-primary">Importar para revisión</button></div></form></div></div></div>
+<% } %>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script><script src="/js/cajaChica.js"></script>
+</body></html>

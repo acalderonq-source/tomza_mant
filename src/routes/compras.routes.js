@@ -11,6 +11,14 @@ const { ensureTipoMantenimientoColumns, normalizarTipoMantenimiento, detectarTip
 const { construirResumenFinanciero } = require("../utils/resumenFinanciero");
 const { esSedeTransportadoraDetalle } = require("../utils/sedes");
 const { ensureUploadDirectory } = require("../utils/uploadStorage");
+const { fechaValida: fechaCajaValida, centavos: centavosCaja, datosDocumento: validarDocumentoCaja, monedaCRC } = require('../utils/cajaChicaValidacion');
+const {
+  crearLibroCajaChica,
+  fechaArchivo: fechaArchivoCajaChica,
+  EMPRESA_GAS_TOMZA,
+  EMPRESA_SUPER_GAS,
+  DENOMINACIONES: DENOMINACIONES_CAJA_CHICA
+} = require("../utils/cajaChicaExcel");
 
 // ===================== MIDDLEWARES =====================
 function requireAuth(req, res, next) {
@@ -651,6 +659,67 @@ async function ensureCajaChicaTable() {
       creado_por INT NULL,
       creado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
       INDEX idx_caja_chica_fecha (fecha)
+    )
+  `);
+}
+
+let cajaChicaSchemaPromise;
+function ensureCajaChicaFlujoSchema() {
+  if (!cajaChicaSchemaPromise) {
+    cajaChicaSchemaPromise = crearCajaChicaFlujoSchema().catch(error => {
+      cajaChicaSchemaPromise = null;
+      throw error;
+    });
+  }
+  return cajaChicaSchemaPromise;
+}
+
+async function crearCajaChicaFlujoSchema() {
+  await ensureCajaChicaTable();
+  await ensureFacturacionElectronicaSchema();
+  await queryWithRetry(`
+    CREATE TABLE IF NOT EXISTS caja_chica_cortes (
+      id BIGINT AUTO_INCREMENT PRIMARY KEY,
+      fecha DATE NOT NULL,
+      base_caja DECIMAL(14,2) NOT NULL DEFAULT 900000,
+      vales_total DECIMAL(14,2) NOT NULL DEFAULT 0,
+      efectivo_json TEXT NULL,
+      total_gas_tomza DECIMAL(14,2) NOT NULL DEFAULT 0,
+      total_super_gas DECIMAL(14,2) NOT NULL DEFAULT 0,
+      total_documentos DECIMAL(14,2) NOT NULL DEFAULT 0,
+      observacion TEXT NULL,
+      estado VARCHAR(20) NOT NULL DEFAULT 'GENERADO',
+      reintegro_id INT NULL,
+      creado_por INT NULL,
+      creado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      INDEX idx_caja_chica_cortes_fecha (fecha),
+      INDEX idx_caja_chica_cortes_estado (estado)
+    )
+  `);
+  await queryWithRetry(`
+    CREATE TABLE IF NOT EXISTS caja_chica_documentos (
+      id BIGINT AUTO_INCREMENT PRIMARY KEY,
+      factura_electronica_id BIGINT NULL,
+      corte_id BIGINT NULL,
+      empresa VARCHAR(30) NOT NULL,
+      fecha DATE NOT NULL,
+      cuenta_contable VARCHAR(80) NULL,
+      numero_factura VARCHAR(100) NOT NULL,
+      proveedor VARCHAR(180) NOT NULL,
+      unidad VARCHAR(60) NULL,
+      concepto VARCHAR(80) NOT NULL DEFAULT 'REPUESTOS',
+      monto DECIMAL(14,2) NOT NULL DEFAULT 0,
+      tipo_factura VARCHAR(30) NOT NULL DEFAULT 'ELECTRONICA',
+      estado VARCHAR(20) NOT NULL DEFAULT 'CONFIRMADA',
+      creado_por INT NULL,
+      confirmado_por INT NULL,
+      creado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      actualizado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      UNIQUE KEY uq_caja_chica_factura_electronica (factura_electronica_id),
+      INDEX idx_caja_chica_documentos_corte (corte_id),
+      INDEX idx_caja_chica_documentos_estado (estado),
+      INDEX idx_caja_chica_documentos_empresa (empresa),
+      INDEX idx_caja_chica_documentos_fecha (fecha)
     )
   `);
 }
@@ -1723,13 +1792,14 @@ function redirectFacturas(req, res) {
 
 function redirectCruceOrdenes(req, res) {
   const returnTo = String(req.body.return_to || "");
-  if (returnTo.startsWith("/compras/ordenes")) {
+  if (returnTo.startsWith("/compras/ordenes") || returnTo.startsWith("/compras/facturas/caja-chica")) {
     return res.redirect(returnTo);
   }
   return res.redirect("/compras/ordenes");
 }
 
 async function obtenerCrucesFacturacionElectronicaRecientes() {
+  await ensureCajaChicaFlujoSchema();
   const [facturasElectronicasRecientes] = await queryWithRetry(`
       SELECT
         fe.*,
@@ -1757,6 +1827,7 @@ async function obtenerCrucesFacturacionElectronicaRecientes() {
         fe.criterio_cruce
       FROM facturas_electronicas_cruce fe
       WHERE fe.orden_compra_id IS NULL
+        AND NOT EXISTS (SELECT 1 FROM caja_chica_documentos cd WHERE cd.factura_electronica_id = fe.id)
         AND UPPER(COALESCE(fe.nombre_emisor, '')) NOT LIKE '%GASOTICA%'
       ORDER BY COALESCE(fe.fecha_emision, fe.creado_en) DESC, fe.id DESC
       LIMIT 150
@@ -1766,7 +1837,9 @@ async function obtenerCrucesFacturacionElectronicaRecientes() {
         COUNT(*) AS total,
         SUM(CASE WHEN orden_compra_id IS NOT NULL THEN 1 ELSE 0 END) AS enlazadas,
         SUM(CASE WHEN estado_hacienda = 'ACEPTADA' THEN 1 ELSE 0 END) AS aceptadas,
-        SUM(CASE WHEN orden_compra_id IS NULL AND UPPER(COALESCE(nombre_emisor, '')) NOT LIKE '%GASOTICA%' THEN 1 ELSE 0 END) AS pendientes,
+        SUM(CASE WHEN orden_compra_id IS NULL AND UPPER(COALESCE(nombre_emisor, '')) NOT LIKE '%GASOTICA%'
+          AND NOT EXISTS (SELECT 1 FROM caja_chica_documentos cd WHERE cd.factura_electronica_id = facturas_electronicas_cruce.id)
+          THEN 1 ELSE 0 END) AS pendientes,
         SUM(CASE WHEN orden_compra_id IS NULL AND UPPER(COALESCE(nombre_emisor, '')) LIKE '%GASOTICA%' THEN 1 ELSE 0 END) AS ignoradas_gasotica
       FROM facturas_electronicas_cruce
     `);
@@ -2006,8 +2079,30 @@ async function existePagoProveedor(connection, pago) {
   return rows.length > 0;
 }
 
-async function obtenerResumenCajaChica() {
-  await ensureCajaChicaTable();
+function normalizarEmpresaCajaChica(value) {
+  const texto = normalizarTextoCompra(value);
+  return texto.includes("SUPER") ? EMPRESA_SUPER_GAS : EMPRESA_GAS_TOMZA;
+}
+
+function normalizarTipoFacturaCajaChica(value) {
+  return normalizarTextoCompra(value).includes("SIMPL") ? "SIMPLIFICADO" : "ELECTRONICA";
+}
+
+function numeroFacturaCajaChica(value) {
+  return limpiarValorOpcionalFacturaElectronica(value).slice(0, 100);
+}
+
+function normalizarConceptoCajaChica(value) {
+  return normalizarTextoCompra(value || "REPUESTOS").replace(/\s+/g, " ").trim().slice(0, 80) || "REPUESTOS";
+}
+
+function normalizarUnidadCajaChica(value) {
+  const texto = String(value || "").trim().toUpperCase().slice(0, 60);
+  return texto || "-";
+}
+
+async function obtenerResumenCajaChica(filtros = {}) {
+  await ensureCajaChicaFlujoSchema();
 
   const [resumenRows] = await queryWithRetry(`
     SELECT
@@ -2033,10 +2128,90 @@ async function obtenerResumenCajaChica() {
     LIMIT 300
   `);
 
+  const pagina = Math.max(1, Math.min(100000, parseInt(filtros.pagina, 10) || 1));
+  const busqueda = String(filtros.q || '').trim().slice(0, 100);
+  const fechaDesde = fechaCajaValida(filtros.desde) ? filtros.desde : '';
+  const fechaHasta = fechaCajaValida(filtros.hasta) ? filtros.hasta : '';
+  const filtrosFE = [];
+  const paramsFE = [];
+  if (busqueda) {
+    filtrosFE.push("CONCAT_WS(' ', fe.nombre_emisor, fe.consecutivo, fe.clave, fe.numero_factura) LIKE ?");
+    paramsFE.push(`%${busqueda}%`);
+  }
+  if (fechaDesde) { filtrosFE.push('fe.fecha_emision >= ?'); paramsFE.push(fechaDesde); }
+  if (fechaHasta) { filtrosFE.push('fe.fecha_emision < DATE_ADD(?, INTERVAL 1 DAY)'); paramsFE.push(fechaHasta); }
+  const whereFE = `cd.id IS NULL AND fe.orden_compra_id IS NULL AND fe.factura_id IS NULL
+    AND UPPER(COALESCE(fe.estado_hacienda, '')) = 'ACEPTADA'
+    ${filtrosFE.length ? 'AND ' + filtrosFE.join(' AND ') : ''}`;
+  const [[totalFE]] = await queryWithRetry(`SELECT COUNT(*) AS total FROM facturas_electronicas_cruce fe
+    LEFT JOIN caja_chica_documentos cd ON cd.factura_electronica_id = fe.id WHERE ${whereFE}`, paramsFE);
+  const [facturasElectronicasPendientes] = await queryWithRetry(`
+    SELECT
+      fe.id,
+      fe.fecha_emision,
+      fe.consecutivo,
+      fe.numero_factura,
+      fe.clave,
+      fe.nombre_emisor,
+      fe.cedula_emisor,
+      fe.monto_total,
+      fe.moneda,
+      fe.detalle_resumen,
+      fe.estado_hacienda
+    FROM facturas_electronicas_cruce fe
+    LEFT JOIN caja_chica_documentos cd ON cd.factura_electronica_id = fe.id
+    WHERE ${whereFE}
+    ORDER BY COALESCE(fe.fecha_emision, fe.creado_en) DESC, fe.id DESC
+    LIMIT 50 OFFSET ?
+  `, [...paramsFE, (pagina - 1) * 50]);
+
+  const [documentosListos] = await queryWithRetry(`
+    SELECT cd.*, u.usuario AS confirmado_por_usuario
+    FROM caja_chica_documentos cd
+    LEFT JOIN usuarios u ON u.id = cd.confirmado_por
+    WHERE cd.corte_id IS NULL
+      AND cd.estado = 'CONFIRMADA'
+    ORDER BY cd.fecha DESC, cd.id DESC
+    LIMIT 500
+  `);
+
+  const [cortes] = await queryWithRetry(`
+    SELECT cc.*, u.usuario AS creado_por_usuario, COALESCE(cd.documentos, 0) AS documentos
+    FROM caja_chica_cortes cc
+    LEFT JOIN usuarios u ON u.id = cc.creado_por
+    LEFT JOIN (
+      SELECT corte_id, COUNT(*) AS documentos
+      FROM caja_chica_documentos
+      WHERE corte_id IS NOT NULL
+      GROUP BY corte_id
+    ) cd ON cd.corte_id = cc.id
+    ORDER BY cc.fecha DESC, cc.id DESC
+    LIMIT 100
+  `);
+
+  const [[flujoResumen]] = await queryWithRetry(`
+    SELECT
+      COUNT(*) AS documentos_listos,
+      COALESCE(SUM(monto), 0) AS monto_listo,
+      COALESCE(SUM(CASE WHEN empresa = 'GAS TOMZA' THEN monto ELSE 0 END), 0) AS monto_gas_tomza,
+      COALESCE(SUM(CASE WHEN empresa = 'SUPER GAS' THEN monto ELSE 0 END), 0) AS monto_super_gas
+    FROM caja_chica_documentos
+    WHERE corte_id IS NULL
+      AND estado = 'CONFIRMADA'
+  `);
+
   return {
     resumen: resumenRows[0] || { registros: 0, total: 0, total_mes: 0 },
     porMes,
-    historial
+    historial,
+    facturasElectronicasPendientes,
+    documentosListos,
+    cortes,
+    filtros: { q: busqueda, desde: fechaDesde, hasta: fechaHasta, pagina, paginas: Math.max(1, Math.ceil(Number(totalFE.total) / 50)) },
+    flujoResumen: {
+      ...(flujoResumen || {}),
+      facturas_pendientes: Number(totalFE.total || 0)
+    }
   };
 }
 
@@ -5439,7 +5614,7 @@ router.get("/facturas/pagos-proveedor/reporte/excel", requireAuth, allowRoles("A
 
 router.get("/facturas/caja-chica", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER", "CONTABILIDAD"), async (req, res) => {
   try {
-    const cajaChica = await obtenerResumenCajaChica();
+    const cajaChica = await obtenerResumenCajaChica(req.query);
     const success = req.session.success;
     const error = req.session.error;
     delete req.session.success;
@@ -5455,6 +5630,339 @@ router.get("/facturas/caja-chica", requireAuth, allowRoles("ADMIN", "TALLER", "P
   } catch (error) {
     console.error("Error cargando caja chica:", error);
     res.status(500).send("Error cargando caja chica");
+  }
+});
+
+router.post("/facturas/caja-chica/electronicas/:id/confirmar", requireAuth, allowRoles(...ROLES_GESTION_FACTURAS), async (req, res) => {
+  let connection;
+  try {
+    await ensureCajaChicaFlujoSchema();
+    validarDocumentoCaja(req.body);
+    const facturaElectronicaId = Number(req.params.id);
+    if (!Number.isSafeInteger(facturaElectronicaId) || facturaElectronicaId <= 0) throw new Error('Factura no válida.');
+    connection = await pool.getConnection();
+    await connection.beginTransaction();
+    const [[facturaElectronica]] = await connection.query(
+      `SELECT *
+       FROM facturas_electronicas_cruce
+       WHERE id = ?
+         AND orden_compra_id IS NULL
+         AND factura_id IS NULL
+         AND UPPER(COALESCE(estado_hacienda, '')) = 'ACEPTADA'
+       LIMIT 1 FOR UPDATE`,
+      [facturaElectronicaId]
+    );
+
+    if (!facturaElectronica) {
+      await connection.rollback();
+      req.session.error = "La factura electrónica no está disponible para caja chica.";
+      return res.redirect("/compras/facturas/caja-chica");
+    }
+
+    if (!monedaCRC(facturaElectronica.moneda)) {
+      await connection.rollback();
+      req.session.error = 'La caja se genera en colones. Revise la moneda de la factura antes de confirmarla.';
+      return res.redirect('/compras/facturas/caja-chica');
+    }
+
+    const fecha = /^\d{4}-\d{2}-\d{2}$/.test(String(req.body.fecha || ""))
+      ? String(req.body.fecha)
+      : fechaSoloSql(facturaElectronica.fecha_emision) || new Date().toISOString().slice(0, 10);
+    const monto = parseMontoCotizacion(req.body.monto || facturaElectronica.monto_total);
+    const empresa = normalizarEmpresaCajaChica(req.body.empresa);
+    const numeroFactura = numeroFacturaCajaChica(req.body.numero_factura || facturaElectronica.numero_factura || facturaElectronica.consecutivo);
+    const proveedor = String(req.body.proveedor || facturaElectronica.nombre_emisor || "").trim().slice(0, 180);
+
+    if (!proveedor || monto <= 0) {
+      await connection.rollback();
+      req.session.error = "La factura debe tener proveedor y monto mayor a cero.";
+      return res.redirect("/compras/facturas/caja-chica");
+    }
+
+    const [result] = await connection.query(
+      `INSERT INTO caja_chica_documentos (
+         factura_electronica_id, empresa, fecha, cuenta_contable, numero_factura,
+         proveedor, unidad, concepto, monto, tipo_factura, estado,
+         creado_por, confirmado_por
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'ELECTRONICA', 'CONFIRMADA', ?, ?)`,
+      [
+        facturaElectronicaId,
+        empresa,
+        fecha,
+        String(req.body.cuenta_contable || "").trim().slice(0, 80) || null,
+        numeroFactura,
+        proveedor,
+        normalizarUnidadCajaChica(req.body.unidad),
+        normalizarConceptoCajaChica(req.body.concepto),
+        monto,
+        req.session.user.id || null,
+        req.session.user.id || null
+      ]
+    );
+    await connection.commit();
+
+    if (!result.affectedRows) {
+      req.session.error = "Esa factura ya fue confirmada para caja chica.";
+    } else {
+      req.session.success = `Factura ${numeroFactura} confirmada para ${empresa === EMPRESA_SUPER_GAS ? "Súper Gas" : "Gas Tomza"}.`;
+    }
+    return res.redirect("/compras/facturas/caja-chica#preparar");
+  } catch (error) {
+    await connection?.rollback();
+    console.error("Error confirmando factura electrónica para caja chica:", error);
+    req.session.error = error.code === 'ER_DUP_ENTRY' ? 'Esa factura ya fue confirmada.' : error.code ? 'No se pudo confirmar la factura.' : error.message;
+    return res.redirect("/compras/facturas/caja-chica");
+  } finally {
+    connection?.release();
+  }
+});
+
+router.post("/facturas/caja-chica/documentos/manual", requireAuth, allowRoles(...ROLES_GESTION_FACTURAS), async (req, res) => {
+  try {
+    await ensureCajaChicaFlujoSchema();
+    validarDocumentoCaja(req.body);
+    if (req.body.tipo_factura !== 'SIMPLIFICADO') throw new Error('Las facturas electrónicas deben confirmarse desde el listado de recibidas.');
+    const fecha = String(req.body.fecha || "").trim();
+    const proveedor = String(req.body.proveedor || "").trim().slice(0, 180);
+    const numeroFactura = String(req.body.numero_factura || "").trim().slice(0, 100);
+    const monto = parseMontoCotizacion(req.body.monto);
+
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha) || !proveedor || !numeroFactura || monto <= 0) {
+      req.session.error = "Complete fecha, número de factura, proveedor y monto.";
+      return res.redirect("/compras/facturas/caja-chica");
+    }
+
+    await queryWithRetry(
+      `INSERT INTO caja_chica_documentos (
+         empresa, fecha, cuenta_contable, numero_factura, proveedor, unidad,
+         concepto, monto, tipo_factura, estado, creado_por, confirmado_por
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'CONFIRMADA', ?, ?)`,
+      [
+        normalizarEmpresaCajaChica(req.body.empresa),
+        fecha,
+        String(req.body.cuenta_contable || "").trim().slice(0, 80) || null,
+        numeroFactura,
+        proveedor,
+        normalizarUnidadCajaChica(req.body.unidad),
+        normalizarConceptoCajaChica(req.body.concepto),
+        monto,
+        normalizarTipoFacturaCajaChica(req.body.tipo_factura),
+        req.session.user.id || null,
+        req.session.user.id || null
+      ]
+    );
+
+    req.session.success = `Factura ${numeroFactura} agregada a la preparación de caja chica.`;
+    return res.redirect("/compras/facturas/caja-chica#preparar");
+  } catch (error) {
+    console.error("Error agregando documento manual de caja chica:", error);
+    req.session.error = error.code ? 'No se pudo agregar la factura manual.' : error.message;
+    return res.redirect("/compras/facturas/caja-chica");
+  }
+});
+
+router.post("/facturas/caja-chica/documentos/:id/actualizar", requireAuth, allowRoles(...ROLES_GESTION_FACTURAS), async (req, res) => {
+  try {
+    await ensureCajaChicaFlujoSchema();
+    validarDocumentoCaja(req.body);
+    const id = Number(req.params.id);
+    const fecha = String(req.body.fecha || "").trim();
+    const proveedor = String(req.body.proveedor || "").trim().slice(0, 180);
+    const numeroFactura = String(req.body.numero_factura || "").trim().slice(0, 100);
+    const monto = parseMontoCotizacion(req.body.monto);
+
+    if (!Number.isInteger(id) || id <= 0 || !/^\d{4}-\d{2}-\d{2}$/.test(fecha) || !proveedor || !numeroFactura || monto <= 0) {
+      req.session.error = "Los datos de la factura no son válidos.";
+      return res.redirect("/compras/facturas/caja-chica");
+    }
+
+    const [result] = await queryWithRetry(
+      `UPDATE caja_chica_documentos
+       SET empresa = ?, fecha = ?, cuenta_contable = ?, numero_factura = ?, proveedor = ?,
+           unidad = ?, concepto = ?, monto = ?,
+           tipo_factura = CASE WHEN factura_electronica_id IS NULL THEN ? ELSE 'ELECTRONICA' END
+       WHERE id = ?
+         AND corte_id IS NULL
+         AND estado = 'CONFIRMADA'`,
+      [
+        normalizarEmpresaCajaChica(req.body.empresa),
+        fecha,
+        String(req.body.cuenta_contable || "").trim().slice(0, 80) || null,
+        numeroFactura,
+        proveedor,
+        normalizarUnidadCajaChica(req.body.unidad),
+        normalizarConceptoCajaChica(req.body.concepto),
+        monto,
+        'SIMPLIFICADO',
+        id
+      ]
+    );
+
+    req.session.success = result.affectedRows ? "Factura actualizada." : "La factura ya pertenece a un corte cerrado.";
+    return res.redirect("/compras/facturas/caja-chica#preparar");
+  } catch (error) {
+    console.error("Error actualizando documento de caja chica:", error);
+    req.session.error = error.code ? 'No se pudo actualizar la factura.' : error.message;
+    return res.redirect("/compras/facturas/caja-chica");
+  }
+});
+
+router.post("/facturas/caja-chica/documentos/:id/eliminar", requireAuth, allowRoles(...ROLES_GESTION_FACTURAS), async (req, res) => {
+  try {
+    await ensureCajaChicaFlujoSchema();
+    const id = Number(req.params.id);
+    const [result] = await queryWithRetry(
+      `DELETE FROM caja_chica_documentos
+       WHERE id = ?
+         AND corte_id IS NULL
+         AND estado = 'CONFIRMADA'`,
+      [id]
+    );
+    req.session.success = result.affectedRows ? "Factura retirada de la preparación." : "La factura ya pertenece a un corte cerrado.";
+  } catch (error) {
+    console.error("Error retirando documento de caja chica:", error);
+    req.session.error = "No se pudo retirar la factura.";
+  }
+  return res.redirect("/compras/facturas/caja-chica");
+});
+
+router.post("/facturas/caja-chica/cortes", requireAuth, allowRoles(...ROLES_GESTION_FACTURAS), async (req, res) => {
+  let connection;
+  try {
+    await ensureCajaChicaFlujoSchema();
+    const documentoIds = [...new Set(toArray(req.body.documento_ids)
+      .map(value => Number(value))
+      .filter(value => Number.isInteger(value) && value > 0))];
+    const fecha = String(req.body.fecha || "").trim();
+    const baseCaja = centavosCaja(req.body.base_caja ?? '900000') / 100;
+    const valesTotal = centavosCaja(req.body.vales_total || '0') / 100;
+
+    if (!documentoIds.length || documentoIds.length > 500 || !fechaCajaValida(fecha) || baseCaja <= 0) {
+      req.session.error = "Seleccione al menos una factura e indique una fecha y base válidas.";
+      return res.redirect("/compras/facturas/caja-chica");
+    }
+
+    const efectivo = DENOMINACIONES_CAJA_CHICA.reduce((result, denominacion) => {
+      const cantidad = Number(req.body[`efectivo_${denominacion}`] || 0);
+      if (!Number.isInteger(cantidad) || cantidad < 0 || cantidad > 100000) throw new Error('La cantidad de billetes y monedas debe ser un entero entre 0 y 100000.');
+      result[denominacion] = cantidad;
+      return result;
+    }, {});
+
+    connection = await pool.getConnection();
+    await connection.beginTransaction();
+    const [documentos] = await connection.query(
+      `SELECT *
+       FROM caja_chica_documentos
+       WHERE id IN (?)
+         AND corte_id IS NULL
+         AND estado = 'CONFIRMADA'
+       FOR UPDATE`,
+      [documentoIds]
+    );
+
+    if (documentos.length !== documentoIds.length) {
+      await connection.rollback();
+      req.session.error = "Una de las facturas seleccionadas ya fue incluida en otro corte. Actualice la página.";
+      return res.redirect("/compras/facturas/caja-chica");
+    }
+
+    const idsElectronicas = documentos.map(item => item.factura_electronica_id).filter(Boolean);
+    if (idsElectronicas.length) {
+      const [electronicas] = await connection.query('SELECT * FROM facturas_electronicas_cruce WHERE id IN (?) FOR UPDATE', [idsElectronicas]);
+      const validas = electronicas.filter(item => item.estado_hacienda === 'ACEPTADA' && !item.orden_compra_id && !item.factura_id && monedaCRC(item.moneda));
+      if (validas.length !== idsElectronicas.length) throw new Error('Una factura cambió de estado o ya está ligada a una orden. Retírela de la preparación y revise el documento.');
+    }
+
+    const totalGasTomza = documentos
+      .filter(documento => documento.empresa === EMPRESA_GAS_TOMZA)
+      .reduce((sum, documento) => sum + centavosCaja(documento.monto), 0) / 100;
+    const totalSuperGas = documentos
+      .filter(documento => documento.empresa === EMPRESA_SUPER_GAS)
+      .reduce((sum, documento) => sum + centavosCaja(documento.monto), 0) / 100;
+    const totalDocumentos = Math.round((totalGasTomza + totalSuperGas) * 100) / 100;
+
+    const [corteResult] = await connection.query(
+      `INSERT INTO caja_chica_cortes (
+         fecha, base_caja, vales_total, efectivo_json, total_gas_tomza,
+         total_super_gas, total_documentos, observacion, creado_por
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        fecha,
+        baseCaja,
+        valesTotal,
+        JSON.stringify(efectivo),
+        totalGasTomza,
+        totalSuperGas,
+        totalDocumentos,
+        String(req.body.observacion || "").trim().slice(0, 2000) || null,
+        req.session.user.id || null
+      ]
+    );
+    const corteId = corteResult.insertId;
+
+    await connection.query(
+      `UPDATE caja_chica_documentos
+       SET corte_id = ?, estado = 'INCLUIDA'
+       WHERE id IN (?)`,
+      [corteId, documentoIds]
+    );
+
+    const [reintegroResult] = await connection.query(
+      `INSERT INTO caja_chica_reintegros (fecha, monto, observacion, creado_por)
+       VALUES (?, ?, ?, ?)`,
+      [
+        fecha,
+        totalDocumentos,
+        `Corte de caja chica #${corteId}: Gas Tomza ₡${totalGasTomza.toFixed(2)}; Súper Gas ₡${totalSuperGas.toFixed(2)}`,
+        req.session.user.id || null
+      ]
+    );
+    await connection.query("UPDATE caja_chica_cortes SET reintegro_id = ? WHERE id = ?", [reintegroResult.insertId, corteId]);
+
+    await connection.commit();
+    req.session.success = `Corte #${corteId} generado con ${documentos.length} factura(s). Ya puede descargar ambos Excel.`;
+    return res.redirect("/compras/facturas/caja-chica#cortes");
+  } catch (error) {
+    await connection?.rollback();
+    console.error("Error generando corte de caja chica:", error);
+    req.session.error = error.code ? 'No se pudo generar el corte de caja chica.' : error.message;
+    return res.redirect("/compras/facturas/caja-chica");
+  } finally {
+    connection?.release();
+  }
+});
+
+router.get("/facturas/caja-chica/cortes/:id/excel/:empresa", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER", "CONTABILIDAD"), async (req, res) => {
+  try {
+    await ensureCajaChicaFlujoSchema();
+    const corteId = Number(req.params.id);
+    if (!Number.isSafeInteger(corteId) || corteId <= 0 || !['gas-tomza', 'super-gas'].includes(req.params.empresa)) {
+      return res.status(400).send('Corte o empresa no válidos');
+    }
+    const empresa = String(req.params.empresa || "").toLowerCase() === "super-gas" ? EMPRESA_SUPER_GAS : EMPRESA_GAS_TOMZA;
+    const [[corte]] = await queryWithRetry("SELECT * FROM caja_chica_cortes WHERE id = ? LIMIT 1", [corteId]);
+    if (!corte) return res.status(404).send("Corte de caja chica no encontrado");
+
+    const [documentos] = await queryWithRetry(
+      `SELECT *
+       FROM caja_chica_documentos
+       WHERE corte_id = ?
+       ORDER BY fecha ASC, id ASC`,
+      [corteId]
+    );
+    const corteNormalizado = { ...corte, fecha: fechaSoloSql(corte.fecha) };
+    const workbook = await crearLibroCajaChica({ empresa, corte: corteNormalizado, documentos });
+    const buffer = await workbook.xlsx.writeBuffer();
+    const empresaArchivo = empresa === EMPRESA_SUPER_GAS ? "Super_Gas" : "Gas_Tomza";
+    const filename = `Caja_Chica_${empresaArchivo}_${fechaArchivoCajaChica(corteNormalizado.fecha)}.xlsx`;
+
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    return res.send(Buffer.from(buffer));
+  } catch (error) {
+    console.error("Error generando Excel de caja chica:", error);
+    return res.status(500).send("No se pudo generar el Excel de caja chica");
   }
 });
 
@@ -5559,6 +6067,7 @@ router.post("/ordenes/:id/electronica/enlazar", requireAuth, allowRoles(...ROLES
   const connection = await pool.getConnection();
   try {
     await ensureFacturasSchema();
+    await ensureCajaChicaFlujoSchema();
 
     const ordenId = Number(req.params.id);
     const facturaElectronicaId = Number(req.body.factura_electronica_id);
@@ -5597,6 +6106,12 @@ router.post("/ordenes/:id/electronica/enlazar", requireAuth, allowRoles(...ROLES
     if (!facturaElectronica) {
       await connection.rollback();
       req.session.error = "No encontré la factura electrónica seleccionada.";
+      return redirectCruceOrdenes(req, res);
+    }
+    const [[enCaja]] = await connection.query('SELECT id FROM caja_chica_documentos WHERE factura_electronica_id = ? LIMIT 1 FOR UPDATE', [facturaElectronicaId]);
+    if (enCaja) {
+      await connection.rollback();
+      req.session.error = 'La factura está reservada para caja chica. Retírela de la preparación antes de enlazarla a una orden.';
       return redirectCruceOrdenes(req, res);
     }
     if (facturaElectronica.orden_compra_id) {
@@ -5669,12 +6184,15 @@ router.post("/ordenes/:id/electronica/enlazar", requireAuth, allowRoles(...ROLES
   }
 });
 
-router.post("/ordenes/electronicas/importar", requireAuth, allowRoles(...ROLES_GESTION_FACTURAS), async (req, res) => {
+router.post(["/ordenes/electronicas/importar", "/facturas/caja-chica/importar"], requireAuth, allowRoles(...ROLES_GESTION_FACTURAS), async (req, res) => {
   const connection = await pool.getConnection();
   try {
     await ensureFacturasSchema();
+    await ensureCajaChicaFlujoSchema();
+    const soloCaja = req.path === '/facturas/caja-chica/importar';
     const texto = String(req.body.facturas_electronicas_texto || "").trim();
-    const estadoDefault = normalizarEstadoFacturaElectronica(req.body.estado_default || "ACEPTADA", "ACEPTADA");
+    const estadoPorDefecto = soloCaja ? 'PENDIENTE' : 'ACEPTADA';
+    const estadoDefault = normalizarEstadoFacturaElectronica(req.body.estado_default || estadoPorDefecto, estadoPorDefecto);
     const fuenteArchivo = String(req.body.fuente_archivo || "Exportacion facturacion electronica").trim().slice(0, 255);
 
     if (!texto) {
@@ -5688,14 +6206,18 @@ router.post("/ordenes/electronicas/importar", requireAuth, allowRoles(...ROLES_G
       return redirectCruceOrdenes(req, res);
     }
 
-    const indiceCruce = await construirIndiceCruceFacturas(connection, documentos);
+    const indiceCruce = soloCaja ? null : await construirIndiceCruceFacturas(connection, documentos);
     await connection.beginTransaction();
     let enlazadas = 0;
     let ordenesFacturadas = 0;
     let sinEnlace = 0;
 
     for (const documento of documentos) {
-      const match = buscarFacturaInternaEnIndice(documento, indiceCruce);
+      const [[existente]] = await connection.query('SELECT id FROM facturas_electronicas_cruce WHERE clave = ? FOR UPDATE', [documento.clave || documento.consecutivo]);
+      const [[reservada]] = existente
+        ? await connection.query('SELECT id FROM caja_chica_documentos WHERE factura_electronica_id = ? LIMIT 1 FOR UPDATE', [existente.id])
+        : [[]];
+      const match = soloCaja || reservada ? { tipo: null, criterio: reservada ? 'Reservada para caja chica' : 'Revisión de caja chica' } : buscarFacturaInternaEnIndice(documento, indiceCruce);
       const numeroFacturaDocumento = numeroFacturaDesdeDocumento(documento);
       const fechaFacturaDocumento = fechaSoloSql(documento.fecha_emision);
       const fechaVencimientoDocumento = fechaFacturaDocumento
@@ -5789,7 +6311,9 @@ router.post("/ordenes/electronicas/importar", requireAuth, allowRoles(...ROLES_G
     }
 
     await connection.commit();
-    req.session.success = `Cruce importado: ${documentos.length} documento(s), ${enlazadas} enlazado(s), ${ordenesFacturadas} orden(es) facturada(s) y ${sinEnlace} pendiente(s) de revisar.`;
+    req.session.success = soloCaja
+      ? `Reporte importado: ${documentos.length} documento(s). Confirme las facturas recibidas para preparar la caja.`
+      : `Cruce importado: ${documentos.length} documento(s), ${enlazadas} enlazado(s), ${ordenesFacturadas} orden(es) facturada(s) y ${sinEnlace} pendiente(s) de revisar.`;
     return redirectCruceOrdenes(req, res);
   } catch (error) {
     await connection.rollback();

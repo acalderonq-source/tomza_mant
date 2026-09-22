@@ -1,0 +1,42 @@
+CREATE TABLE IF NOT EXISTS caja_chica_cortes (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  fecha DATE NOT NULL,
+  base_caja DECIMAL(14,2) NOT NULL DEFAULT 900000,
+  vales_total DECIMAL(14,2) NOT NULL DEFAULT 0,
+  efectivo_json TEXT NULL,
+  total_gas_tomza DECIMAL(14,2) NOT NULL DEFAULT 0,
+  total_super_gas DECIMAL(14,2) NOT NULL DEFAULT 0,
+  total_documentos DECIMAL(14,2) NOT NULL DEFAULT 0,
+  observacion TEXT NULL,
+  estado VARCHAR(20) NOT NULL DEFAULT 'GENERADO',
+  reintegro_id INT NULL,
+  creado_por INT NULL,
+  creado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_caja_chica_cortes_fecha (fecha),
+  INDEX idx_caja_chica_cortes_estado (estado)
+);
+
+CREATE TABLE IF NOT EXISTS caja_chica_documentos (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  factura_electronica_id BIGINT NULL,
+  corte_id BIGINT NULL,
+  empresa VARCHAR(30) NOT NULL,
+  fecha DATE NOT NULL,
+  cuenta_contable VARCHAR(80) NULL,
+  numero_factura VARCHAR(100) NOT NULL,
+  proveedor VARCHAR(180) NOT NULL,
+  unidad VARCHAR(60) NULL,
+  concepto VARCHAR(80) NOT NULL DEFAULT 'REPUESTOS',
+  monto DECIMAL(14,2) NOT NULL DEFAULT 0,
+  tipo_factura VARCHAR(30) NOT NULL DEFAULT 'ELECTRONICA',
+  estado VARCHAR(20) NOT NULL DEFAULT 'CONFIRMADA',
+  creado_por INT NULL,
+  confirmado_por INT NULL,
+  creado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  actualizado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_caja_chica_factura_electronica (factura_electronica_id),
+  INDEX idx_caja_chica_documentos_corte (corte_id),
+  INDEX idx_caja_chica_documentos_estado (estado),
+  INDEX idx_caja_chica_documentos_empresa (empresa),
+  INDEX idx_caja_chica_documentos_fecha (fecha)
+);
