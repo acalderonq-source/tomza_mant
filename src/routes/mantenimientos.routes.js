@@ -177,18 +177,28 @@ function obtenerFiltroMecanicosPorSede(sedeFiltro, soloIds = false, user = null,
     return { sql, params };
   }
 
-  if (esUsuarioMecanicosCentrales(user)) {
-    sql += " AND nombre IN (?)";
-    params.push(MECANICOS_USUARIOS_CENTRALES);
-    sql += " ORDER BY FIELD(nombre, ?)";
-    params.push(MECANICOS_USUARIOS_CENTRALES);
-    return { sql, params };
-  }
-
   const sede = String(sedeFiltro || "").trim();
   const sedesMecanico = normalizarSedesParaMecanicos(sedesPermitidas);
   const sedeUpper = sede.toUpperCase();
   const esGranel = SEDES_GRANEL.some(s => s.toUpperCase() === sedeUpper) || sedeUpper.includes("GRANEL");
+
+  if (esUsuarioMecanicosCentrales(user)) {
+    if (esUsuarioPesados(user)) {
+      sql += " AND (sede IN (?) OR nombre IN (?))";
+      params.push(expandirSedesEquivalentes(SEDES_TRANSPORTE), MECANICOS_USUARIOS_CENTRALES);
+    } else if (sede) {
+      sql += " AND (sede = ? OR nombre IN (?))";
+      params.push(sedeOperativaRepuestosAceites(sede), MECANICOS_USUARIOS_CENTRALES);
+    } else if (sedesMecanico.length) {
+      sql += " AND (sede IN (?) OR nombre IN (?))";
+      params.push(sedesMecanico, MECANICOS_USUARIOS_CENTRALES);
+    } else {
+      sql += " AND nombre IN (?)";
+      params.push(MECANICOS_USUARIOS_CENTRALES);
+    }
+    sql += " ORDER BY nombre";
+    return { sql, params };
+  }
 
   if (esUsuarioPesados(user)) {
     sql += " AND sede IN (?)";
