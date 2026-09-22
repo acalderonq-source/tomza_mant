@@ -17,10 +17,12 @@ const {
 } = require("../utils/sedes");
 const { agregarFiltroPlacaSql } = require("../utils/placas");
 const { normalizarTipoMantenimiento, detectarTipoMantenimiento } = require("../utils/tipoMantenimiento");
+const { ensureRutasSupervisoresTables } = require("../utils/rutasSupervisoresDb");
 
 const ROLES_VER = ["ADMIN", "TALLER", "MECANICO", "SUPERVISOR", "SUPERVISOR_PESADO"];
 const ROLES_CREAR = ["ADMIN", "TALLER", "SUPERVISOR", "SUPERVISOR_PESADO"];
 const ROLES_EDITAR = ["ADMIN", "TALLER"];
+const ROLES_RUTAS = ["ADMIN", "TALLER", "SUPERVISOR", "SUPERVISOR_PESADO"];
 
 function requireAuth(req, res, next) {
   if (!req.session.user) return res.redirect("/login");
@@ -138,7 +140,15 @@ function lunesDesdeSemanaInput(value) {
 
 function semanaInputDesdeFecha(value) {
   if (!value) return "";
-  const fecha = new Date(`${String(value).slice(0, 10)}T12:00:00`);
+  const fechaBase = value instanceof Date
+    ? new Intl.DateTimeFormat("en-CA", {
+        timeZone: "America/Costa_Rica",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit"
+      }).format(value)
+    : (String(value).match(/^\d{4}-\d{2}-\d{2}/)?.[0] || "");
+  const fecha = new Date(`${fechaBase}T12:00:00`);
   if (Number.isNaN(fecha.getTime())) return "";
   return semanaInputValue(fecha);
 }
@@ -150,6 +160,67 @@ function semanaDefaultReporte() {
     base.setDate(base.getDate() + 7);
   }
   return semanaInputValue(base);
+}
+
+function semanaActualRutas() {
+  const hoyCostaRica = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Costa_Rica" }));
+  return semanaInputValue(hoyCostaRica);
+}
+
+function texto(value, maxLength = 255) {
+  return String(value || "").trim().replace(/\s+/g, " ").slice(0, maxLength);
+}
+
+async function cargarSedesRutas(req) {
+  const sedesPermitidas = await obtenerSedesPermitidas(req);
+  let sql = `SELECT DISTINCT sede FROM unidades WHERE COALESCE(activa, 1) = 1 AND sede IS NOT NULL AND TRIM(sede) <> ''`;
+  const params = [];
+  if (sedesPermitidas.length) {
+    sql += " AND sede IN (?)";
+    params.push(sedesPermitidas);
+  }
+  sql += " ORDER BY sede";
+  const [rows] = await pool.query(sql, params);
+  return rows.map(row => row.sede);
+}
+
+function usuarioPuedeUsarSede(sede, sedesPermitidas) {
+  return !sedesPermitidas.length || sedesPermitidas.includes(sede);
+}
+
+function nombreUsuario(user) {
+  return texto(user?.nombre || user?.usuario || "Usuario", 180);
+}
+
+async function registrarMovimientoRuta(conn, asignacionId, accion, anterior, nuevo, req, motivo = "") {
+  const semana = nuevo?.semana_inicio || anterior?.semana_inicio;
+  await conn.query(
+    `INSERT INTO supervisor_rutas_movimientos (
+      asignacion_id, accion, semana_inicio,
+      sede_anterior, sede_nueva, ruta_anterior, ruta_nueva,
+      chofer_anterior, chofer_nuevo, unidad_id_anterior, unidad_id_nueva,
+      observacion_anterior, observacion_nueva, motivo,
+      cambiado_por, cambiado_por_nombre
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      asignacionId,
+      accion,
+      semana,
+      anterior?.sede || null,
+      nuevo?.sede || null,
+      anterior?.ruta || null,
+      nuevo?.ruta || null,
+      anterior?.chofer || null,
+      nuevo?.chofer || null,
+      anterior?.unidad_id || null,
+      nuevo?.unidad_id || null,
+      anterior?.observacion || null,
+      nuevo?.observacion || null,
+      texto(motivo) || null,
+      req.session.user.id,
+      nombreUsuario(req.session.user)
+    ]
+  );
 }
 
 function puedeElegirSemanaReporte(user) {
@@ -555,6 +626,7 @@ router.use(requireAuth);
 router.get("/", allowRoles(...ROLES_VER), async (req, res) => {
   try {
     await ensureReportesSupervisoresTables(pool);
+    await ensureRutasSupervisoresTables(pool);
     const sedesPermitidas = await obtenerSedesPermitidas(req);
     const { sede, placa, importante, correctivo_id } = req.query;
     const semana = String(req.query.semana || "").trim();
@@ -563,6 +635,14 @@ router.get("/", allowRoles(...ROLES_VER), async (req, res) => {
     const reportesAgrupados = agruparReportesPorPlaca(reportes);
     const unidades = await cargarUnidades(req);
     const sugerencias = await obtenerSugerenciasPendientes(sedesPermitidas, correctivo_id || null);
+    const semanaRutasFecha = lunesDesdeSemanaInput(semanaActualRutas());
+    const paramsRutas = [semanaRutasFecha];
+    let sqlRutas = `SELECT COUNT(*) AS total FROM supervisor_rutas_semanales WHERE activo = 1 AND semana_inicio = ?`;
+    if (sedesPermitidas.length) {
+      sqlRutas += " AND sede IN (?)";
+      paramsRutas.push(sedesPermitidas);
+    }
+    const [[rutasSemanaRow]] = await pool.query(sqlRutas, paramsRutas);
     const success = req.session.success;
     const error = req.session.error;
     delete req.session.success;
@@ -578,6 +658,8 @@ router.get("/", allowRoles(...ROLES_VER), async (req, res) => {
       puedeElegirSemanaReporte: puedeElegirSemanaReporte(req.session.user),
       puedeCrear: ROLES_CREAR.includes(req.session.user.rol),
       puedeEditar: ROLES_EDITAR.includes(req.session.user.rol),
+      rutasSemanaActual: Number(rutasSemanaRow.total || 0),
+      semanaRutasActual: semanaActualRutas(),
       renderReporteHtml,
       success,
       error
@@ -585,6 +667,237 @@ router.get("/", allowRoles(...ROLES_VER), async (req, res) => {
   } catch (error) {
     console.error("Error cargando reportes de supervisores:", error);
     res.status(500).send("Error interno");
+  }
+});
+
+router.get("/rutas", allowRoles(...ROLES_RUTAS), async (req, res) => {
+  try {
+    await ensureRutasSupervisoresTables(pool);
+    const sedesPermitidas = await obtenerSedesPermitidas(req);
+    const sedes = await cargarSedesRutas(req);
+    const unidades = await cargarUnidades(req);
+    const semanaInput = String(req.query.semana || semanaActualRutas()).trim();
+    const semanaFecha = lunesDesdeSemanaInput(semanaInput) || lunesDesdeSemanaInput(semanaActualRutas());
+    const sede = texto(req.query.sede, 100);
+
+    if (sede && !usuarioPuedeUsarSede(sede, sedesPermitidas)) {
+      return res.status(403).send("No autorizado para esa sede");
+    }
+
+    const params = [semanaFecha];
+    let sql = `
+      SELECT sr.*, u.placa
+      FROM supervisor_rutas_semanales sr
+      LEFT JOIN unidades u ON u.id = sr.unidad_id
+      WHERE sr.activo = 1 AND sr.semana_inicio = ?
+    `;
+    if (sedesPermitidas.length) {
+      sql += " AND sr.sede IN (?)";
+      params.push(sedesPermitidas);
+    }
+    if (sede) {
+      sql += " AND sr.sede = ?";
+      params.push(sede);
+    }
+    sql += " ORDER BY sr.sede, sr.ruta, sr.chofer";
+    const [asignaciones] = await pool.query(sql, params);
+
+    const movimientoParams = [semanaFecha];
+    let movimientoSql = `
+      SELECT
+        sm.*,
+        ua.placa AS placa_anterior,
+        un.placa AS placa_nueva
+      FROM supervisor_rutas_movimientos sm
+      LEFT JOIN unidades ua ON ua.id = sm.unidad_id_anterior
+      LEFT JOIN unidades un ON un.id = sm.unidad_id_nueva
+      WHERE sm.semana_inicio = ?
+    `;
+    if (sedesPermitidas.length) {
+      movimientoSql += " AND COALESCE(sm.sede_nueva, sm.sede_anterior) IN (?)";
+      movimientoParams.push(sedesPermitidas);
+    }
+    if (sede) {
+      movimientoSql += " AND COALESCE(sm.sede_nueva, sm.sede_anterior) = ?";
+      movimientoParams.push(sede);
+    }
+    movimientoSql += " ORDER BY sm.cambiado_en DESC, sm.id DESC LIMIT 250";
+    const [movimientos] = await pool.query(movimientoSql, movimientoParams);
+
+    const success = req.session.success;
+    const error = req.session.error;
+    delete req.session.success;
+    delete req.session.error;
+
+    res.render("reportes_supervisores_rutas", {
+      user: req.session.user,
+      asignaciones,
+      movimientos,
+      unidades,
+      sedes,
+      filtros: { semana: semanaInputDesdeFecha(semanaFecha), sede },
+      semanaActual: semanaActualRutas(),
+      success,
+      error
+    });
+  } catch (error) {
+    console.error("Error cargando rutas semanales de supervisores:", error);
+    res.status(500).send("Error cargando rutas y choferes");
+  }
+});
+
+router.post("/rutas", allowRoles(...ROLES_RUTAS), async (req, res) => {
+  const conn = await pool.getConnection();
+  try {
+    await ensureRutasSupervisoresTables(pool);
+    const semanaInput = String(req.body.semana || semanaActualRutas()).trim();
+    const semanaInicio = lunesDesdeSemanaInput(semanaInput);
+    const sede = texto(req.body.sede, 100);
+    const ruta = texto(req.body.ruta, 150);
+    const chofer = texto(req.body.chofer, 180);
+    const observacion = texto(req.body.observacion, 255);
+    const unidadId = Number(req.body.unidad_id) || null;
+    const sedesPermitidas = await obtenerSedesPermitidas(req);
+
+    if (!semanaInicio || !sede || !ruta || !chofer) throw new Error("Debe indicar semana, sede, ruta y chofer.");
+    if (!usuarioPuedeUsarSede(sede, sedesPermitidas)) throw new Error("No tiene permiso para registrar esa sede.");
+
+    await conn.beginTransaction();
+    if (unidadId) {
+      const [[unidad]] = await conn.query("SELECT id, sede FROM unidades WHERE id = ? AND COALESCE(activa, 1) = 1 LIMIT 1", [unidadId]);
+      if (!unidad || !usuarioPuedeUsarSede(unidad.sede, sedesPermitidas)) throw new Error("La unidad seleccionada no está autorizada.");
+    }
+
+    const [[existente]] = await conn.query(
+      `SELECT * FROM supervisor_rutas_semanales
+       WHERE semana_inicio = ? AND sede = ? AND ruta = ?
+       LIMIT 1 FOR UPDATE`,
+      [semanaInicio, sede, ruta]
+    );
+    const nuevo = { semana_inicio: semanaInicio, sede, ruta, chofer, unidad_id: unidadId, observacion };
+
+    if (existente) {
+      const cambioChofer = texto(existente.chofer, 180).toUpperCase() !== chofer.toUpperCase();
+      const cambioUnidad = Number(existente.unidad_id || 0) !== Number(unidadId || 0);
+      const cambioDetalle = texto(existente.observacion) !== observacion;
+      const reactivada = Number(existente.activo || 0) !== 1;
+      await conn.query(
+        `UPDATE supervisor_rutas_semanales
+         SET chofer = ?, unidad_id = ?, observacion = ?, supervisor_id = ?, supervisor_nombre = ?, activo = 1
+         WHERE id = ?`,
+        [chofer, unidadId, observacion || null, req.session.user.id, nombreUsuario(req.session.user), existente.id]
+      );
+      if (cambioChofer || cambioUnidad || cambioDetalle || reactivada) {
+        const motivo = texto(req.body.motivo, 255);
+        if (!motivo) throw new Error("Debe indicar el motivo para cambiar una asignación existente.");
+        const accion = reactivada ? "REACTIVAR" : cambioChofer && !cambioUnidad ? "CAMBIO_CHOFER" : cambioUnidad && !cambioChofer ? "CAMBIO_UNIDAD" : "ACTUALIZAR";
+        await registrarMovimientoRuta(conn, existente.id, accion, existente, nuevo, req, motivo);
+      }
+      req.session.success = cambioChofer || cambioUnidad || cambioDetalle || reactivada
+        ? `Asignación actualizada para la ruta ${ruta}.`
+        : `La ruta ${ruta} ya tenía esa misma asignación.`;
+    } else {
+      const [result] = await conn.query(
+        `INSERT INTO supervisor_rutas_semanales
+          (semana_inicio, sede, ruta, chofer, unidad_id, observacion, supervisor_id, supervisor_nombre)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [semanaInicio, sede, ruta, chofer, unidadId, observacion || null, req.session.user.id, nombreUsuario(req.session.user)]
+      );
+      await registrarMovimientoRuta(conn, result.insertId, "CREAR", null, nuevo, req, req.body.motivo);
+      req.session.success = `Ruta ${ruta} asignada a ${chofer}.`;
+    }
+
+    await conn.commit();
+    res.redirect(`/reportes-supervisores/rutas?semana=${encodeURIComponent(semanaInput)}&sede=${encodeURIComponent(sede)}`);
+  } catch (error) {
+    await conn.rollback();
+    console.error("Error guardando ruta semanal:", error);
+    req.session.error = error.code === "ER_DUP_ENTRY" ? "Ya existe esa ruta para la semana y sede seleccionadas." : (error.message || "No se pudo guardar la ruta.");
+    res.redirect("/reportes-supervisores/rutas");
+  } finally {
+    conn.release();
+  }
+});
+
+router.post("/rutas/:id", allowRoles(...ROLES_RUTAS), async (req, res) => {
+  const conn = await pool.getConnection();
+  try {
+    await ensureRutasSupervisoresTables(pool);
+    const id = Number(req.params.id);
+    const sede = texto(req.body.sede, 100);
+    const ruta = texto(req.body.ruta, 150);
+    const chofer = texto(req.body.chofer, 180);
+    const observacion = texto(req.body.observacion, 255);
+    const motivo = texto(req.body.motivo, 255);
+    const unidadId = Number(req.body.unidad_id) || null;
+    const sedesPermitidas = await obtenerSedesPermitidas(req);
+    if (!id || !sede || !ruta || !chofer) throw new Error("Debe indicar sede, ruta y chofer.");
+
+    await conn.beginTransaction();
+    const [[anterior]] = await conn.query("SELECT * FROM supervisor_rutas_semanales WHERE id = ? AND activo = 1 FOR UPDATE", [id]);
+    if (!anterior) throw new Error("La asignación ya no está activa.");
+    if (!usuarioPuedeUsarSede(anterior.sede, sedesPermitidas) || !usuarioPuedeUsarSede(sede, sedesPermitidas)) {
+      throw new Error("No tiene permiso para modificar esa sede.");
+    }
+    if (unidadId) {
+      const [[unidad]] = await conn.query("SELECT id, sede FROM unidades WHERE id = ? AND COALESCE(activa, 1) = 1 LIMIT 1", [unidadId]);
+      if (!unidad || !usuarioPuedeUsarSede(unidad.sede, sedesPermitidas)) throw new Error("La unidad seleccionada no está autorizada.");
+    }
+
+    const nuevo = { semana_inicio: anterior.semana_inicio, sede, ruta, chofer, unidad_id: unidadId, observacion };
+    const cambioChofer = texto(anterior.chofer, 180).toUpperCase() !== chofer.toUpperCase();
+    const cambioRuta = texto(anterior.ruta, 150).toUpperCase() !== ruta.toUpperCase() || anterior.sede !== sede;
+    const cambioUnidad = Number(anterior.unidad_id || 0) !== Number(unidadId || 0);
+    const cambioDetalle = texto(anterior.observacion) !== observacion;
+    if (!cambioChofer && !cambioRuta && !cambioUnidad && !cambioDetalle) {
+      await conn.rollback();
+      req.session.success = "No había cambios por guardar.";
+      return res.redirect(`/reportes-supervisores/rutas?semana=${encodeURIComponent(semanaInputDesdeFecha(anterior.semana_inicio))}`);
+    }
+    if (!motivo) throw new Error("Debe indicar el motivo del cambio.");
+
+    await conn.query(
+      `UPDATE supervisor_rutas_semanales
+       SET sede = ?, ruta = ?, chofer = ?, unidad_id = ?, observacion = ?, supervisor_id = ?, supervisor_nombre = ?
+       WHERE id = ?`,
+      [sede, ruta, chofer, unidadId, observacion || null, req.session.user.id, nombreUsuario(req.session.user), id]
+    );
+    const accion = cambioChofer && !cambioRuta && !cambioUnidad ? "CAMBIO_CHOFER" : cambioRuta && !cambioChofer && !cambioUnidad ? "CAMBIO_RUTA" : cambioUnidad && !cambioChofer && !cambioRuta ? "CAMBIO_UNIDAD" : "ACTUALIZAR";
+    await registrarMovimientoRuta(conn, id, accion, anterior, nuevo, req, motivo);
+    await conn.commit();
+    req.session.success = `Cambios guardados para la ruta ${ruta}.`;
+    res.redirect(`/reportes-supervisores/rutas?semana=${encodeURIComponent(semanaInputDesdeFecha(anterior.semana_inicio))}&sede=${encodeURIComponent(sede)}`);
+  } catch (error) {
+    await conn.rollback();
+    console.error("Error actualizando ruta semanal:", error);
+    req.session.error = error.code === "ER_DUP_ENTRY" ? "Ya existe otra asignación con esa ruta, semana y sede." : (error.message || "No se pudo actualizar la ruta.");
+    res.redirect("/reportes-supervisores/rutas");
+  } finally {
+    conn.release();
+  }
+});
+
+router.post("/rutas/:id/retirar", allowRoles(...ROLES_RUTAS), async (req, res) => {
+  const conn = await pool.getConnection();
+  try {
+    await ensureRutasSupervisoresTables(pool);
+    const sedesPermitidas = await obtenerSedesPermitidas(req);
+    await conn.beginTransaction();
+    const [[anterior]] = await conn.query("SELECT * FROM supervisor_rutas_semanales WHERE id = ? AND activo = 1 FOR UPDATE", [Number(req.params.id)]);
+    if (!anterior) throw new Error("La asignación ya no está activa.");
+    if (!usuarioPuedeUsarSede(anterior.sede, sedesPermitidas)) throw new Error("No tiene permiso para retirar esa ruta.");
+    await conn.query("UPDATE supervisor_rutas_semanales SET activo = 0, supervisor_id = ?, supervisor_nombre = ? WHERE id = ?", [req.session.user.id, nombreUsuario(req.session.user), anterior.id]);
+    await registrarMovimientoRuta(conn, anterior.id, "RETIRAR", anterior, null, req, req.body.motivo || "Ruta retirada de la semana");
+    await conn.commit();
+    req.session.success = `Ruta ${anterior.ruta} retirada de la semana.`;
+    res.redirect(`/reportes-supervisores/rutas?semana=${encodeURIComponent(semanaInputDesdeFecha(anterior.semana_inicio))}`);
+  } catch (error) {
+    await conn.rollback();
+    console.error("Error retirando ruta semanal:", error);
+    req.session.error = error.message || "No se pudo retirar la ruta.";
+    res.redirect("/reportes-supervisores/rutas");
+  } finally {
+    conn.release();
   }
 });
 

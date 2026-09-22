@@ -353,7 +353,7 @@
   };
   const origenTexto = (value) => value === 'CONSIGNACION' ? 'Consignación' : 'Nuestro';
   const origenClase = (value) => value === 'CONSIGNACION' ? 'pill-consignacion' : 'pill-propio';
-  const articulosDisponibles = (Array.isArray(articulos) ? articulos : []).filter(a => Number(a.stock_actual || 0) > 0);
+  const articulosDisponibles = (Array.isArray(articulosCompatibilidad) ? articulosCompatibilidad : articulos || []).filter(a => Number(a.stock_actual || 0) > 0);
   const articulosConsignacion = (Array.isArray(articulos) ? articulos : []).filter(a => a.origen_inventario === 'CONSIGNACION');
   const listaSuministros = Array.isArray(suministros) ? suministros : [];
   const paginaActual = pagina || 'inicio';
@@ -367,6 +367,10 @@
     entregas: {
       titulo: 'Entregas y entradas de bodega',
       texto: 'Registre salidas por placa, entradas de mercadería y devoluciones con trazabilidad de stock.'
+    },
+    compatibilidad: {
+      titulo: 'Compatibilidad por unidad',
+      texto: 'Relacione cada configuración de vehículo con los repuestos y cantidades que le corresponden.'
     },
     suministros: {
       titulo: 'Suministros de bodega',
@@ -430,6 +434,7 @@
   <section class="module-tabs mb-3">
     <a class="module-tab <%= paginaActual === 'inicio' ? 'active' : '' %>" href="/bodega">Inicio</a>
     <a class="module-tab <%= paginaActual === 'entregas' ? 'active' : '' %>" href="/bodega/entregas">Entregas</a>
+    <a class="module-tab <%= paginaActual === 'compatibilidad' ? 'active' : '' %>" href="/bodega/compatibilidad">Compatibilidad</a>
     <a class="module-tab <%= paginaActual === 'suministros' ? 'active' : '' %>" href="/bodega/suministros">Suministros</a>
     <a class="module-tab <%= paginaActual === 'consignacion' ? 'active' : '' %>" href="/bodega/consignacion">Consignación</a>
     <a class="module-tab <%= paginaActual === 'inventario' ? 'active' : '' %>" href="/bodega/inventario">Inventario</a>
@@ -474,6 +479,7 @@
 
   <section class="quick-actions mb-3 <%= mostrar('inicio') ? '' : 'd-none' %>">
     <a href="/bodega/entregas" class="quick-btn btn-blue"><i class="bi bi-box-arrow-up-right"></i><span><strong>Entregas</strong><small>Salidas, entradas y devoluciones</small></span></a>
+    <a href="/bodega/compatibilidad" class="quick-btn btn-green"><i class="bi bi-diagram-3"></i><span><strong>Compatibilidad</strong><small>Repuestos correctos por placa</small></span></a>
     <a href="/bodega/suministros" class="quick-btn btn-blue"><i class="bi bi-clipboard2-check"></i><span><strong>Suministros</strong><small>Materiales de uso diario</small></span></a>
     <a href="/bodega/consignacion" class="quick-btn btn-amber"><i class="bi bi-truck"></i><span><strong>Consignación</strong><small>Inventario Maxi Repuestos</small></span></a>
     <a href="/bodega/inventario" class="quick-btn btn-darkx"><i class="bi bi-list-check"></i><span><strong>Inventario</strong><small>Existencias y ajustes físicos</small></span></a>
@@ -627,6 +633,128 @@
     </div>
   </section>
 
+  <section class="panel mb-3 <%= mostrar('entregas') ? '' : 'd-none' %>" id="busqueda-compatibilidad">
+    <div class="panel-head">
+      <div>
+        <h2 class="panel-title">Buscar repuestos por placa</h2>
+        <p class="panel-copy">Identifica la unidad y muestra únicamente los repuestos compatibles para el trabajo seleccionado.</p>
+      </div>
+    </div>
+    <div class="panel-body">
+      <div class="row g-2 align-items-end">
+        <div class="col-md-4">
+          <label class="form-label">Placa de la unidad</label>
+          <div class="input-group">
+            <input class="form-control text-uppercase" id="placa-compatible" placeholder="C164528" autocomplete="off">
+            <button class="btn btn-primary fw-bold" type="button" id="buscar-compatible"><i class="bi bi-search"></i> Buscar</button>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Trabajo</label>
+          <select class="form-select" id="servicio-compatible" disabled><option value="">Todos los compatibles</option></select>
+        </div>
+        <div class="col-md-4 d-grid">
+          <button class="btn btn-success fw-bold" type="button" id="cargar-despacho" disabled><i class="bi bi-box-arrow-up-right"></i> Cargar al despacho</button>
+        </div>
+      </div>
+      <div id="unidad-compatible" class="alert alert-light border mt-3 mb-2 d-none"></div>
+      <div id="resultado-compatible" class="table-responsive d-none">
+        <table class="table table-sm align-middle mb-0">
+          <thead><tr><th>Usar</th><th>Producto</th><th>Código</th><th>Existencia</th><th>Ubicación</th><th>Cantidad</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div id="mensaje-compatible" class="small text-muted fw-semibold mt-2">Digite una placa para consultar su configuración.</div>
+    </div>
+  </section>
+
+  <section class="panel mb-3 <%= mostrar('compatibilidad') ? '' : 'd-none' %>">
+    <div class="panel-head">
+      <div><h2 class="panel-title">Configurar repuestos por vehículo</h2><p class="panel-copy">Use una placa de ejemplo. La compatibilidad queda compartida por marca, modelo, año y motor.</p></div>
+    </div>
+    <div class="panel-body">
+      <form method="POST" action="/bodega/compatibilidad" class="row g-2 form-card">
+        <div class="col-md-2"><label class="form-label">Placa ejemplo</label><input class="form-control text-uppercase" name="placa" placeholder="C164528" required></div>
+        <div class="col-md-2"><label class="form-label">Motor / configuración</label><input class="form-control" name="motor" placeholder="Ej. J08E"></div>
+        <div class="col-md-2"><label class="form-label">Tipo de trabajo</label><input class="form-control" name="tipo_servicio" list="tipos-servicio" value="MANTENIMIENTO MOTOR" required></div>
+        <div class="col-md-4">
+          <label class="form-label">Artículo compatible</label>
+          <div class="articulo-picker">
+            <input class="form-control articulo-search mb-1" type="search" placeholder="Buscar artículo" autocomplete="off">
+            <select class="form-select articulo-select" name="articulo_id" required>
+              <option value="">Seleccione</option>
+              <% articulosCompatibilidad.forEach(a => { %><option value="<%= a.id %>" data-search="<%= [a.codigo_taller, a.codigo, a.nombre, a.categoria, a.marca, a.numero_parte].filter(Boolean).join(' ') %>"><%= a.codigo_taller || '----' %> · <%= a.nombre %> · <%= fmt(a.stock_actual) %> <%= a.unidad_medida %></option><% }) %>
+            </select>
+            <div class="articulo-search-status mt-1">Escriba para filtrar el listado.</div>
+          </div>
+        </div>
+        <div class="col-md-1"><label class="form-label">Cantidad</label><input class="form-control" type="number" min="0.01" step="0.01" name="cantidad" value="1" required></div>
+        <div class="col-md-1 d-grid"><label class="form-label">&nbsp;</label><button class="btn btn-primary fw-bold">Guardar</button></div>
+        <div class="col-12"><label class="form-label">Observación</label><input class="form-control" name="observacion" placeholder="Ej. filtro primario, usar con motor J08E"></div>
+      </form>
+      <datalist id="tipos-servicio"><option value="MANTENIMIENTO MOTOR"><option value="CAMBIO DE ACEITE"><option value="FRENOS"><option value="TRANSMISION"><option value="ELECTRICO"><option value="CARROCERIA"><option value="GENERAL"></datalist>
+    </div>
+  </section>
+
+  <section class="panel mb-3 <%= mostrar('compatibilidad') ? '' : 'd-none' %>">
+    <div class="panel-head">
+      <div>
+        <h2 class="panel-title">Pendientes de validación</h2>
+        <p class="panel-copy"><%= articulosSinCompatibilidad.length %> producto(s) de Maxi todavía no tienen una aplicación suficientemente precisa.</p>
+      </div>
+      <span class="badge text-bg-warning"><%= articulosSinCompatibilidad.length %> pendientes</span>
+    </div>
+    <div class="panel-body pb-2">
+      <div class="alert alert-warning py-2 mb-2">
+        Estos productos están disponibles en inventario, pero no se muestran como compatibles con una placa hasta confirmar el modelo, chasis o motor exacto.
+      </div>
+      <% if (unidadesSinFicha > 0) { %>
+        <div class="small text-muted mb-2"><strong><%= unidadesSinFicha %></strong> unidad(es) activas todavía no tienen marca y modelo completos; se podrán relacionar cuando se complete esa ficha.</div>
+      <% } %>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead><tr><th>Código taller</th><th>SKU Maxi</th><th>Producto</th><th>Existencia</th><th>Estado</th></tr></thead>
+        <tbody>
+          <% if (!articulosSinCompatibilidad.length) { %><tr><td colspan="5" class="empty-row">Todos los productos de Maxi tienen una compatibilidad registrada.</td></tr><% } %>
+          <% articulosSinCompatibilidad.forEach(a => { %>
+            <tr>
+              <td><span class="code-badge"><%= a.codigo_taller || '----' %></span></td>
+              <td><strong><%= a.codigo || 'Sin SKU' %></strong></td>
+              <td><%= a.nombre %></td>
+              <td class="money"><%= fmt(a.stock_actual) %> <%= a.unidad_medida %></td>
+              <td><span class="badge text-bg-warning">Confirmar aplicación</span></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="panel mb-3 <%= mostrar('compatibilidad') ? '' : 'd-none' %>">
+    <div class="panel-head"><div><h2 class="panel-title">Compatibilidades registradas</h2><p class="panel-copy"><%= compatibilidades.length %> relación(es) activas.</p></div></div>
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead><tr><th>Vehículo</th><th>Motor</th><th>Trabajo</th><th>Repuesto</th><th>Validación</th><th>Cantidad</th><th>Existencia</th><th></th></tr></thead>
+        <tbody>
+          <% if (!compatibilidades.length) { %><tr><td colspan="8" class="empty-row">Todavía no hay compatibilidades registradas.</td></tr><% } %>
+          <% compatibilidades.forEach(c => { %>
+            <tr>
+              <td><strong><%= c.marca %> <%= c.modelo %></strong><div class="small muted"><%= c.anio || 'Todos los años' %></div></td>
+              <td><%= c.motor || 'Sin especificar' %></td>
+              <td><span class="pill pill-propio"><%= c.tipo_servicio %></span></td>
+              <td><span class="code-badge"><%= c.codigo_taller || '----' %></span> <strong><%= c.articulo_nombre %></strong><div class="small muted"><%= c.codigo || 'Sin código proveedor' %></div></td>
+              <td><span class="badge <%= c.nivel_confianza === 'PROBABLE' ? 'text-bg-warning' : 'text-bg-success' %>"><%= c.nivel_confianza || 'MANUAL' %></span><div class="small muted"><%= c.criterio_compatibilidad || '' %></div><% if (c.fuente_url) { %><a class="small" href="<%= c.fuente_url %>" target="_blank" rel="noopener">Fuente</a><% } %></td>
+              <td class="money"><%= fmt(c.cantidad) %> <%= c.unidad_medida %></td>
+              <td class="money"><%= fmt(c.stock_actual) %> <%= c.unidad_medida %></td>
+              <td><form method="POST" action="/bodega/compatibilidad/<%= c.id %>/eliminar" onsubmit="return confirm('¿Quitar esta compatibilidad?');"><button class="btn btn-outline-danger btn-sm" title="Quitar"><i class="bi bi-trash"></i></button></form></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
   <div class="row g-3 <%= mostrar('entregas') ? '' : 'd-none' %>">
     <div class="col-xl-7">
       <section class="panel" id="entregar">
@@ -637,10 +765,10 @@
           </div>
         </div>
         <div class="panel-body">
-          <form method="POST" action="/bodega/entregar" class="form-card">
+          <form method="POST" action="/bodega/entregar" class="form-card" id="form-entrega">
             <input type="hidden" name="redirect_to" value="entregas">
             <div class="row g-2 mb-2">
-              <div class="col-md-3"><label class="form-label">Placa</label><input class="form-control placa-search" name="placa" placeholder="C173517" required></div>
+              <div class="col-md-3"><label class="form-label">Placa</label><input class="form-control placa-search" id="placa-entrega" name="placa" placeholder="C173517" required></div>
               <div class="col-md-4"><label class="form-label">Mecánico</label><input class="form-control" name="mecanico" placeholder="Nombre del mecánico" required></div>
               <div class="col-md-3"><label class="form-label">Tipo de trabajo</label><select class="form-select" name="tipo_trabajo"><% tiposTrabajo.forEach(t => { %><option value="<%= t %>"><%= t %></option><% }) %></select></div>
               <div class="col-md-2 d-grid align-items-end"><label class="form-label">&nbsp;</label><button class="btn btn-primary fw-bold">Entregar</button></div>
@@ -969,6 +1097,13 @@
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase();
 
+  const escaparHtml = (value) => String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+
   const actualizarFiltroArticulo = (picker) => {
     const input = picker.querySelector('.articulo-search');
     const select = picker.querySelector('.articulo-select');
@@ -1042,6 +1177,124 @@
     const button = event.target.closest('.remove-linea');
     if (!button) return;
     button.closest('.line-row')?.remove();
+  });
+
+  let consultaCompatibilidad = null;
+  const placaCompatible = document.getElementById('placa-compatible');
+  const servicioCompatible = document.getElementById('servicio-compatible');
+  const resultadoCompatible = document.getElementById('resultado-compatible');
+  const unidadCompatible = document.getElementById('unidad-compatible');
+  const mensajeCompatible = document.getElementById('mensaje-compatible');
+  const cargarDespacho = document.getElementById('cargar-despacho');
+
+  const productosCompatiblesVisibles = () => {
+    const servicio = servicioCompatible?.value || '';
+    return (consultaCompatibilidad?.productos || []).filter(item => !servicio || item.tipo_servicio === servicio);
+  };
+
+  const renderCompatibilidad = () => {
+    if (!resultadoCompatible || !consultaCompatibilidad) return;
+    const productos = productosCompatiblesVisibles();
+    const tbody = resultadoCompatible.querySelector('tbody');
+    tbody.innerHTML = '';
+
+    productos.forEach(item => {
+      const stock = Number(item.stock_actual || 0);
+      const cantidad = Number(item.cantidad_recomendada || 1);
+      const disponible = stock >= cantidad;
+      const confianza = String(item.nivel_confianza || 'MANUAL').toUpperCase();
+      const seleccionAutomatica = disponible && confianza !== 'PROBABLE';
+      const row = document.createElement('tr');
+      row.innerHTML = `
+        <td><input class="form-check-input compatible-check" type="checkbox" data-articulo-id="${item.articulo_id}" data-cantidad="${cantidad}" data-origen="${item.origen_inventario || ''}" ${seleccionAutomatica ? 'checked' : ''} ${disponible ? '' : 'disabled'}></td>
+        <td><strong>${escaparHtml(item.nombre)}</strong><div class="small text-muted">${escaparHtml(item.tipo_servicio)}${item.observacion ? ` · ${escaparHtml(item.observacion)}` : ''}</div><span class="badge ${confianza === 'PROBABLE' ? 'text-bg-warning' : 'text-bg-success'}">${escaparHtml(confianza)}</span>${item.criterio_compatibilidad ? `<div class="small text-muted">${escaparHtml(item.criterio_compatibilidad)}</div>` : ''}</td>
+        <td><span class="code-badge">${escaparHtml(item.codigo_taller || '----')}</span><div class="small text-muted">${escaparHtml(item.codigo || 'Sin código proveedor')}</div></td>
+        <td class="fw-bold ${disponible ? 'text-success' : 'text-danger'}">${stock.toLocaleString('es-CR')} ${item.unidad_medida || ''}</td>
+        <td>${escaparHtml(item.ubicacion || 'Sin ubicación')}</td>
+        <td><input class="form-control form-control-sm compatible-cantidad" type="number" min="0.01" step="0.01" value="${cantidad}" ${disponible ? '' : 'disabled'}></td>`;
+      tbody.appendChild(row);
+    });
+
+    resultadoCompatible.classList.toggle('d-none', productos.length === 0);
+    mensajeCompatible.textContent = productos.length
+      ? `${productos.length} repuesto(s) compatibles. Los productos sin existencia no se pueden despachar.`
+      : 'No hay repuestos registrados para este tipo de trabajo.';
+    cargarDespacho.disabled = !productos.some(item => Number(item.stock_actual || 0) >= Number(item.cantidad_recomendada || 1));
+  };
+
+  const buscarCompatibilidad = async () => {
+    const placa = String(placaCompatible?.value || '').trim().toUpperCase();
+    if (!placa) return;
+    consultaCompatibilidad = null;
+    resultadoCompatible?.classList.add('d-none');
+    unidadCompatible?.classList.add('d-none');
+    cargarDespacho.disabled = true;
+    mensajeCompatible.textContent = 'Consultando unidad y compatibilidades...';
+    try {
+      const response = await fetch(`/bodega/api/compatibilidad/${encodeURIComponent(placa)}`, { headers: { Accept: 'application/json' } });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'No se pudo consultar la placa.');
+      consultaCompatibilidad = data;
+      const u = data.unidad;
+      unidadCompatible.innerHTML = `<strong>${escaparHtml(u.placa)}</strong> · ${escaparHtml(u.marca || 'Sin marca')} ${escaparHtml(u.modelo || 'Sin modelo')} · ${escaparHtml(u.anio || 'Sin año')} · Motor: ${escaparHtml(u.motor || data.configuracion?.motor || 'sin especificar')} · Sede: ${escaparHtml(u.sede || 'sin sede')}`;
+      unidadCompatible.classList.remove('d-none');
+      servicioCompatible.innerHTML = '<option value="">Todos los compatibles</option>' + (data.servicios || []).map(servicio => `<option value="${escaparHtml(servicio)}">${escaparHtml(servicio)}</option>`).join('');
+      servicioCompatible.disabled = !(data.servicios || []).length;
+      if ((data.servicios || []).length) servicioCompatible.value = data.servicios[0];
+      if (!data.configuracion) {
+        mensajeCompatible.innerHTML = `Esta unidad todavía no tiene configuración. <a href="/bodega/compatibilidad" class="fw-bold">Configurar repuestos</a>`;
+        return;
+      }
+      renderCompatibilidad();
+    } catch (error) {
+      mensajeCompatible.textContent = error.message;
+    }
+  };
+
+  document.getElementById('buscar-compatible')?.addEventListener('click', buscarCompatibilidad);
+  placaCompatible?.addEventListener('keydown', event => {
+    if (event.key !== 'Enter') return;
+    event.preventDefault();
+    buscarCompatibilidad();
+  });
+  servicioCompatible?.addEventListener('change', renderCompatibilidad);
+
+  cargarDespacho?.addEventListener('click', () => {
+    const seleccionados = Array.from(resultadoCompatible?.querySelectorAll('.compatible-check:checked') || []).map(check => {
+      const row = check.closest('tr');
+      return {
+        articuloId: check.dataset.articuloId,
+        cantidad: row.querySelector('.compatible-cantidad')?.value || check.dataset.cantidad || '1',
+        origen: check.dataset.origen || ''
+      };
+    });
+    if (!seleccionados.length) return;
+
+    const target = document.getElementById('lineas-entrega');
+    const template = document.getElementById('linea-template');
+    const primera = target?.querySelector('.line-row');
+    if (!target || !template || !primera) return;
+    Array.from(target.querySelectorAll('.line-row')).slice(1).forEach(row => row.remove());
+
+    seleccionados.forEach((item, index) => {
+      let linea = primera;
+      if (index > 0) {
+        const fragment = template.content.cloneNode(true);
+        linea = fragment.querySelector('.line-row');
+        target.appendChild(fragment);
+        linea.querySelectorAll('.articulo-picker').forEach(prepararBuscadorArticulo);
+      }
+      const select = linea.querySelector('[name="articulo_id"]');
+      const cantidad = linea.querySelector('[name="cantidad"]');
+      const origen = linea.querySelector('[name="origen_salida"]');
+      select.value = item.articuloId;
+      cantidad.value = item.cantidad;
+      origen.value = item.origen;
+      select.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+
+    document.getElementById('placa-entrega').value = consultaCompatibilidad.unidad.placa;
+    document.getElementById('form-entrega')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   });
 </script>
 </body>

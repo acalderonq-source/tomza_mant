@@ -6,6 +6,7 @@ const path = require("path");
 const { generarPDFOrden } = require("../utils/pdfOrdenCompra");
 const { agregarFiltroPlacaSql, normalizarPlaca } = require("../utils/placas");
 const { normalizarTipoMantenimiento, detectarTipoMantenimiento } = require("../utils/tipoMantenimiento");
+const { ensureUploadDirectory } = require("../utils/uploadStorage");
 
 const ROLES_MOTOR = ["ADMIN", "TALLER", "PROVEEDURIA_TALLER"];
 
@@ -184,8 +185,7 @@ function guardarCotizacionMotor(dataUrl, originalName, mimeType, usuarioId) {
     throw new Error("La cotización supera 5 MB.");
   }
 
-  const uploadDir = path.join(__dirname, "..", "..", "public", "uploads", "cotizaciones");
-  fs.mkdirSync(uploadDir, { recursive: true });
+  const uploadDir = ensureUploadDirectory("cotizaciones");
 
   const fileName = `cotizacion_motor_${Date.now()}_${usuarioId || "user"}_${Math.round(Math.random() * 1e6)}.${extension}`;
   fs.writeFileSync(path.join(uploadDir, fileName), buffer);

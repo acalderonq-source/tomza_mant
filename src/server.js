@@ -9,6 +9,7 @@ const pool = require("./db");
 const enviarAlertasDekra = require("./utils/dekraMail");
 const { enviarRecordatoriosMantenimientos, ensurePushTables } = require("./utils/notificacionesPush");
 const { ensureCsrfToken, injectSecurityAssets } = require("./middleware/security");
+const { UPLOAD_ROOT, seedBundledUploads } = require("./utils/uploadStorage");
 
 // Inicializar app
 const app = express();
@@ -55,8 +56,14 @@ if (isProduction) {
 // ===================== MIDDLEWARES =====================
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 app.use(express.json({ limit: "10mb" }));
+seedBundledUploads();
+app.use("/uploads", express.static(UPLOAD_ROOT));
 // ✅ CORREGIDO: Apunta a la carpeta public en la raíz del proyecto
 app.use(express.static(path.join(__dirname, "..", "public")));
+
+app.get("/health", (_req, res) => {
+  res.status(200).json({ status: "ok" });
+});
 
 app.get("/.well-known/assetlinks.json", (req, res) => {
   const packageName = process.env.ANDROID_PACKAGE_NAME || "com.gastomza.taller";

@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Rutas y choferes por semana</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <style>
+    :root { --navy:#0b1733; --blue:#17458d; --line:#d8e2ef; --muted:#64748b; --bg:#eef3f8; }
+    body { background:var(--bg); color:#10213c; font-family:"Segoe UI",Arial,sans-serif; font-size:.9rem; }
+    .topbar { background:var(--navy); border-bottom:3px solid #dc2626; }
+    .shell { max-width:1580px; }
+    .hero { background:linear-gradient(125deg,#123f86,#0b1733); border-radius:8px; color:#fff; padding:1rem 1.1rem; }
+    .hero h1 { font-size:1.45rem; font-weight:900; margin:0; }
+    .hero p { color:#dbeafe; margin:.2rem 0 0; }
+    .panel,.metric { background:#fff; border:1px solid var(--line); border-radius:8px; box-shadow:0 8px 22px rgba(15,23,42,.05); }
+    .panel-head { align-items:center; border-bottom:1px solid var(--line); display:flex; gap:1rem; justify-content:space-between; padding:.8rem 1rem; }
+    .panel-title { font-size:1rem; font-weight:900; margin:0; }
+    .panel-copy { color:var(--muted); font-size:.78rem; margin:.15rem 0 0; }
+    .panel-body { padding:1rem; }
+    .metrics { display:grid; gap:.7rem; grid-template-columns:repeat(3,minmax(0,1fr)); }
+    .metric { border-top:4px solid var(--blue); padding:.8rem 1rem; }
+    .metric-label { color:var(--muted); font-size:.7rem; font-weight:800; text-transform:uppercase; }
+    .metric-value { color:#071a3c; font-size:1.4rem; font-weight:900; }
+    .route-name { color:#0b3274; font-weight:900; }
+    .driver-name { font-weight:850; }
+    .movement-change { color:#9a3412; font-weight:800; }
+    .badge-action { background:#eaf1fb; border-radius:999px; color:#17458d; display:inline-block; font-size:.7rem; font-weight:850; padding:.25rem .5rem; }
+    .table > :not(caption) > * > * { border-color:#e2e8f0; padding:.65rem; }
+    .empty { color:var(--muted); padding:2rem; text-align:center; }
+    @media(max-width:760px){ .metrics{grid-template-columns:1fr;} .desktop-table{min-width:980px;} }
+  </style>
+</head>
+<body>
+<%
+  const fecha = value => {
+    if (!value) return '-';
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? '-' : date.toLocaleString('es-CR');
+  };
+  const semanaFecha = value => {
+    if (!value) return '-';
+    const raw = String(value).slice(0, 10);
+    const date = new Date(`${raw}T12:00:00`);
+    return Number.isNaN(date.getTime()) ? raw : date.toLocaleDateString('es-CR');
+  };
+  const choferes = new Set(asignaciones.map(item => String(item.chofer || '').trim().toUpperCase()).filter(Boolean)).size;
+  const cambios = movimientos.filter(item => item.accion !== 'CREAR').length;
+  const etiquetaAccion = value => ({
+    CREAR:'Asignación creada', REACTIVAR:'Ruta reactivada', CAMBIO_CHOFER:'Cambio de chofer',
+    CAMBIO_RUTA:'Cambio de ruta', CAMBIO_UNIDAD:'Cambio de unidad', ACTUALIZAR:'Asignación actualizada', RETIRAR:'Ruta retirada'
+  }[value] || value);
+%>
+
+<nav class="navbar navbar-dark topbar px-3 py-2">
+  <span class="navbar-brand fw-semibold"><i class="bi bi-signpost-split me-2"></i>Rutas y choferes</span>
+  <div class="d-flex gap-2 align-items-center">
+    <span class="text-white small fw-semibold d-none d-md-inline"><%= user.usuario %></span>
+    <a href="/reportes-supervisores" class="btn btn-outline-light btn-sm">Reportes</a>
+    <a href="/dashboard" class="btn btn-secondary btn-sm">Dashboard</a>
+  </div>
+</nav>
+
+<main class="container-fluid shell py-3">
+  <section class="hero mb-3">
+    <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
+      <div><h1>Asignación semanal de rutas</h1><p>Chofer, ruta y unidad con trazabilidad completa de cada cambio.</p></div>
+      <span class="badge bg-light text-dark fs-6">Semana <%= filtros.semana %></span>
+    </div>
+  </section>
+
+  <% if (success) { %><div class="alert alert-success fw-semibold"><%= success %></div><% } %>
+  <% if (error) { %><div class="alert alert-danger fw-semibold"><%= error %></div><% } %>
+
+  <section class="metrics mb-3">
+    <div class="metric"><div class="metric-label">Rutas activas</div><div class="metric-value"><%= asignaciones.length %></div></div>
+    <div class="metric"><div class="metric-label">Choferes asignados</div><div class="metric-value"><%= choferes %></div></div>
+    <div class="metric"><div class="metric-label">Movimientos de la semana</div><div class="metric-value"><%= cambios %></div></div>
+  </section>
+
+  <section class="panel mb-3">
+    <div class="panel-head"><div><h2 class="panel-title">Semana y sede</h2><p class="panel-copy">Cambie la semana para consultar asignaciones anteriores o preparar la siguiente.</p></div></div>
+    <div class="panel-body">
+      <form method="GET" action="/reportes-supervisores/rutas" class="row g-2 align-items-end">
+        <div class="col-md-3"><label class="form-label">Semana</label><input type="week" class="form-control" name="semana" value="<%= filtros.semana || semanaActual %>" required></div>
+        <div class="col-md-4"><label class="form-label">Sede</label><select class="form-select" name="sede"><option value="">Todas las sedes autorizadas</option><% sedes.forEach(item => { %><option value="<%= item %>" <%= filtros.sede === item ? 'selected' : '' %>><%= item %></option><% }) %></select></div>
+        <div class="col-md-2 d-grid"><button class="btn btn-dark fw-bold"><i class="bi bi-search"></i> Consultar</button></div>
+        <div class="col-md-2 d-grid"><a href="/reportes-supervisores/rutas" class="btn btn-outline-secondary">Semana actual</a></div>
+      </form>
+    </div>
+  </section>
+
+  <section class="panel mb-3">
+    <div class="panel-head"><div><h2 class="panel-title">Registrar ruta y chofer</h2><p class="panel-copy">Si la ruta ya existe en esa semana, se actualizará y el cambio quedará en movimientos.</p></div></div>
+    <div class="panel-body">
+      <form method="POST" action="/reportes-supervisores/rutas" class="row g-2 align-items-end">
+        <div class="col-md-2"><label class="form-label">Semana</label><input type="week" class="form-control" name="semana" value="<%= filtros.semana || semanaActual %>" required></div>
+        <div class="col-md-2"><label class="form-label">Sede</label><select class="form-select js-sede" name="sede" required><option value="">Seleccione</option><% sedes.forEach(item => { %><option value="<%= item %>" <%= filtros.sede === item ? 'selected' : '' %>><%= item %></option><% }) %></select></div>
+        <div class="col-md-2"><label class="form-label">Ruta</label><input class="form-control" name="ruta" placeholder="Ej. Ruta 12 - Centro" required></div>
+        <div class="col-md-2"><label class="form-label">Chofer</label><input class="form-control" name="chofer" placeholder="Nombre completo" required></div>
+        <div class="col-md-2"><label class="form-label">Unidad (opcional)</label><select class="form-select js-unidad" name="unidad_id"><option value="">Sin unidad fija</option><% unidades.forEach(u => { %><option value="<%= u.id %>" data-sede="<%= u.sede %>"><%= u.placa %> · <%= u.sede %></option><% }) %></select></div>
+        <div class="col-md-2"><label class="form-label">Observación</label><input class="form-control" name="observacion" placeholder="Turno, relevo, detalle..."></div>
+        <div class="col-md-4"><label class="form-label">Motivo (si está cambiando una ruta existente)</label><input class="form-control" name="motivo" placeholder="Ej. cambio de turno, vacaciones o incapacidad"></div>
+        <div class="col-12 d-flex justify-content-end"><button class="btn btn-primary fw-bold px-4"><i class="bi bi-check2-circle"></i> Guardar asignación</button></div>
+      </form>
+    </div>
+  </section>
+
+  <section class="panel mb-3">
+    <div class="panel-head"><div><h2 class="panel-title">Asignaciones de la semana</h2><p class="panel-copy">Esta es la distribución vigente para la semana que está consultando.</p></div></div>
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0 desktop-table">
+        <thead><tr><th>Sede</th><th>Ruta</th><th>Chofer actual</th><th>Unidad</th><th>Observación</th><th>Registrado por</th><th>Acciones</th></tr></thead>
+        <tbody>
+          <% if (!asignaciones.length) { %><tr><td colspan="7" class="empty">No hay rutas registradas para esta semana. El supervisor debe completar la asignación semanal.</td></tr><% } %>
+          <% asignaciones.forEach(item => { %>
+            <tr>
+              <td><%= item.sede %></td>
+              <td class="route-name"><%= item.ruta %></td>
+              <td class="driver-name"><%= item.chofer %></td>
+              <td><%= item.placa || 'Sin unidad fija' %></td>
+              <td><%= item.observacion || '-' %></td>
+              <td><%= item.supervisor_nombre || 'Sin identificar' %><div class="small text-muted"><%= fecha(item.actualizado_en) %></div></td>
+              <td><button class="btn btn-outline-primary btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#editarRuta<%= item.id %>"><i class="bi bi-pencil"></i> Editar</button></td>
+            </tr>
+            <tr class="collapse" id="editarRuta<%= item.id %>">
+              <td colspan="7" class="bg-light">
+                <form method="POST" action="/reportes-supervisores/rutas/<%= item.id %>" class="row g-2 align-items-end p-2">
+                  <div class="col-md-2"><label class="form-label small">Sede</label><select class="form-select form-select-sm js-sede" name="sede" required><% sedes.forEach(s => { %><option value="<%= s %>" <%= item.sede === s ? 'selected' : '' %>><%= s %></option><% }) %></select></div>
+                  <div class="col-md-2"><label class="form-label small">Ruta</label><input class="form-control form-control-sm" name="ruta" value="<%= item.ruta %>" required></div>
+                  <div class="col-md-2"><label class="form-label small">Chofer</label><input class="form-control form-control-sm" name="chofer" value="<%= item.chofer %>" required></div>
+                  <div class="col-md-2"><label class="form-label small">Unidad</label><select class="form-select form-select-sm js-unidad" name="unidad_id"><option value="">Sin unidad fija</option><% unidades.forEach(u => { %><option value="<%= u.id %>" data-sede="<%= u.sede %>" <%= Number(item.unidad_id) === Number(u.id) ? 'selected' : '' %>><%= u.placa %> · <%= u.sede %></option><% }) %></select></div>
+                  <div class="col-md-2"><label class="form-label small">Observación</label><input class="form-control form-control-sm" name="observacion" value="<%= item.observacion || '' %>"></div>
+                  <div class="col-md-2"><label class="form-label small">Motivo del cambio</label><input class="form-control form-control-sm" name="motivo" placeholder="Ej. incapacidad" required></div>
+                  <div class="col-12 d-flex justify-content-end">
+                    <button class="btn btn-primary btn-sm fw-bold">Guardar cambios</button>
+                  </div>
+                  </form>
+                  <form method="POST" action="/reportes-supervisores/rutas/<%= item.id %>/retirar" class="d-flex justify-content-end px-2 pb-2" onsubmit="return confirm('¿Retirar esta ruta de la semana? El movimiento quedará en el historial.');">
+                    <input type="hidden" name="motivo" value="Ruta retirada desde la asignación semanal">
+                    <button class="btn btn-outline-danger btn-sm">Retirar de esta semana</button>
+                  </form>
+              </td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="panel mb-3">
+    <div class="panel-head"><div><h2 class="panel-title">Movimientos de choferes y rutas</h2><p class="panel-copy">Historial de quién cambió la asignación, cuándo la cambió y cuáles eran los datos anteriores.</p></div></div>
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0 desktop-table">
+        <thead><tr><th>Fecha</th><th>Movimiento</th><th>Sede</th><th>Ruta</th><th>Chofer</th><th>Unidad</th><th>Motivo</th><th>Usuario</th></tr></thead>
+        <tbody>
+          <% if (!movimientos.length) { %><tr><td colspan="8" class="empty">No hay movimientos registrados en esta semana.</td></tr><% } %>
+          <% movimientos.forEach(m => { %>
+            <tr>
+              <td><%= fecha(m.cambiado_en) %></td>
+              <td><span class="badge-action"><%= etiquetaAccion(m.accion) %></span></td>
+              <td><%= m.sede_nueva || m.sede_anterior || '-' %></td>
+              <td><% if (m.ruta_anterior && m.ruta_anterior !== m.ruta_nueva) { %><span class="text-muted text-decoration-line-through"><%= m.ruta_anterior %></span><br><% } %><strong><%= m.ruta_nueva || m.ruta_anterior || '-' %></strong></td>
+              <td><% if (m.chofer_anterior && m.chofer_anterior !== m.chofer_nuevo) { %><span class="text-muted text-decoration-line-through"><%= m.chofer_anterior %></span><br><% } %><span class="movement-change"><%= m.chofer_nuevo || m.chofer_anterior || '-' %></span></td>
+              <td><% if (m.placa_anterior && m.placa_anterior !== m.placa_nueva) { %><span class="text-muted text-decoration-line-through"><%= m.placa_anterior %></span><br><% } %><%= m.placa_nueva || m.placa_anterior || 'Sin unidad fija' %></td>
+              <td><%= m.motivo || '-' %></td>
+              <td><%= m.cambiado_por_nombre || 'Sin identificar' %></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  </section>
+</main>
+
+<script>
+  document.querySelectorAll('form').forEach(form => {
+    const sede = form.querySelector('.js-sede');
+    const unidad = form.querySelector('.js-unidad');
+    if (!sede || !unidad) return;
+    const filtrar = () => {
+      const sedeElegida = sede.value;
+      Array.from(unidad.options).forEach((option, index) => {
+        if (index === 0) return;
+        option.hidden = Boolean(sedeElegida && option.dataset.sede !== sedeElegida && !option.selected);
+      });
+    };
+    sede.addEventListener('change', filtrar);
+    filtrar();
+  });
+</script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

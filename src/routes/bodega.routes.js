@@ -158,6 +158,13 @@ async function asignarCodigosTallerPendientes(conn = pool) {
 }
 
 async function ensureBodegaTables() {
+  if (!(await columnExists("unidades", "motor"))) {
+    await pool.query(`
+      ALTER TABLE unidades
+      ADD COLUMN motor VARCHAR(120) NULL AFTER modelo
+    `);
+  }
+
   await pool.query(`
     CREATE TABLE IF NOT EXISTS bodega_articulos (
       id INT AUTO_INCREMENT PRIMARY KEY,
@@ -308,6 +315,109 @@ async function ensureBodegaTables() {
       ADD COLUMN origen_inventario ENUM('PROPIO','CONSIGNACION') NOT NULL DEFAULT 'PROPIO' AFTER tipo_movimiento
     `);
   }
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS bodega_configuraciones_unidad (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      marca VARCHAR(100) NOT NULL,
+      modelo VARCHAR(120) NOT NULL,
+      anio INT NULL,
+      motor VARCHAR(120) NULL,
+      descripcion VARCHAR(220) NULL,
+      activo TINYINT(1) NOT NULL DEFAULT 1,
+      creado_por INT NULL,
+      creado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      actualizado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX idx_bodega_config_vehiculo (marca, modelo, anio, activo)
+    )
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS bodega_unidades_configuracion (
+      unidad_id INT PRIMARY KEY,
+      configuracion_id INT NOT NULL,
+      creado_por INT NULL,
+      creado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      actualizado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX idx_bodega_unidad_config (configuracion_id)
+    )
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS bodega_compatibilidades (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      configuracion_id INT NOT NULL,
+      articulo_id INT NOT NULL,
+      tipo_servicio VARCHAR(80) NOT NULL DEFAULT 'GENERAL',
+      cantidad DECIMAL(12,2) NOT NULL DEFAULT 1,
+      observacion VARCHAR(220) NULL,
+      activo TINYINT(1) NOT NULL DEFAULT 1,
+      creado_por INT NULL,
+      creado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      actualizado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      UNIQUE KEY uk_bodega_compatibilidad (configuracion_id, articulo_id, tipo_servicio),
+      INDEX idx_bodega_compat_articulo (articulo_id, activo)
+    )
+  `);
+
+  const columnasCompatibilidad = [
+    ["nivel_confianza", "VARCHAR(30) NOT NULL DEFAULT 'MANUAL' AFTER observacion"],
+    ["criterio_compatibilidad", "VARCHAR(255) NULL AFTER nivel_confianza"],
+    ["fuente_url", "VARCHAR(500) NULL AFTER criterio_compatibilidad"]
+  ];
+  for (const [columna, definicion] of columnasCompatibilidad) {
+    if (!(await columnExists("bodega_compatibilidades", columna))) {
+      await pool.query(`ALTER TABLE bodega_compatibilidades ADD COLUMN ${columna} ${definicion}`);
+    }
+  }
+}
+
+async function obtenerUnidadPorPlaca(conn, placa, bloquear = false) {
+  const placaNormalizada = normalizarPlaca(placa) || upper(placa);
+  if (!placaNormalizada) return null;
+  const [[unidad]] = await conn.query(
+    `SELECT id, placa, sede, marca, modelo, anio, motor
+     FROM unidades
+     WHERE REPLACE(UPPER(TRIM(placa)), ' ', '') = ?
+       AND COALESCE(activa, 1) = 1
+     LIMIT 1${bloquear ? " FOR UPDATE" : ""}`,
+    [placaNormalizada]
+  );
+  return unidad || null;
+}
+
+async function obtenerConfiguracionUnidad(conn, unidad) {
+  const [[asignada]] = await conn.query(
+    `SELECT bc.*
+     FROM bodega_unidades_configuracion buc
+     JOIN bodega_configuraciones_unidad bc ON bc.id = buc.configuracion_id
+     WHERE buc.unidad_id = ? AND bc.activo = 1
+     LIMIT 1`,
+    [unidad.id]
+  );
+  if (asignada) return asignada;
+
+  const [candidatas] = await conn.query(
+    `SELECT *
+     FROM bodega_configuraciones_unidad
+     WHERE activo = 1
+       AND UPPER(TRIM(marca)) = UPPER(TRIM(?))
+       AND UPPER(TRIM(modelo)) = UPPER(TRIM(?))
+       AND (anio IS NULL OR anio = ?)
+       AND (
+         TRIM(?) = ''
+         OR motor IS NULL
+         OR TRIM(motor) = ''
+         OR UPPER(TRIM(motor)) = UPPER(TRIM(?))
+       )
+     ORDER BY
+       CASE WHEN motor IS NOT NULL AND TRIM(motor) <> '' THEN 0 ELSE 1 END,
+       CASE WHEN anio IS NOT NULL THEN 0 ELSE 1 END,
+       id
+     LIMIT 2`,
+    [unidad.marca || "", unidad.modelo || "", unidad.anio || null, unidad.motor || "", unidad.motor || ""]
+  );
+  return candidatas.length === 1 ? candidatas[0] : null;
 }
 
 async function obtenerProveedor(proveedorId, proveedorTexto = "") {
@@ -330,7 +440,7 @@ async function articuloParaMovimiento(conn, articuloId) {
 function redirectBodega(req, res) {
   const q = limpiar(req.body.q || req.query.q);
   const pagina = limpiar(req.body.redirect_to || req.query.redirect_to);
-  const paginas = new Set(["entregas", "suministros", "consignacion", "inventario", "herramientas", "movimientos"]);
+  const paginas = new Set(["entregas", "compatibilidad", "suministros", "consignacion", "inventario", "herramientas", "movimientos"]);
   const base = paginas.has(pagina) ? `/bodega/${pagina}` : "/bodega";
   res.redirect(`${base}${q ? `?q=${encodeURIComponent(q)}` : ""}`);
 }
@@ -441,6 +551,65 @@ async function renderBodega(req, res, pagina = "inicio") {
     `);
 
     const [proveedores] = await pool.query("SELECT id, nombre FROM proveedores ORDER BY nombre ASC LIMIT 500");
+    const [articulosCompatibilidad] = await pool.query(`
+      SELECT *
+      FROM bodega_articulos
+      WHERE activo = 1 AND grupo_bodega = 'INVENTARIO'
+      ORDER BY nombre
+    `);
+    const [compatibilidades] = await pool.query(`
+      SELECT
+        bco.id,
+        bco.tipo_servicio,
+        bco.cantidad,
+        bco.observacion,
+        bco.nivel_confianza,
+        bco.criterio_compatibilidad,
+        bco.fuente_url,
+        bc.marca,
+        bc.modelo,
+        bc.anio,
+        bc.motor,
+        ba.codigo_taller,
+        ba.codigo,
+        ba.nombre AS articulo_nombre,
+        ba.unidad_medida,
+        ba.stock_actual
+      FROM bodega_compatibilidades bco
+      JOIN bodega_configuraciones_unidad bc ON bc.id = bco.configuracion_id
+      JOIN bodega_articulos ba ON ba.id = bco.articulo_id
+      WHERE bco.activo = 1 AND bc.activo = 1 AND ba.activo = 1
+      ORDER BY bc.marca, bc.modelo, bc.anio, bco.tipo_servicio, ba.nombre
+      LIMIT 400
+    `);
+    const [articulosSinCompatibilidad] = await pool.query(`
+      SELECT
+        ba.id,
+        ba.codigo_taller,
+        ba.codigo,
+        ba.nombre,
+        ba.stock_actual,
+        ba.unidad_medida
+      FROM bodega_articulos ba
+      LEFT JOIN bodega_compatibilidades bco
+        ON bco.articulo_id = ba.id
+       AND bco.activo = 1
+      WHERE ba.activo = 1
+        AND ba.origen_inventario = 'CONSIGNACION'
+        AND UPPER(TRIM(COALESCE(ba.proveedor_consignacion, ''))) = UPPER(?)
+      GROUP BY ba.id, ba.codigo_taller, ba.codigo, ba.nombre, ba.stock_actual, ba.unidad_medida
+      HAVING COUNT(bco.id) = 0
+      ORDER BY ba.nombre
+    `, [PROVEEDOR_CONSIGNACION_DEFAULT]);
+    const [[unidadesSinFichaRow]] = await pool.query(`
+      SELECT COUNT(*) AS total
+      FROM unidades
+      WHERE COALESCE(activa, 1) = 1
+        AND (
+          marca IS NULL OR TRIM(marca) = ''
+          OR modelo IS NULL OR TRIM(modelo) = ''
+        )
+    `);
     const proximoCodigoTaller = await siguienteCodigoTaller();
 
     res.render("bodega", {
@@ -449,6 +618,10 @@ async function renderBodega(req, res, pagina = "inicio") {
       origen,
       articulos,
       proveedores,
+      articulosCompatibilidad,
+      compatibilidades,
+      articulosSinCompatibilidad,
+      unidadesSinFicha: Number(unidadesSinFichaRow.total || 0),
       porComprar,
       suministros,
       movimientos,
@@ -487,11 +660,142 @@ async function renderBodega(req, res, pagina = "inicio") {
 
 router.get("/", (req, res) => renderBodega(req, res, "inicio"));
 router.get("/entregas", (req, res) => renderBodega(req, res, "entregas"));
+router.get("/compatibilidad", (req, res) => renderBodega(req, res, "compatibilidad"));
 router.get("/suministros", (req, res) => renderBodega(req, res, "suministros"));
 router.get("/consignacion", (req, res) => renderBodega(req, res, "consignacion"));
 router.get("/inventario", (req, res) => renderBodega(req, res, "inventario"));
 router.get("/herramientas", (req, res) => renderBodega(req, res, "herramientas"));
 router.get("/movimientos", (req, res) => renderBodega(req, res, "movimientos"));
+
+router.get("/api/compatibilidad/:placa", async (req, res) => {
+  try {
+    await ensureBodegaTables();
+    const unidad = await obtenerUnidadPorPlaca(pool, req.params.placa);
+    if (!unidad) return res.status(404).json({ error: "No se encontró una unidad activa con esa placa." });
+    if (!unidad.marca || !unidad.modelo) {
+      return res.status(422).json({
+        error: "La unidad no tiene marca y modelo completos. Actualícelos en Unidades antes de configurar repuestos.",
+        unidad
+      });
+    }
+
+    const configuracion = await obtenerConfiguracionUnidad(pool, unidad);
+    if (!configuracion) {
+      return res.json({ unidad, configuracion: null, servicios: [], productos: [] });
+    }
+
+    const [productos] = await pool.query(`
+      SELECT
+        bco.id AS compatibilidad_id,
+        bco.tipo_servicio,
+        bco.cantidad AS cantidad_recomendada,
+        bco.observacion,
+        bco.nivel_confianza,
+        bco.criterio_compatibilidad,
+        bco.fuente_url,
+        ba.id AS articulo_id,
+        ba.codigo_taller,
+        ba.codigo,
+        ba.nombre,
+        ba.stock_actual,
+        ba.stock_minimo,
+        ba.unidad_medida,
+        ba.ubicacion,
+        ba.origen_inventario,
+        ba.precio_unitario
+      FROM bodega_compatibilidades bco
+      JOIN bodega_articulos ba ON ba.id = bco.articulo_id
+      WHERE bco.configuracion_id = ?
+        AND bco.activo = 1
+        AND ba.activo = 1
+      ORDER BY bco.tipo_servicio, ba.nombre
+    `, [configuracion.id]);
+
+    const servicios = [...new Set(productos.map(item => item.tipo_servicio))];
+    res.json({ unidad, configuracion, servicios, productos });
+  } catch (error) {
+    console.error("ERROR buscando compatibilidad bodega:", error);
+    res.status(500).json({ error: "No se pudieron consultar los repuestos compatibles." });
+  }
+});
+
+router.post("/compatibilidad", async (req, res) => {
+  const conn = await pool.getConnection();
+  try {
+    await ensureBodegaTables();
+    await conn.beginTransaction();
+    const unidad = await obtenerUnidadPorPlaca(conn, req.body.placa, true);
+    const articuloId = Number(req.body.articulo_id);
+    const cantidad = numero(req.body.cantidad);
+    const tipoServicio = upper(req.body.tipo_servicio || "GENERAL").replace(/\s+/g, " ").slice(0, 80);
+    const motor = limpiar(req.body.motor || unidad?.motor);
+
+    if (!unidad) throw new Error("No se encontró una unidad activa con esa placa.");
+    if (!unidad.marca || !unidad.modelo) throw new Error("La unidad debe tener marca y modelo antes de crear compatibilidades.");
+    if (!articuloId || cantidad <= 0) throw new Error("Seleccione el artículo y una cantidad válida.");
+
+    const [[articulo]] = await conn.query("SELECT id FROM bodega_articulos WHERE id = ? AND activo = 1 LIMIT 1", [articuloId]);
+    if (!articulo) throw new Error("El artículo seleccionado no existe o está inactivo.");
+
+    let configuracion = await obtenerConfiguracionUnidad(conn, unidad);
+    if (!configuracion) {
+      const [result] = await conn.query(
+        `INSERT INTO bodega_configuraciones_unidad
+          (marca, modelo, anio, motor, descripcion, creado_por)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+        [
+          unidad.marca,
+          unidad.modelo,
+          unidad.anio || null,
+          motor || null,
+          [unidad.marca, unidad.modelo, unidad.anio, motor].filter(Boolean).join(" "),
+          req.session.user.id
+        ]
+      );
+      configuracion = { id: result.insertId };
+    } else if (motor && !limpiar(configuracion.motor)) {
+      await conn.query("UPDATE bodega_configuraciones_unidad SET motor = ? WHERE id = ?", [motor, configuracion.id]);
+    }
+
+    await conn.query(
+      `INSERT INTO bodega_unidades_configuracion (unidad_id, configuracion_id, creado_por)
+       VALUES (?, ?, ?)
+       ON DUPLICATE KEY UPDATE configuracion_id = VALUES(configuracion_id), actualizado_en = CURRENT_TIMESTAMP`,
+      [unidad.id, configuracion.id, req.session.user.id]
+    );
+    if (motor) await conn.query("UPDATE unidades SET motor = ? WHERE id = ?", [motor, unidad.id]);
+
+    await conn.query(
+      `INSERT INTO bodega_compatibilidades
+        (configuracion_id, articulo_id, tipo_servicio, cantidad, observacion, nivel_confianza, criterio_compatibilidad, creado_por)
+       VALUES (?, ?, ?, ?, ?, 'MANUAL', 'Asignación manual realizada desde Bodega', ?)
+       ON DUPLICATE KEY UPDATE cantidad = VALUES(cantidad), observacion = VALUES(observacion), nivel_confianza = 'MANUAL', criterio_compatibilidad = VALUES(criterio_compatibilidad), activo = 1, actualizado_en = CURRENT_TIMESTAMP`,
+      [configuracion.id, articuloId, tipoServicio || "GENERAL", cantidad, limpiar(req.body.observacion) || null, req.session.user.id]
+    );
+
+    await conn.commit();
+    req.session.success = `Compatibilidad guardada para ${unidad.placa}.`;
+  } catch (error) {
+    await conn.rollback();
+    console.error("ERROR guardar compatibilidad bodega:", error);
+    req.session.error = error.message || "No se pudo guardar la compatibilidad.";
+  } finally {
+    conn.release();
+  }
+  res.redirect("/bodega/compatibilidad");
+});
+
+router.post("/compatibilidad/:id/eliminar", async (req, res) => {
+  try {
+    await ensureBodegaTables();
+    await pool.query("UPDATE bodega_compatibilidades SET activo = 0 WHERE id = ?", [Number(req.params.id)]);
+    req.session.success = "Compatibilidad eliminada.";
+  } catch (error) {
+    console.error("ERROR eliminar compatibilidad bodega:", error);
+    req.session.error = "No se pudo eliminar la compatibilidad.";
+  }
+  res.redirect("/bodega/compatibilidad");
+});
 
 router.post("/articulos", async (req, res) => {
   try {

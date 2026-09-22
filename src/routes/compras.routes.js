@@ -10,6 +10,7 @@ const { agregarFiltroPlacaSql, normalizarPlaca: normalizarPlacaSistema } = requi
 const { ensureTipoMantenimientoColumns, normalizarTipoMantenimiento, detectarTipoMantenimiento } = require("../utils/tipoMantenimiento");
 const { construirResumenFinanciero } = require("../utils/resumenFinanciero");
 const { esSedeTransportadoraDetalle } = require("../utils/sedes");
+const { ensureUploadDirectory } = require("../utils/uploadStorage");
 
 // ===================== MIDDLEWARES =====================
 function requireAuth(req, res, next) {
@@ -714,8 +715,7 @@ function guardarFotoProducto(dataUrl, usuarioId) {
     throw new Error("La foto del producto supera 5 MB.");
   }
 
-  const uploadDir = path.join(__dirname, "..", "..", "public", "uploads", "facturas");
-  fs.mkdirSync(uploadDir, { recursive: true });
+  const uploadDir = ensureUploadDirectory("facturas");
 
   const fileName = `producto_${Date.now()}_${usuarioId || "user"}_${Math.round(Math.random() * 1e6)}.${extension}`;
   fs.writeFileSync(path.join(uploadDir, fileName), buffer);
@@ -747,8 +747,7 @@ function guardarCotizacionOrden(dataUrl, originalName, mimeType, usuarioId) {
     throw new Error("La cotización supera 5 MB.");
   }
 
-  const uploadDir = path.join(__dirname, "..", "..", "public", "uploads", "cotizaciones");
-  fs.mkdirSync(uploadDir, { recursive: true });
+  const uploadDir = ensureUploadDirectory("cotizaciones");
 
   const fileName = `cotizacion_${Date.now()}_${usuarioId || "user"}_${Math.round(Math.random() * 1e6)}.${extension}`;
   fs.writeFileSync(path.join(uploadDir, fileName), buffer);
@@ -2748,6 +2747,169 @@ function pdfStreamToBuffer(pdfDoc) {
   });
 }
 
+function generarPDFReporteOrdenes({ ordenes, filtros, totalFiltrado, fechaGeneracion }) {
+  const printer = new PdfPrinter(PDF_FONTS);
+  const contenido = [
+    {
+      columns: [
+        [
+          { text: "Reporte de ordenes de compra", fontSize: 16, bold: true },
+          { text: "Gas Tomza - Sistema de compras", color: "#64748b", margin: [0, 2, 0, 0] }
+        ],
+        [
+          { text: `Generado: ${fechaGeneracion}`, alignment: "right", bold: true },
+          { text: `${ordenes.length} orden${ordenes.length === 1 ? "" : "es"}`, alignment: "right", color: "#64748b" }
+        ]
+      ],
+      margin: [0, 0, 0, 10]
+    },
+    {
+      table: {
+        widths: ["*", "*", "*", "*", "*", "*", "*"],
+        body: [[
+          { text: `Proveedor: ${filtros.proveedor_nombre || "Todos"}`, style: "filterBox" },
+          { text: `Desde: ${filtros.fecha_desde || "-"}`, style: "filterBox" },
+          { text: `Hasta: ${filtros.fecha_hasta || "-"}`, style: "filterBox" },
+          { text: `PO: ${filtros.po_numero || "Todas"}`, style: "filterBox" },
+          { text: `Placa: ${filtros.placa_unidad || "Todas"}`, style: "filterBox" },
+          { text: `Estado: ${String(filtros.estado || "Todos").replace(/_/g, " ")}`, style: "filterBox" },
+          { text: `Facturada: ${filtros.facturada === "1" ? "Si" : filtros.facturada === "0" ? "No" : "Todas"}`, style: "filterBox" }
+        ]]
+      },
+      layout: "noBorders",
+      margin: [0, 0, 0, 8]
+    }
+  ];
+
+  if (!ordenes.length) {
+    contenido.push({ text: "No hay ordenes con los filtros seleccionados.", alignment: "center", color: "#64748b", margin: [0, 24, 0, 24] });
+  }
+
+  ordenes.forEach(orden => {
+    const estado = String(orden.estado || "-").replace(/_/g, " ");
+    const facturacion = [
+      `Facturada: ${Number(orden.facturada || 0) ? "Si" : "No"}`,
+      `N. factura: ${orden.factura || "-"}`,
+      `Vence: ${formatDateCR(orden.fecha_vencimiento_factura)}`,
+      `Pagada: ${Number(orden.pagada || 0) ? "Si" : "No"}`,
+      `Fecha pago: ${formatDateCR(orden.fecha_pago)}`,
+      `Recibido: ${Number(orden.factura_producto_recibido || 0) ? "Si" : "No"}`,
+      `Recepcion: ${formatDateCR(orden.factura_fecha_recepcion)}`
+    ].join(" | ");
+    const detalle = (orden.lineas || []).map(linea => [
+      linea.codigo || "-",
+      linea.codigo_producto || "-",
+      linea.descripcion || "-",
+      { text: formatMoneyCR(linea.cantidad), alignment: "right" },
+      { text: `CRC ${formatMoneyCR(linea.precio_unitario)}`, alignment: "right" },
+      { text: `CRC ${formatMoneyCR(linea.subtotal)}`, alignment: "right", bold: true }
+    ]);
+
+    contenido.push(
+      {
+        table: {
+          headerRows: 1,
+          widths: [52, 48, "*", 52, 58, 56, 68, 62],
+          body: [
+            ["PO", "Fecha", "Proveedor", "Placa", "Empresa", "Pago", "Total", "Estado"].map(texto => ({ text: texto, style: "tableHeader" })),
+            [
+              { text: orden.po_numero || "-", bold: true },
+              formatDateCR(orden.fecha),
+              orden.proveedor_nombre || "-",
+              orden.placa_visual || orden.placa_unidad || "-",
+              orden.empresa_destino || "GAS TOMZA",
+              orden.forma_pago || "-",
+              { text: `${orden.moneda || "CRC"} ${formatMoneyCR(orden.total)}`, alignment: "right", bold: true },
+              estado
+            ]
+          ]
+        },
+        layout: "lightHorizontalLines",
+        margin: [0, 4, 0, 0]
+      },
+      { text: `Observacion: ${orden.observaciones || "Sin observaciones"}`, color: "#334155", margin: [3, 4, 3, 2] },
+      { text: facturacion, color: "#475569", fontSize: 7, margin: [3, 0, 3, 2] },
+      ...(orden.factura_observacion ? [{ text: `Observacion de factura: ${orden.factura_observacion}`, color: "#475569", fontSize: 7, margin: [3, 0, 3, 3] }] : []),
+      {
+        table: {
+          headerRows: 1,
+          widths: [55, 70, "*", 48, 70, 70],
+          body: [
+            ["Placa", "Codigo", "Descripcion", "Cantidad", "Precio unitario", "Subtotal"].map(texto => ({ text: texto, style: "detailHeader" })),
+            ...(detalle.length ? detalle : [[{ text: "Sin productos o servicios registrados.", colSpan: 6, color: "#64748b" }, {}, {}, {}, {}, {}]])
+          ]
+        },
+        layout: "lightHorizontalLines",
+        margin: [0, 0, 0, 9]
+      }
+    );
+  });
+
+  contenido.push({ text: `Total filtrado: CRC ${formatMoneyCR(totalFiltrado)}`, alignment: "right", fontSize: 11, bold: true, color: "#14532d", margin: [0, 8, 0, 0] });
+
+  const docDefinition = {
+    pageSize: "LETTER",
+    pageOrientation: "landscape",
+    pageMargins: [22, 24, 22, 28],
+    defaultStyle: { font: "Helvetica", fontSize: 7.2, color: "#111827" },
+    footer: (currentPage, pageCount) => ({ text: `Pagina ${currentPage} de ${pageCount}`, alignment: "right", margin: [0, 0, 22, 0], fontSize: 7, color: "#64748b" }),
+    content: contenido,
+    styles: {
+      tableHeader: { fillColor: "#111827", color: "#ffffff", bold: true, fontSize: 7 },
+      detailHeader: { fillColor: "#334155", color: "#ffffff", bold: true, fontSize: 6.8 },
+      filterBox: { fillColor: "#f8fafc", margin: [3, 4, 3, 4], bold: true, fontSize: 6.5 }
+    }
+  };
+
+  return pdfStreamToBuffer(printer.createPdfKitDocument(docDefinition));
+}
+
+function generarPDFGastoProveedores({ proveedores, totalGeneral, filtros, fechaGeneracion }) {
+  const printer = new PdfPrinter(PDF_FONTS);
+  const body = [[
+    { text: "Proveedor", style: "tableHeader" },
+    { text: "Total gastado", style: "tableHeader", alignment: "right" }
+  ]];
+
+  proveedores.forEach(proveedor => {
+    body.push([
+      proveedor.nombre || "-",
+      { text: `CRC ${formatMoneyCR(proveedor.total_gastado)}`, alignment: "right" }
+    ]);
+  });
+  if (!proveedores.length) {
+    body.push([{ text: "No hay proveedores con gasto registrado.", colSpan: 2, alignment: "center", color: "#64748b", margin: [0, 12, 0, 12] }, {}]);
+  }
+
+  const docDefinition = {
+    pageSize: "LETTER",
+    pageMargins: [32, 30, 32, 32],
+    defaultStyle: { font: "Helvetica", fontSize: 9, color: "#111827" },
+    footer: (currentPage, pageCount) => ({ text: `Pagina ${currentPage} de ${pageCount}`, alignment: "center", fontSize: 7, color: "#94a3b8" }),
+    content: [
+      {
+        columns: [
+          [{ text: "Gas Tomza", bold: true, fontSize: 13 }, { text: "Sistema de compras", color: "#64748b" }],
+          [{ text: "Reporte de gasto por proveedor", bold: true, fontSize: 16, alignment: "right" }, { text: fechaGeneracion, alignment: "right", color: "#64748b" }]
+        ],
+        margin: [0, 0, 0, 14]
+      },
+      {
+        text: `Proveedor: ${filtros.proveedor_nombre || "Todos"} | Desde: ${filtros.fecha_desde || "-"} | Hasta: ${filtros.fecha_hasta || "-"} | Estado: ${filtros.estado || "Todos"}`,
+        fillColor: "#f8fafc",
+        margin: [8, 7, 8, 7]
+      },
+      { table: { headerRows: 1, widths: ["*", 130], body }, layout: "lightHorizontalLines", margin: [0, 12, 0, 0] },
+      { text: `Total general: CRC ${formatMoneyCR(totalGeneral)}`, alignment: "right", fontSize: 12, bold: true, color: "#14532d", margin: [0, 12, 0, 0] }
+    ],
+    styles: {
+      tableHeader: { fillColor: "#1f2937", color: "#ffffff", bold: true, fontSize: 8 }
+    }
+  };
+
+  return pdfStreamToBuffer(printer.createPdfKitDocument(docDefinition));
+}
+
 async function generarPDFFacturasPendientes({ gruposProveedor, facturas, filtros, totales, fechaGeneracion, metaReporte }) {
   const meta = metaReporte || obtenerMetaReporteFacturas("0");
   const printer = new PdfPrinter(PDF_FONTS);
@@ -3953,14 +4115,7 @@ router.get("/ordenes/reporte/pdf", requireAuth, allowRoles("ADMIN", "TALLER", "P
       : [[null]];
 
     const totalFiltrado = ordenes.reduce((sum, orden) => sum + (parseFloat(orden.total) || 0), 0);
-    const ejs = require("ejs");
-    const path = require("path");
-    const fs = require("fs");
-    const pdf = require("html-pdf");
-    const tmpDir = path.join(process.cwd(), "tmp");
-    fs.mkdirSync(tmpDir, { recursive: true });
-
-    const html = await ejs.renderFile(path.join(__dirname, "../views/compras/ordenes_reporte_pdf.ejs"), {
+    const buffer = await generarPDFReporteOrdenes({
       ordenes,
       filtros: {
         ...filtros,
@@ -3969,16 +4124,10 @@ router.get("/ordenes/reporte/pdf", requireAuth, allowRoles("ADMIN", "TALLER", "P
       totalFiltrado,
       fechaGeneracion: new Date().toLocaleString("es-CR")
     });
-
-    pdf.create(html, { format: "Letter", orientation: "landscape", border: "8mm", directory: tmpDir }).toBuffer((err, buffer) => {
-      if (err) {
-        console.error("Error generando reporte de órdenes:", err);
-        return res.status(500).send("Error al generar reporte");
-      }
-      res.setHeader("Content-Type", "application/pdf");
-      res.setHeader("Content-Disposition", `attachment; filename=reporte_ordenes_${new Date().toISOString().slice(0, 19).replace(/:/g, "-")}.pdf`);
-      res.send(buffer);
-    });
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename=reporte_ordenes_${new Date().toISOString().slice(0, 19).replace(/:/g, "-")}.pdf`);
+    res.setHeader("Content-Length", buffer.length);
+    res.end(buffer);
   } catch (error) {
     console.error("Error descargando reporte de órdenes:", error);
     res.status(500).send("Error descargando reporte");
@@ -7273,27 +7422,16 @@ router.get("/dashboard/proveedores/pdf", requireAuth, allowRoles("ADMIN", "TALLE
     }
     let totalGeneral = 0;
     todosProveedoresGasto.forEach(p => totalGeneral += parseFloat(p.total_gastado) || 0);
-    const ejs = require('ejs');
-    const path = require('path');
-    const pdf = require('html-pdf');
-    const templatePath = path.join(__dirname, '../views/compras/proveedores_gasto_pdf.ejs');
-    const html = await ejs.renderFile(templatePath, {
+    const buffer = await generarPDFGastoProveedores({
       proveedores: todosProveedoresGasto,
       totalGeneral: totalGeneral,
       filtros: { proveedor_id, proveedor_nombre: proveedorNombreFiltro, fecha_desde, fecha_hasta, estado },
       fechaGeneracion: new Date().toLocaleString('es-CR')
     });
-    const options = { format: 'Letter', orientation: 'portrait' };
-    pdf.create(html, options).toBuffer((err, buffer) => {
-      if (err) {
-        console.error("Error generando PDF de proveedores:", err);
-        return res.status(500).send("Error al generar el PDF");
-      }
-      res.setHeader('Content-Type', 'application/pdf');
-      res.setHeader('Content-Disposition', `attachment; filename=reporte_gasto_proveedores_${new Date().toISOString().slice(0,19).replace(/:/g, '-')}.pdf`);
-      res.setHeader('Content-Length', buffer.length);
-      res.end(buffer);
-    });
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename=reporte_gasto_proveedores_${new Date().toISOString().slice(0,19).replace(/:/g, '-')}.pdf`);
+    res.setHeader('Content-Length', buffer.length);
+    res.end(buffer);
   } catch (error) {
     console.error("Error en PDF de proveedores:", error);
     res.status(500).send("Error generando el reporte");

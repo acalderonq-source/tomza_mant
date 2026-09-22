@@ -471,6 +471,12 @@
             <span class="module-icon icon-blue"><i class="bi bi-clipboard-pulse"></i></span>
             <div><div class="module-title">Reportes supervisores</div><p class="module-copy">Fallas reportadas por unidad.</p></div>
           </a>
+          <% if (['ADMIN', 'TALLER', 'SUPERVISOR', 'SUPERVISOR_PESADO'].includes(user.rol)) { %>
+            <a href="/reportes-supervisores/rutas" class="module-card">
+              <span class="module-icon icon-green"><i class="bi bi-signpost-split"></i></span>
+              <div><div class="module-title">Rutas y choferes</div><p class="module-copy">Asignación semanal e historial de cambios.</p></div>
+            </a>
+          <% } %>
         <% } %>
         <% if (!esMecanicoLimitado) { %>
           <a href="/unidades" class="module-card">

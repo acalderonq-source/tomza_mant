@@ -109,6 +109,9 @@
       <p class="page-subtitle">Taller/admin edita, marca lo importante y confirma cuando un correctivo resolvió el reporte.</p>
     </div>
     <div class="d-flex gap-2 flex-wrap">
+      <% if (['ADMIN', 'TALLER', 'SUPERVISOR', 'SUPERVISOR_PESADO'].includes(user.rol)) { %>
+        <a href="/reportes-supervisores/rutas" class="btn btn-primary btn-sm"><i class="bi bi-signpost-split"></i> Rutas y choferes</a>
+      <% } %>
       <a href="<%= excelGeneralUrl %>" class="btn btn-success btn-sm">Descargar todo</a>
       <a href="/reportes-supervisores/historial" class="btn btn-outline-dark btn-sm">Historial</a>
     </div>
@@ -116,6 +119,13 @@
 
   <% if (success) { %><div class="alert alert-success"><%= success %></div><% } %>
   <% if (error) { %><div class="alert alert-danger"><%= error %></div><% } %>
+
+  <% if (['SUPERVISOR', 'SUPERVISOR_PESADO'].includes(user.rol) && Number(rutasSemanaActual || 0) === 0) { %>
+    <div class="alert alert-warning d-flex justify-content-between align-items-center gap-3 flex-wrap">
+      <div><strong>Asignación semanal pendiente.</strong> Debe registrar las rutas y los choferes de la semana <%= semanaRutasActual %>.</div>
+      <a href="/reportes-supervisores/rutas?semana=<%= encodeURIComponent(semanaRutasActual) %>" class="btn btn-warning btn-sm fw-bold">Registrar ahora</a>
+    </div>
+  <% } %>
 
   <% if (puedeCrear) { %>
     <section class="surface-card p-3 mb-3">
