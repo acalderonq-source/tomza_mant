@@ -14,7 +14,8 @@
   const reportes = Array.isArray(reportesPendientes) ? reportesPendientes : [];
   const conPendiente = correctivos.filter(c => c.pendiente).length;
   const conMecanico = correctivos.filter(c => c.mecanicos && c.mecanicos !== '—').length;
-  const placasUnicas = new Set(correctivos.map(c => c.placa)).size;
+  const placasUnicas = new Set(correctivos.filter(c => !c.es_sin_placa).map(c => c.placa)).size;
+  const trabajosSinPlaca = correctivos.filter(c => c.es_sin_placa).length;
 %>
 
 <nav class="navbar navbar-dark px-3 py-2">
@@ -56,6 +57,10 @@
     <div class="summary-card">
       <div class="summary-label">Unidades</div>
       <div class="summary-value"><%= placasUnicas %></div>
+    </div>
+    <div class="summary-card">
+      <div class="summary-label">Sin placa</div>
+      <div class="summary-value"><%= trabajosSinPlaca %></div>
     </div>
   </div>
 
@@ -134,8 +139,8 @@
             <% correctivos.forEach(c => { %>
               <tr>
                 <td data-label="Fecha"><%= c.fecha_formato %></td>
-                <td data-label="Placa"><strong><%= c.placa %></strong></td>
-                <td data-label="Tipo"><span class="badge text-bg-light"><%= c.tipo_mantenimiento || 'CORRECTIVO' %></span></td>
+                <td data-label="Placa"><strong><%= c.placa %></strong><div class="small text-muted"><%= c.sede || '' %></div></td>
+                <td data-label="Tipo"><span class="badge <%= c.es_sin_placa ? 'text-bg-secondary' : 'text-bg-light' %>"><%= c.tipo_mantenimiento || 'CORRECTIVO' %></span></td>
                 <td data-label="Trabajo realizado" class="text-cell"><%= c.trabajo_realizado %></td>
                 <td data-label="Pendiente" class="text-cell">
                   <% if (c.pendiente) { %>
@@ -146,9 +151,13 @@
                 </td>
                 <td data-label="Mecánico(s)"><%= c.mecanicos %></td>
                 <td data-label="Acciones" class="text-end">
-                  <a href="/mantenimientos/correctivos/<%= c.id %>/agregar" class="btn btn-sm btn-primary">
-                    <i class="bi bi-plus-circle"></i> Agregar más
-                  </a>
+                  <% if (c.es_sin_placa) { %>
+                    <span class="small text-muted">Registrado</span>
+                  <% } else { %>
+                    <a href="/mantenimientos/correctivos/<%= c.id %>/agregar" class="btn btn-sm btn-primary">
+                      <i class="bi bi-plus-circle"></i> Agregar más
+                    </a>
+                  <% } %>
                 </td>
               </tr>
             <% }) %>

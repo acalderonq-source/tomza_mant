@@ -42,6 +42,22 @@ function puedeTrabajarComoMecanico(user) {
   return ["ADMIN", "TALLER"].includes(user?.rol) || esUsuarioMecanicoLimitado(user);
 }
 
+const MECANICOS_USUARIOS_CENTRALES = [
+  "Norman Fonseca",
+  "Martin Montenegro",
+  "Roberto Montenegro",
+  "Christian Maroto"
+];
+
+function esUsuarioMecanicosCentrales(user) {
+  const usuario = String(user?.usuario || "").trim().toLowerCase();
+  return ["pesados", "mecanico"].includes(usuario);
+}
+
+function puedeRegistrarTrabajoSinPlaca(user) {
+  return ["ADMIN", "TALLER"].includes(user?.rol) || esUsuarioMecanicosCentrales(user);
+}
+
 // =====================================================
 // OBTENER SEDE SEGÚN USUARIO
 // =====================================================
@@ -158,6 +174,14 @@ function obtenerFiltroMecanicosPorSede(sedeFiltro, soloIds = false, user = null,
     sql += " AND nombre = ?";
     params.push("Josue Soto Delgado");
     sql += " ORDER BY nombre";
+    return { sql, params };
+  }
+
+  if (esUsuarioMecanicosCentrales(user)) {
+    sql += " AND nombre IN (?)";
+    params.push(MECANICOS_USUARIOS_CENTRALES);
+    sql += " ORDER BY FIELD(nombre, ?)";
+    params.push(MECANICOS_USUARIOS_CENTRALES);
     return { sql, params };
   }
 
@@ -706,6 +730,82 @@ async function obtenerReporteSupervisorAutorizado(reporteId, sedeFiltro, sedesFi
   return reporte || null;
 }
 
+function ordenarPorFechaDesc(registros) {
+  return [...registros].sort((a, b) => {
+    const fechaA = new Date(a.fecha_orden || a.fecha_programada || 0).getTime();
+    const fechaB = new Date(b.fecha_orden || b.fecha_programada || 0).getTime();
+    if (fechaB !== fechaA) return fechaB - fechaA;
+    return Number(b.id || 0) - Number(a.id || 0);
+  });
+}
+
+async function obtenerTrabajosSinPlaca(req, filtros = {}) {
+  const condiciones = [];
+  const params = [];
+  const sedeFiltro = filtros.sedeFiltro !== undefined ? filtros.sedeFiltro : obtenerSedeFiltro(req);
+  const placa = String(filtros.placa || "").trim().toUpperCase();
+  const tipo = String(filtros.tipo || "").trim().toUpperCase();
+
+  if (filtros.filtro === "pendientes") condiciones.push("1 = 0");
+  if (placa && !"SIN PLACA".includes(placa)) condiciones.push("1 = 0");
+  if (tipo && tipo !== "SIN_PLACA") condiciones.push("1 = 0");
+  if (filtros.prioridad) condiciones.push("1 = 0");
+
+  if (filtros.fecha_desde) {
+    condiciones.push("DATE(tsp.fecha) >= ?");
+    params.push(filtros.fecha_desde);
+  }
+  if (filtros.fecha_hasta) {
+    condiciones.push("DATE(tsp.fecha) <= ?");
+    params.push(filtros.fecha_hasta);
+  }
+  if (filtros.mecanico_id) {
+    condiciones.push(`EXISTS (
+      SELECT 1
+      FROM trabajos_taller_sin_placa_mecanicos tspm2
+      WHERE tspm2.trabajo_sin_placa_id = tsp.id
+        AND tspm2.mecanico_id = ?
+    )`);
+    params.push(filtros.mecanico_id);
+  }
+
+  aplicarFiltroSedesPermitidas(req, condiciones, params, "tsp.sede", sedeFiltro);
+  const where = condiciones.length ? `WHERE ${condiciones.join(" AND ")}` : "";
+  const [rows] = await pool.query(
+    `
+    SELECT
+      tsp.id,
+      'SIN PLACA' AS placa,
+      tsp.sede,
+      'SIN_PLACA' AS tipo,
+      'TRABAJO SIN PLACA' AS tipo_mantenimiento,
+      'CERRADO' AS estado,
+      'MEDIA' AS prioridad,
+      tsp.fecha AS fecha_programada,
+      tsp.fecha AS fecha_orden,
+      DATE_FORMAT(tsp.fecha, '%d/%m/%Y %H:%i') AS fecha_formato,
+      tsp.observacion AS ejecucion,
+      tsp.observacion AS trabajo_realizado,
+      tsp.pendiente,
+      COALESCE(GROUP_CONCAT(DISTINCT mec.nombre ORDER BY mec.nombre SEPARATOR ', '), '—') AS mecanicos,
+      COALESCE(GROUP_CONCAT(DISTINCT NULLIF(TRIM(tspm.trabajo), '') SEPARATOR ' | '), '') AS trabajos_detalle,
+      COALESCE(GROUP_CONCAT(DISTINCT NULLIF(TRIM(tspm.repuestos), '') SEPARATOR ' | '), '') AS repuestos_detalle,
+      1 AS es_sin_placa
+    FROM trabajos_taller_sin_placa tsp
+    LEFT JOIN trabajos_taller_sin_placa_mecanicos tspm
+      ON tspm.trabajo_sin_placa_id = tsp.id
+    LEFT JOIN mecanicos mec ON mec.id = tspm.mecanico_id
+    ${where}
+    GROUP BY tsp.id, tsp.sede, tsp.fecha, tsp.observacion, tsp.pendiente
+    ORDER BY tsp.fecha DESC, tsp.id DESC
+    LIMIT 1000
+    `,
+    params
+  );
+
+  return rows;
+}
+
 // =====================================================
 // LISTADO DE CORRECTIVOS
 // =====================================================
@@ -722,6 +822,7 @@ router.get("/correctivos", requireAuth, async (req, res) => {
       SELECT
         c.id,
         COALESCE(c.tipo_mantenimiento, 'CORRECTIVO') AS tipo_mantenimiento,
+        c.fecha AS fecha_orden,
         DATE_FORMAT(c.fecha, '%d/%m/%Y %H:%i') AS fecha_formato,
         u.placa,
         c.trabajo_realizado,
@@ -737,12 +838,14 @@ router.get("/correctivos", requireAuth, async (req, res) => {
       `,
       params
     );
+    const trabajosSinPlaca = await obtenerTrabajosSinPlaca(req, { sedeFiltro });
+    const correctivos = ordenarPorFechaDesc([...rows, ...trabajosSinPlaca]);
     const reportesPendientes = puedeTrabajarComoMecanico(req.session.user)
       ? await obtenerReportesPendientesSupervisores(sedeFiltro, sedesFiltro)
       : [];
 
     res.render("correctivos", {
-      correctivos: rows,
+      correctivos,
       reportesPendientes,
       user: req.session.user
     });
@@ -930,11 +1033,16 @@ router.get("/correctivos/nuevo", requireAuth, async (req, res) => {
     );
     const { sql: sqlMecanicos, params: paramsMecanicos } = obtenerFiltroMecanicosPorSede(sedeFiltro, false, req.session.user, sedesFormulario);
     const [mecanicos] = await pool.query(sqlMecanicos, paramsMecanicos);
+    const sedeTrabajoSinPlaca = String(
+      sedeFiltro || req.session.user.sede || sedesFormulario[0] || "Taller"
+    ).trim();
     res.render("correctivos_nuevo", {
       unidades,
       mecanicos,
       reporteAtendido,
       tipoDefault: normalizarTipoMantenimiento(reporteAtendido?.tipo_mantenimiento),
+      sedeTrabajoSinPlaca,
+      permiteTrabajoSinPlaca: puedeRegistrarTrabajoSinPlaca(req.session.user),
       user: req.session.user
     });
   } catch (error) {
@@ -960,14 +1068,89 @@ router.post("/correctivos", requireAuth, async (req, res) => {
       detectarTipoMantenimiento([trabajo_general, pendiente], { fallback: "CORRECTIVO" })
     );
     const pendienteTexto = String(pendiente || "").trim();
-    if (!unidad_id) return res.status(400).send("Debe seleccionar una unidad.");
+    const esTrabajoSinPlaca = ["1", "true", "on"].includes(
+      String(req.body.sin_placa || "").trim().toLowerCase()
+    );
+    const observacionSinPlaca = String(req.body.observacion_sin_placa || "").trim();
     const mecanicosArray = obtenerValoresSeleccionados(req.body);
     if (mecanicosArray.length === 0) return res.status(400).send("Debe seleccionar al menos un mecánico.");
 
     const sedeFiltro = obtenerSedeFiltro(req);
+    const sedesPermitidasCorrectivo = obtenerSedesFiltroUsuario(req, sedeFiltro);
+
+    if (esTrabajoSinPlaca) {
+      if (!puedeRegistrarTrabajoSinPlaca(req.session.user)) {
+        return res.status(403).send("No autorizado para registrar trabajos sin placa.");
+      }
+      if (reporte_id) {
+        return res.status(400).send("Un reporte de supervisor siempre debe quedar ligado a su placa.");
+      }
+      if (!observacionSinPlaca) {
+        return res.status(400).send("Debe escribir la observación del trabajo realizado.");
+      }
+
+      const sedeSinPlaca = String(
+        req.body.sede_sin_placa || sedeFiltro || req.session.user.sede || "Taller"
+      ).trim();
+      if (!sedeSinPlaca) return res.status(400).send("Debe indicar la sede del trabajo.");
+      if (!tieneSedePermitida(sedeSinPlaca, sedesPermitidasCorrectivo)) {
+        return res.status(403).send("Sede no autorizada para este usuario.");
+      }
+
+      const filtroMecanicos = obtenerFiltroMecanicosPorSede(
+        sedeSinPlaca,
+        true,
+        req.session.user,
+        sedesPermitidasCorrectivo
+      );
+      const [mecanicosPermitidos] = await pool.query(filtroMecanicos.sql, filtroMecanicos.params);
+      const idsPermitidos = mecanicosPermitidos.map(mecanico => String(mecanico.id));
+      if (mecanicosArray.some(id => !idsPermitidos.includes(String(id)))) {
+        return res.status(403).send("Mecánico no autorizado para este usuario.");
+      }
+
+      const connection = await pool.getConnection();
+      try {
+        await connection.beginTransaction();
+        const [trabajoResult] = await connection.query(
+          `INSERT INTO trabajos_taller_sin_placa
+           (sede, observacion, pendiente, creado_por)
+           VALUES (?, ?, ?, ?)`,
+          [sedeSinPlaca, observacionSinPlaca, pendienteTexto || null, req.session.user.id]
+        );
+
+        for (const idMec of mecanicosArray) {
+          const indice = idsPermitidos.indexOf(String(idMec));
+          const trabajoMecanico = obtenerValorCampoMecanico(req.body, "trabajos", idMec, indice);
+          const repuestosMecanico = obtenerValorCampoMecanico(req.body, "repuestos", idMec, indice);
+          await connection.query(
+            `INSERT INTO trabajos_taller_sin_placa_mecanicos
+             (trabajo_sin_placa_id, mecanico_id, trabajo, repuestos)
+             VALUES (?, ?, ?, ?)`,
+            [
+              trabajoResult.insertId,
+              idMec,
+              trabajoMecanico || observacionSinPlaca,
+              repuestosMecanico || null
+            ]
+          );
+        }
+
+        await connection.commit();
+      } catch (error) {
+        await connection.rollback();
+        throw error;
+      } finally {
+        connection.release();
+      }
+
+      req.session.success = "Trabajo sin placa registrado correctamente.";
+      return res.redirect("/mantenimientos");
+    }
+
+    if (!unidad_id) return res.status(400).send("Debe seleccionar una unidad.");
     const [[unidadCorrectivo]] = await pool.query("SELECT id, sede FROM unidades WHERE id = ?", [unidad_id]);
     if (!unidadCorrectivo) return res.status(400).send("Unidad no encontrada.");
-    const sedesPermitidasCorrectivo = obtenerSedesFiltroUsuario(req, sedeFiltro);
     if (!tieneSedePermitida(unidadCorrectivo.sede, sedesPermitidasCorrectivo)) {
       return res.status(403).send("Unidad no autorizada para este usuario.");
     }
@@ -1302,7 +1485,7 @@ router.get("/", requireAuth, async (req, res) => {
     aplicarFiltroSedesPermitidas(req, condicionesCorrectivos, paramsCorrectivos, "COALESCE(c.sede, u.sede)", sedeFiltro);
 
     const whereCorrectivos = condicionesCorrectivos.length ? "WHERE " + condicionesCorrectivos.join(" AND ") : "";
-    const [correctivos] = await pool.query(
+    const [correctivosConPlaca] = await pool.query(
       `
       SELECT
         c.id,
@@ -1312,6 +1495,7 @@ router.get("/", requireAuth, async (req, res) => {
         'CERRADO' AS estado,
         'MEDIA' AS prioridad,
         c.fecha AS fecha_programada,
+        c.fecha AS fecha_orden,
         DATE_FORMAT(c.fecha, '%d/%m/%Y') AS fecha_formato,
         c.trabajo_realizado AS ejecucion,
         c.pendiente,
@@ -1329,6 +1513,18 @@ router.get("/", requireAuth, async (req, res) => {
       `,
       paramsCorrectivos
     );
+
+    const trabajosSinPlaca = await obtenerTrabajosSinPlaca(req, {
+      sedeFiltro,
+      filtro,
+      placa,
+      tipo,
+      prioridad,
+      fecha_desde,
+      fecha_hasta,
+      mecanico_id
+    });
+    const correctivos = ordenarPorFechaDesc([...correctivosConPlaca, ...trabajosSinPlaca]);
 
     const { sql: sqlMecanicos, params: paramsMecanicos } = obtenerFiltroMecanicosPorSede(sedeFiltro, false, req.session.user, sedesListado);
     const [mecanicos] = await pool.query(sqlMecanicos, paramsMecanicos);

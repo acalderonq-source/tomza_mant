@@ -4,7 +4,7 @@ services:
     runtime: node
     plan: starter
     buildCommand: npm ci --omit=dev
-    startCommand: npm start
+    startCommand: npm run migrate && npm start
     healthCheckPath: /health
     autoDeployTrigger: commit
     disk:

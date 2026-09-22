@@ -348,6 +348,7 @@
       if (!target && allowFree) input.value = normalizePlate(input.value);
     });
     input.form?.addEventListener("submit", event => {
+      if (input.disabled || (target && target.disabled)) return;
       if (allowFree && (!target || !target.value)) {
         input.value = normalizePlate(input.value);
       }

@@ -123,6 +123,7 @@
           <option value="" <%= !filtrosActuales.tipo ? 'selected' : '' %>>Todos</option>
           <option value="PREVENTIVO" <%= filtrosActuales.tipo === 'PREVENTIVO' ? 'selected' : '' %>>Preventivo</option>
           <option value="CORRECTIVO" <%= filtrosActuales.tipo === 'CORRECTIVO' ? 'selected' : '' %>>Correctivo</option>
+          <option value="SIN_PLACA" <%= filtrosActuales.tipo === 'SIN_PLACA' ? 'selected' : '' %>>Trabajo sin placa</option>
         </select>
       </div>
       <div class="col-md-2">
@@ -279,17 +280,32 @@
           <% } %>
           <% correctivosLista.forEach(c => { %>
             <tr>
-              <td data-label="Placa"><strong><%= c.placa %></strong><div class="small text-muted"><%= c.sede || 'Sin sede' %></div></td>
+              <td data-label="Placa">
+                <strong><%= c.placa %></strong>
+                <% if (c.es_sin_placa) { %><span class="badge text-bg-secondary ms-1">Taller</span><% } %>
+                <div class="small text-muted"><%= c.sede || 'Sin sede' %></div>
+              </td>
               <td data-label="Fecha"><%= c.fecha_formato %></td>
-              <td data-label="Tipo"><span class="badge badge-late"><%= c.tipo || 'CORRECTIVO' %></span></td>
+              <td data-label="Tipo"><span class="badge <%= c.es_sin_placa ? 'text-bg-secondary' : 'badge-late' %>"><%= c.es_sin_placa ? 'TRABAJO SIN PLACA' : (c.tipo || 'CORRECTIVO') %></span></td>
               <td data-label="Trabajo" class="text-cell">
                 <strong><%= c.mecanicos || '—' %></strong>
-                <div><%= c.trabajos_detalle || c.ejecucion || '—' %></div>
+                <% if (c.es_sin_placa) { %>
+                  <div><%= c.ejecucion || '—' %></div>
+                  <% if (c.trabajos_detalle && c.trabajos_detalle !== c.ejecucion) { %>
+                    <div class="small text-muted">Detalle: <%= c.trabajos_detalle %></div>
+                  <% } %>
+                <% } else { %>
+                  <div><%= c.trabajos_detalle || c.ejecucion || '—' %></div>
+                <% } %>
                 <% if (c.repuestos_detalle) { %><div class="small text-muted">Repuestos: <%= c.repuestos_detalle %></div><% } %>
                 <% if (c.pendiente) { %><div class="small text-danger fw-bold">Pendiente: <%= c.pendiente %></div><% } %>
               </td>
               <td data-label="Acción" class="text-end">
-                <a href="/mantenimientos/correctivos/<%= c.id %>/agregar" class="btn btn-sm btn-dark"><i class="bi bi-plus-circle"></i> Agregar</a>
+                <% if (c.es_sin_placa) { %>
+                  <span class="small text-muted">Registrado</span>
+                <% } else { %>
+                  <a href="/mantenimientos/correctivos/<%= c.id %>/agregar" class="btn btn-sm btn-dark"><i class="bi bi-plus-circle"></i> Agregar</a>
+                <% } %>
               </td>
             </tr>
           <% }) %>

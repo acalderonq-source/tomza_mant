@@ -115,6 +115,7 @@
   <div class="simple-card">
     <form id="formCorrectivo" method="POST" action="/mantenimientos/correctivos">
       <input type="hidden" name="trabajo_general" id="trabajoGeneral">
+      <% const puedeSinPlaca = typeof permiteTrabajoSinPlaca !== 'undefined' && permiteTrabajoSinPlaca; %>
       <% if (reporte) { %>
         <input type="hidden" name="reporte_id" value="<%= reporte.id %>">
         <div class="alert alert-info mb-4">
@@ -126,13 +127,22 @@
         </div>
       <% } %>
       <section class="mb-4">
-        <h2 class="step-title"><i class="bi bi-truck-front"></i> 1. Unidad</h2>
-        <div class="row g-3">
+        <h2 class="step-title" id="tituloReferenciaTrabajo"><i class="bi bi-truck-front"></i> 1. Unidad</h2>
+        <% if (puedeSinPlaca && !reporte) { %>
+          <div class="helper-box mb-3">
+            <div class="form-check form-switch mb-0">
+              <input class="form-check-input" type="checkbox" role="switch" id="sinPlaca" name="sin_placa" value="1">
+              <label class="form-check-label fw-bold" for="sinPlaca">Trabajo sin placa</label>
+            </div>
+            <div class="small text-muted mt-1">Actívelo para registrar labores de taller que no pertenecen a una unidad.</div>
+          </div>
+        <% } %>
+        <div class="row g-3" id="camposUnidad">
         <% const selectedTipo = typeof tipoDefault !== 'undefined' ? tipoDefault : 'CORRECTIVO'; %>
         <div class="col-lg-4">
           <label class="form-label">Unidad</label>
           <div data-placa-search data-placa-mode="unidad" data-placa-target="#unidadCorrectivoId">
-            <input type="text" class="form-control" data-placa-input data-placa-autocomplete placeholder="Escriba la placa" value="<%= reporte ? reporte.placa : '' %>" required>
+            <input type="text" class="form-control" id="placaCorrectivo" data-placa-input data-placa-autocomplete placeholder="Escriba la placa" value="<%= reporte ? reporte.placa : '' %>" required>
             <input type="hidden" name="unidad_id" id="unidadCorrectivoId" value="<%= reporte ? reporte.unidad_id : '' %>" required>
             <div data-placa-results></div>
             <div data-placa-selected><%= reporte ? `${reporte.placa} · ${reporte.sede}` : '' %></div>
@@ -153,6 +163,19 @@
           </div>
         </div>
         </div>
+        <% if (puedeSinPlaca && !reporte) { %>
+          <div id="camposSinPlaca" class="row g-3" hidden>
+            <div class="col-lg-4">
+              <label class="form-label">Sede del trabajo</label>
+              <input type="text" class="form-control" value="<%= sedeTrabajoSinPlaca %>" readonly>
+              <input type="hidden" name="sede_sin_placa" value="<%= sedeTrabajoSinPlaca %>" disabled>
+            </div>
+            <div class="col-lg-8">
+              <label class="form-label">Observación del trabajo realizado</label>
+              <textarea name="observacion_sin_placa" id="observacionSinPlaca" class="form-control" rows="3" placeholder="Describa claramente el trabajo que se realizó" disabled></textarea>
+            </div>
+          </div>
+        <% } %>
       </section>
 
       <section class="mb-4">
@@ -186,7 +209,7 @@
       </section>
 
       <div class="sticky-actions">
-        <button type="submit" class="btn btn-success"><i class="bi bi-save"></i> Guardar mantenimiento</button>
+        <button type="submit" class="btn btn-success" id="botonGuardar"><i class="bi bi-save"></i> Guardar mantenimiento</button>
         <a href="/mantenimientos" class="btn btn-secondary">Cancelar</a>
       </div>
     </form>
@@ -197,6 +220,52 @@
 <script>
   document.addEventListener('DOMContentLoaded', function() {
     const form = document.getElementById('formCorrectivo');
+    const sinPlaca = document.getElementById('sinPlaca');
+    const camposUnidad = document.getElementById('camposUnidad');
+    const camposSinPlaca = document.getElementById('camposSinPlaca');
+    const tituloReferencia = document.getElementById('tituloReferenciaTrabajo');
+    const placaCorrectivo = document.getElementById('placaCorrectivo');
+    const unidadCorrectivoId = document.getElementById('unidadCorrectivoId');
+    const observacionSinPlaca = document.getElementById('observacionSinPlaca');
+    const sedeSinPlaca = document.querySelector('input[name="sede_sin_placa"]');
+    const tipoMantenimiento = document.querySelector('select[name="tipo_mantenimiento"]');
+    const botonGuardar = document.getElementById('botonGuardar');
+
+    function sincronizarModoTrabajo() {
+      const activo = Boolean(sinPlaca && sinPlaca.checked);
+      if (camposUnidad) camposUnidad.hidden = activo;
+      if (camposSinPlaca) camposSinPlaca.hidden = !activo;
+      if (tituloReferencia) {
+        tituloReferencia.innerHTML = activo
+          ? '<i class="bi bi-clipboard-check"></i> 1. Trabajo sin placa'
+          : '<i class="bi bi-truck-front"></i> 1. Unidad';
+      }
+      if (placaCorrectivo) {
+        placaCorrectivo.disabled = activo;
+        placaCorrectivo.required = !activo;
+      }
+      if (unidadCorrectivoId) {
+        unidadCorrectivoId.disabled = activo;
+        unidadCorrectivoId.required = !activo;
+      }
+      if (tipoMantenimiento) tipoMantenimiento.disabled = activo;
+      if (observacionSinPlaca) {
+        observacionSinPlaca.disabled = !activo;
+        observacionSinPlaca.required = activo;
+      }
+      if (sedeSinPlaca) sedeSinPlaca.disabled = !activo;
+      if (botonGuardar) {
+        botonGuardar.innerHTML = activo
+          ? '<i class="bi bi-save"></i> Guardar trabajo'
+          : '<i class="bi bi-save"></i> Guardar mantenimiento';
+      }
+    }
+
+    if (sinPlaca) {
+      sinPlaca.addEventListener('change', sincronizarModoTrabajo);
+      sincronizarModoTrabajo();
+    }
+
     document.querySelectorAll('.mechanic-card').forEach(card => {
       const check = card.querySelector('.mec-check');
       const sync = () => card.classList.toggle('selected', check.checked);
@@ -230,9 +299,16 @@
           }
         }
       });
+      const esSinPlaca = Boolean(sinPlaca && sinPlaca.checked);
+      if (esSinPlaca && observacionSinPlaca && observacionSinPlaca.value.trim()) {
+        resumen.unshift(observacionSinPlaca.value.trim());
+        tieneTrabajo = true;
+      }
       if (!tieneTrabajo) {
         e.preventDefault();
-        alert('Debe escribir al menos un trabajo en un mecánico seleccionado.');
+        alert(esSinPlaca
+          ? 'Debe escribir la observación del trabajo realizado.'
+          : 'Debe escribir al menos un trabajo en un mecánico seleccionado.');
         return;
       }
 
