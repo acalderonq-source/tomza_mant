@@ -4035,16 +4035,53 @@ router.get("/ordenes", requireAuth, allowRoles(...ROLES_VER_ORDENES), async (req
     await ensureOrdenDetalleCodigoProductoColumn();
     await ensureOrdenCotizacionColumns();
     await ensureFacturasSchema();
-    const { proveedor_id, fecha_desde, fecha_hasta, po_numero, placa_unidad, estado, facturada } = req.query;
-    const { sql, params } = construirConsultaOrdenes({ proveedor_id, fecha_desde, fecha_hasta, po_numero, placa_unidad, estado, facturada });
+    const {
+      proveedor_id,
+      fecha_desde,
+      fecha_hasta,
+      po_numero,
+      placa_unidad,
+      estado,
+      facturada
+    } = req.query;
+    const filtros = { proveedor_id, fecha_desde, fecha_hasta, po_numero, placa_unidad, estado, facturada };
+    const { sql, params } = construirConsultaOrdenes(filtros);
+    const sqlSinOrden = sql.replace(/\s+ORDER BY o\.fecha DESC, o\.id DESC\s*$/i, "");
+    const porPaginaSolicitado = Number.parseInt(req.query.por_pagina, 10);
+    const porPagina = [25, 50, 100].includes(porPaginaSolicitado) ? porPaginaSolicitado : 50;
+    const paginaSolicitada = Number.parseInt(req.query.pagina, 10);
+    let pagina = Number.isInteger(paginaSolicitada) && paginaSolicitada > 0 ? paginaSolicitada : 1;
 
-    let [ordenes] = await pool.query(sql, params);
+    const [[resumenRaw]] = await pool.query(
+      `SELECT
+         COUNT(*) AS total_ordenes,
+         COALESCE(SUM(total), 0) AS total_filtrado,
+         COALESCE(SUM(
+           CASE
+             WHEN facturada = 1 OR NULLIF(TRIM(COALESCE(factura, '')), '') IS NOT NULL THEN 1
+             ELSE 0
+           END
+         ), 0) AS facturadas,
+         COALESCE(SUM(CASE WHEN estado IN ('RECIBIDA_TOTAL', 'RECIBIDA_PARCIAL') THEN 1 ELSE 0 END), 0) AS recibidas
+       FROM (${sqlSinOrden}) ordenes_filtradas`,
+      params
+    );
+    const totalOrdenes = Number(resumenRaw.total_ordenes || 0);
+    const totalPaginas = Math.max(1, Math.ceil(totalOrdenes / porPagina));
+    pagina = Math.min(pagina, totalPaginas);
+    const offset = (pagina - 1) * porPagina;
+
+    let [ordenes] = await pool.query(`${sql} LIMIT ? OFFSET ?`, [...params, porPagina, offset]);
     ordenes = await aplicarPlacaVisualOrdenes(ordenes);
     const [proveedores] = await pool.query("SELECT id, nombre FROM proveedores ORDER BY nombre");
     const estados = ['BORRADOR', 'ENVIADA', 'RECIBIDA_PARCIAL', 'RECIBIDA_TOTAL'];
 
-    let totalFiltrado = 0;
-    ordenes.forEach(o => totalFiltrado += parseFloat(o.total) || 0);
+    const resumenOrdenes = {
+      total: totalOrdenes,
+      totalFiltrado: Number(resumenRaw.total_filtrado || 0),
+      facturadas: Number(resumenRaw.facturadas || 0),
+      recibidas: Number(resumenRaw.recibidas || 0)
+    };
     const { facturasElectronicasRecientes, facturasElectronicasPendientes, resumenElectronico } = await obtenerCrucesFacturacionElectronicaRecientes();
     const success = req.session.success;
     const error = req.session.error;
@@ -4056,8 +4093,17 @@ router.get("/ordenes", requireAuth, allowRoles(...ROLES_VER_ORDENES), async (req
       user: req.session.user,
       proveedores,
       estados,
-      filtros: { proveedor_id, fecha_desde, fecha_hasta, po_numero, placa_unidad, estado, facturada },
-      totalFiltrado,
+      filtros,
+      resumenOrdenes,
+      totalFiltrado: resumenOrdenes.totalFiltrado,
+      paginacion: {
+        pagina,
+        porPagina,
+        total: totalOrdenes,
+        totalPaginas,
+        desde: totalOrdenes ? offset + 1 : 0,
+        hasta: totalOrdenes ? offset + ordenes.length : 0
+      },
       facturasElectronicasRecientes,
       facturasElectronicasPendientes,
       resumenElectronico,
@@ -4668,7 +4714,7 @@ router.post("/cotizacion/analizar", requireAuth, allowRoles("ADMIN", "TALLER", "
 router.post("/ordenes/:id/recibir", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER"), async (req, res) => {
   try {
     const id = req.params.id;
-    const { proveedor_id, fecha_desde, fecha_hasta, po_numero, placa_unidad, estado, facturada } = req.body;
+    const { proveedor_id, fecha_desde, fecha_hasta, po_numero, placa_unidad, estado, facturada, pagina, por_pagina } = req.body;
     await pool.query("UPDATE ordenes_compra SET estado = 'RECIBIDA_TOTAL' WHERE id = ?", [id]);
     const queryParams = [];
     if (proveedor_id) queryParams.push(`proveedor_id=${encodeURIComponent(proveedor_id)}`);
@@ -4678,6 +4724,8 @@ router.post("/ordenes/:id/recibir", requireAuth, allowRoles("ADMIN", "TALLER", "
     if (placa_unidad) queryParams.push(`placa_unidad=${encodeURIComponent(placa_unidad)}`);
     if (estado) queryParams.push(`estado=${encodeURIComponent(estado)}`);
     if (facturada !== undefined && facturada !== '') queryParams.push(`facturada=${encodeURIComponent(facturada)}`);
+    if (pagina) queryParams.push(`pagina=${encodeURIComponent(pagina)}`);
+    if (por_pagina) queryParams.push(`por_pagina=${encodeURIComponent(por_pagina)}`);
     const redirectUrl = "/compras/ordenes" + (queryParams.length ? "?" + queryParams.join("&") : "");
     res.redirect(redirectUrl);
   } catch (error) {
@@ -4689,7 +4737,7 @@ router.post("/ordenes/:id/recibir", requireAuth, allowRoles("ADMIN", "TALLER", "
 router.post("/ordenes/:id/eliminar", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER"), async (req, res) => {
   try {
     const id = req.params.id;
-    const { proveedor_id, fecha_desde, fecha_hasta, po_numero, placa_unidad, estado, facturada } = req.body;
+    const { proveedor_id, fecha_desde, fecha_hasta, po_numero, placa_unidad, estado, facturada, pagina, por_pagina } = req.body;
     const [[orden]] = await pool.query("SELECT * FROM ordenes_compra WHERE id = ?", [id]);
     if (!orden) return res.status(404).send("Orden no encontrada");
     await pool.query("DELETE FROM ordenes_compra_detalle WHERE orden_compra_id = ?", [id]);
@@ -4702,6 +4750,8 @@ router.post("/ordenes/:id/eliminar", requireAuth, allowRoles("ADMIN", "TALLER", 
     if (placa_unidad) queryParams.push(`placa_unidad=${encodeURIComponent(placa_unidad)}`);
     if (estado) queryParams.push(`estado=${encodeURIComponent(estado)}`);
     if (facturada !== undefined && facturada !== '') queryParams.push(`facturada=${encodeURIComponent(facturada)}`);
+    if (pagina) queryParams.push(`pagina=${encodeURIComponent(pagina)}`);
+    if (por_pagina) queryParams.push(`por_pagina=${encodeURIComponent(por_pagina)}`);
     const redirectUrl = "/compras/ordenes" + (queryParams.length ? "?" + queryParams.join("&") : "");
     res.redirect(redirectUrl);
   } catch (error) {
@@ -4731,6 +4781,8 @@ router.post("/ordenes/:id/factura", requireAuth, allowRoles(...ROLES_REGISTRAR_F
       placa_unidad,
       estado,
       facturada,
+      pagina,
+      por_pagina,
       clave_electronica,
       consecutivo_electronico,
       estado_hacienda,
@@ -4749,6 +4801,8 @@ router.post("/ordenes/:id/factura", requireAuth, allowRoles(...ROLES_REGISTRAR_F
     if (placa_unidad) queryParams.push(`placa_unidad=${encodeURIComponent(placa_unidad)}`);
     if (estado) queryParams.push(`estado=${encodeURIComponent(estado)}`);
     if (facturada !== undefined && facturada !== '') queryParams.push(`facturada=${encodeURIComponent(facturada)}`);
+    if (pagina) queryParams.push(`pagina=${encodeURIComponent(pagina)}`);
+    if (por_pagina) queryParams.push(`por_pagina=${encodeURIComponent(por_pagina)}`);
     const redirectUrl = "/compras/ordenes" + (queryParams.length ? "?" + queryParams.join("&") : "");
 
     const [[orden]] = await pool.query("SELECT fecha, po_numero, facturada FROM ordenes_compra WHERE id = ?", [id]);
