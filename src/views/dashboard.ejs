@@ -312,7 +312,7 @@
   const puedeVerGiras = !esMecanicoLimitado && ['ADMIN', 'TALLER', 'MECANICO', 'SUPERVISOR', 'SUPERVISOR_PESADO'].includes(user.rol);
   const puedeVerDashboardTaller = esMecanicoLimitado || ['ADMIN', 'TALLER', 'MECANICO', 'SUPERVISOR', 'SUPERVISOR_PESADO'].includes(user.rol);
   const puedeVerLogisticaTaller = !esMecanicoLimitado && ['ADMIN', 'TALLER', 'MECANICO', 'PROVEEDURIA_TALLER'].includes(user.rol);
-  const puedeVerLavadoUnidades = esMecanicoLimitado || ['ADMIN', 'TALLER', 'MECANICO'].includes(user.rol);
+  const puedeVerLavadoUnidades = esMecanicoLimitado || ['ADMIN', 'TALLER', 'MECANICO', 'SUPERVISOR', 'SUPERVISOR_PESADO'].includes(user.rol);
   const puedeVerKpisMecanicos = !esMecanicoLimitado && ['ADMIN', 'TALLER', 'PROVEEDURIA_TALLER'].includes(user.rol);
   const puedeVerOrdenesMotor = !esMecanicoLimitado && ['ADMIN', 'TALLER', 'PROVEEDURIA_TALLER'].includes(user.rol);
   const puedeVerResumenEjecutivo = esMecanicoLimitado || ['ADMIN', 'TALLER', 'PROVEEDURIA', 'PROVEEDURIA_TALLER', 'TRAMITES'].includes(user.rol);
@@ -505,7 +505,7 @@
         <% if (puedeVerLavadoUnidades) { %>
           <a href="/lavado-unidades" class="module-card">
             <span class="module-icon icon-blue"><i class="bi bi-droplet"></i></span>
-            <div><div class="module-title">Lavado de unidades</div><p class="module-copy">Orden de lavado con fotos por ángulo.</p></div>
+            <div><div class="module-title">Lavado semanal</div><p class="module-copy">Evidencia fotográfica, cumplimiento y unidades pendientes.</p></div>
           </a>
         <% } %>
         <% if (puedeVerRevisionRuta) { %>

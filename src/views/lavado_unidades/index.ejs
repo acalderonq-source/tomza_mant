@@ -3,51 +3,129 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Lavado de unidades</title>
+  <title>Lavado semanal de unidades</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
   <style>
-    body { background:#eef2f7; color:#0f172a; font-family:"Segoe UI", Roboto, Arial, sans-serif; }
-    .topbar { background:#101827; border-bottom:3px solid #0ea5e9; }
-    .shell { max-width:1400px; }
-    .hero, .panel, .wash-card { background:#fff; border:1px solid #dbe3ef; border-radius:10px; }
-    .hero { padding:1rem; }
-    .page-title { font-size:1.45rem; font-weight:900; margin:0; }
-    .small-muted { color:#64748b; }
-    .form-label { color:#334155; font-size:.82rem; font-weight:850; }
-    .wash-grid { display:grid; gap:.85rem; grid-template-columns:repeat(auto-fill, minmax(320px, 1fr)); }
+    :root {
+      --navy:#0d2d62;
+      --navy-2:#123f86;
+      --ink:#10213d;
+      --muted:#60708a;
+      --line:#d9e2ef;
+      --surface:#ffffff;
+      --page:#edf2f8;
+      --green:#138a5b;
+      --amber:#d98b08;
+      --red:#d43d4f;
+    }
+    body { background:var(--page); color:var(--ink); font-family:"Segoe UI", Roboto, Arial, sans-serif; }
+    .topbar { background:#0b1830; border-bottom:3px solid #199ed8; }
+    .shell { max-width:1480px; }
+    .hero, .panel, .metric, .segment-card, .wash-card { background:var(--surface); border:1px solid var(--line); border-radius:8px; }
+    .hero { padding:1rem 1.1rem; }
+    .eyebrow { color:#087f62; font-size:.72rem; font-weight:900; text-transform:uppercase; }
+    .page-title { font-size:1.55rem; font-weight:900; margin:.15rem 0; }
+    .small-muted { color:var(--muted); font-size:.84rem; }
+    .form-label { color:#34445f; font-size:.76rem; font-weight:900; margin-bottom:.3rem; text-transform:uppercase; }
+    .filter-panel { border-top:4px solid var(--navy-2); }
+    .week-nav { align-items:center; display:flex; gap:.35rem; }
+    .week-nav .btn { height:38px; width:38px; }
+    .metric-grid { display:grid; gap:.8rem; grid-template-columns:repeat(4, minmax(0, 1fr)); }
+    .metric { min-height:102px; padding:.9rem 1rem; position:relative; }
+    .metric::before { background:var(--metric-color, var(--navy-2)); content:""; height:4px; left:0; position:absolute; right:0; top:0; }
+    .metric-label { color:var(--muted); font-size:.72rem; font-weight:900; text-transform:uppercase; }
+    .metric-value { font-size:1.75rem; font-weight:950; line-height:1.05; margin-top:.45rem; }
+    .segment-grid { display:grid; gap:.7rem; grid-template-columns:repeat(3, minmax(0, 1fr)); }
+    .segment-card { color:inherit; display:block; padding:.8rem .9rem; text-decoration:none; transition:border-color .15s, box-shadow .15s; }
+    .segment-card:hover { border-color:#7aa6dd; box-shadow:0 4px 14px rgba(15,45,98,.09); color:inherit; }
+    .segment-card.active { border:2px solid var(--navy-2); padding:calc(.8rem - 1px) calc(.9rem - 1px); }
+    .segment-title { font-size:.82rem; font-weight:950; }
+    .segment-counts { color:var(--muted); font-size:.75rem; }
+    .progress { background:#e8eef6; height:6px; }
+    .progress-bar { background:var(--green); }
+    .section-head { align-items:center; background:var(--navy); color:#fff; display:flex; justify-content:space-between; padding:.7rem .9rem; }
+    .section-head h2 { font-size:.98rem; font-weight:900; margin:0; }
+    .section-count { background:#fff; border-radius:999px; color:var(--navy); font-size:.72rem; font-weight:950; padding:.25rem .55rem; }
+    .wash-grid { display:grid; gap:.8rem; grid-template-columns:repeat(auto-fill, minmax(340px, 1fr)); padding:.85rem; }
     .wash-card { overflow:hidden; }
-    .wash-head { align-items:center; border-bottom:1px solid #e6edf6; display:flex; gap:.75rem; justify-content:space-between; padding:.8rem .9rem; }
-    .wash-number { color:#0f172a; font-size:.98rem; font-weight:950; }
-    .wash-plate { color:#0b3b82; font-size:1.25rem; font-weight:950; line-height:1.1; }
-    .wash-body { padding:.9rem; }
-    .cover-photo { border-radius:10px; height:170px; object-fit:cover; width:100%; }
-    .photo-strip { display:grid; gap:.4rem; grid-template-columns:repeat(5, 1fr); margin-top:.55rem; }
-    .photo-mini { border:1px solid #dbe3ef; border-radius:8px; height:58px; object-fit:cover; width:100%; }
-    .photo-label { color:#64748b; font-size:.66rem; font-weight:800; margin-top:.2rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-    .empty-state { color:#64748b; font-weight:800; padding:1.5rem; text-align:center; }
-    @media (max-width:680px) { .wash-grid { grid-template-columns:1fr; } }
+    .wash-card-head { align-items:flex-start; border-bottom:1px solid #e8edf5; display:flex; gap:.75rem; justify-content:space-between; padding:.75rem .85rem; }
+    .wash-plate { color:var(--navy); font-size:1.18rem; font-weight:950; line-height:1.05; }
+    .wash-order { color:var(--muted); font-size:.7rem; font-weight:800; }
+    .segment-badge { border-radius:999px; font-size:.68rem; font-weight:900; padding:.3rem .55rem; }
+    .segment-HINOS { background:#e8f0ff; color:#174c96; }
+    .segment-GRANELES { background:#e5f6ee; color:#087a51; }
+    .segment-OTROS { background:#fff1d8; color:#8a5700; }
+    .wash-body { padding:.8rem .85rem; }
+    .record-meta { color:#53637c; display:grid; font-size:.77rem; gap:.3rem; grid-template-columns:repeat(2, minmax(0,1fr)); }
+    .record-meta strong { color:#263954; display:block; font-size:.7rem; text-transform:uppercase; }
+    .photo-strip { display:grid; gap:.35rem; grid-template-columns:repeat(5, minmax(0, 1fr)); margin-top:.7rem; }
+    .photo-button { background:#e8eef6; border:0; border-radius:6px; overflow:hidden; padding:0; position:relative; }
+    .photo-mini { aspect-ratio:1/1; display:block; object-fit:cover; width:100%; }
+    .photo-button span { background:rgba(8,24,49,.82); bottom:0; color:#fff; font-size:.56rem; left:0; overflow:hidden; padding:.15rem .2rem; position:absolute; right:0; text-overflow:ellipsis; white-space:nowrap; }
+    .observation { background:#f6f8fb; border-left:3px solid #8da1bc; color:#485973; font-size:.78rem; margin-top:.7rem; padding:.55rem .65rem; }
+    .empty-state { color:var(--muted); font-weight:700; padding:2rem 1rem; text-align:center; }
+    .pending-wrap { max-height:690px; overflow:auto; }
+    .pending-table { margin:0; }
+    .pending-table thead { position:sticky; top:0; z-index:2; }
+    .pending-table th { background:#f4f7fb; color:#40516a; font-size:.7rem; letter-spacing:0; text-transform:uppercase; }
+    .pending-table td { color:#293a55; font-size:.8rem; vertical-align:middle; }
+    .plate { color:var(--navy); font-weight:950; }
+    .content-grid { align-items:start; display:grid; gap:1rem; grid-template-columns:minmax(0, 1.55fr) minmax(360px, .85fr); }
+    .modal-photo { max-height:78vh; object-fit:contain; width:100%; }
+    @media (max-width:1050px) {
+      .content-grid { grid-template-columns:1fr; }
+      .pending-wrap { max-height:520px; }
+    }
+    @media (max-width:760px) {
+      .metric-grid { grid-template-columns:repeat(2, minmax(0, 1fr)); }
+      .segment-grid { grid-template-columns:1fr; }
+      .wash-grid { grid-template-columns:1fr; padding:.6rem; }
+      .record-meta { grid-template-columns:1fr; }
+      .photo-strip { gap:.25rem; }
+      .page-title { font-size:1.3rem; }
+    }
   </style>
 </head>
 <body>
+<%
+  const queryString = values => Object.entries(values)
+    .filter(([, value]) => value !== undefined && value !== null && value !== '')
+    .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value)}`)
+    .join('&');
+  const filtrosBase = {
+    semana: filtros.semana,
+    sede: filtros.sede,
+    segmento: filtros.segmento,
+    placa: filtros.placa,
+    supervisor: filtros.supervisor
+  };
+  const hrefPanel = cambios => `/lavado-unidades?${queryString({ ...filtrosBase, ...cambios })}`;
+  const hrefExportar = `/lavado-unidades/exportar?${queryString(filtrosBase)}`;
+  const hrefNuevo = `/lavado-unidades/nuevo?${queryString({ semana: filtros.semana, sede: filtros.sede, segmento: filtros.segmento })}`;
+%>
 <nav class="navbar navbar-dark topbar px-3 py-2">
-  <span class="navbar-brand fw-semibold"><i class="bi bi-droplet me-2"></i>Lavado de unidades</span>
+  <span class="navbar-brand fw-semibold"><i class="bi bi-droplet-half me-2"></i>Lavado semanal</span>
   <div class="d-flex align-items-center gap-2 flex-wrap">
-    <span class="text-white small"><%= user.usuario %> · <%= user.rol %></span>
-    <a href="/dashboard" class="btn btn-sm btn-outline-light">Dashboard</a>
+    <span class="text-white small"><%= user.nombre || user.usuario %> · <%= user.rol %></span>
+    <a href="/dashboard" class="btn btn-sm btn-outline-light"><i class="bi bi-grid me-1"></i>Dashboard</a>
   </div>
 </nav>
 
-<main class="container-fluid shell py-4">
+<main class="container-fluid shell py-3 py-lg-4">
   <section class="hero mb-3">
     <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
       <div>
-        <h1 class="page-title">Órdenes de lavado</h1>
-        <div class="small-muted">Registro fotográfico por unidad: adelante, lados, atrás y cabina.</div>
+        <div class="eyebrow">Control fotográfico por semana</div>
+        <h1 class="page-title">Lavado de unidades</h1>
+        <div class="small-muted"><strong><%= semana %></strong> · <%= etiquetaPeriodo %></div>
       </div>
-      <% if (puedeCrear) { %>
-        <a href="/lavado-unidades/nuevo" class="btn btn-primary rounded-pill fw-bold"><i class="bi bi-plus-circle me-1"></i>Nuevo lavado</a>
-      <% } %>
+      <div class="d-flex gap-2 flex-wrap">
+        <a href="<%= hrefExportar %>" class="btn btn-outline-success fw-bold"><i class="bi bi-file-earmark-excel me-1"></i>Exportar</a>
+        <% if (puedeCrear) { %>
+          <a href="<%= hrefNuevo %>" class="btn btn-primary fw-bold"><i class="bi bi-camera me-1"></i>Registrar lavado</a>
+        <% } %>
+      </div>
     </div>
   </section>
 
@@ -58,66 +136,204 @@
     <div class="alert alert-danger"><i class="bi bi-exclamation-triangle me-1"></i><%= error %></div>
   <% } %>
 
-  <section class="panel p-3 mb-3">
+  <section class="panel filter-panel p-3 mb-3">
     <form method="GET" action="/lavado-unidades" class="row g-3 align-items-end">
-      <div class="col-md-3">
-        <label class="form-label">Desde</label>
-        <input type="date" name="fecha_desde" class="form-control form-control-sm" value="<%= filtros.fecha_desde || '' %>">
+      <div class="col-12 col-sm-6 col-lg-3">
+        <label class="form-label">Semana</label>
+        <div class="week-nav">
+          <a class="btn btn-outline-secondary" href="<%= hrefPanel({ semana: semanaAnterior }) %>" title="Semana anterior" aria-label="Semana anterior"><i class="bi bi-chevron-left"></i></a>
+          <input type="week" name="semana" class="form-control" value="<%= filtros.semana %>" required>
+          <a class="btn btn-outline-secondary" href="<%= hrefPanel({ semana: semanaSiguiente }) %>" title="Semana siguiente" aria-label="Semana siguiente"><i class="bi bi-chevron-right"></i></a>
+        </div>
       </div>
-      <div class="col-md-3">
-        <label class="form-label">Hasta</label>
-        <input type="date" name="fecha_hasta" class="form-control form-control-sm" value="<%= filtros.fecha_hasta || '' %>">
+      <div class="col-12 col-sm-6 col-lg-2">
+        <label class="form-label">CEDIS</label>
+        <select name="sede" class="form-select">
+          <option value="TODAS" <%= filtros.sede === 'TODAS' ? 'selected' : '' %>>Todas</option>
+          <% sedes.forEach(item => { %>
+            <option value="<%= item %>" <%= filtros.sede === item ? 'selected' : '' %>><%= item %></option>
+          <% }) %>
+        </select>
       </div>
-      <div class="col-md-3">
+      <div class="col-12 col-sm-6 col-lg-2">
+        <label class="form-label">Segmento</label>
+        <select name="segmento" class="form-select">
+          <option value="TODOS" <%= filtros.segmento === 'TODOS' ? 'selected' : '' %>>Todos</option>
+          <option value="HINOS" <%= filtros.segmento === 'HINOS' ? 'selected' : '' %>>Hinos</option>
+          <option value="GRANELES" <%= filtros.segmento === 'GRANELES' ? 'selected' : '' %>>Graneles</option>
+          <option value="OTROS" <%= filtros.segmento === 'OTROS' ? 'selected' : '' %>>Otros</option>
+        </select>
+      </div>
+      <% if (puedeFiltrarSupervisor) { %>
+        <div class="col-12 col-sm-6 col-lg-2">
+          <label class="form-label">Registrado por</label>
+          <select name="supervisor" class="form-select">
+            <option value="TODOS">Todos</option>
+            <% supervisores.forEach(item => { %>
+              <option value="<%= item.id %>" <%= filtros.supervisor === item.id ? 'selected' : '' %>><%= item.nombre %></option>
+            <% }) %>
+          </select>
+        </div>
+      <% } %>
+      <div class="col-12 col-sm-6 col-lg-2">
         <label class="form-label">Placa</label>
-        <input type="text" name="placa" class="form-control form-control-sm" value="<%= filtros.placa || '' %>" placeholder="Buscar placa">
+        <input type="text" name="placa" class="form-control text-uppercase" value="<%= filtros.placa %>" placeholder="Buscar placa">
       </div>
-      <div class="col-md-2">
-        <button class="btn btn-dark btn-sm w-100"><i class="bi bi-funnel me-1"></i>Filtrar</button>
-      </div>
-      <div class="col-md-1">
-        <a href="/lavado-unidades" class="btn btn-secondary btn-sm w-100">Limpiar</a>
+      <div class="col-12 col-sm-6 col-lg">
+        <button class="btn btn-dark w-100"><i class="bi bi-funnel me-1"></i>Aplicar</button>
       </div>
     </form>
   </section>
 
-  <% if (!lavados.length) { %>
-    <section class="panel empty-state">No hay órdenes de lavado con los filtros seleccionados.</section>
-  <% } else { %>
-    <section class="wash-grid">
-      <% lavados.forEach(lavado => { %>
-        <% const fotos = fotosPorLavado[lavado.id] || []; %>
-        <article class="wash-card">
-          <div class="wash-head">
-            <div>
-              <div class="wash-number"><%= lavado.numero_lavado %></div>
-              <div class="small-muted"><%= lavado.fecha_formato %> · <%= lavado.sede %></div>
-            </div>
-            <span class="badge text-bg-info"><%= lavado.fotos_total %> fotos</span>
-          </div>
-          <div class="wash-body">
-            <div class="wash-plate"><%= lavado.placa %></div>
-            <div class="small-muted mb-2">Registrado por <%= lavado.creado_por_nombre || 'Taller' %> · <%= lavado.creado_formato %></div>
-            <% if (lavado.foto_portada) { %>
-              <img class="cover-photo" src="<%= lavado.foto_portada %>" alt="Foto de lavado <%= lavado.placa %>">
-            <% } %>
-            <div class="photo-strip">
-              <% fotos.forEach(foto => { %>
+  <section class="metric-grid mb-3">
+    <article class="metric" style="--metric-color:#123f86">
+      <div class="metric-label">Unidades esperadas</div>
+      <div class="metric-value"><%= metricas.unidades %></div>
+      <div class="small-muted mt-1">Según los filtros activos</div>
+    </article>
+    <article class="metric" style="--metric-color:#138a5b">
+      <div class="metric-label">Lavadas</div>
+      <div class="metric-value"><%= metricas.lavadas %></div>
+      <div class="small-muted mt-1">Con evidencia completa</div>
+    </article>
+    <article class="metric" style="--metric-color:#d43d4f">
+      <div class="metric-label">No lavadas</div>
+      <div class="metric-value"><%= metricas.pendientes %></div>
+      <div class="small-muted mt-1">Pendientes esta semana</div>
+    </article>
+    <article class="metric" style="--metric-color:#d98b08">
+      <div class="metric-label">Cumplimiento</div>
+      <div class="metric-value"><%= Number(metricas.cumplimiento).toLocaleString('es-CR') %>%</div>
+      <div class="progress mt-2"><div class="progress-bar" style="width:<%= Math.min(metricas.cumplimiento, 100) %>%"></div></div>
+    </article>
+  </section>
+
+  <section class="segment-grid mb-3">
+    <% resumenSegmentos.forEach(item => { %>
+      <a class="segment-card <%= filtros.segmento === item.nombre ? 'active' : '' %>" href="<%= hrefPanel({ segmento: filtros.segmento === item.nombre ? 'TODOS' : item.nombre }) %>">
+        <div class="d-flex justify-content-between align-items-center gap-2">
+          <div class="segment-title"><%= item.nombre === 'HINOS' ? 'Hinos' : item.nombre === 'GRANELES' ? 'Graneles' : 'Otros' %></div>
+          <strong><%= item.cumplimiento %>%</strong>
+        </div>
+        <div class="segment-counts mt-1"><%= item.lavadas %> lavadas · <%= item.pendientes %> pendientes · <%= item.total %> total</div>
+        <div class="progress mt-2"><div class="progress-bar" style="width:<%= item.cumplimiento %>%"></div></div>
+      </a>
+    <% }) %>
+  </section>
+
+  <section class="content-grid">
+    <div class="panel overflow-hidden">
+      <div class="section-head">
+        <h2><i class="bi bi-images me-2"></i>Unidades lavadas</h2>
+        <span class="section-count"><%= lavados.length %> registro(s)</span>
+      </div>
+      <% if (!lavados.length) { %>
+        <div class="empty-state">
+          <i class="bi bi-camera fs-2 d-block mb-2"></i>
+          No hay lavados registrados para esta selección.
+        </div>
+      <% } else { %>
+        <div class="wash-grid">
+          <% lavados.forEach(lavado => { %>
+            <% const fotos = fotosPorLavado[lavado.id] || []; %>
+            <article class="wash-card">
+              <div class="wash-card-head">
                 <div>
-                  <img class="photo-mini" src="<%= foto.foto_base64 %>" alt="<%= foto.angulo_nombre %>">
-                  <div class="photo-label"><%= foto.angulo_nombre %></div>
+                  <div class="wash-plate"><%= lavado.placa %></div>
+                  <div class="wash-order"><%= lavado.numero_lavado %> · <%= lavado.fecha_formato %></div>
                 </div>
+                <span class="segment-badge segment-<%= lavado.segmento %>"><%= lavado.segmento %></span>
+              </div>
+              <div class="wash-body">
+                <div class="record-meta">
+                  <div><strong>CEDIS</strong><%= lavado.cedis %></div>
+                  <div><strong>Registrado por</strong><%= lavado.creado_por_nombre || lavado.creado_por_usuario || 'Sin identificar' %></div>
+                  <div><strong>Unidad</strong><%= [lavado.marca, lavado.modelo, lavado.anio].filter(Boolean).join(' · ') || 'Sin ficha técnica' %></div>
+                  <div><strong>Captura</strong><%= lavado.creado_formato %></div>
+                </div>
+                <div class="photo-strip">
+                  <% fotos.forEach(foto => { %>
+                    <button type="button" class="photo-button js-photo" data-photo="/lavado-unidades/fotos/<%= foto.id %>" data-title="<%= lavado.placa %> · <%= foto.angulo_nombre %>" title="Ver <%= foto.angulo_nombre %>">
+                      <img class="photo-mini" src="/lavado-unidades/fotos/<%= foto.id %>" alt="<%= foto.angulo_nombre %> de <%= lavado.placa %>" loading="lazy">
+                      <span><%= foto.angulo_nombre %></span>
+                    </button>
+                  <% }) %>
+                </div>
+                <% if (lavado.observaciones) { %>
+                  <div class="observation"><strong>Observaciones:</strong> <%= lavado.observaciones %></div>
+                <% } %>
+              </div>
+            </article>
+          <% }) %>
+        </div>
+      <% } %>
+    </div>
+
+    <div class="panel overflow-hidden">
+      <div class="section-head">
+        <h2><i class="bi bi-exclamation-circle me-2"></i>Unidades no lavadas</h2>
+        <span class="section-count"><%= unidadesNoLavadas.length %> pendiente(s)</span>
+      </div>
+      <% if (!unidadesNoLavadas.length) { %>
+        <div class="empty-state text-success">
+          <i class="bi bi-check-circle fs-2 d-block mb-2"></i>
+          No hay unidades pendientes en esta selección.
+        </div>
+      <% } else { %>
+        <div class="pending-wrap">
+          <table class="table table-hover pending-table">
+            <thead>
+              <tr><th>Placa</th><th>CEDIS</th><th>Segmento</th><th>Unidad</th></tr>
+            </thead>
+            <tbody>
+              <% unidadesNoLavadas.forEach(unidad => { %>
+                <tr>
+                  <td class="plate"><%= unidad.placa %></td>
+                  <td><%= unidad.cedis %></td>
+                  <td><span class="segment-badge segment-<%= unidad.segmento %>"><%= unidad.segmento %></span></td>
+                  <td><%= [unidad.marca, unidad.modelo].filter(Boolean).join(' ') || '-' %></td>
+                </tr>
               <% }) %>
-            </div>
-            <% if (lavado.observaciones) { %>
-              <div class="alert alert-light border mt-3 mb-0"><%= lavado.observaciones %></div>
-            <% } %>
-          </div>
-        </article>
-      <% }) %>
-    </section>
-  <% } %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
+    </div>
+  </section>
 </main>
+
+<div class="modal fade" id="photoModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 class="modal-title fs-6 fw-bold" id="photoModalTitle">Evidencia de lavado</h2>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+      <div class="modal-body bg-dark text-center p-2">
+        <img id="photoModalImage" class="modal-photo" alt="Evidencia ampliada">
+      </div>
+    </div>
+  </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+  const photoModalElement = document.getElementById("photoModal");
+  const photoModal = new bootstrap.Modal(photoModalElement);
+  const photoImage = document.getElementById("photoModalImage");
+  const photoTitle = document.getElementById("photoModalTitle");
+
+  document.querySelectorAll(".js-photo").forEach(button => {
+    button.addEventListener("click", () => {
+      photoImage.src = button.dataset.photo;
+      photoTitle.textContent = button.dataset.title || "Evidencia de lavado";
+      photoModal.show();
+    });
+  });
+
+  photoModalElement.addEventListener("hidden.bs.modal", () => {
+    photoImage.removeAttribute("src");
+  });
+</script>
 </body>
 </html>
