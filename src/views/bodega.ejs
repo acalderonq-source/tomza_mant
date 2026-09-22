@@ -353,7 +353,8 @@
   };
   const origenTexto = (value) => value === 'CONSIGNACION' ? 'Consignación' : 'Nuestro';
   const origenClase = (value) => value === 'CONSIGNACION' ? 'pill-consignacion' : 'pill-propio';
-  const articulosDisponibles = (Array.isArray(articulosCompatibilidad) ? articulosCompatibilidad : articulos || []).filter(a => Number(a.stock_actual || 0) > 0);
+  const grupoTexto = (value) => value === 'SUMINISTRO' ? 'Suministro' : 'Inventario';
+  const articulosDisponibles = (Array.isArray(articulosEntrega) ? articulosEntrega : articulos || []).filter(a => Number(a.stock_actual || 0) > 0);
   const articulosConsignacion = (Array.isArray(articulos) ? articulos : []).filter(a => a.origen_inventario === 'CONSIGNACION');
   const listaSuministros = Array.isArray(suministros) ? suministros : [];
   const paginaActual = pagina || 'inicio';
@@ -760,8 +761,8 @@
       <section class="panel" id="entregar">
         <div class="panel-head">
           <div>
-            <h2 class="panel-title">Entregar repuestos o herramientas</h2>
-            <p class="panel-copy">Una placa, un mecánico y varios artículos en la misma entrega.</p>
+            <h2 class="panel-title">Entregar repuestos, suministros o herramientas</h2>
+            <p class="panel-copy">Busque cualquier artículo disponible y registre varios en una misma entrega.</p>
           </div>
         </div>
         <div class="panel-body">
@@ -793,8 +794,9 @@
                             a.numero_parte,
                             a.tipo_unidad,
                             a.ubicacion,
+                            grupoTexto(a.grupo_bodega),
                             origenTexto(a.origen_inventario)
-                          ].filter(Boolean).join(' ') %>"><%= a.codigo_taller || '----' %> · <%= a.nombre %> · <%= origenTexto(a.origen_inventario) %> · Stock <%= fmt(a.stock_actual) %> <%= a.unidad_medida %> · <%= a.ubicacion || 'Sin ubicación' %></option>
+                          ].filter(Boolean).join(' ') %>"><%= a.codigo_taller || '----' %> · <%= a.nombre %> · <%= grupoTexto(a.grupo_bodega) %> · <%= origenTexto(a.origen_inventario) %> · Stock <%= fmt(a.stock_actual) %> <%= a.unidad_medida %> · <%= a.ubicacion || 'Sin ubicación' %></option>
                         <% }) %>
                       </select>
                       <div class="articulo-search-status mt-1">Escriba para filtrar el listado.</div>
@@ -1069,8 +1071,9 @@
                 a.numero_parte,
                 a.tipo_unidad,
                 a.ubicacion,
+                grupoTexto(a.grupo_bodega),
                 origenTexto(a.origen_inventario)
-              ].filter(Boolean).join(' ') %>"><%= a.codigo_taller || '----' %> · <%= a.nombre %> · <%= origenTexto(a.origen_inventario) %> · Stock <%= fmt(a.stock_actual) %> <%= a.unidad_medida %> · <%= a.ubicacion || 'Sin ubicación' %></option>
+              ].filter(Boolean).join(' ') %>"><%= a.codigo_taller || '----' %> · <%= a.nombre %> · <%= grupoTexto(a.grupo_bodega) %> · <%= origenTexto(a.origen_inventario) %> · Stock <%= fmt(a.stock_actual) %> <%= a.unidad_medida %> · <%= a.ubicacion || 'Sin ubicación' %></option>
             <% }) %>
           </select>
           <div class="articulo-search-status mt-1">Escriba para filtrar el listado.</div>

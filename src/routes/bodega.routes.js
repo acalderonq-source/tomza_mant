@@ -557,6 +557,16 @@ async function renderBodega(req, res, pagina = "inicio") {
       WHERE activo = 1 AND grupo_bodega = 'INVENTARIO'
       ORDER BY nombre
     `);
+    const [articulosEntrega] = await pool.query(`
+      SELECT *
+      FROM bodega_articulos
+      WHERE activo = 1
+        AND stock_actual > 0
+      ORDER BY
+        CASE WHEN grupo_bodega = 'SUMINISTRO' THEN 0 ELSE 1 END,
+        nombre
+      LIMIT 1000
+    `);
     const [compatibilidades] = await pool.query(`
       SELECT
         bco.id,
@@ -619,6 +629,7 @@ async function renderBodega(req, res, pagina = "inicio") {
       articulos,
       proveedores,
       articulosCompatibilidad,
+      articulosEntrega,
       compatibilidades,
       articulosSinCompatibilidad,
       unidadesSinFicha: Number(unidadesSinFichaRow.total || 0),
