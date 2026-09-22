@@ -25,12 +25,12 @@ require.cache[dbPath] = { id: dbPath, filename: dbPath, loaded: true, exports: {
   }
 } };
 const router = require('../src/routes/compras.routes');
-const data = { empresa: 'GAS TOMZA', fecha: '2026-09-22', monto: '100.10', proveedor: 'Prueba', numero_factura: '00100001010000340575' };
+const data = { empresa: 'GAS TOMZA', fecha: '2026-09-22', monto: '100.10', proveedor: 'Prueba', numero_factura: '00100001010000340575', tipo_factura: 'ELECTRONICA' };
 async function request(path, body = {}, params = {}, role = 'ADMIN') {
   const route = router.stack.find(layer => layer.route && [layer.route.path].flat().includes(path)).route;
   const req = { path, body, params, session: { user: { id: 1, rol: role } } };
   const result = { status: 200 };
-  const res = { redirect: url => { result.redirect = url; }, status: code => { result.status = code; return res; }, send: value => { result.body = value; } };
+  const res = { render: (view, locals) => { result.view = view; result.locals = locals; }, redirect: url => { result.redirect = url; }, status: code => { result.status = code; return res; }, send: value => { result.body = value; } };
   for (const layer of route.stack) {
     let allowed = false;
     await layer.handle(req, res, () => { allowed = true; });
@@ -147,4 +147,38 @@ test('cash import does not auto-link orders or assume fiscal acceptance', async 
   const insert = statements.find(item => /INSERT INTO facturas_electronicas_cruce/.test(item.sql));
   assert.equal(insert.params[7], 'PENDIENTE');
   assert.equal(insert.params[14], null);
+});
+
+for (const tipo of ['ELECTRONICA', 'SIMPLIFICADO']) {
+  test(`manual ${tipo} invoice is independent from orders and imported invoices`, async () => {
+    query = async (sql, params) => {
+      assert.match(sql, /INSERT INTO caja_chica_documentos/);
+      assert.doesNotMatch(sql, /factura_electronica_id|orden_compra_id|facturas_electronicas_cruce/);
+      assert.equal(params[3], data.numero_factura);
+      assert.equal(params[8], tipo);
+      return [{ affectedRows: 1 }];
+    };
+    const result = await request('/facturas/caja-chica/documentos/manual', { ...data, tipo_factura: tipo });
+    assert.match(result.session.success, /agregada/);
+    assert.equal(statements.length, 1);
+    assert.match(result.redirect, /#preparar$/);
+  });
+}
+test('editing a manually entered invoice preserves its selected type', async () => {
+  query = async (sql, params) => {
+    assert.match(sql, /CASE WHEN factura_electronica_id IS NULL/);
+    assert.equal(params[8], 'ELECTRONICA');
+    return [{ affectedRows: 1 }];
+  };
+  const result = await request('/facturas/caja-chica/documentos/:id/actualizar', data, { id: 1 });
+  assert.equal(result.session.success, 'Factura actualizada.');
+});
+test('cash screen no longer queries or preloads imported invoice listings', async () => {
+  query = async sql => {
+    assert.doesNotMatch(sql, /FROM facturas_electronicas_cruce/);
+    return [[]];
+  };
+  const result = await request('/facturas/caja-chica');
+  assert.equal(result.view, 'compras/caja_chica');
+  assert.equal(result.locals.cajaChica.facturasElectronicasPendientes, undefined);
 });

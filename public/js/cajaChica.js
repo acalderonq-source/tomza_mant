@@ -63,15 +63,15 @@
     fields.forEach(field => { byId(`doc-${field}`).value = data[field] || ''; });
     if (!data.fecha) byId('doc-fecha').value = byId('fecha-corte')?.value || '';
     byId('doc-unidad').value ||= '-';
-    byId('doc-tipo').value = mode === 'manual' ? 'SIMPLIFICADO' : data.tipo;
-    const title = mode === 'manual' ? 'Agregar factura simplificada' : mode === 'editar' ? 'Editar factura confirmada' : 'Confirmar factura recibida';
+    byId('doc-tipo').value = mode === 'manual' ? 'ELECTRONICA' : data.tipo;
+    const title = mode === 'manual' ? 'Agregar factura' : mode === 'editar' ? 'Editar factura' : 'Confirmar factura recibida';
     byId('documento-titulo').textContent = title;
     byId('guardar-documento').textContent = mode === 'confirmar' ? 'Confirmar recibida' : 'Guardar factura';
     byId('guardar-documento').disabled = false;
   });
   byId('form-documento')?.addEventListener('submit', () => { byId('guardar-documento').disabled = true; });
   document.querySelectorAll('.js-retirar').forEach(button => button.addEventListener('click', () => {
-    if (!/^\d+$/.test(button.dataset.id) || !window.confirm('¿Retirar esta factura de la preparación? Si es electrónica, volverá a estar pendiente de confirmación.')) return;
+    if (!/^\d+$/.test(button.dataset.id) || !window.confirm('¿Retirar esta factura de la preparación de caja chica?')) return;
     const form = byId('retirar-documento');
     form.action = `${base}/documentos/${button.dataset.id}/eliminar`;
     form.submit();
@@ -87,7 +87,7 @@
 
   function activateTab() {
     const name = window.location.hash.slice(1);
-    if (['recibidas', 'preparar', 'cortes'].includes(name) && window.bootstrap) {
+    if (['preparar', 'cortes'].includes(name) && window.bootstrap) {
       bootstrap.Tab.getOrCreateInstance(byId(`tab-${name}`)).show();
     }
   }

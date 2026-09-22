@@ -2101,7 +2101,7 @@ function normalizarUnidadCajaChica(value) {
   return texto || "-";
 }
 
-async function obtenerResumenCajaChica(filtros = {}) {
+async function obtenerResumenCajaChica() {
   await ensureCajaChicaFlujoSchema();
 
   const [resumenRows] = await queryWithRetry(`
@@ -2127,43 +2127,6 @@ async function obtenerResumenCajaChica(filtros = {}) {
     ORDER BY c.fecha DESC, c.id DESC
     LIMIT 300
   `);
-
-  const pagina = Math.max(1, Math.min(100000, parseInt(filtros.pagina, 10) || 1));
-  const busqueda = String(filtros.q || '').trim().slice(0, 100);
-  const fechaDesde = fechaCajaValida(filtros.desde) ? filtros.desde : '';
-  const fechaHasta = fechaCajaValida(filtros.hasta) ? filtros.hasta : '';
-  const filtrosFE = [];
-  const paramsFE = [];
-  if (busqueda) {
-    filtrosFE.push("CONCAT_WS(' ', fe.nombre_emisor, fe.consecutivo, fe.clave, fe.numero_factura) LIKE ?");
-    paramsFE.push(`%${busqueda}%`);
-  }
-  if (fechaDesde) { filtrosFE.push('fe.fecha_emision >= ?'); paramsFE.push(fechaDesde); }
-  if (fechaHasta) { filtrosFE.push('fe.fecha_emision < DATE_ADD(?, INTERVAL 1 DAY)'); paramsFE.push(fechaHasta); }
-  const whereFE = `cd.id IS NULL AND fe.orden_compra_id IS NULL AND fe.factura_id IS NULL
-    AND UPPER(COALESCE(fe.estado_hacienda, '')) = 'ACEPTADA'
-    ${filtrosFE.length ? 'AND ' + filtrosFE.join(' AND ') : ''}`;
-  const [[totalFE]] = await queryWithRetry(`SELECT COUNT(*) AS total FROM facturas_electronicas_cruce fe
-    LEFT JOIN caja_chica_documentos cd ON cd.factura_electronica_id = fe.id WHERE ${whereFE}`, paramsFE);
-  const [facturasElectronicasPendientes] = await queryWithRetry(`
-    SELECT
-      fe.id,
-      fe.fecha_emision,
-      fe.consecutivo,
-      fe.numero_factura,
-      fe.clave,
-      fe.nombre_emisor,
-      fe.cedula_emisor,
-      fe.monto_total,
-      fe.moneda,
-      fe.detalle_resumen,
-      fe.estado_hacienda
-    FROM facturas_electronicas_cruce fe
-    LEFT JOIN caja_chica_documentos cd ON cd.factura_electronica_id = fe.id
-    WHERE ${whereFE}
-    ORDER BY COALESCE(fe.fecha_emision, fe.creado_en) DESC, fe.id DESC
-    LIMIT 50 OFFSET ?
-  `, [...paramsFE, (pagina - 1) * 50]);
 
   const [documentosListos] = await queryWithRetry(`
     SELECT cd.*, u.usuario AS confirmado_por_usuario
@@ -2204,14 +2167,9 @@ async function obtenerResumenCajaChica(filtros = {}) {
     resumen: resumenRows[0] || { registros: 0, total: 0, total_mes: 0 },
     porMes,
     historial,
-    facturasElectronicasPendientes,
     documentosListos,
     cortes,
-    filtros: { q: busqueda, desde: fechaDesde, hasta: fechaHasta, pagina, paginas: Math.max(1, Math.ceil(Number(totalFE.total) / 50)) },
-    flujoResumen: {
-      ...(flujoResumen || {}),
-      facturas_pendientes: Number(totalFE.total || 0)
-    }
+    flujoResumen: flujoResumen || {}
   };
 }
 
@@ -5614,7 +5572,7 @@ router.get("/facturas/pagos-proveedor/reporte/excel", requireAuth, allowRoles("A
 
 router.get("/facturas/caja-chica", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER", "CONTABILIDAD"), async (req, res) => {
   try {
-    const cajaChica = await obtenerResumenCajaChica(req.query);
+    const cajaChica = await obtenerResumenCajaChica();
     const success = req.session.success;
     const error = req.session.error;
     delete req.session.success;
@@ -5721,7 +5679,7 @@ router.post("/facturas/caja-chica/documentos/manual", requireAuth, allowRoles(..
   try {
     await ensureCajaChicaFlujoSchema();
     validarDocumentoCaja(req.body);
-    if (req.body.tipo_factura !== 'SIMPLIFICADO') throw new Error('Las facturas electrónicas deben confirmarse desde el listado de recibidas.');
+    if (!['ELECTRONICA', 'SIMPLIFICADO'].includes(req.body.tipo_factura)) throw new Error('Seleccione el tipo de factura.');
     const fecha = String(req.body.fecha || "").trim();
     const proveedor = String(req.body.proveedor || "").trim().slice(0, 180);
     const numeroFactura = String(req.body.numero_factura || "").trim().slice(0, 100);
@@ -5732,7 +5690,7 @@ router.post("/facturas/caja-chica/documentos/manual", requireAuth, allowRoles(..
       return res.redirect("/compras/facturas/caja-chica");
     }
 
-    await queryWithRetry(
+    await pool.query(
       `INSERT INTO caja_chica_documentos (
          empresa, fecha, cuenta_contable, numero_factura, proveedor, unidad,
          concepto, monto, tipo_factura, estado, creado_por, confirmado_por
@@ -5765,6 +5723,7 @@ router.post("/facturas/caja-chica/documentos/:id/actualizar", requireAuth, allow
   try {
     await ensureCajaChicaFlujoSchema();
     validarDocumentoCaja(req.body);
+    if (!['ELECTRONICA', 'SIMPLIFICADO'].includes(req.body.tipo_factura)) throw new Error('Seleccione el tipo de factura.');
     const id = Number(req.params.id);
     const fecha = String(req.body.fecha || "").trim();
     const proveedor = String(req.body.proveedor || "").trim().slice(0, 180);
@@ -5793,7 +5752,7 @@ router.post("/facturas/caja-chica/documentos/:id/actualizar", requireAuth, allow
         normalizarUnidadCajaChica(req.body.unidad),
         normalizarConceptoCajaChica(req.body.concepto),
         monto,
-        'SIMPLIFICADO',
+        req.body.tipo_factura,
         id
       ]
     );

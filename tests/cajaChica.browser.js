@@ -8,6 +8,12 @@ const { injectSecurityAssets } = require('../src/middleware/security');
 
 async function main() {
   const app = express();
+  const submitted = [];
+  app.use(express.urlencoded({ extended: true }));
+  app.post('/compras/facturas/caja-chica/documentos/manual', (req, res) => {
+    submitted.push(req.body);
+    res.redirect('/');
+  });
   app.use('/js', express.static(path.join(__dirname, '../public/js')));
   app.get('/', async (req, res) => {
     const ready = [
@@ -17,9 +23,8 @@ async function main() {
     const html = await ejs.renderFile(path.join(__dirname, '../src/views/compras/caja_chica.ejs'), {
       user: { rol: req.query.role || 'ADMIN', usuario: 'Prueba' }, success: '', error: '', hoy: '2026-09-22',
       cajaChica: {
-        filtros: { q: '', desde: '', hasta: '', pagina: 1, paginas: 1 }, resumen: { total_mes: 0, total: 0 },
-        flujoResumen: { facturas_pendientes: 1, monto_gas_tomza: 100.1, monto_super_gas: 200.2, documentos_listos: 2 },
-        facturasElectronicasPendientes: [{ id: 3, fecha_emision: '2026-09-22', nombre_emisor: 'Almacen de materiales', consecutivo: '00100001010000340576', clave: '506' + '0'.repeat(47), monto_total: 27354.05, moneda: 'CRC', detalle_resumen: 'Repuestos para unidad' }],
+        resumen: { total_mes: 0, total: 0 },
+        flujoResumen: { monto_gas_tomza: 100.1, monto_super_gas: 200.2, documentos_listos: 2 },
         documentosListos: ready, cortes: [], historial: []
       }
     });
@@ -36,11 +41,29 @@ async function main() {
     const url = `http://127.0.0.1:${server.address().port}`;
     await page.goto(url);
     await page.waitForFunction(() => Boolean(window.bootstrap));
-    await page.getByRole('button', { name: 'Confirmar recibida', exact: true }).click();
+    assert.equal(await page.locator('#recibidas,#importar').count(), 0);
+    await page.locator('button[data-mode="manual"]').click();
     await page.locator('#documento.show').waitFor();
-    assert.equal(await page.locator('#doc-numero').inputValue(), '00100001010000340576');
-    assert.match(await page.locator('#form-documento').getAttribute('action'), /electronicas\/3\/confirmar$/);
+    assert.equal(await page.locator('#doc-numero').inputValue(), '');
+    assert.equal(await page.locator('#doc-proveedor').inputValue(), '');
+    assert.equal(await page.locator('#doc-tipo').inputValue(), 'ELECTRONICA');
+    assert.match(await page.locator('#form-documento').getAttribute('action'), /documentos\/manual$/);
     assert.equal(await page.locator('#form-documento input[name="_csrf"]').inputValue(), 'test-csrf');
+    await page.locator('#doc-empresa').selectOption('SUPER GAS');
+    await page.locator('#doc-numero').fill('00000012345');
+    await page.locator('#doc-proveedor').fill('Proveedor de caja independiente');
+    await page.locator('#doc-monto').fill('200.20');
+    await page.locator('#doc-concepto').fill('SUMINISTROS');
+    await page.locator('#guardar-documento').click();
+    await page.waitForURL(url + '/');
+    assert.equal(submitted.length, 1);
+    assert.equal(submitted[0].numero_factura, '00000012345');
+    assert.equal(submitted[0].tipo_factura, 'ELECTRONICA');
+    assert.equal(submitted[0].factura_electronica_id, undefined);
+    await page.locator('button[data-mode="manual"]').click();
+    await page.locator('#documento.show').waitFor();
+    assert.equal(await page.locator('#doc-numero').inputValue(), '');
+    await page.locator('#doc-tipo').selectOption('SIMPLIFICADO');
     await page.locator('#documento').getByRole('button', { name: 'Cancelar', exact: true }).click();
     await page.locator('#tab-preparar').click();
     await page.locator('#seleccionar-todas').check();
