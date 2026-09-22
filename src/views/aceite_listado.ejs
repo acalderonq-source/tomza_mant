@@ -480,13 +480,13 @@
       <div class="form-card">
         <form method="POST" action="/aceite/rellenos" class="row g-3 align-items-end">
           <div class="col-md-4">
-            <label class="form-label fw-bold">Placa</label>
-            <div data-placa-search data-placa-mode="unidad" data-placa-target="#unidadAceiteRellenoId">
-              <input type="text" class="form-control text-uppercase" data-placa-input data-placa-autocomplete placeholder="Escriba la placa" required>
-              <input type="hidden" name="unidad_id" id="unidadAceiteRellenoId" required>
-              <div data-placa-results></div>
-              <div data-placa-selected class="small text-muted mt-1"></div>
-            </div>
+            <label for="sedeAceiteRelleno" class="form-label fw-bold">Sede del estañón</label>
+            <select name="sede" id="sedeAceiteRelleno" class="form-select" required>
+              <option value="">Seleccione la sede</option>
+              <% sedesGestion.forEach(sede => { %>
+                <option value="<%= sede %>" <%= sedesGestion.length === 1 ? 'selected' : '' %>><%= etiquetaSede(sede) %></option>
+              <% }) %>
+            </select>
           </div>
           <div class="col-md-2">
             <label class="form-label fw-bold">Galones de relleno</label>

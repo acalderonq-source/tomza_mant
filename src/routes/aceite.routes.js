@@ -329,6 +329,14 @@ function puedeUsarSede(sede, sedesPermitidas) {
   return inventario === "Transportadora" && sedesPermitidas.some(esSedeAceiteTransportadora);
 }
 
+async function obtenerSedesGestionAceite(sedesPermitidas) {
+  return unirSedesAceite(
+    (await obtenerTodasSedes(pool))
+      .filter(sede => puedeUsarSede(sede, sedesPermitidas))
+      .map(sedeInventarioAceite)
+  );
+}
+
 async function consumirAceitePorSede(connection, { sede, litros, cambioAceiteId = null, unidadId, placa, userId, descripcion = null }) {
   const sedeInventario = sedeInventarioAceite(sede);
   const sedesBusqueda = expandirSedeInventarioAceite(sede);
@@ -656,11 +664,7 @@ router.get("/", async (req, res) => {
     await ensureAceiteTables();
     const sedesPermitidas = await getSedesPermitidasAceite(req);
     const sedesInventario = expandirSedesInventarioAceite(sedesPermitidas);
-    const sedesGestion = unirSedesAceite(
-      (await obtenerTodasSedes(pool))
-        .filter(sede => puedeUsarSede(sede, sedesPermitidas))
-        .map(sedeInventarioAceite)
-    );
+    const sedesGestion = await obtenerSedesGestionAceite(sedesPermitidas);
     await sincronizarCambiosPendientesAceite(sedesPermitidas, req.session.user.id || null);
 
     const [cambios] = await pool.query(
@@ -989,7 +993,7 @@ router.post("/estanones/:id/eliminar", async (req, res) => {
 });
 
 router.post("/rellenos", async (req, res) => {
-  const connection = await pool.getConnection();
+  let connection;
   try {
     if (!puedeGestionarAceite(req.session.user)) {
       return res.status(403).send("No autorizado");
@@ -1001,46 +1005,63 @@ router.post("/rellenos", async (req, res) => {
     const litrosUsados = galonesALitros(galonesUsados);
     const sedesPermitidas = await getSedesPermitidasAceite(req);
 
-    if (!unidad_id || galonesUsados <= 0) {
-      req.session.error = "Seleccione la placa y coloque los galones usados para el relleno.";
+    if (galonesUsados <= 0) {
+      req.session.error = "Coloque los galones usados para el relleno.";
       return res.redirect("/aceite");
     }
 
-    const [[unidad]] = await pool.query(
-      "SELECT id, placa, sede FROM unidades WHERE id = ?",
-      [unidad_id]
-    );
-
-    if (!unidad || !puedeUsarSede(unidad.sede, sedesPermitidas)) {
-      return res.status(403).send("No autorizado para esa unidad");
+    let unidad = null;
+    let sede;
+    // Keep older forms with a selected unit compatible; new fills need only a stock site.
+    if (unidad_id) {
+      if (!Number.isSafeInteger(Number(unidad_id)) || Number(unidad_id) <= 0) {
+        req.session.error = "La unidad seleccionada no es válida.";
+        return res.redirect("/aceite");
+      }
+      [[unidad]] = await pool.query("SELECT id, placa, sede FROM unidades WHERE id = ?", [unidad_id]);
+      if (!unidad || !puedeUsarSede(unidad.sede, sedesPermitidas)) {
+        return res.status(403).send("No autorizado para esa unidad");
+      }
+      sede = unidad.sede;
+    } else {
+      const sedeInput = String(req.body.sede || "").trim();
+      if (!sedeInput) {
+        req.session.error = "Seleccione la sede del estañón para registrar el relleno.";
+        return res.redirect("/aceite");
+      }
+      sede = sedeInventarioAceite(sedeInput);
+      const sedesGestion = await obtenerSedesGestionAceite(sedesPermitidas);
+      if (!sedesGestion.includes(sede)) return res.status(403).send("No autorizado para esa sede");
     }
 
     const detalle = String(observaciones || "").trim();
+    const concepto = unidad ? `Relleno de aceite ${unidad.placa}` : "Relleno de aceite";
     const descripcion = detalle
-      ? `Relleno de aceite ${unidad.placa} - ${detalle.slice(0, 180)}`
-      : `Relleno de aceite ${unidad.placa}`;
+      ? `${concepto} - ${detalle.slice(0, 180)}`
+      : concepto;
 
+    connection = await pool.getConnection();
     await connection.beginTransaction();
     await consumirAceitePorSede(connection, {
-      sede: unidad.sede,
+      sede,
       litros: litrosUsados,
       cambioAceiteId: null,
-      unidadId: unidad.id,
-      placa: unidad.placa,
+      unidadId: unidad?.id || null,
+      placa: unidad?.placa || null,
       userId: req.session.user.id || null,
       descripcion
     });
     await connection.commit();
 
-    req.session.success = `Relleno registrado para ${unidad.placa}. Se rebajaron ${galonesUsados.toFixed(2)} galones de ${etiquetaSedeInventarioAceite(unidad.sede)} sin crear cambio de aceite.`;
+    req.session.success = `Relleno registrado${unidad ? ` para ${unidad.placa}` : " sin placa"}. Se rebajaron ${galonesUsados.toFixed(2)} galones de ${etiquetaSedeInventarioAceite(sede)} sin crear cambio de aceite.`;
     res.redirect("/aceite");
   } catch (error) {
-    await connection.rollback().catch(() => {});
+    if (connection) await connection.rollback().catch(() => {});
     console.error("ERROR guardar relleno de aceite:", error);
     req.session.error = error.message || "Error interno al guardar el relleno de aceite.";
     res.redirect("/aceite");
   } finally {
-    connection.release();
+    if (connection) connection.release();
   }
 });
 
