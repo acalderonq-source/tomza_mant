@@ -12,6 +12,7 @@ const {
   esUsuarioMecanicoSede,
   esUsuarioPesados,
   expandirSedesEquivalentes,
+  expandirSedesOperativasRepuestosAceites,
   obtenerSedesTransporte,
   sedesEspecialesPorUsuario
 } = require("../utils/sedes");
@@ -70,6 +71,11 @@ async function obtenerSedesPermitidas(req) {
   }
 
   return expandirSedesEquivalentes(sedes);
+}
+
+async function obtenerSedesPermitidasRutas(req) {
+  const sedes = await obtenerSedesPermitidas(req);
+  return sedes.length ? expandirSedesOperativasRepuestosAceites(sedes) : [];
 }
 
 function aplicarFiltroSedes(sql, params, sedesPermitidas, alias = "rs") {
@@ -172,8 +178,12 @@ function texto(value, maxLength = 255) {
 }
 
 async function cargarSedesRutas(req) {
-  const sedesPermitidas = await obtenerSedesPermitidas(req);
-  let sql = `SELECT DISTINCT sede FROM unidades WHERE COALESCE(activa, 1) = 1 AND sede IS NOT NULL AND TRIM(sede) <> ''`;
+  const sedesPermitidas = await obtenerSedesPermitidasRutas(req);
+  let sql = `SELECT DISTINCT sede FROM (
+    SELECT sede FROM unidades WHERE COALESCE(activa, 1) = 1
+    UNION ALL
+    SELECT sede FROM supervisor_rutas_semanales WHERE activo = 1
+  ) AS sedes_rutas WHERE sede IS NOT NULL AND TRIM(sede) <> ''`;
   const params = [];
   if (sedesPermitidas.length) {
     sql += " AND sede IN (?)";
@@ -199,9 +209,10 @@ async function registrarMovimientoRuta(conn, asignacionId, accion, anterior, nue
       asignacion_id, accion, semana_inicio,
       sede_anterior, sede_nueva, ruta_anterior, ruta_nueva,
       chofer_anterior, chofer_nuevo, unidad_id_anterior, unidad_id_nueva,
+      placa_reportada_anterior, placa_reportada_nueva,
       observacion_anterior, observacion_nueva, motivo,
       cambiado_por, cambiado_por_nombre
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       asignacionId,
       accion,
@@ -214,6 +225,8 @@ async function registrarMovimientoRuta(conn, asignacionId, accion, anterior, nue
       nuevo?.chofer || null,
       anterior?.unidad_id || null,
       nuevo?.unidad_id || null,
+      anterior?.placa_reportada || null,
+      nuevo?.placa_reportada || null,
       anterior?.observacion || null,
       nuevo?.observacion || null,
       texto(motivo) || null,
@@ -572,8 +585,8 @@ function agregarHojaReportes(workbook, sede, items) {
   });
 }
 
-async function cargarUnidades(req) {
-  const sedesPermitidas = await obtenerSedesPermitidas(req);
+async function cargarUnidades(req, sedesRutas = false) {
+  const sedesPermitidas = sedesRutas ? await obtenerSedesPermitidasRutas(req) : await obtenerSedesPermitidas(req);
   let sql = "SELECT id, placa, sede FROM unidades WHERE activa = 1";
   const params = [];
   if (sedesPermitidas.length) {
@@ -638,9 +651,10 @@ router.get("/", allowRoles(...ROLES_VER), async (req, res) => {
     const semanaRutasFecha = lunesDesdeSemanaInput(semanaActualRutas());
     const paramsRutas = [semanaRutasFecha];
     let sqlRutas = `SELECT COUNT(*) AS total FROM supervisor_rutas_semanales WHERE activo = 1 AND semana_inicio = ?`;
-    if (sedesPermitidas.length) {
+    const sedesRutas = await obtenerSedesPermitidasRutas(req);
+    if (sedesRutas.length) {
       sqlRutas += " AND sede IN (?)";
-      paramsRutas.push(sedesPermitidas);
+      paramsRutas.push(sedesRutas);
     }
     const [[rutasSemanaRow]] = await pool.query(sqlRutas, paramsRutas);
     const success = req.session.success;
@@ -673,9 +687,8 @@ router.get("/", allowRoles(...ROLES_VER), async (req, res) => {
 router.get("/rutas", allowRoles(...ROLES_RUTAS), async (req, res) => {
   try {
     await ensureRutasSupervisoresTables(pool);
-    const sedesPermitidas = await obtenerSedesPermitidas(req);
+    const sedesPermitidas = await obtenerSedesPermitidasRutas(req);
     const sedes = await cargarSedesRutas(req);
-    const unidades = await cargarUnidades(req);
     const semanaInput = String(req.query.semana || semanaActualRutas()).trim();
     const semanaFecha = lunesDesdeSemanaInput(semanaInput) || lunesDesdeSemanaInput(semanaActualRutas());
     const sede = texto(req.query.sede, 100);
@@ -686,7 +699,7 @@ router.get("/rutas", allowRoles(...ROLES_RUTAS), async (req, res) => {
 
     const params = [semanaFecha];
     let sql = `
-      SELECT sr.*, u.placa
+      SELECT sr.*, COALESCE(u.placa, sr.placa_reportada) AS placa
       FROM supervisor_rutas_semanales sr
       LEFT JOIN unidades u ON u.id = sr.unidad_id
       WHERE sr.activo = 1 AND sr.semana_inicio = ?
@@ -701,13 +714,20 @@ router.get("/rutas", allowRoles(...ROLES_RUTAS), async (req, res) => {
     }
     sql += " ORDER BY sr.sede, sr.ruta, sr.chofer";
     const [asignaciones] = await pool.query(sql, params);
+    const unidades = await cargarUnidades(req, true);
+    const idsVisibles = asignaciones.map(item => Number(item.unidad_id)).filter(Boolean);
+    const idsFaltantes = idsVisibles.filter(id => !unidades.some(unidad => Number(unidad.id) === id));
+    if (idsFaltantes.length) {
+      const [unidadesAsignadas] = await pool.query("SELECT id, placa, sede FROM unidades WHERE id IN (?)", [idsFaltantes]);
+      unidades.push(...unidadesAsignadas);
+    }
 
     const movimientoParams = [semanaFecha];
     let movimientoSql = `
       SELECT
         sm.*,
-        ua.placa AS placa_anterior,
-        un.placa AS placa_nueva
+        COALESCE(ua.placa, sm.placa_reportada_anterior) AS placa_anterior,
+        COALESCE(un.placa, sm.placa_reportada_nueva) AS placa_nueva
       FROM supervisor_rutas_movimientos sm
       LEFT JOIN unidades ua ON ua.id = sm.unidad_id_anterior
       LEFT JOIN unidades un ON un.id = sm.unidad_id_nueva
@@ -757,51 +777,56 @@ router.post("/rutas", allowRoles(...ROLES_RUTAS), async (req, res) => {
     const chofer = texto(req.body.chofer, 180);
     const observacion = texto(req.body.observacion, 255);
     const unidadId = Number(req.body.unidad_id) || null;
-    const sedesPermitidas = await obtenerSedesPermitidas(req);
+    const placaReportada = texto(req.body.placa_reportada, 30) || null;
+    const sedesPermitidas = await obtenerSedesPermitidasRutas(req);
 
     if (!semanaInicio || !sede || !ruta || !chofer) throw new Error("Debe indicar semana, sede, ruta y chofer.");
     if (!usuarioPuedeUsarSede(sede, sedesPermitidas)) throw new Error("No tiene permiso para registrar esa sede.");
 
     await conn.beginTransaction();
+    let placaUnidad = null;
     if (unidadId) {
-      const [[unidad]] = await conn.query("SELECT id, sede FROM unidades WHERE id = ? AND COALESCE(activa, 1) = 1 LIMIT 1", [unidadId]);
+      const [[unidad]] = await conn.query("SELECT id, sede, placa FROM unidades WHERE id = ? AND COALESCE(activa, 1) = 1 LIMIT 1", [unidadId]);
       if (!unidad || !usuarioPuedeUsarSede(unidad.sede, sedesPermitidas)) throw new Error("La unidad seleccionada no está autorizada.");
+      placaUnidad = unidad.placa;
     }
+    const identificador = texto(placaUnidad || placaReportada, 80).toUpperCase();
 
     const [[existente]] = await conn.query(
       `SELECT * FROM supervisor_rutas_semanales
-       WHERE semana_inicio = ? AND sede = ? AND ruta = ?
+       WHERE semana_inicio = ? AND sede = ? AND ruta = ? AND identificador = ?
        LIMIT 1 FOR UPDATE`,
-      [semanaInicio, sede, ruta]
+      [semanaInicio, sede, ruta, identificador]
     );
-    const nuevo = { semana_inicio: semanaInicio, sede, ruta, chofer, unidad_id: unidadId, observacion };
+    const nuevo = { semana_inicio: semanaInicio, sede, ruta, chofer, unidad_id: unidadId, placa_reportada: placaReportada, identificador, observacion };
 
     if (existente) {
       const cambioChofer = texto(existente.chofer, 180).toUpperCase() !== chofer.toUpperCase();
       const cambioUnidad = Number(existente.unidad_id || 0) !== Number(unidadId || 0);
+      const cambioPlacaReportada = (existente.placa_reportada || null) !== placaReportada;
       const cambioDetalle = texto(existente.observacion) !== observacion;
       const reactivada = Number(existente.activo || 0) !== 1;
       await conn.query(
         `UPDATE supervisor_rutas_semanales
-         SET chofer = ?, unidad_id = ?, observacion = ?, supervisor_id = ?, supervisor_nombre = ?, activo = 1
+         SET chofer = ?, unidad_id = ?, placa_reportada = ?, observacion = ?, supervisor_id = ?, supervisor_nombre = ?, activo = 1
          WHERE id = ?`,
-        [chofer, unidadId, observacion || null, req.session.user.id, nombreUsuario(req.session.user), existente.id]
+        [chofer, unidadId, placaReportada, observacion || null, req.session.user.id, nombreUsuario(req.session.user), existente.id]
       );
-      if (cambioChofer || cambioUnidad || cambioDetalle || reactivada) {
+      if (cambioChofer || cambioUnidad || cambioPlacaReportada || cambioDetalle || reactivada) {
         const motivo = texto(req.body.motivo, 255);
         if (!motivo) throw new Error("Debe indicar el motivo para cambiar una asignación existente.");
         const accion = reactivada ? "REACTIVAR" : cambioChofer && !cambioUnidad ? "CAMBIO_CHOFER" : cambioUnidad && !cambioChofer ? "CAMBIO_UNIDAD" : "ACTUALIZAR";
         await registrarMovimientoRuta(conn, existente.id, accion, existente, nuevo, req, motivo);
       }
-      req.session.success = cambioChofer || cambioUnidad || cambioDetalle || reactivada
+      req.session.success = cambioChofer || cambioUnidad || cambioPlacaReportada || cambioDetalle || reactivada
         ? `Asignación actualizada para la ruta ${ruta}.`
         : `La ruta ${ruta} ya tenía esa misma asignación.`;
     } else {
       const [result] = await conn.query(
         `INSERT INTO supervisor_rutas_semanales
-          (semana_inicio, sede, ruta, chofer, unidad_id, observacion, supervisor_id, supervisor_nombre)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-        [semanaInicio, sede, ruta, chofer, unidadId, observacion || null, req.session.user.id, nombreUsuario(req.session.user)]
+          (semana_inicio, sede, ruta, chofer, unidad_id, placa_reportada, identificador, observacion, supervisor_id, supervisor_nombre)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [semanaInicio, sede, ruta, chofer, unidadId, placaReportada, identificador, observacion || null, req.session.user.id, nombreUsuario(req.session.user)]
       );
       await registrarMovimientoRuta(conn, result.insertId, "CREAR", null, nuevo, req, req.body.motivo);
       req.session.success = `Ruta ${ruta} asignada a ${chofer}.`;
@@ -830,7 +855,9 @@ router.post("/rutas/:id", allowRoles(...ROLES_RUTAS), async (req, res) => {
     const observacion = texto(req.body.observacion, 255);
     const motivo = texto(req.body.motivo, 255);
     const unidadId = Number(req.body.unidad_id) || null;
-    const sedesPermitidas = await obtenerSedesPermitidas(req);
+    const placaReportada = Object.hasOwn(req.body, "placa_reportada")
+      ? texto(req.body.placa_reportada, 30) || null : undefined;
+    const sedesPermitidas = await obtenerSedesPermitidasRutas(req);
     if (!id || !sede || !ruta || !chofer) throw new Error("Debe indicar sede, ruta y chofer.");
 
     await conn.beginTransaction();
@@ -839,17 +866,24 @@ router.post("/rutas/:id", allowRoles(...ROLES_RUTAS), async (req, res) => {
     if (!usuarioPuedeUsarSede(anterior.sede, sedesPermitidas) || !usuarioPuedeUsarSede(sede, sedesPermitidas)) {
       throw new Error("No tiene permiso para modificar esa sede.");
     }
+    let placaUnidad = null;
     if (unidadId) {
-      const [[unidad]] = await conn.query("SELECT id, sede FROM unidades WHERE id = ? AND COALESCE(activa, 1) = 1 LIMIT 1", [unidadId]);
-      if (!unidad || !usuarioPuedeUsarSede(unidad.sede, sedesPermitidas)) throw new Error("La unidad seleccionada no está autorizada.");
+      const [[unidad]] = await conn.query("SELECT id, sede, placa FROM unidades WHERE id = ? AND COALESCE(activa, 1) = 1 LIMIT 1", [unidadId]);
+      if (!unidad || (!usuarioPuedeUsarSede(unidad.sede, sedesPermitidas) && Number(anterior.unidad_id) !== unidadId)) {
+        throw new Error("La unidad seleccionada no está autorizada.");
+      }
+      placaUnidad = unidad.placa;
     }
 
-    const nuevo = { semana_inicio: anterior.semana_inicio, sede, ruta, chofer, unidad_id: unidadId, observacion };
+    const placaReportadaNueva = placaReportada === undefined ? anterior.placa_reportada || null : placaReportada;
+    const identificador = texto(placaUnidad || placaReportadaNueva, 80).toUpperCase();
+    const nuevo = { semana_inicio: anterior.semana_inicio, sede, ruta, chofer, unidad_id: unidadId, placa_reportada: placaReportadaNueva, identificador, observacion };
     const cambioChofer = texto(anterior.chofer, 180).toUpperCase() !== chofer.toUpperCase();
     const cambioRuta = texto(anterior.ruta, 150).toUpperCase() !== ruta.toUpperCase() || anterior.sede !== sede;
-    const cambioUnidad = Number(anterior.unidad_id || 0) !== Number(unidadId || 0);
+    const cambioUnidad = Number(anterior.unidad_id || 0) !== Number(unidadId || 0) || anterior.identificador !== identificador;
+    const cambioPlacaReportada = (anterior.placa_reportada || null) !== placaReportadaNueva;
     const cambioDetalle = texto(anterior.observacion) !== observacion;
-    if (!cambioChofer && !cambioRuta && !cambioUnidad && !cambioDetalle) {
+    if (!cambioChofer && !cambioRuta && !cambioUnidad && !cambioPlacaReportada && !cambioDetalle) {
       await conn.rollback();
       req.session.success = "No había cambios por guardar.";
       return res.redirect(`/reportes-supervisores/rutas?semana=${encodeURIComponent(semanaInputDesdeFecha(anterior.semana_inicio))}`);
@@ -858,9 +892,9 @@ router.post("/rutas/:id", allowRoles(...ROLES_RUTAS), async (req, res) => {
 
     await conn.query(
       `UPDATE supervisor_rutas_semanales
-       SET sede = ?, ruta = ?, chofer = ?, unidad_id = ?, observacion = ?, supervisor_id = ?, supervisor_nombre = ?
+       SET sede = ?, ruta = ?, chofer = ?, unidad_id = ?, placa_reportada = ?, identificador = ?, observacion = ?, supervisor_id = ?, supervisor_nombre = ?
        WHERE id = ?`,
-      [sede, ruta, chofer, unidadId, observacion || null, req.session.user.id, nombreUsuario(req.session.user), id]
+      [sede, ruta, chofer, unidadId, placaReportadaNueva, identificador, observacion || null, req.session.user.id, nombreUsuario(req.session.user), id]
     );
     const accion = cambioChofer && !cambioRuta && !cambioUnidad ? "CAMBIO_CHOFER" : cambioRuta && !cambioChofer && !cambioUnidad ? "CAMBIO_RUTA" : cambioUnidad && !cambioChofer && !cambioRuta ? "CAMBIO_UNIDAD" : "ACTUALIZAR";
     await registrarMovimientoRuta(conn, id, accion, anterior, nuevo, req, motivo);
@@ -881,7 +915,7 @@ router.post("/rutas/:id/retirar", allowRoles(...ROLES_RUTAS), async (req, res) =
   const conn = await pool.getConnection();
   try {
     await ensureRutasSupervisoresTables(pool);
-    const sedesPermitidas = await obtenerSedesPermitidas(req);
+    const sedesPermitidas = await obtenerSedesPermitidasRutas(req);
     await conn.beginTransaction();
     const [[anterior]] = await conn.query("SELECT * FROM supervisor_rutas_semanales WHERE id = ? AND activo = 1 FOR UPDATE", [Number(req.params.id)]);
     if (!anterior) throw new Error("La asignación ya no está activa.");

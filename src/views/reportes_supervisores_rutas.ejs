@@ -45,7 +45,7 @@
     const date = new Date(`${raw}T12:00:00`);
     return Number.isNaN(date.getTime()) ? raw : date.toLocaleDateString('es-CR');
   };
-  const choferes = new Set(asignaciones.map(item => String(item.chofer || '').trim().toUpperCase()).filter(Boolean)).size;
+  const choferes = new Set(asignaciones.map(item => String(item.chofer || '').trim().toUpperCase()).filter(value => value && value !== 'SIN ASIGNAR')).size;
   const cambios = movimientos.filter(item => item.accion !== 'CREAR').length;
   const etiquetaAccion = value => ({
     CREAR:'Asignación creada', REACTIVAR:'Ruta reactivada', CAMBIO_CHOFER:'Cambio de chofer',
@@ -100,6 +100,7 @@
         <div class="col-md-2"><label class="form-label">Ruta</label><input class="form-control" name="ruta" placeholder="Ej. Ruta 12 - Centro" required></div>
         <div class="col-md-2"><label class="form-label">Chofer</label><input class="form-control" name="chofer" placeholder="Nombre completo" required></div>
         <div class="col-md-2"><label class="form-label">Unidad (opcional)</label><select class="form-select js-unidad" name="unidad_id"><option value="">Sin unidad fija</option><% unidades.forEach(u => { %><option value="<%= u.id %>" data-sede="<%= u.sede %>"><%= u.placa %> · <%= u.sede %></option><% }) %></select></div>
+        <div class="col-md-2"><label class="form-label">Placa / número reportado</label><input class="form-control" name="placa_reportada" maxlength="30" placeholder="Si no aparece en unidades"></div>
         <div class="col-md-2"><label class="form-label">Observación</label><input class="form-control" name="observacion" placeholder="Turno, relevo, detalle..."></div>
         <div class="col-md-4"><label class="form-label">Motivo (si está cambiando una ruta existente)</label><input class="form-control" name="motivo" placeholder="Ej. cambio de turno, vacaciones o incapacidad"></div>
         <div class="col-12 d-flex justify-content-end"><button class="btn btn-primary fw-bold px-4"><i class="bi bi-check2-circle"></i> Guardar asignación</button></div>
@@ -131,6 +132,7 @@
                   <div class="col-md-2"><label class="form-label small">Ruta</label><input class="form-control form-control-sm" name="ruta" value="<%= item.ruta %>" required></div>
                   <div class="col-md-2"><label class="form-label small">Chofer</label><input class="form-control form-control-sm" name="chofer" value="<%= item.chofer %>" required></div>
                   <div class="col-md-2"><label class="form-label small">Unidad</label><select class="form-select form-select-sm js-unidad" name="unidad_id"><option value="">Sin unidad fija</option><% unidades.forEach(u => { %><option value="<%= u.id %>" data-sede="<%= u.sede %>" <%= Number(item.unidad_id) === Number(u.id) ? 'selected' : '' %>><%= u.placa %> · <%= u.sede %></option><% }) %></select></div>
+                  <div class="col-md-2"><label class="form-label small">Placa / número reportado</label><input class="form-control form-control-sm" name="placa_reportada" maxlength="30" value="<%= item.placa_reportada || '' %>" placeholder="Si no aparece en unidades"></div>
                   <div class="col-md-2"><label class="form-label small">Observación</label><input class="form-control form-control-sm" name="observacion" value="<%= item.observacion || '' %>"></div>
                   <div class="col-md-2"><label class="form-label small">Motivo del cambio</label><input class="form-control form-control-sm" name="motivo" placeholder="Ej. incapacidad" required></div>
                   <div class="col-12 d-flex justify-content-end">
@@ -181,9 +183,12 @@
     if (!sede || !unidad) return;
     const filtrar = () => {
       const sedeElegida = sede.value;
+      const sedesTransportadora = ['Cabezales', 'Cisternas', 'Carretas', 'Gruas', 'Grúas', 'Tandem', 'Tándem', 'Tamden'];
       Array.from(unidad.options).forEach((option, index) => {
         if (index === 0) return;
-        option.hidden = Boolean(sedeElegida && option.dataset.sede !== sedeElegida && !option.selected);
+        const mismaSede = option.dataset.sede === sedeElegida ||
+          (sedeElegida === 'Transportadora' && sedesTransportadora.includes(option.dataset.sede));
+        option.hidden = Boolean(sedeElegida && !mismaSede && !option.selected);
       });
     };
     sede.addEventListener('change', filtrar);
