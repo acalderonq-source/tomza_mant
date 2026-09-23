@@ -517,6 +517,7 @@
                     <button
                       type="submit"
                       class="btn btn-outline-danger btn-sm delete-unit-btn"
+                      form="deleteUnitForm"
                       formmethod="POST"
                       formaction="/unidades/<%= u.id %>/eliminar"
                       data-delete-unit="<%= u.placa %>"
@@ -532,6 +533,7 @@
       </div>
     <% if (puedeEditar) { %>
       </form>
+      <form id="deleteUnitForm" method="POST"></form>
     <% } %>
   </section>
 </div>
@@ -559,20 +561,20 @@
 
     form.addEventListener('submit', (event) => {
       const button = event.submitter || form.querySelector('button[type="submit"]');
-      if (button?.dataset.deleteUnit) {
-        const confirmar = window.confirm(`¿Eliminar la unidad ${button.dataset.deleteUnit}? Solo se eliminará si no tiene historial registrado.`);
-        if (!confirmar) {
-          event.preventDefault();
-          return;
-        }
-      }
-
       if (button) {
         button.disabled = true;
-        button.innerHTML = button.dataset.deleteUnit
-          ? '<span class="spinner-border spinner-border-sm me-1"></span>Eliminando...'
-          : '<span class="spinner-border spinner-border-sm me-1"></span>Guardando...';
+        button.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Guardando...';
       }
+    });
+
+    document.getElementById('deleteUnitForm')?.addEventListener('submit', event => {
+      const button = event.submitter;
+      if (!button?.dataset.deleteUnit || !window.confirm(`¿Eliminar la unidad ${button.dataset.deleteUnit}? Solo se eliminará si no tiene historial registrado.`)) {
+        event.preventDefault();
+        return;
+      }
+      button.disabled = true;
+      button.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Eliminando...';
     });
   })();
 </script>

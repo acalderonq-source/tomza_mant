@@ -54,7 +54,7 @@ if (isProduction) {
 }
 
 // ===================== MIDDLEWARES =====================
-app.use(express.urlencoded({ extended: true, limit: "10mb" }));
+app.use(express.urlencoded({ extended: true, limit: "10mb", parameterLimit: 5000 }));
 app.use(express.json({ limit: "10mb" }));
 seedBundledUploads();
 app.use("/uploads", express.static(UPLOAD_ROOT));
