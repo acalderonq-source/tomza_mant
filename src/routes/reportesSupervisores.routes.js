@@ -8,6 +8,7 @@ const {
 } = require("../utils/reportesSupervisoresDb");
 const {
   agregarTallerParaMecanico,
+  esSedeTransportadoraDetalle,
   esSedeTransporte,
   esUsuarioMecanicoSede,
   esUsuarioPesados,
@@ -191,7 +192,7 @@ async function cargarSedesRutas(req) {
   }
   sql += " ORDER BY sede";
   const [rows] = await pool.query(sql, params);
-  return rows.map(row => row.sede);
+  return [...new Set(rows.map(row => esSedeTransportadoraDetalle(row.sede) ? "Transportadora" : row.sede))].sort();
 }
 
 function usuarioPuedeUsarSede(sede, sedesPermitidas) {
@@ -708,13 +709,27 @@ router.get("/rutas", allowRoles(...ROLES_RUTAS), async (req, res) => {
       sql += " AND sr.sede IN (?)";
       params.push(sedesPermitidas);
     }
+    const sedesFiltro = sede === "Transportadora" ? expandirSedesEquivalentes(sede) : [sede];
     if (sede) {
-      sql += " AND sr.sede = ?";
-      params.push(sede);
+      sql += " AND sr.sede IN (?)";
+      params.push(sedesFiltro);
     }
     sql += " ORDER BY sr.sede, sr.ruta, sr.chofer";
     const [asignaciones] = await pool.query(sql, params);
-    const unidades = await cargarUnidades(req, true);
+    const unidadesActivas = await cargarUnidades(req, true);
+    const [unidadesAsignadas] = await pool.query(
+      "SELECT DISTINCT unidad_id FROM supervisor_rutas_semanales WHERE activo = 1 AND semana_inicio = ? AND unidad_id IS NOT NULL",
+      [semanaFecha]
+    );
+    const idsAsignados = new Set(unidadesAsignadas.map(item => Number(item.unidad_id)));
+    const unidadesPendientes = unidadesActivas
+      .filter(unidad => !idsAsignados.has(Number(unidad.id)))
+      .filter(unidad => !sede || sedesFiltro.includes(unidad.sede))
+      .map(unidad => ({
+        ...unidad,
+        sedeRuta: esSedeTransportadoraDetalle(unidad.sede) ? "Transportadora" : unidad.sede
+      }));
+    const unidades = [...unidadesActivas];
     const idsVisibles = asignaciones.map(item => Number(item.unidad_id)).filter(Boolean);
     const idsFaltantes = idsVisibles.filter(id => !unidades.some(unidad => Number(unidad.id) === id));
     if (idsFaltantes.length) {
@@ -738,8 +753,8 @@ router.get("/rutas", allowRoles(...ROLES_RUTAS), async (req, res) => {
       movimientoParams.push(sedesPermitidas);
     }
     if (sede) {
-      movimientoSql += " AND COALESCE(sm.sede_nueva, sm.sede_anterior) = ?";
-      movimientoParams.push(sede);
+      movimientoSql += " AND COALESCE(sm.sede_nueva, sm.sede_anterior) IN (?)";
+      movimientoParams.push(sedesFiltro);
     }
     movimientoSql += " ORDER BY sm.cambiado_en DESC, sm.id DESC LIMIT 250";
     const [movimientos] = await pool.query(movimientoSql, movimientoParams);
@@ -752,6 +767,7 @@ router.get("/rutas", allowRoles(...ROLES_RUTAS), async (req, res) => {
     res.render("reportes_supervisores_rutas", {
       user: req.session.user,
       asignaciones,
+      unidadesPendientes,
       movimientos,
       unidades,
       sedes,
@@ -777,17 +793,32 @@ router.post("/rutas", allowRoles(...ROLES_RUTAS), async (req, res) => {
     const chofer = texto(req.body.chofer, 180);
     const observacion = texto(req.body.observacion, 255);
     const unidadId = Number(req.body.unidad_id) || null;
+    const completarPendiente = req.body.completar_pendiente === "1";
     const placaReportada = texto(req.body.placa_reportada, 30) || null;
     const sedesPermitidas = await obtenerSedesPermitidasRutas(req);
 
-    if (!semanaInicio || !sede || !ruta || !chofer) throw new Error("Debe indicar semana, sede, ruta y chofer.");
+    if (!semanaInicio || !sede || !ruta || !chofer || (completarPendiente && !unidadId)) {
+      throw new Error("Debe indicar semana, sede, unidad, ruta y chofer.");
+    }
     if (!usuarioPuedeUsarSede(sede, sedesPermitidas)) throw new Error("No tiene permiso para registrar esa sede.");
 
     await conn.beginTransaction();
     let placaUnidad = null;
     if (unidadId) {
-      const [[unidad]] = await conn.query("SELECT id, sede, placa FROM unidades WHERE id = ? AND COALESCE(activa, 1) = 1 LIMIT 1", [unidadId]);
+      const [[unidad]] = await conn.query(
+        `SELECT id, sede, placa FROM unidades WHERE id = ? AND COALESCE(activa, 1) = 1 LIMIT 1${completarPendiente ? " FOR UPDATE" : ""}`,
+        [unidadId]
+      );
       if (!unidad || !usuarioPuedeUsarSede(unidad.sede, sedesPermitidas)) throw new Error("La unidad seleccionada no está autorizada.");
+      if (completarPendiente) {
+        const sedeRuta = esSedeTransportadoraDetalle(unidad.sede) ? "Transportadora" : unidad.sede;
+        if (sede !== sedeRuta) throw new Error("La sede de la unidad no coincide con la asignación.");
+        const [[asignada]] = await conn.query(
+          "SELECT id FROM supervisor_rutas_semanales WHERE activo = 1 AND semana_inicio = ? AND unidad_id = ? LIMIT 1 FOR UPDATE",
+          [semanaInicio, unidadId]
+        );
+        if (asignada) throw new Error("Esta unidad ya tiene una asignación en la semana. Actualice la página.");
+      }
       placaUnidad = unidad.placa;
     }
     const identificador = texto(placaUnidad || placaReportada, 80).toUpperCase();
@@ -813,7 +844,7 @@ router.post("/rutas", allowRoles(...ROLES_RUTAS), async (req, res) => {
         [chofer, unidadId, placaReportada, observacion || null, req.session.user.id, nombreUsuario(req.session.user), existente.id]
       );
       if (cambioChofer || cambioUnidad || cambioPlacaReportada || cambioDetalle || reactivada) {
-        const motivo = texto(req.body.motivo, 255);
+        const motivo = texto(req.body.motivo, 255) || (completarPendiente ? "Completar unidad pendiente" : "");
         if (!motivo) throw new Error("Debe indicar el motivo para cambiar una asignación existente.");
         const accion = reactivada ? "REACTIVAR" : cambioChofer && !cambioUnidad ? "CAMBIO_CHOFER" : cambioUnidad && !cambioChofer ? "CAMBIO_UNIDAD" : "ACTUALIZAR";
         await registrarMovimientoRuta(conn, existente.id, accion, existente, nuevo, req, motivo);
@@ -833,12 +864,15 @@ router.post("/rutas", allowRoles(...ROLES_RUTAS), async (req, res) => {
     }
 
     await conn.commit();
-    res.redirect(`/reportes-supervisores/rutas?semana=${encodeURIComponent(semanaInput)}&sede=${encodeURIComponent(sede)}`);
+    const sedeConsulta = completarPendiente ? texto(req.body.sede_consulta, 100) : sede;
+    res.redirect(`/reportes-supervisores/rutas?semana=${encodeURIComponent(semanaInput)}&sede=${encodeURIComponent(sedeConsulta)}#pendientes`);
   } catch (error) {
     await conn.rollback();
     console.error("Error guardando ruta semanal:", error);
     req.session.error = error.code === "ER_DUP_ENTRY" ? "Ya existe esa ruta para la semana y sede seleccionadas." : (error.message || "No se pudo guardar la ruta.");
-    res.redirect("/reportes-supervisores/rutas");
+    const semana = lunesDesdeSemanaInput(String(req.body.semana || "")) ? req.body.semana : semanaActualRutas();
+    const sedeConsulta = req.body.completar_pendiente === "1" ? texto(req.body.sede_consulta, 100) : "";
+    res.redirect(`/reportes-supervisores/rutas?semana=${encodeURIComponent(semana)}&sede=${encodeURIComponent(sedeConsulta)}#pendientes`);
   } finally {
     conn.release();
   }

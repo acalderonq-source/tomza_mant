@@ -19,7 +19,7 @@
     .panel-title { font-size:1rem; font-weight:900; margin:0; }
     .panel-copy { color:var(--muted); font-size:.78rem; margin:.15rem 0 0; }
     .panel-body { padding:1rem; }
-    .metrics { display:grid; gap:.7rem; grid-template-columns:repeat(3,minmax(0,1fr)); }
+    .metrics { display:grid; gap:.7rem; grid-template-columns:repeat(4,minmax(0,1fr)); }
     .metric { border-top:4px solid var(--blue); padding:.8rem 1rem; }
     .metric-label { color:var(--muted); font-size:.7rem; font-weight:800; text-transform:uppercase; }
     .metric-value { color:#071a3c; font-size:1.4rem; font-weight:900; }
@@ -29,6 +29,9 @@
     .badge-action { background:#eaf1fb; border-radius:999px; color:#17458d; display:inline-block; font-size:.7rem; font-weight:850; padding:.25rem .5rem; }
     .table > :not(caption) > * > * { border-color:#e2e8f0; padding:.65rem; }
     .empty { color:var(--muted); padding:2rem; text-align:center; }
+    .pending-list { max-height:590px; overflow:auto; }
+    .pending-list thead { position:sticky; top:0; z-index:1; }
+    .pending-list th { background:#f8fbff; }
     @media(max-width:760px){ .metrics{grid-template-columns:1fr;} .desktop-table{min-width:980px;} }
   </style>
 </head>
@@ -76,6 +79,7 @@
   <section class="metrics mb-3">
     <div class="metric"><div class="metric-label">Rutas activas</div><div class="metric-value"><%= asignaciones.length %></div></div>
     <div class="metric"><div class="metric-label">Choferes asignados</div><div class="metric-value"><%= choferes %></div></div>
+    <div class="metric"><div class="metric-label">Unidades por completar</div><div class="metric-value"><%= unidadesPendientes.length %></div></div>
     <div class="metric"><div class="metric-label">Movimientos de la semana</div><div class="metric-value"><%= cambios %></div></div>
   </section>
 
@@ -88,6 +92,38 @@
         <div class="col-md-2 d-grid"><button class="btn btn-dark fw-bold"><i class="bi bi-search"></i> Consultar</button></div>
         <div class="col-md-2 d-grid"><a href="/reportes-supervisores/rutas" class="btn btn-outline-secondary">Semana actual</a></div>
       </form>
+    </div>
+  </section>
+
+  <section id="pendientes" class="panel mb-3">
+    <div class="panel-head flex-wrap">
+      <div><h2 class="panel-title">Unidades por completar <span class="badge text-bg-warning ms-1"><%= unidadesPendientes.length %></span></h2><p class="panel-copy">Unidades activas sin ruta ni chofer registrados en esta semana.</p></div>
+      <input id="buscarPendiente" type="search" class="form-control form-control-sm" style="max-width:280px" placeholder="Buscar placa o sede" aria-label="Buscar unidad pendiente">
+    </div>
+    <div class="table-responsive pending-list">
+      <table class="table table-hover align-middle mb-0" style="min-width:680px">
+        <thead><tr><th>Unidad</th><th>Ruta</th><th>Chofer</th><th></th></tr></thead>
+        <tbody>
+          <% if (!unidadesPendientes.length) { %><tr><td colspan="4" class="empty">No hay unidades pendientes en esta selección.</td></tr><% } %>
+          <% unidadesPendientes.forEach(unidad => { %>
+            <tr class="js-pendiente" data-search="<%= `${unidad.placa} ${unidad.sede} ${unidad.sedeRuta}`.toLowerCase() %>">
+              <td>
+                <strong><%= unidad.placa %></strong><div class="small text-muted"><%= unidad.sedeRuta %></div>
+                <form id="completar-<%= unidad.id %>" method="POST" action="/reportes-supervisores/rutas">
+                  <input type="hidden" name="semana" value="<%= filtros.semana %>">
+                  <input type="hidden" name="sede" value="<%= unidad.sedeRuta %>">
+                  <input type="hidden" name="sede_consulta" value="<%= filtros.sede %>">
+                  <input type="hidden" name="unidad_id" value="<%= unidad.id %>">
+                  <input type="hidden" name="completar_pendiente" value="1">
+                </form>
+              </td>
+              <td><input form="completar-<%= unidad.id %>" class="form-control form-control-sm" name="ruta" maxlength="150" aria-label="Ruta de <%= unidad.placa %>" required></td>
+              <td><input form="completar-<%= unidad.id %>" class="form-control form-control-sm" name="chofer" maxlength="180" aria-label="Chofer de <%= unidad.placa %>" required></td>
+              <td><button form="completar-<%= unidad.id %>" class="btn btn-primary btn-sm text-nowrap" type="submit"><i class="bi bi-check2"></i> Guardar</button></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
     </div>
   </section>
 
@@ -128,7 +164,7 @@
             <tr class="collapse" id="editarRuta<%= item.id %>">
               <td colspan="7" class="bg-light">
                 <form method="POST" action="/reportes-supervisores/rutas/<%= item.id %>" class="row g-2 align-items-end p-2">
-                  <div class="col-md-2"><label class="form-label small">Sede</label><select class="form-select form-select-sm js-sede" name="sede" required><% sedes.forEach(s => { %><option value="<%= s %>" <%= item.sede === s ? 'selected' : '' %>><%= s %></option><% }) %></select></div>
+                  <div class="col-md-2"><label class="form-label small">Sede</label><select class="form-select form-select-sm js-sede" name="sede" required><% if (!sedes.includes(item.sede)) { %><option value="<%= item.sede %>" selected><%= item.sede %></option><% } %><% sedes.forEach(s => { %><option value="<%= s %>" <%= item.sede === s ? 'selected' : '' %>><%= s %></option><% }) %></select></div>
                   <div class="col-md-2"><label class="form-label small">Ruta</label><input class="form-control form-control-sm" name="ruta" value="<%= item.ruta %>" required></div>
                   <div class="col-md-2"><label class="form-label small">Chofer</label><input class="form-control form-control-sm" name="chofer" value="<%= item.chofer %>" required></div>
                   <div class="col-md-2"><label class="form-label small">Unidad</label><select class="form-select form-select-sm js-unidad" name="unidad_id"><option value="">Sin unidad fija</option><% unidades.forEach(u => { %><option value="<%= u.id %>" data-sede="<%= u.sede %>" <%= Number(item.unidad_id) === Number(u.id) ? 'selected' : '' %>><%= u.placa %> · <%= u.sede %></option><% }) %></select></div>
@@ -177,6 +213,12 @@
 </main>
 
 <script>
+  document.getElementById('buscarPendiente')?.addEventListener('input', event => {
+    const query = event.target.value.trim().toLowerCase();
+    document.querySelectorAll('.js-pendiente').forEach(row => {
+      row.hidden = !row.dataset.search.includes(query);
+    });
+  });
   document.querySelectorAll('form').forEach(form => {
     const sede = form.querySelector('.js-sede');
     const unidad = form.querySelector('.js-unidad');
