@@ -3,6 +3,7 @@ const router = express.Router();
 const pool = require("../db");
 const { ensureGastosOperativosTables, registrarAuditoriaSistema, registrarGastoOperativo } = require("../utils/gastosOperativos");
 const { enviarNotificacionAdmins } = require("../utils/notificacionesPush");
+const { defaultPeriod, reportPeriod, consumption, inventoryXlsx, consignmentXlsx, ownInventoryPdf } = require("../utils/bodegaReportes");
 
 const ROLES_BODEGA = ["ADMIN", "TALLER", "PROVEEDURIA_TALLER", "BODEGA", "BODEGUERO"];
 const ROLES_AJUSTE = ["ADMIN", "TALLER"];
@@ -649,6 +650,7 @@ async function renderBodega(req, res, pagina = "inicio") {
       q,
       origen,
       grupo,
+      periodoReporte: defaultPeriod(fechaCostaRica()),
       articulos,
       proveedores,
       articulosCompatibilidad,
@@ -700,6 +702,100 @@ router.get("/consignacion", (req, res) => renderBodega(req, res, "consignacion")
 router.get("/inventario", (req, res) => renderBodega(req, res, "inventario"));
 router.get("/herramientas", (req, res) => renderBodega(req, res, "herramientas"));
 router.get("/movimientos", (req, res) => renderBodega(req, res, "movimientos"));
+
+async function movimientosConsumo(origen, period, proveedor = "") {
+  const params = [origen, period.desde, period.hasta];
+  let proveedorSql = "";
+  if (proveedor) {
+    proveedorSql = " AND COALESCE(NULLIF(TRIM(ba.proveedor_consignacion), ''), NULLIF(TRIM(ba.proveedor_nombre), ''), ?) = ?";
+    params.push(PROVEEDOR_CONSIGNACION_DEFAULT, proveedor);
+  }
+  const [rows] = await pool.query(`
+    SELECT bm.articulo_id, bm.tipo_movimiento, bm.cantidad, bm.precio_unitario, bm.creado_en,
+           bm.placa, bm.mecanico, ba.codigo_taller, ba.codigo, ba.nombre, ba.unidad_medida,
+           ba.precio_unitario AS precio_actual,
+           COALESCE(NULLIF(TRIM(ba.proveedor_consignacion), ''), NULLIF(TRIM(ba.proveedor_nombre), ''), ?) AS proveedor
+    FROM bodega_movimientos bm
+    JOIN bodega_articulos ba ON ba.id = bm.articulo_id
+    WHERE bm.origen_inventario = ?
+      AND bm.tipo_movimiento IN ('SALIDA', 'DEVOLUCION')
+      AND DATE(bm.creado_en) BETWEEN ? AND ?${proveedorSql}
+    ORDER BY bm.creado_en, bm.id
+  `, [PROVEEDOR_CONSIGNACION_DEFAULT, ...params]);
+  return consumption(rows);
+}
+
+router.get("/inventario/exportar.xlsx", async (req, res) => {
+  try {
+    await ensureBodegaTables();
+    const q = limpiar(req.query.q);
+    const origen = origenInventario(req.query.origen, "");
+    const grupo = ["SUMINISTRO", "INVENTARIO"].includes(upper(req.query.grupo)) ? upper(req.query.grupo) : "";
+    const conditions = ["activo = 1"];
+    const params = [];
+    if (origen) { conditions.push("origen_inventario = ?"); params.push(origen); }
+    if (grupo) { conditions.push("grupo_bodega = ?"); params.push(grupo); }
+    if (q) {
+      conditions.push("(nombre LIKE ? OR codigo LIKE ? OR codigo_taller LIKE ? OR numero_parte LIKE ? OR categoria LIKE ? OR marca LIKE ? OR tipo_unidad LIKE ? OR ubicacion LIKE ? OR proveedor_consignacion LIKE ?)");
+      params.push(...Array(9).fill(`%${q}%`));
+    }
+    const [articles] = await pool.query(
+      `SELECT codigo_taller, codigo, nombre, origen_inventario, grupo_bodega, unidad_medida,
+              ubicacion, proveedor_consignacion, proveedor_nombre, stock_actual, stock_minimo,
+              stock_maximo, precio_unitario
+       FROM bodega_articulos WHERE ${conditions.join(" AND ")}
+       ORDER BY origen_inventario, nombre, codigo_taller`, params
+    );
+    const buffer = await inventoryXlsx(articles, [origen, grupo, q].filter(Boolean).join(" · "));
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    res.setHeader("Content-Disposition", `attachment; filename="inventario_bodega_${fechaCostaRica()}.xlsx"`);
+    res.send(buffer);
+  } catch (error) {
+    console.error("ERROR exportar inventario bodega:", error);
+    res.status(500).send("No se pudo descargar el inventario.");
+  }
+});
+
+router.get("/consignacion/consumos.xlsx", async (req, res) => {
+  let period;
+  try { period = reportPeriod(req.query, fechaCostaRica()); }
+  catch (error) { return res.status(400).send(error.message); }
+  try {
+    await ensureBodegaTables();
+    const proveedor = limpiar(req.query.proveedor);
+    const data = await movimientosConsumo("CONSIGNACION", period, proveedor);
+    const buffer = await consignmentXlsx(data, period, proveedor);
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    res.setHeader("Content-Disposition", `attachment; filename="consumo_consignacion_${period.desde}_${period.hasta}.xlsx"`);
+    res.send(buffer);
+  } catch (error) {
+    console.error("ERROR reporte consumo consignación:", error);
+    res.status(500).send("No se pudo descargar el consumo de consignación.");
+  }
+});
+
+router.get("/inventario/propio.pdf", async (req, res) => {
+  let period;
+  try { period = reportPeriod(req.query, fechaCostaRica()); }
+  catch (error) { return res.status(400).send(error.message); }
+  try {
+    await ensureBodegaTables();
+    const [articles] = await pool.query(`
+      SELECT id, codigo_taller, codigo, nombre, stock_actual, precio_unitario
+      FROM bodega_articulos
+      WHERE activo = 1 AND origen_inventario = 'PROPIO'
+      ORDER BY nombre, codigo_taller
+    `);
+    const data = await movimientosConsumo("PROPIO", period);
+    const buffer = await ownInventoryPdf(articles, data, period);
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="inventario_propio_${period.desde}_${period.hasta}.pdf"`);
+    res.send(buffer);
+  } catch (error) {
+    console.error("ERROR reporte inventario propio:", error);
+    res.status(500).send("No se pudo descargar el PDF de inventario propio.");
+  }
+});
 
 router.get("/api/placas", async (req, res) => {
   try {

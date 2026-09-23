@@ -28,7 +28,7 @@ async function main() {
     const proveedor = proveedoresConsignacion.find(item => item.proveedor === req.query.proveedor)?.proveedor || "";
     const html = await ejs.renderFile(path.join(__dirname, "../src/views/bodega.ejs"), {
       user: { usuario: "bodeguero", rol: "BODEGUERO" },
-      q: "", origen: "", grupo: req.query.grupo || "", articulos: [articulo], proveedores: [], articulosCompatibilidad: [],
+      q: "", origen: "", grupo: req.query.grupo || "", periodoReporte: { desde: "2026-09-21", hasta: "2026-09-27" }, articulos: [articulo], proveedores: [], articulosCompatibilidad: [],
       articulosEntrega: [articulo], articulosConsignacion: proveedor ? consignados.filter(item => item.proveedor_consignacion === proveedor) : consignados,
       proveedoresConsignacion, proveedorConsignacionSeleccionado: proveedor, compatibilidades: [], articulosSinCompatibilidad: [],
       unidadesSinFicha: 0, porComprar: [], suministros: [], movimientos: [], prestamos: [],
@@ -83,11 +83,13 @@ async function main() {
     assert.deepEqual(errors, []);
 
     await page.goto(`${base}/bodega/consignacion`);
+    assert.equal(await page.locator('form[action="/bodega/consignacion/consumos.xlsx"]').count(), 1);
     assert.equal(await page.locator('.module-tabs a[href="/bodega/suministros"]').count(), 0);
     assert.equal(await page.locator('#consignacion .panel-body a').count(), 3);
     assert.equal(await page.locator('#consignacion tbody tr').count(), 2);
     await page.getByRole('link', { name: 'CONSIGNACION BATERIAS (1)' }).click();
     assert.equal(await page.locator('#consignacion tbody tr').count(), 1);
+    assert.equal(await page.locator('form[action="/bodega/consignacion/consumos.xlsx"] [name="proveedor"]').inputValue(), 'CONSIGNACION BATERIAS');
     assert.match(await page.locator('#consignacion tbody').textContent(), /Batería/);
     assert.doesNotMatch(await page.locator('#consignacion tbody').textContent(), /Retenedor/);
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
@@ -95,6 +97,9 @@ async function main() {
     await page.screenshot({ path: path.join(os.tmpdir(), "bodega-consignacion-mobile.png") });
 
     await page.goto(`${base}/bodega/inventario?grupo=SUMINISTRO`);
+    assert.equal(await page.locator('a[href*="/bodega/inventario/exportar.xlsx"]').count(), 1);
+    assert.match(await page.locator('a[href*="/bodega/inventario/exportar.xlsx"]').getAttribute('href'), /grupo=SUMINISTRO/);
+    assert.equal(await page.locator('form[action="/bodega/inventario/propio.pdf"]').count(), 1);
     assert.equal(await page.locator('select[name="grupo"]').inputValue(), 'SUMINISTRO');
     assert.match(await page.locator('#inventario tbody').textContent(), /Suministro/);
     console.log("Bodega UI OK: plates, supplier tabs, inventory group and mobile layout.");

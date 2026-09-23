@@ -399,6 +399,11 @@
     if (proveedor) params.set('proveedor', proveedor);
     return `/bodega/consignacion${params.size ? `?${params}` : ''}`;
   };
+  const inventarioExportParams = new URLSearchParams();
+  if (q) inventarioExportParams.set('q', q);
+  if (origen) inventarioExportParams.set('origen', origen);
+  if (grupo) inventarioExportParams.set('grupo', grupo);
+  const urlInventarioExportar = `/bodega/inventario/exportar.xlsx${inventarioExportParams.size ? `?${inventarioExportParams}` : ''}`;
   const pageInfo = {
     inicio: {
       titulo: 'Centro de control de bodega',
@@ -596,6 +601,12 @@
         <a class="btn btn-sm <%= proveedorConsignacionSeleccionado === item.proveedor ? 'btn-primary' : 'btn-outline-primary' %> fw-bold" href="<%= urlConsignacion(item.proveedor) %>"><%= item.proveedor %> (<%= item.total_articulos %>)</a>
       <% }) %>
     </div>
+    <form method="GET" action="/bodega/consignacion/consumos.xlsx" class="panel-body border-bottom d-flex align-items-end gap-2 flex-wrap">
+      <% if (proveedorConsignacionSeleccionado) { %><input type="hidden" name="proveedor" value="<%= proveedorConsignacionSeleccionado %>"><% } %>
+      <div><label class="form-label" for="consumo-desde">Consumo desde</label><input class="form-control form-control-sm" id="consumo-desde" type="date" name="fecha_desde" value="<%= periodoReporte.desde %>" required></div>
+      <div><label class="form-label" for="consumo-hasta">Hasta</label><input class="form-control form-control-sm" id="consumo-hasta" type="date" name="fecha_hasta" value="<%= periodoReporte.hasta %>" required></div>
+      <button class="btn btn-outline-primary btn-sm fw-bold"><i class="bi bi-download"></i> Consumo consignación Excel</button>
+    </form>
     <div class="table-responsive">
       <table class="table table-sm table-modern align-middle">
         <thead><tr><th>Cód. taller</th><th>Cód. proveedor</th><th>Repuesto</th><th>Proveedor consignación</th><th>Stock</th><th>Ubicación</th><th>Estado</th></tr></thead>
@@ -921,8 +932,16 @@
   <section class="panel mt-3 <%= mostrar('inventario') ? '' : 'd-none' %>" id="inventario">
     <div class="panel-head">
       <div><h2 class="panel-title">Inventario general</h2><p class="panel-copy">Existencia actual, ubicación, mínimo y proveedor.</p></div>
-      <button class="btn btn-dark btn-sm fw-bold" data-bs-toggle="collapse" data-bs-target="#crear-articulo"><i class="bi bi-plus-circle"></i> Nuevo artículo</button>
+      <div class="d-flex gap-2 flex-wrap">
+        <a class="btn btn-outline-primary btn-sm fw-bold" href="<%= urlInventarioExportar %>"><i class="bi bi-download"></i> Descargar inventario Excel</a>
+        <button class="btn btn-dark btn-sm fw-bold" data-bs-toggle="collapse" data-bs-target="#crear-articulo"><i class="bi bi-plus-circle"></i> Nuevo artículo</button>
+      </div>
     </div>
+    <form method="GET" action="/bodega/inventario/propio.pdf" class="panel-body border-bottom d-flex align-items-end gap-2 flex-wrap">
+      <div><label class="form-label" for="propio-desde">Consumo propio desde</label><input class="form-control form-control-sm" id="propio-desde" type="date" name="fecha_desde" value="<%= periodoReporte.desde %>" required></div>
+      <div><label class="form-label" for="propio-hasta">Hasta</label><input class="form-control form-control-sm" id="propio-hasta" type="date" name="fecha_hasta" value="<%= periodoReporte.hasta %>" required></div>
+      <button class="btn btn-outline-dark btn-sm fw-bold"><i class="bi bi-file-earmark-pdf"></i> Inventario propio y costo PDF</button>
+    </form>
     <div class="collapse" id="crear-articulo">
       <div class="panel-body border-bottom">
         <form method="POST" action="/bodega/articulos" class="row g-2 form-card">
