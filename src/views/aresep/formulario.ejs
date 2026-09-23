@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title><%= a.secciones[seccion].title %> | ARESEP</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/css/aresep.css" rel="stylesheet">
+</head>
+<body>
+<nav class="aresep-nav"><a href="/aresep?periodo=<%= periodo %>&seccion=<%= seccion %>">Volver a ARESEP</a><strong><%= periodo %></strong><span><%= user.nombre %></span></nav>
+<main class="aresep-shell">
+  <header class="aresep-heading"><div><h1><%= row ? 'Editar' : 'Agregar' %> · <%= a.secciones[seccion].title %></h1><div class="muted">Mes de control: <%= periodo %><%= row ? ' · Versión ' + row.version : '' %></div></div></header>
+  <% if (error) { %><div role="alert" class="form-error"><%= error %></div><% } %>
+  <form method="post" action="<%= row ? '/aresep/registro/' + row.id : '/aresep/nuevo?periodo=' + periodo + '&seccion=' + seccion %>" id="aresep-form">
+    <input type="hidden" name="version" value="<%= version %>">
+    <% if (a.secciones[seccion].unidad) { %>
+    <div class="aresep-fields"><div class="field"><label for="unidad-buscar">Buscar placa</label><input class="form-control" id="unidad-buscar" type="search" autocomplete="off" <%= row ? 'disabled' : '' %>></div>
+      <div class="field"><label for="unidad">Unidad *</label><select class="form-select" id="unidad" name="unidad_id" required <%= row ? 'disabled' : '' %>>
+        <option value="">Seleccione una unidad</option>
+        <% unidades.forEach(u => { %><option value="<%= u.id %>" <%= String(unidadId) === String(u.id) ? 'selected' : '' %> data-placa="<%= u.placa %>" data-marca="<%= u.marca || '' %>" data-almacenamiento="<%= u.sede || '' %>" data-anio="<%= u.anio || '' %>"><%= u.placa %> · <%= u.marca || '' %> <%= u.modelo || '' %> · <%= u.sede || '' %></option><% }) %>
+      </select><% if (row) { %><input type="hidden" name="unidad_id" value="<%= row.unidad_id %>"><% } %></div>
+    </div><% } %>
+    <% a.secciones[seccion].groups.forEach(g => { %>
+    <fieldset class="aresep-group"><legend><%= g.title %></legend><div class="aresep-fields">
+      <% g.fields.forEach(f => { const v = valores[f.id] ?? ''; %><div class="field">
+        <label for="f-<%= f.id %>"><%= f.label %><%= f.required ? ' *' : f.optional ? ' (opcional)' : '' %></label>
+        <% if (f.type === 'select') { %><select class="form-select" id="f-<%= f.id %>" name="<%= f.id %>"><option value="">Pendiente</option><% Object.entries(f.choices).forEach(([k, label]) => { %><option value="<%= k %>" <%= String(v) === k ? 'selected' : '' %>><%= k %> · <%= label %></option><% }) %></select>
+        <% } else { %><input class="form-control" id="f-<%= f.id %>" name="<%= f.id %>" value="<%= v %>" type="<%= ['number', 'integer'].includes(f.type) ? 'number' : f.type %>"
+          <% if (['number', 'integer'].includes(f.type)) { %>min="<%= f.min ?? 0 %>" max="<%= f.max ?? 999999999999.99 %>" step="<%= f.type === 'integer' ? '1' : '0.01' %>"<% } %>
+          <% if (f.type === 'text') { %>maxlength="250"<% } %> <%= f.required ? 'required' : '' %> <%= f.readonly ? 'readonly' : '' %>><% } %>
+      </div><% }) %>
+    </div></fieldset><% }) %>
+    <% if (seccion === 'planilla') { %><p class="aresep-note">La deducción CCSS se calcula con el porcentaje que usted indique para el mes. No se aplica automáticamente el porcentaje del archivo de ejemplo.</p><% } %>
+    <% if (seccion === 'rutas') { %><p class="aresep-note">Registre los litros reales. No se convierten libras a litros automáticamente.</p><% } %>
+    <div class="field"><label for="observacion">Observaciones</label><textarea class="form-control" id="observacion" name="observacion" rows="3" maxlength="2000"><%= valores.observacion || '' %></textarea></div>
+    <div class="aresep-footer"><button class="btn btn-success" type="submit">Guardar registro</button><a class="btn btn-outline-secondary" href="/aresep?periodo=<%= periodo %>&seccion=<%= seccion %>">Cancelar</a><span class="muted">Los campos vacíos quedan pendientes; cero significa que no hubo consumo o gasto.</span></div>
+  </form>
+  <% if (historial.length) { %><section class="aresep-group"><h2 class="mb-3">Últimas modificaciones</h2><div class="aresep-table"><table><thead><tr><th>Versión</th><th>Fecha de registro</th><th>Usuario</th></tr></thead><tbody><% historial.forEach(h => { %><tr><td><%= h.version %></td><td><%= new Date(h.creado_en).toLocaleString('es-CR', { timeZone: 'America/Costa_Rica' }) %></td><td><%= h.usuario || 'Usuario no disponible' %></td></tr><% }) %></tbody></table></div></section><% } %>
+</main>
+<script src="/js/aresep.js" defer></script>
+</body></html>

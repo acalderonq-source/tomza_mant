@@ -577,6 +577,12 @@
           </a>
         <% } %>
       <% } %>
+      <% if (!esMecanicoLimitado && ['ADMIN', 'CONTABILIDAD', 'TRAMITES'].includes(user.rol)) { %>
+        <a href="/aresep" class="module-card">
+          <span class="module-icon icon-green"><i class="bi bi-clipboard-data"></i></span>
+          <div><div class="module-title">ARESEP</div><p class="module-copy">Unidades A7, costos, planillas y control mensual.</p></div>
+        </a>
+      <% } %>
       <% if (puedeVerBodega && !puedeVerOperaciones) { %>
         <a href="/bodega" class="module-card">
           <span class="module-icon icon-green"><i class="bi bi-boxes"></i></span>
