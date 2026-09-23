@@ -32,7 +32,19 @@
     .pending-list { max-height:590px; overflow:auto; }
     .pending-list thead { position:sticky; top:0; z-index:1; }
     .pending-list th { background:#f8fbff; }
-    @media(max-width:760px){ .metrics{grid-template-columns:1fr;} .desktop-table{min-width:980px;} }
+    @media(max-width:760px){
+      .metrics{grid-template-columns:1fr;}
+      .desktop-table{min-width:980px;}
+      .pending-list{max-height:65vh;overflow-x:hidden;overflow-y:auto;}
+      .pending-list table{display:block;min-width:0!important;width:100%;}
+      .pending-list thead{display:none;}
+      .pending-list tbody{display:block;}
+      .pending-list tr.js-pendiente{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.55rem;padding:.75rem;border-bottom:1px solid var(--line);}
+      .pending-list tr.js-pendiente[hidden]{display:none!important;}
+      .pending-list tr.js-pendiente td{display:block;min-width:0;padding:0;border:0;}
+      .pending-list tr.js-pendiente td:first-child,.pending-list tr.js-pendiente td:last-child{grid-column:1/-1;}
+      .pending-list tr.js-pendiente td:last-child .btn{width:100%;}
+    }
   </style>
 </head>
 <body>
@@ -117,8 +129,8 @@
                   <input type="hidden" name="completar_pendiente" value="1">
                 </form>
               </td>
-              <td><input form="completar-<%= unidad.id %>" class="form-control form-control-sm" name="ruta" maxlength="150" aria-label="Ruta de <%= unidad.placa %>" required></td>
-              <td><input form="completar-<%= unidad.id %>" class="form-control form-control-sm" name="chofer" maxlength="180" aria-label="Chofer de <%= unidad.placa %>" required></td>
+              <td><label for="ruta-<%= unidad.id %>" class="form-label small fw-semibold d-md-none mb-1">Ruta</label><input id="ruta-<%= unidad.id %>" form="completar-<%= unidad.id %>" class="form-control form-control-sm" name="ruta" maxlength="150" aria-label="Ruta de <%= unidad.placa %>" required></td>
+              <td><label for="chofer-<%= unidad.id %>" class="form-label small fw-semibold d-md-none mb-1">Chofer</label><input id="chofer-<%= unidad.id %>" form="completar-<%= unidad.id %>" class="form-control form-control-sm" name="chofer" maxlength="180" aria-label="Chofer de <%= unidad.placa %>" required></td>
               <td><button form="completar-<%= unidad.id %>" class="btn btn-primary btn-sm text-nowrap" type="submit"><i class="bi bi-check2"></i> Guardar</button></td>
             </tr>
           <% }) %>
