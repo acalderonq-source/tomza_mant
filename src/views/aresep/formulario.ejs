@@ -27,7 +27,7 @@
         <% if (f.type === 'select') { %><select class="form-select" id="f-<%= f.id %>" name="<%= f.id %>"><option value="">Pendiente</option><% Object.entries(f.choices).forEach(([k, label]) => { %><option value="<%= k %>" <%= String(v) === k ? 'selected' : '' %>><%= k %> · <%= label %></option><% }) %></select>
         <% } else { %><input class="form-control" id="f-<%= f.id %>" name="<%= f.id %>" value="<%= v %>" type="<%= ['number', 'integer'].includes(f.type) ? 'number' : f.type %>"
           <% if (['number', 'integer'].includes(f.type)) { %>min="<%= f.min ?? 0 %>" max="<%= f.max ?? 999999999999.99 %>" step="<%= f.type === 'integer' ? '1' : '0.01' %>"<% } %>
-          <% if (f.type === 'text') { %>maxlength="250"<% } %> <%= f.required ? 'required' : '' %> <%= f.readonly ? 'readonly' : '' %>><% } %>
+          <% if (f.type === 'text') { %>maxlength="250"<% } %> <%= f.required ? 'required' : '' %> <%- f.readonly ? 'readonly data-placa-ready="1"' : '' %>><% } %>
       </div><% }) %>
     </div></fieldset><% }) %>
     <% if (seccion === 'planilla') { %><p class="aresep-note">La deducción CCSS se calcula con el porcentaje que usted indique para el mes. No se aplica automáticamente el porcentaje del archivo de ejemplo.</p><% } %>

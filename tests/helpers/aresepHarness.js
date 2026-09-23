@@ -73,7 +73,8 @@ function crearHarness() {
     const role = req.get('x-test-role') || 'ADMIN';
     req.session = { csrfToken: 'test-csrf', user: role === 'ANON' ? null : { id: 1, usuario: req.get('x-test-user') || 'admin', nombre: 'Administrador de prueba', rol: role } };
     const render = res.render.bind(res);
-    res.render = (view, locals) => render(view, locals, (err, html) => err ? next(err) : res.send(injectSecurityAssets(html, 'test-csrf')));
+    res.render = (view, locals) => render(view, locals, (err, html) => err ? next(err) : res.send(injectSecurityAssets(
+      html.replace('</body>', '<script src="/js/placa-search.js" defer></script><script src="/js/loading-guard.js" defer></script></body>'), 'test-csrf')));
     next();
   });
   app.use(ensureCsrfToken);

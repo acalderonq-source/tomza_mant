@@ -26,6 +26,7 @@ async function main() {
     await page.screenshot({ path: path.join(os.tmpdir(), 'aresep-desktop.png'), fullPage: true });
     await page.getByRole('link', { name: 'Editar C164528', exact: true }).click();
     assert.equal(await page.locator('#f-placa').inputValue(), 'C164528');
+    assert.equal(await page.locator('#f-placa').evaluate(el => el.parentElement.querySelectorAll('.tomza-plate-results').length), 0);
     assert.equal(await page.locator('#f-marca').inputValue(), 'Hino');
     await page.locator('#f-activo').fill('0001');
     await page.locator('#f-codigo_cr').fill('CR-01');
