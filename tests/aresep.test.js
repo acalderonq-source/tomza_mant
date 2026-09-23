@@ -23,8 +23,8 @@ test('Roles y protección de planillas', () => {
 });
 test('Períodos, fechas reales y pertenencia al mes', () => {
   for (const p of ['2026-00', '2026-13', '26-09', '', ['2026-09']]) assert.equal(a.periodoValido(p), false);
-  assert.throws(() => a.validar('rutas', { fecha: '2026-02-30', bodega: 'A', producto: 'B' }, '2026-02'), /fecha inválida/);
-  assert.throws(() => a.validar('rutas', { fecha: '2026-08-01', bodega: 'A', producto: 'B' }, '2026-09'), /mes seleccionado/);
+  assert.throws(() => a.validar('rutas', { sede: 'Cartago', fecha: '2026-02-30', bodega: 'A', producto: 'B' }, '2026-02'), /fecha inválida/);
+  assert.throws(() => a.validar('rutas', { sede: 'Cartago', fecha: '2026-08-01', bodega: 'A', producto: 'B' }, '2026-09'), /mes seleccionado/);
 });
 test('No inventa campos pendientes ni altera la placa desde el formulario', () => {
   const d = a.validar('unidades', { placa: 'OTRA' }, '2026-09', unidad);
@@ -36,15 +36,15 @@ test('No inventa campos pendientes ni altera la placa desde el formulario', () =
   assert.throws(() => a.validar('unidades', { tipo_transporte: '99' }, '2026-09', unidad), /opción inválida/);
 });
 test('Distingue cero de pendiente y rechaza importes inválidos', () => {
-  const d = a.validar('ventas', { litros: '0', ruta: '0,00' }, '2026-09');
+  const d = a.validar('ventas', { sede: 'Cartago', litros: '0', ruta: '0,00' }, '2026-09');
   assert.equal(d.litros, 0);
   assert.equal(d.planta, null);
   assert.equal(a.derivados('ventas', d).diferencia, null);
-  for (const value of ['-1', 'NaN', 'Infinity', '1e5', '1.000,00', '12.345', '999999999999999']) assert.throws(() => a.validar('ventas', { litros: value }, '2026-09'));
+  for (const value of ['-1', 'NaN', 'Infinity', '1e5', '1.000,00', '12.345', '999999999999999']) assert.throws(() => a.validar('ventas', { sede: 'Cartago', litros: value }, '2026-09'));
   assert.throws(() => a.validar('unidades', { llantas: '2.5' }, '2026-09', unidad), /fuera de rango/);
 });
 test('Planilla utiliza la tasa ingresada, sin la tasa fija del ejemplo', () => {
-  const d = a.validar('planilla', { nombre: 'Prueba', identificacion: '001', salario_reportado: '1000', salario_base: '900', comision: '100', tasa_ccss: '10' }, '2026-09');
+  const d = a.validar('planilla', { sede: 'Cartago', nombre: 'Prueba', identificacion: '001', salario_reportado: '1000', salario_base: '900', comision: '100', tasa_ccss: '10' }, '2026-09');
   assert.deepEqual(a.derivados('planilla', d), { base_comision: 1000, ccss: 100, neto: 900 });
   assert.equal(a.derivados('planilla', { ...d, tasa_ccss: null }).neto, null);
   assert.throws(() => a.validar('planilla', { ...d, dias_laborados: 30, dias_incapacidad: 1 }, '2026-09'), /días del mes/);
@@ -53,6 +53,11 @@ test('Identidad normalizada impide duplicados de ruta, persona y unidad', () => 
   assert.equal(a.clave('operacion', { ruta: ' Río  Claro ' }, 1), a.clave('operacion', { ruta: 'rio claro' }, 1));
   assert.notEqual(a.clave('operacion', { ruta: 'A' }, 1), a.clave('operacion', { ruta: 'B' }, 1));
   assert.notEqual(a.clave('unidades', {}, 1), a.clave('unidades', {}, 2));
+  assert.notEqual(a.clave('ventas', { sede: 'Cartago' }), a.clave('ventas', { sede: 'Nicoya' }));
+  assert.notEqual(a.clave('rutas', { sede: 'Cartago', fecha: '2026-09-01', bodega: 'Ruta 1', producto: 'Cil25' }),
+    a.clave('rutas', { sede: 'Nicoya', fecha: '2026-09-01', bodega: 'Ruta 1', producto: 'Cil25' }));
+  assert.equal(a.sedeRegistro({ seccion: 'unidades', datos: { almacenamiento: 'Cartago' } }), 'Cartago');
+  assert.equal(a.sedeRegistro({ seccion: 'operacion', unidad_id: 1, datos: {} }, new Map([[1, 'Guapiles']])), 'Guapiles');
 });
 test('Excel A7 mantiene plantilla, códigos y datos de cada columna', async () => {
   const d = a.validar('unidades', { activo: '0001', almacenamiento: 'Cartago', codigo_cr: 'CR-01', tipo_transporte: '3', medicion: '2', serie_medidor: '00007', marca: 'Hino', peso_maximo: '5000.50', potencia: '200', llantas: '6', anio: '2016' }, '2026-09', unidad);
@@ -70,7 +75,7 @@ test('Excel A7 mantiene plantilla, códigos y datos de cada columna', async () =
 test('Excel de costos no conserva datos de ejemplo y calcula sólo datos conocidos', async () => {
   const op = a.validar('operacion', { ruta: 'Prueba', marchamo: '200', costo_peaje: '100' }, '2026-09', unidad);
   const rows = [{ seccion: 'operacion', datos: op, version: 1 },
-    { seccion: 'ventas', datos: { litros: 100, ruta: 70, planta: 30 }, version: 1 },
+    { seccion: 'ventas', datos: { sede: 'Cartago', litros: 100, ruta: 70, planta: 30 }, version: 1 },
     { seccion: 'planilla', datos: { nombre: '=HYPERLINK("bad")', identificacion: '001', salario_base: 100, comision: 0, salario_reportado: 100, tasa_ccss: 5 }, version: 1 }];
   const wb = new ExcelJS.Workbook();
   await wb.xlsx.load(await generarExcel('costos', '2026-09', rows, true));
@@ -121,13 +126,31 @@ test('Rutas HTTP: permisos, CSRF, alta, edición, mes, duplicados y auditoría a
       assert.match(await (await get('?periodo=2026-09')).text(), /C164528/);
       assert.doesNotMatch(await (await get('?periodo=2026-10')).text(), /C164528/);
     });
+    await t.test('Filtro por sede afecta filas, apartados, descargas e importación', async () => {
+      const html = await (await get('?periodo=2026-09&sede=Cartago')).text();
+      assert.match(html, /C164528/);
+      assert.doesNotMatch(html, /C178652/);
+      assert.match(html, /seccion=operacion&amp;sede=Cartago/);
+      const form = await (await get('/nuevo?periodo=2026-09&seccion=operacion&sede=Cartago')).text();
+      assert.match(form, /C164528/);
+      assert.doesNotMatch(form, /C178652/);
+      const exportado = await get('/exportar/a7?periodo=2026-09&sede=Cartago');
+      const wb = new ExcelJS.Workbook();
+      await wb.xlsx.load(await exportado.arrayBuffer());
+      assert.equal(wb.getWorksheet('Plantilla').getCell('D2').value, 'C164528');
+      assert.equal(wb.getWorksheet('Plantilla').getCell('D3').value, null);
+      assert.equal(wb.getWorksheet('Control').getCell('F4').value, 'Cartago');
+      assert.equal((await post('/incorporar-unidades?periodo=2026-10&sede=Cartago', {})).status, 302);
+      assert.equal(db.rows.filter(r => r.periodo === '2026-10' && r.seccion === 'unidades').length, 1);
+    });
     await t.test('Edición y protección contra versiones obsoletas', async () => {
+      const historyBefore = db.history.length;
       assert.equal((await post('/registro/1', { version: 1, activo: '001', placa: 'BAD' })).status, 302);
       assert.equal(JSON.parse(db.rows[0].datos).placa, 'C164528');
       assert.equal(db.rows[0].version, 2);
       assert.equal((await post('/registro/1', { version: 1, activo: '002' })).status, 409);
       assert.equal(db.rows[0].version, 2);
-      assert.equal(db.history.length, 3);
+      assert.equal(db.history.length, historyBefore + 1);
     });
     await t.test('Alta de operación, duplicados, campos inválidos y salida escapada', async () => {
       const data = { unidad_id: 1, ruta: '<script>alert(1)</script>', km_mes: '100,50' };
@@ -139,7 +162,7 @@ test('Rutas HTTP: permisos, CSRF, alta, edición, mes, duplicados y auditoría a
       assert.match(html, /&lt;script&gt;/);
     });
     await t.test('Planilla privada incluso con ID o exportación directos', async () => {
-      assert.equal((await post('/nuevo?periodo=2026-09&seccion=planilla', { nombre: 'Persona Privada', identificacion: '001' })).status, 302);
+      assert.equal((await post('/nuevo?periodo=2026-09&seccion=planilla', { sede: 'Cartago', nombre: 'Persona Privada', identificacion: '001' })).status, 302);
       const id = db.rows.find(r => r.seccion === 'planilla').id;
       assert.equal((await get(`/registro/${id}`, { 'x-test-role': 'TRAMITES' })).status, 404);
       assert.equal((await post(`/registro/${id}`, { version: 1 }, { 'x-test-role': 'TRAMITES' })).status, 404);
@@ -149,10 +172,26 @@ test('Rutas HTTP: permisos, CSRF, alta, edición, mes, duplicados y auditoría a
       await wb.xlsx.load(await response.arrayBuffer());
       assert.equal(wb.getWorksheet('Planilla 1 mes'), undefined);
     });
+    await t.test('Litros vendidos admiten registros y exportaciones independientes por sede', async () => {
+      for (const [sede, litros] of [['Cartago', 100], ['Guapiles', 50]]) {
+        assert.equal((await post('/nuevo?periodo=2026-09&seccion=ventas&sede=' + sede, { sede, litros })).status, 302);
+      }
+      assert.equal(db.rows.filter(r => r.seccion === 'ventas').length, 2);
+      const listado = await (await get('?periodo=2026-09&seccion=ventas&sede=Guapiles')).text();
+      assert.match(listado, /Guapiles/);
+      assert.match(listado, /50/);
+      assert.doesNotMatch(listado, />100</);
+      const response = await get('/exportar/costos?periodo=2026-09&sede=Guapiles');
+      const wb = new ExcelJS.Workbook();
+      await wb.xlsx.load(await response.arrayBuffer());
+      assert.equal(wb.getWorksheet('LITROS VENDIDOS periodo').getCell('B8').value, 50);
+      assert.equal(wb.getWorksheet('LITROS VENDIDOS periodo').getCell('B9').value, null);
+      assert.equal(wb.getWorksheet('Control').getCell('F4').value, 'Guapiles');
+    });
     await t.test('Rollback completo cuando falla el historial', async () => {
       const count = db.rows.length;
       db.failAudit = true;
-      assert.equal((await post('/nuevo?periodo=2026-09&seccion=ventas', { litros: '100' })).status, 500);
+      assert.equal((await post('/nuevo?periodo=2026-09&seccion=ventas', { sede: 'La Cruz', litros: '100' })).status, 500);
       db.failAudit = false;
       assert.equal(db.rows.length, count);
     });

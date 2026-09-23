@@ -85,6 +85,13 @@ function validar(seccion, body, periodo, unidad) {
   if (!Object.hasOwn(secciones, seccion) || !periodoValido(periodo)) throw new Error('Seleccione un apartado y un mes válidos.');
   if (secciones[seccion].unidad && !unidad) throw new Error('Seleccione una unidad registrada.');
   const datos = {};
+  if (!secciones[seccion].unidad) {
+    const sede = texto(body.sede);
+    if (!sede || sede.length > 100) throw new Error('Seleccione una sede válida.');
+    datos.sede = sede;
+  } else if (seccion === 'operacion') {
+    datos.sede = texto(body.sede) || texto(unidad.sede);
+  }
   for (const f of campos(seccion)) {
     const raw = f.id === 'placa' ? unidad.placa : texto(body[f.id]);
     if (!raw) {
@@ -114,9 +121,13 @@ function validar(seccion, body, periodo, unidad) {
   if (datos.observacion.length > 2000) throw new Error('La observación admite hasta 2000 caracteres.');
   return datos;
 }
-function pendientes(seccion, datos) { return campos(seccion).filter(f => !f.optional && (datos[f.id] === null || datos[f.id] === undefined || datos[f.id] === '')).map(f => f.label); }
+function pendientes(seccion, datos) {
+  const faltantes = campos(seccion).filter(f => !f.optional && (datos[f.id] === null || datos[f.id] === undefined || datos[f.id] === '')).map(f => f.label);
+  if (!secciones[seccion].unidad && !datos.sede) faltantes.unshift('Sede');
+  return faltantes;
+}
 function clave(seccion, d, unidadId) {
-  const keys = { unidades: [unidadId], operacion: [unidadId, d.ruta], planilla: [d.identificacion], ventas: ['total'], rutas: [d.fecha, d.bodega, d.producto] };
+  const keys = { unidades: [unidadId], operacion: [unidadId, d.ruta], planilla: [d.identificacion], ventas: [d.sede], rutas: [d.sede, d.fecha, d.bodega, d.producto] };
   const values = keys[seccion].map(v => String(v).normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').trim().toUpperCase());
   return crypto.createHash('sha256').update(JSON.stringify(values)).digest('hex');
 }
@@ -131,6 +142,12 @@ function derivados(seccion, d) {
   return {};
 }
 function leerDatos(record) { return typeof record.datos === 'string' ? JSON.parse(record.datos) : record.datos; }
+function sedeRegistro(record, unidadesPorId = new Map()) {
+  const datos = leerDatos(record);
+  if (record.seccion === 'unidades') return texto(datos.almacenamiento) || texto(record.sede) || texto(unidadesPorId.get(record.unidad_id));
+  if (record.seccion === 'operacion') return texto(datos.sede) || texto(record.sede) || texto(unidadesPorId.get(record.unidad_id));
+  return texto(datos.sede);
+}
 function preparar(record) {
   const datos = leerDatos(record);
   return { ...record, datos, valores: { ...datos, ...derivados(record.seccion, datos) }, pendientes: pendientes(record.seccion, datos) };
@@ -142,4 +159,4 @@ function mostrar(seccion, key, value) {
   if (f?.choices) return f.choices[value] || value;
   return typeof value === 'number' ? value.toLocaleString('es-CR', { maximumFractionDigits: 2 }) : value;
 }
-module.exports = { secciones, tipos, mediciones, campos, permitidas, mesActual, periodoValido, validar, pendientes, clave, derivados, leerDatos, preparar, mostrar, extras };
+module.exports = { secciones, tipos, mediciones, campos, permitidas, mesActual, periodoValido, validar, pendientes, clave, derivados, leerDatos, preparar, mostrar, sedeRegistro, extras };

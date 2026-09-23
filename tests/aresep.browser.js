@@ -23,6 +23,18 @@ async function main() {
     await page.waitForURL('**/*incorporados=1');
     assert.equal(db.rows.length, 2);
     assert.equal(await page.locator('tbody tr').count(), 2);
+    await page.locator('#sede').selectOption('Cartago');
+    await page.getByRole('button', { name: 'Consultar' }).click();
+    await page.waitForURL('**/*sede=Cartago*');
+    assert.equal(await page.locator('tbody tr').count(), 1);
+    assert.match(await page.locator('tbody').textContent(), /C164528/);
+    assert.doesNotMatch(await page.locator('tbody').textContent(), /C178652/);
+    await page.getByRole('link', { name: /Operación y costos/ }).click();
+    assert.equal(new URL(page.url()).searchParams.get('sede'), 'Cartago');
+    await page.getByRole('link', { name: /Unidades A7/ }).click();
+    await page.locator('#sede').selectOption('');
+    await page.getByRole('button', { name: 'Consultar' }).click();
+    await page.waitForURL(url + '/aresep?seccion=unidades&periodo=2026-09&sede=&q=&estado=');
     await page.screenshot({ path: path.join(os.tmpdir(), 'aresep-desktop.png'), fullPage: true });
     await page.getByRole('link', { name: 'Editar C164528', exact: true }).click();
     assert.equal(await page.locator('#f-placa').inputValue(), 'C164528');
@@ -55,6 +67,7 @@ async function main() {
       await page.goto(`${url}/aresep/nuevo?periodo=2026-09&seccion=${seccion}`);
       assert.equal(await page.locator('form input[name="_csrf"]').inputValue(), 'test-csrf');
       assert.equal(await page.locator('.form-error').count(), 0);
+      if (['planilla', 'ventas', 'rutas'].includes(seccion)) assert.equal(await page.locator('#sede-registro').count(), 1);
     }
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto(`${url}/aresep?periodo=2026-09`);

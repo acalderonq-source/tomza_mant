@@ -76,10 +76,11 @@ async function generarExcel(tipo, periodo, rows, incluirPlanilla) {
         ventas.getCell(`${c}${n}`).numFmt = '0.00%';
       }
     });
-    ventas.getCell('A20').value = 'Total del periodo';
+    const totalVentasRow = Math.max(20, de('ventas').length + 8);
+    ventas.getCell(`A${totalVentasRow}`).value = 'Total del periodo';
     for (const [col, key] of [['B', 'litros'], ['C', 'ruta'], ['D', 'planta'], ['E', 'diferencia']]) {
       const values = de('ventas').map(r => r.valores[key]).filter(v => v !== null && v !== undefined);
-      formula(ventas, `${col}20`, `IF(COUNT(${col}8:${col}19)=0,"",SUM(${col}8:${col}19))`, values.length ? values.reduce((s, v) => s + v, 0) : null);
+      formula(ventas, `${col}${totalVentasRow}`, `IF(COUNT(${col}8:${col}${totalVentasRow - 1})=0,"",SUM(${col}8:${col}${totalVentasRow - 1}))`, values.length ? values.reduce((s, v) => s + v, 0) : null);
     }
     const rutas = wb.getWorksheet('Litros por ruta');
     limpiar(rutas, 5, 18);
@@ -96,11 +97,11 @@ async function generarExcel(tipo, periodo, rows, incluirPlanilla) {
   const control = wb.addWorksheet('Control');
   control.addRow(['Periodo', periodo]);
   control.addRow(['Uso', 'Control interno basado en las plantillas suministradas. Revisar antes de presentar.']);
-  control.addRow(['Apartado', 'Registro', 'Estado', 'Campos pendientes', 'Versión']);
+  control.addRow(['Apartado', 'Registro', 'Estado', 'Campos pendientes', 'Versión', 'Sede']);
   registros.forEach(r => control.addRow([a.secciones[r.seccion].title,
     r.datos.placa || r.datos.nombre || r.datos.bodega || periodo,
-    r.pendientes.length ? 'Pendiente' : 'Completo', r.pendientes.join(', '), r.version]));
-  control.columns = [{ width: 24 }, { width: 36 }, { width: 18 }, { width: 90 }, { width: 12 }];
+    r.pendientes.length ? 'Pendiente' : 'Completo', r.pendientes.join(', '), r.version, a.sedeRegistro(r)]));
+  control.columns = [{ width: 24 }, { width: 36 }, { width: 18 }, { width: 90 }, { width: 12 }, { width: 25 }];
   control.getRow(3).font = { bold: true };
   control.getColumn(4).alignment = { wrapText: true, vertical: 'top' };
   return wb.xlsx.writeBuffer();

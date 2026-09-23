@@ -10,7 +10,8 @@ function crearHarness() {
     async query(sql, args = []) {
       sql = sql.replace(/\s+/g, ' ').trim();
       this.calls.push({ sql, args });
-      if (sql.startsWith('SELECT') && sql.includes('FROM unidades')) return [sql.includes('WHERE id = ?') ? this.units.filter(u => u.id === Number(args[0])) : this.units];
+      if (sql.startsWith('SELECT') && sql.includes('FROM unidades')) return [sql.includes('WHERE id = ?') ? this.units.filter(u => u.id === Number(args[0]))
+        : sql.includes('WHERE sede = ?') ? this.units.filter(u => u.sede === args[0]) : this.units];
       if (sql.startsWith('SELECT h.version')) return [this.history.filter(h => h.registro_id === Number(args[0])).map(h => ({ ...h, usuario: 'Administrador', creado_en: new Date() }))];
       if (sql.startsWith('SELECT seccion, COUNT')) {
         const counts = {};

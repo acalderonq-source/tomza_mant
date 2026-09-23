@@ -7,11 +7,11 @@
   <link href="/css/aresep.css" rel="stylesheet">
 </head>
 <body>
-<nav class="aresep-nav"><a href="/aresep?periodo=<%= periodo %>&seccion=<%= seccion %>">Volver a ARESEP</a><strong><%= periodo %></strong><span><%= user.nombre %></span></nav>
+<nav class="aresep-nav"><a href="/aresep?<%= new URLSearchParams({ periodo, seccion, ...(sedeFiltro ? { sede: sedeFiltro } : {}) }).toString() %>">Volver a ARESEP</a><strong><%= periodo %></strong><span><%= user.nombre %></span></nav>
 <main class="aresep-shell">
   <header class="aresep-heading"><div><h1><%= row ? 'Editar' : 'Agregar' %> · <%= a.secciones[seccion].title %></h1><div class="muted">Mes de control: <%= periodo %><%= row ? ' · Versión ' + row.version : '' %></div></div></header>
   <% if (error) { %><div role="alert" class="form-error"><%= error %></div><% } %>
-  <form method="post" action="<%= row ? '/aresep/registro/' + row.id : '/aresep/nuevo?periodo=' + periodo + '&seccion=' + seccion %>" id="aresep-form">
+  <form method="post" action="<%= row ? '/aresep/registro/' + row.id + (sedeFiltro ? '?' + new URLSearchParams({ sede: sedeFiltro }).toString() : '') : '/aresep/nuevo?' + new URLSearchParams({ periodo, seccion, ...(sedeFiltro ? { sede: sedeFiltro } : {}) }).toString() %>" id="aresep-form">
     <input type="hidden" name="version" value="<%= version %>">
     <% if (a.secciones[seccion].unidad) { %>
     <div class="aresep-fields"><div class="field"><label for="unidad-buscar">Buscar placa</label><input class="form-control" id="unidad-buscar" type="search" autocomplete="off" <%= row ? 'disabled' : '' %>></div>
@@ -20,6 +20,9 @@
         <% unidades.forEach(u => { %><option value="<%= u.id %>" <%= String(unidadId) === String(u.id) ? 'selected' : '' %> data-placa="<%= u.placa %>" data-marca="<%= u.marca || '' %>" data-almacenamiento="<%= u.sede || '' %>" data-anio="<%= u.anio || '' %>"><%= u.placa %> · <%= u.marca || '' %> <%= u.modelo || '' %> · <%= u.sede || '' %></option><% }) %>
       </select><% if (row) { %><input type="hidden" name="unidad_id" value="<%= row.unidad_id %>"><% } %></div>
     </div><% } %>
+    <% if (!a.secciones[seccion].unidad) { %>
+    <div class="field"><label for="sede-registro">Sede *</label><select class="form-select" id="sede-registro" name="sede" required><option value="">Seleccione la sede</option><% sedes.forEach(s => { %><option value="<%= s %>" <%= sedeSeleccionada === s ? 'selected' : '' %>><%= s %></option><% }) %></select></div>
+    <% } %>
     <% a.secciones[seccion].groups.forEach(g => { %>
     <fieldset class="aresep-group"><legend><%= g.title %></legend><div class="aresep-fields">
       <% g.fields.forEach(f => { const v = valores[f.id] ?? ''; %><div class="field">
@@ -33,7 +36,7 @@
     <% if (seccion === 'planilla') { %><p class="aresep-note">La deducción CCSS se calcula con el porcentaje que usted indique para el mes. No se aplica automáticamente el porcentaje del archivo de ejemplo.</p><% } %>
     <% if (seccion === 'rutas') { %><p class="aresep-note">Registre los litros reales. No se convierten libras a litros automáticamente.</p><% } %>
     <div class="field"><label for="observacion">Observaciones</label><textarea class="form-control" id="observacion" name="observacion" rows="3" maxlength="2000"><%= valores.observacion || '' %></textarea></div>
-    <div class="aresep-footer"><button class="btn btn-success" type="submit">Guardar registro</button><a class="btn btn-outline-secondary" href="/aresep?periodo=<%= periodo %>&seccion=<%= seccion %>">Cancelar</a><span class="muted">Los campos vacíos quedan pendientes; cero significa que no hubo consumo o gasto.</span></div>
+    <div class="aresep-footer"><button class="btn btn-success" type="submit">Guardar registro</button><a class="btn btn-outline-secondary" href="/aresep?<%= new URLSearchParams({ periodo, seccion, ...(sedeFiltro ? { sede: sedeFiltro } : {}) }).toString() %>">Cancelar</a><span class="muted">Los campos vacíos quedan pendientes; cero significa que no hubo consumo o gasto.</span></div>
   </form>
   <% if (historial.length) { %><section class="aresep-group"><h2 class="mb-3">Últimas modificaciones</h2><div class="aresep-table"><table><thead><tr><th>Versión</th><th>Fecha de registro</th><th>Usuario</th></tr></thead><tbody><% historial.forEach(h => { %><tr><td><%= h.version %></td><td><%= new Date(h.creado_en).toLocaleString('es-CR', { timeZone: 'America/Costa_Rica' }) %></td><td><%= h.usuario || 'Usuario no disponible' %></td></tr><% }) %></tbody></table></div></section><% } %>
 </main>

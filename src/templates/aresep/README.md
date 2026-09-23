@@ -13,6 +13,12 @@ sistema sin modificar sus datos maestros. Potencia, codigo CR, activo, medidor y
 otros campos no presentes quedan pendientes. No se infiere el tipo de transporte
 a partir de una sede ni se realizan conversiones de libras a litros.
 
+El filtro de sede usa el almacenamiento de A7 y una copia de la sede de la
+unidad al guardar operaciones. Planilla, ventas y litros por ruta registran sede
+propia. El filtro tambien se aplica a las cifras por apartado, la incorporacion
+de fichas A7 y ambos archivos exportados. La hoja Control incluye una columna
+Sede; ventas permite un consolidado por sede en cada mes.
+
 Los datos se guardan en `aresep_registros` (JSON validado mediante el esquema de
 campos) y cada version en `aresep_historial`, dentro de la misma transaccion. Hay
 una clave unica por mes y ficha/unidad-ruta/persona/producto-fecha-ruta. Los cambios

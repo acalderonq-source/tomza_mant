@@ -13,13 +13,13 @@
   <header class="aresep-heading">
     <div><h1>Control ARESEP</h1><div class="muted">Transporte y costos de distribución · <%= periodo %></div></div>
     <div class="aresep-actions">
-      <a class="btn btn-outline-secondary" href="/aresep/exportar/a7?periodo=<%= periodo %>"><i class="bi bi-download"></i> Excel A7</a>
-      <a class="btn btn-outline-secondary" href="/aresep/exportar/costos?periodo=<%= periodo %>"><i class="bi bi-download"></i> Excel costos</a>
+      <a class="btn btn-outline-secondary" href="/aresep/exportar/a7?<%= new URLSearchParams({ periodo, ...(sede ? { sede } : {}) }).toString() %>"><i class="bi bi-download"></i> Excel A7</a>
+      <a class="btn btn-outline-secondary" href="/aresep/exportar/costos?<%= new URLSearchParams({ periodo, ...(sede ? { sede } : {}) }).toString() %>"><i class="bi bi-download"></i> Excel costos</a>
     </div>
   </header>
   <nav class="aresep-tabs" aria-label="Apartados ARESEP">
     <% a.permitidas(user).forEach(key => { %>
-      <a href="/aresep?periodo=<%= periodo %>&seccion=<%= key %>" <%- key === seccion ? 'aria-current="page"' : '' %>><%= a.secciones[key].title %> <small><%= cuentas[key] || 0 %></small></a>
+      <a href="/aresep?<%= new URLSearchParams({ periodo, seccion: key, ...(sede ? { sede } : {}) }).toString() %>" <%- key === seccion ? 'aria-current="page"' : '' %>><%= a.secciones[key].title %> <small><%= cuentas[key] || 0 %></small></a>
     <% }) %>
   </nav>
   <% if (mensaje) { %><div class="alert alert-success" role="status"><%= mensaje %></div><% } %>
@@ -28,35 +28,36 @@
     <h2><%= a.secciones[seccion].title %></h2>
     <div class="aresep-actions">
       <% if (seccion === 'unidades') { %>
-      <form method="post" action="/aresep/incorporar-unidades?periodo=<%= periodo %>">
-        <button class="btn btn-outline-success" type="submit"><i class="bi bi-truck"></i> Incorporar unidades activas</button>
+      <form method="post" action="/aresep/incorporar-unidades?<%= new URLSearchParams({ periodo, ...(sede ? { sede } : {}) }).toString() %>">
+        <button class="btn btn-outline-success" type="submit"><i class="bi bi-truck"></i> Incorporar unidades activas<%= sede ? ' de ' + etiquetaSede(sede) : '' %></button>
       </form>
       <% } %>
-      <a class="btn btn-success" href="/aresep/nuevo?seccion=<%= seccion %>&periodo=<%= periodo %>"><i class="bi bi-plus-lg"></i> Agregar registro</a>
+      <a class="btn btn-success" href="/aresep/nuevo?<%= new URLSearchParams({ seccion, periodo, ...(sede ? { sede } : {}) }).toString() %>"><i class="bi bi-plus-lg"></i> Agregar registro</a>
     </div>
   </div>
   <form class="aresep-toolbar" method="get" action="/aresep">
     <input type="hidden" name="seccion" value="<%= seccion %>">
     <div><label for="periodo">Mes de control</label><input id="periodo" class="form-control" type="month" name="periodo" value="<%= periodo %>" min="2000-01" max="2099-12" required></div>
+    <div><label for="sede">Sede</label><select id="sede" name="sede" class="form-select"><option value="">Todas las sedes</option><% sedes.forEach(opcion => { %><option value="<%= opcion %>" <%= sede === opcion ? 'selected' : '' %>><%= etiquetaSede(opcion) %></option><% }) %></select></div>
     <div class="search"><label for="q">Buscar en este apartado</label><input class="form-control" id="q" name="q" value="<%= q %>" maxlength="200" placeholder="Placa, ruta o dato registrado"></div>
     <div><label for="estado">Estado de los datos</label><select id="estado" name="estado" class="form-select"><option value="">Todos</option><option value="pendiente" <%= estado === 'pendiente' ? 'selected' : '' %>>Pendientes</option><option value="completo" <%= estado === 'completo' ? 'selected' : '' %>>Completos</option></select></div>
     <button class="btn btn-outline-success" type="submit">Consultar</button>
   </form>
   <% if (registros.length) { %>
   <div class="aresep-table"><table><thead><tr>
-    <% a.secciones[seccion].columns.forEach(key => { %><th><%= a.campos(seccion).find(f => f.id === key)?.label || a.extras[key] %></th><% }) %>
+    <th>Sede</th><% a.secciones[seccion].columns.forEach(key => { %><th><%= a.campos(seccion).find(f => f.id === key)?.label || a.extras[key] %></th><% }) %>
     <th>Estado</th><th>Acciones</th></tr></thead><tbody>
     <% registros.forEach(r => { %><tr>
-      <% a.secciones[seccion].columns.forEach(key => { %><td><%= a.mostrar(seccion, key, r.valores[key]) %></td><% }) %>
+      <td><%= etiquetaSede(r.sede) %></td><% a.secciones[seccion].columns.forEach(key => { %><td><%= a.mostrar(seccion, key, r.valores[key]) %></td><% }) %>
       <td><span class="status <%= r.pendientes.length ? 'status-pending' : 'status-ready' %>" title="<%= r.pendientes.join(', ') %>"><%= r.pendientes.length ? r.pendientes.length + ' pendientes' : 'Completo' %></span></td>
-      <td><a href="/aresep/registro/<%= r.id %>" aria-label="Editar <%= r.datos.placa || r.datos.nombre || r.datos.bodega || periodo %>"><i class="bi bi-pencil-square"></i> Editar</a></td>
+      <td><a href="/aresep/registro/<%= r.id %><%= sede ? '?' + new URLSearchParams({ sede }).toString() : '' %>" aria-label="Editar <%= r.datos.placa || r.datos.nombre || r.datos.bodega || periodo %>"><i class="bi bi-pencil-square"></i> Editar</a></td>
     </tr><% }) %>
   </tbody></table></div>
   <% } else { %><div class="empty"><h2><%= total ? 'No hay coincidencias' : 'Sin registros en este mes' %></h2><p><%= total ? 'Cambie los filtros para consultar otros registros.' : 'Los datos de los otros meses se conservan por separado.' %></p></div><% } %>
   <div class="aresep-pagination"><span class="muted"><%= totalFiltrado %> registros encontrados</span>
-    <% if (pagina > 1) { %><a href="?<%= new URLSearchParams({ periodo, seccion, q, estado, pagina: pagina - 1 }).toString() %>">Anterior</a><% } %>
+    <% if (pagina > 1) { %><a href="?<%= new URLSearchParams({ periodo, seccion, sede, q, estado, pagina: pagina - 1 }).toString() %>">Anterior</a><% } %>
     <% if (paginas > 1) { %><span><%= pagina %> / <%= paginas %></span><% } %>
-    <% if (pagina < paginas) { %><a href="?<%= new URLSearchParams({ periodo, seccion, q, estado, pagina: pagina + 1 }).toString() %>">Siguiente</a><% } %>
+    <% if (pagina < paginas) { %><a href="?<%= new URLSearchParams({ periodo, seccion, sede, q, estado, pagina: pagina + 1 }).toString() %>">Siguiente</a><% } %>
   </div>
   <p class="aresep-note">Control interno basado en sus plantillas. “Completo” indica campos llenos, no validación ni presentación ante ARESEP. Los Excel incluyen también los registros pendientes.</p>
   <% if (!a.permitidas(user).includes('planilla')) { %><p class="aresep-note">La planilla no se incluye en su consulta ni en su exportación.</p><% } %>
