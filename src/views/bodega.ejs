@@ -255,6 +255,37 @@
       min-height: 1rem;
     }
 
+    .placa-picker { position: relative; flex: 1 1 auto; min-width: 0; }
+    .placa-picker > .form-control { width: 100%; }
+    .input-group > .placa-picker .form-control { border-top-right-radius: 0; border-bottom-right-radius: 0; }
+    .placa-options {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      box-shadow: 0 12px 24px rgba(8, 23, 47, .16);
+      left: 0;
+      max-height: 250px;
+      overflow-y: auto;
+      position: absolute;
+      right: 0;
+      top: calc(100% + 3px);
+      z-index: 30;
+    }
+    .placa-options[hidden] { display: none; }
+    .placa-option {
+      background: #fff;
+      border: 0;
+      border-bottom: 1px solid #e5edf7;
+      color: var(--ink);
+      display: block;
+      padding: .5rem .65rem;
+      text-align: left;
+      width: 100%;
+    }
+    .placa-option:hover, .placa-option.active { background: #eef4ff; }
+    .placa-option small { color: var(--muted); display: block; }
+    .placa-empty { color: var(--muted); padding: .55rem .65rem; }
+
     .table-responsive {
       border-radius: 0 0 10px 10px;
     }
@@ -646,7 +677,7 @@
         <div class="col-md-4">
           <label class="form-label">Placa de la unidad</label>
           <div class="input-group">
-            <input class="form-control text-uppercase" id="placa-compatible" placeholder="C164528" autocomplete="off">
+            <input class="form-control text-uppercase placa-search" id="placa-compatible" placeholder="C164528" autocomplete="off" autocapitalize="characters" spellcheck="false">
             <button class="btn btn-primary fw-bold" type="button" id="buscar-compatible"><i class="bi bi-search"></i> Buscar</button>
           </div>
         </div>
@@ -675,7 +706,7 @@
     </div>
     <div class="panel-body">
       <form method="POST" action="/bodega/compatibilidad" class="row g-2 form-card">
-        <div class="col-md-2"><label class="form-label">Placa ejemplo</label><input class="form-control text-uppercase" name="placa" placeholder="C164528" required></div>
+        <div class="col-md-2"><label class="form-label">Placa ejemplo</label><input class="form-control text-uppercase placa-search" name="placa" placeholder="C164528" autocomplete="off" autocapitalize="characters" spellcheck="false" required></div>
         <div class="col-md-2"><label class="form-label">Motor / configuración</label><input class="form-control" name="motor" placeholder="Ej. J08E"></div>
         <div class="col-md-2"><label class="form-label">Tipo de trabajo</label><input class="form-control" name="tipo_servicio" list="tipos-servicio" value="MANTENIMIENTO MOTOR" required></div>
         <div class="col-md-4">
@@ -769,7 +800,7 @@
           <form method="POST" action="/bodega/entregar" class="form-card" id="form-entrega">
             <input type="hidden" name="redirect_to" value="entregas">
             <div class="row g-2 mb-2">
-              <div class="col-md-3"><label class="form-label">Placa</label><input class="form-control placa-search" id="placa-entrega" name="placa" placeholder="C173517" required></div>
+              <div class="col-md-3"><label class="form-label">Placa</label><input class="form-control placa-search" id="placa-entrega" name="placa" placeholder="C173517" autocomplete="off" autocapitalize="characters" spellcheck="false" required></div>
               <div class="col-md-4"><label class="form-label">Mecánico</label><input class="form-control" name="mecanico" placeholder="Nombre del mecánico" required></div>
               <div class="col-md-3"><label class="form-label">Tipo de trabajo</label><select class="form-select" name="tipo_trabajo"><% tiposTrabajo.forEach(t => { %><option value="<%= t %>"><%= t %></option><% }) %></select></div>
               <div class="col-md-2 d-grid align-items-end"><label class="form-label">&nbsp;</label><button class="btn btn-primary fw-bold">Entregar</button></div>
@@ -897,7 +928,7 @@
               </div>
             </div>
             <div class="col-md-4"><label class="form-label">Cantidad</label><input class="form-control" type="number" step="0.01" min="0.01" name="cantidad" value="1" required></div>
-            <div class="col-md-4"><label class="form-label">Placa</label><input class="form-control placa-search" name="placa"></div>
+            <div class="col-md-4"><label class="form-label">Placa</label><input class="form-control placa-search" name="placa" autocomplete="off" autocapitalize="characters" spellcheck="false"></div>
             <div class="col-md-4"><label class="form-label">Mecánico</label><input class="form-control" name="mecanico"></div>
             <div class="col-12"><label class="form-label">Motivo</label><input class="form-control" name="motivo" placeholder="No utilizado"></div>
             <div class="col-12 d-grid"><button class="btn btn-warning fw-bold">Registrar devolución</button></div>
@@ -1095,6 +1126,123 @@
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
+  const normalizarEntradaPlaca = value => String(value || '').trim().toUpperCase().replace(/\s+/g, '');
+
+  const seleccionarPlaca = (input, placa) => {
+    input.value = placa;
+    input.dataset.placaValidada = normalizarEntradaPlaca(placa);
+    input.setCustomValidity('');
+    const lista = input.closest('.placa-picker')?.querySelector('.placa-options');
+    if (lista) lista.hidden = true;
+    input.setAttribute('aria-expanded', 'false');
+  };
+
+  const prepararBuscadorPlaca = (input, index) => {
+    const picker = document.createElement('div');
+    picker.className = 'placa-picker';
+    input.parentNode.insertBefore(picker, input);
+    picker.appendChild(input);
+    const lista = document.createElement('div');
+    lista.className = 'placa-options';
+    lista.id = `placa-opciones-${index}`;
+    lista.setAttribute('role', 'listbox');
+    lista.hidden = true;
+    picker.appendChild(lista);
+    input.setAttribute('role', 'combobox');
+    input.setAttribute('aria-autocomplete', 'list');
+    input.setAttribute('aria-controls', lista.id);
+    input.setAttribute('aria-expanded', 'false');
+
+    let timer;
+    let consultaId = 0;
+    let botones = [];
+    let activo = -1;
+    const cerrar = () => {
+      lista.hidden = true;
+      input.setAttribute('aria-expanded', 'false');
+      input.removeAttribute('aria-activedescendant');
+    };
+    const mostrar = unidades => {
+      lista.replaceChildren();
+      botones = [];
+      activo = -1;
+      if (!unidades.length) {
+        const vacio = document.createElement('div');
+        vacio.className = 'placa-empty';
+        vacio.textContent = 'No hay placas activas que coincidan.';
+        lista.appendChild(vacio);
+      }
+      unidades.forEach((unidad, itemIndex) => {
+        const opcion = document.createElement('button');
+        opcion.type = 'button';
+        opcion.className = 'placa-option';
+        opcion.id = `${lista.id}-${itemIndex}`;
+        opcion.setAttribute('role', 'option');
+        const titulo = document.createElement('strong');
+        titulo.textContent = unidad.placa;
+        const detalle = document.createElement('small');
+        detalle.textContent = [unidad.sede, unidad.marca, unidad.modelo].filter(Boolean).join(' · ');
+        opcion.append(titulo, detalle);
+        opcion.addEventListener('pointerdown', event => event.preventDefault());
+        opcion.addEventListener('click', () => { seleccionarPlaca(input, unidad.placa); cerrar(); });
+        lista.appendChild(opcion);
+        botones.push(opcion);
+      });
+      lista.hidden = false;
+      input.setAttribute('aria-expanded', 'true');
+    };
+    const consultar = async () => {
+      const q = input.value.trim();
+      const actual = ++consultaId;
+      if (!q) return cerrar();
+      try {
+        const respuesta = await fetch(`/bodega/api/placas?q=${encodeURIComponent(q)}`, { headers: { Accept: 'application/json' } });
+        if (!respuesta.ok) throw new Error('No se pudieron consultar las placas.');
+        const unidades = await respuesta.json();
+        if (actual === consultaId && input.value.trim() === q) mostrar(unidades);
+      } catch (error) {
+        if (actual === consultaId) {
+          mostrar([]);
+          lista.querySelector('.placa-empty').textContent = error.message;
+        }
+      }
+    };
+    input.addEventListener('input', () => {
+      input.value = input.value.toUpperCase();
+      input.dataset.placaValidada = '';
+      input.setCustomValidity(input.value.trim() ? 'Seleccione una placa de la lista.' : '');
+      cerrar();
+      clearTimeout(timer);
+      timer = setTimeout(consultar, 180);
+    });
+    input.addEventListener('focus', () => { if (input.value && !input.dataset.placaValidada) consultar(); });
+    input.addEventListener('keydown', event => {
+      if (event.key === 'Escape') return cerrar();
+      if (lista.hidden || !botones.length) return;
+      if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+        event.preventDefault();
+        activo = (activo + (event.key === 'ArrowDown' ? 1 : -1) + botones.length) % botones.length;
+        botones.forEach((boton, i) => boton.classList.toggle('active', i === activo));
+        input.setAttribute('aria-activedescendant', botones[activo].id);
+      } else if (event.key === 'Enter') {
+        event.preventDefault();
+        botones[activo >= 0 ? activo : 0].click();
+      }
+    });
+    input.addEventListener('blur', () => setTimeout(cerrar, 150));
+    input.form?.addEventListener('submit', event => {
+      if (!input.value.trim() && !input.required) return;
+      if (input.dataset.placaValidada !== normalizarEntradaPlaca(input.value)) {
+        event.preventDefault();
+        input.setCustomValidity('Seleccione una placa de la lista.');
+        input.reportValidity();
+        input.focus();
+      }
+    });
+  };
+
+  document.querySelectorAll('.placa-search').forEach(prepararBuscadorPlaca);
+
   const normalizarBusquedaArticulo = (value) => String(value || '')
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
@@ -1227,7 +1375,18 @@
 
   const buscarCompatibilidad = async () => {
     const placa = String(placaCompatible?.value || '').trim().toUpperCase();
-    if (!placa) return;
+    if (!placa) {
+      placaCompatible.setCustomValidity('Seleccione una placa de la lista.');
+      placaCompatible.reportValidity();
+      placaCompatible.focus();
+      return;
+    }
+    if (placaCompatible.dataset.placaValidada !== normalizarEntradaPlaca(placa)) {
+      placaCompatible.setCustomValidity('Seleccione una placa de la lista.');
+      placaCompatible.reportValidity();
+      placaCompatible.focus();
+      return;
+    }
     consultaCompatibilidad = null;
     resultadoCompatible?.classList.add('d-none');
     unidadCompatible?.classList.add('d-none');
@@ -1296,7 +1455,7 @@
       select.dispatchEvent(new Event('change', { bubbles: true }));
     });
 
-    document.getElementById('placa-entrega').value = consultaCompatibilidad.unidad.placa;
+    seleccionarPlaca(document.getElementById('placa-entrega'), consultaCompatibilidad.unidad.placa);
     document.getElementById('form-entrega')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   });
 </script>

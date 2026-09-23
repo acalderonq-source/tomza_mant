@@ -1,7 +1,6 @@
 const express = require("express");
 const router = express.Router();
 const pool = require("../db");
-const { normalizarPlaca } = require("../utils/placas");
 const { ensureGastosOperativosTables, registrarAuditoriaSistema, registrarGastoOperativo } = require("../utils/gastosOperativos");
 const { enviarNotificacionAdmins } = require("../utils/notificacionesPush");
 
@@ -373,15 +372,15 @@ async function ensureBodegaTables() {
 }
 
 async function obtenerUnidadPorPlaca(conn, placa, bloquear = false) {
-  const placaNormalizada = normalizarPlaca(placa) || upper(placa);
-  if (!placaNormalizada) return null;
+  const placaIngresada = upper(placa).replace(/\s+/g, "");
+  if (!placaIngresada) return null;
   const [[unidad]] = await conn.query(
     `SELECT id, placa, sede, marca, modelo, anio, motor
      FROM unidades
      WHERE REPLACE(UPPER(TRIM(placa)), ' ', '') = ?
        AND COALESCE(activa, 1) = 1
      LIMIT 1${bloquear ? " FOR UPDATE" : ""}`,
-    [placaNormalizada]
+    [placaIngresada]
   );
   return unidad || null;
 }
@@ -678,6 +677,26 @@ router.get("/inventario", (req, res) => renderBodega(req, res, "inventario"));
 router.get("/herramientas", (req, res) => renderBodega(req, res, "herramientas"));
 router.get("/movimientos", (req, res) => renderBodega(req, res, "movimientos"));
 
+router.get("/api/placas", async (req, res) => {
+  try {
+    const busqueda = upper(req.query.q).replace(/[^A-Z0-9]/g, "").slice(0, 30);
+    if (!busqueda) return res.json([]);
+    const [unidades] = await pool.query(
+      `SELECT id, placa, sede, marca, modelo
+       FROM unidades
+       WHERE COALESCE(activa, 1) = 1
+         AND REPLACE(UPPER(TRIM(placa)), ' ', '') LIKE ?
+       ORDER BY CASE WHEN REPLACE(UPPER(TRIM(placa)), ' ', '') LIKE ? THEN 0 ELSE 1 END, placa
+       LIMIT 12`,
+      [`%${busqueda}%`, `${busqueda}%`]
+    );
+    res.json(unidades);
+  } catch (error) {
+    console.error("ERROR buscando placas en bodega:", error);
+    res.status(500).json({ error: "No se pudieron consultar las placas." });
+  }
+});
+
 router.get("/api/compatibilidad/:placa", async (req, res) => {
   try {
     await ensureBodegaTables();
@@ -916,7 +935,7 @@ router.post("/entregar", async (req, res) => {
   try {
     await ensureBodegaTables();
     await ensureGastosOperativosTables();
-    const placa = normalizarPlaca(req.body.placa) || upper(req.body.placa);
+    const placaSolicitada = limpiar(req.body.placa);
     const mecanico = limpiar(req.body.mecanico);
     const tipoTrabajo = TIPOS_TRABAJO.includes(upper(req.body.tipo_trabajo)) ? upper(req.body.tipo_trabajo) : "MANTENIMIENTO";
     const observacion = limpiar(req.body.observacion) || null;
@@ -931,16 +950,15 @@ router.post("/entregar", async (req, res) => {
       }))
       .filter(linea => linea.id && linea.cantidad > 0);
 
-    if (!placa || !mecanico || !lineas.length) {
+    if (!placaSolicitada || !mecanico || !lineas.length) {
       req.session.error = "Debe indicar placa, mecánico y al menos un artículo.";
       return redirectBodega(req, res);
     }
 
     await conn.beginTransaction();
-    const [[unidadEntrega]] = await conn.query(
-      "SELECT sede FROM unidades WHERE REPLACE(UPPER(TRIM(placa)), ' ', '') = ? LIMIT 1",
-      [placa]
-    );
+    const unidadEntrega = await obtenerUnidadPorPlaca(conn, placaSolicitada, true);
+    if (!unidadEntrega) throw new Error("Seleccione una placa activa de la lista de unidades.");
+    const placa = unidadEntrega.placa;
     const [entregaResult] = await conn.query(
       "INSERT INTO bodega_entregas (placa, mecanico, tipo_trabajo, observacion, creado_por) VALUES (?, ?, ?, ?, ?)",
       [placa, mecanico, tipoTrabajo, observacion, req.session.user.id]
@@ -1166,6 +1184,9 @@ router.post("/devolver", async (req, res) => {
     }
 
     await conn.beginTransaction();
+    const placaSolicitada = limpiar(req.body.placa);
+    const unidad = placaSolicitada ? await obtenerUnidadPorPlaca(conn, placaSolicitada, true) : null;
+    if (placaSolicitada && !unidad) throw new Error("Seleccione una placa activa de la lista de unidades.");
     const articulo = await articuloParaMovimiento(conn, articuloId);
     const anterior = Number(articulo.stock_actual || 0);
     const nueva = anterior + cantidad;
@@ -1181,7 +1202,7 @@ router.post("/devolver", async (req, res) => {
         cantidad,
         anterior,
         nueva,
-        normalizarPlaca(req.body.placa) || upper(req.body.placa) || null,
+        unidad?.placa || null,
         limpiar(req.body.mecanico) || null,
         limpiar(req.body.motivo) || "Devolución",
         req.session.user.id
