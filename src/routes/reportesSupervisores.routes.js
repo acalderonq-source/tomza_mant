@@ -723,6 +723,7 @@ router.get("/rutas", allowRoles(...ROLES_RUTAS), async (req, res) => {
     );
     const idsAsignados = new Set(unidadesAsignadas.map(item => Number(item.unidad_id)));
     const unidadesPendientes = unidadesActivas
+      .filter(unidad => String(unidad.sede || "").trim().toUpperCase() !== "CISTERNAS")
       .filter(unidad => !idsAsignados.has(Number(unidad.id)))
       .filter(unidad => !sede || sedesFiltro.includes(unidad.sede))
       .map(unidad => ({
