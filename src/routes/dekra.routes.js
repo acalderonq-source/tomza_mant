@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const pool = require("../db");
-const { esUsuarioTodasSedes } = require("../utils/sedes");
+const { esUsuarioTodasSedes, sedeGranelDesdeUsuario } = require("../utils/sedes");
 
 function requireAuth(req, res, next) {
   if (!req.session.user) return res.redirect("/login");
@@ -13,6 +13,9 @@ function obtenerSedeFiltro(req) {
   if (!req.session.user) {
     return null;
   }
+
+  const sedeGranel = sedeGranelDesdeUsuario(req.session.user);
+  if (sedeGranel) return sedeGranel;
 
   // =========================
   // ADMIN
@@ -40,6 +43,21 @@ function obtenerSedeFiltro(req) {
     req.session.user.sede
   );
 
+}
+
+async function registroAutorizado(req, id) {
+  const [[registro]] = await pool.query(
+    `SELECT d.sede, u.sede AS unidad_sede
+     FROM dekra_control d JOIN unidades u ON u.id = d.unidad_id
+     WHERE d.id = ? LIMIT 1`,
+    [id]
+  );
+  if (!registro) return { error: 404 };
+  const sedeFiltro = obtenerSedeFiltro(req);
+  if (sedeFiltro && (registro.sede !== sedeFiltro || registro.unidad_sede !== sedeFiltro)) {
+    return { error: 403 };
+  }
+  return { registro };
 }
 // =========================
 // LISTADO DEKRA
@@ -71,6 +89,10 @@ router.get("/", requireAuth, async (req, res) => {
     if (sedeFiltro) {
       sql += ` AND d.sede = ?`;
       params.push(sedeFiltro);
+      if (sedeGranelDesdeUsuario(req.session.user)) {
+        sql += ` AND u.sede = ?`;
+        params.push(sedeFiltro);
+      }
     }
 
     if (mes) {
@@ -166,6 +188,10 @@ router.post("/nuevo", requireAuth, async (req, res) => {
     if (!unidad) {
       return res.status(404).send("Unidad no encontrada");
     }
+    const sedeFiltro = obtenerSedeFiltro(req);
+    if (sedeFiltro && unidad.sede !== sedeFiltro) {
+      return res.status(403).send("No autorizado para esta sede");
+    }
 
     await pool.query(
       `
@@ -187,6 +213,8 @@ router.post("/nuevo", requireAuth, async (req, res) => {
 // =========================
 router.post("/:id/realizado", requireAuth, async (req, res) => {
   try {
+    const permiso = await registroAutorizado(req, req.params.id);
+    if (permiso.error) return res.sendStatus(permiso.error);
     await pool.query(
       `
       UPDATE dekra_control
@@ -216,6 +244,9 @@ router.post("/:id/no-realizado", requireAuth, async (req, res) => {
     if (!observacion || !observacion.trim()) {
       return res.status(400).send("Debe indicar el motivo");
     }
+
+    const permiso = await registroAutorizado(req, req.params.id);
+    if (permiso.error) return res.sendStatus(permiso.error);
 
     await pool.query(
       `

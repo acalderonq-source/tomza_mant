@@ -2,7 +2,7 @@ const express = require("express");
 const router = express.Router();
 const pool = require("../db");
 const { enviarConfirmacionCita } = require("../utils/emailService");
-const { esUsuarioTodasSedes } = require("../utils/sedes");
+const { esUsuarioTodasSedes, sedeGranelDesdeUsuario } = require("../utils/sedes");
 
 // =====================================================
 // MIDDLEWARES DE AUTENTICACIÓN Y ROLES
@@ -24,12 +24,18 @@ function allowRoles(...roles) {
 
 // Aplicar a todas las rutas de este router
 router.use(requireAuth);
-router.use(allowRoles("ADMIN", "TRAMITES"));
+router.use((req, res, next) => {
+  if (req.session.user.rol === "SUPERVISOR" &&
+      sedeGranelDesdeUsuario(req.session.user) === "granel_la_cruz") return next();
+  return allowRoles("ADMIN", "TRAMITES")(req, res, next);
+});
 
 // =====================================================
 // OBTENER SEDE FILTRO (nunca retorna undefined)
 // =====================================================
 function obtenerSedeFiltro(req) {
+  const sedeGranel = sedeGranelDesdeUsuario(req.session.user);
+  if (sedeGranel) return sedeGranel;
   if (esUsuarioTodasSedes(req.session.user)) {
     if (
       req.session.sedeSeleccionada &&
@@ -59,7 +65,7 @@ function usuarioPuedeVerSede(req, sede) {
 
 async function obtenerTramiteAutorizado(req, id) {
   const [[tramite]] = await pool.query(
-    `SELECT mt.*, u.placa
+    `SELECT mt.*, u.placa, u.sede AS unidad_sede
      FROM minae_tramites mt
      JOIN unidades u ON u.id = mt.unidad_id
      WHERE mt.id = ?
@@ -71,7 +77,8 @@ async function obtenerTramiteAutorizado(req, id) {
     return { error: 404, mensaje: "Trámite no encontrado" };
   }
 
-  if (!usuarioPuedeVerSede(req, tramite.sede)) {
+  if (!usuarioPuedeVerSede(req, tramite.sede) ||
+      (sedeGranelDesdeUsuario(req.session.user) && !usuarioPuedeVerSede(req, tramite.unidad_sede))) {
     return { error: 403, mensaje: "No tienes permiso para editar este trámite." };
   }
 
@@ -104,6 +111,10 @@ router.get("/", async (req, res) => {
     if (sedeFiltro !== null) {
       sql += ` AND mt.sede = ?`;
       params.push(sedeFiltro);
+      if (sedeGranelDesdeUsuario(req.session.user)) {
+        sql += ` AND u.sede = ?`;
+        params.push(sedeFiltro);
+      }
     }
 
     if (sede && esUsuarioTodasSedes(req.session.user) && sedeFiltro === null) {
@@ -219,6 +230,9 @@ router.post("/nuevo", async (req, res) => {
       [unidad_id]
     );
     if (!unidad) return res.status(404).send("Unidad no encontrada");
+    if (!usuarioPuedeVerSede(req, unidad.sede)) {
+      return res.status(403).send("No autorizado para esta sede");
+    }
 
     const tieneCitaValue = tiene_cita === "on" || tiene_cita === "true" || tiene_cita === true ? 1 : 0;
 
@@ -361,11 +375,9 @@ router.post("/:id/editar", async (req, res) => {
 // =====================================================
 router.get("/:id/cita", async (req, res) => {
   try {
-    const [rows] = await pool.query("SELECT * FROM minae_tramites WHERE id = ?", [req.params.id]);
-    if (rows.length === 0) {
-      return res.status(404).send("Trámite no encontrado");
-    }
-    res.render("minae_cita", { tramite: rows[0], user: req.session.user });
+    const resultado = await obtenerTramiteAutorizado(req, req.params.id);
+    if (resultado.error) return res.status(resultado.error).send(resultado.mensaje);
+    res.render("minae_cita", { tramite: resultado.tramite, user: req.session.user });
   } catch (error) {
     console.error("❌ Error cargando formulario de cita:", error);
     res.status(500).send("Error interno");
@@ -379,6 +391,8 @@ router.post("/:id/cita", async (req, res) => {
   try {
     const { fecha_cita, hora_cita, lugar_cita, email_notificacion } = req.body;
     const id = req.params.id;
+    const resultado = await obtenerTramiteAutorizado(req, id);
+    if (resultado.error) return res.status(resultado.error).send(resultado.mensaje);
 
     // Actualizar la cita y reiniciar flags de recordatorios
     await pool.query(

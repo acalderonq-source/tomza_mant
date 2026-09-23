@@ -15,6 +15,7 @@ const {
   expandirSedesEquivalentes,
   expandirSedesOperativasRepuestosAceites,
   obtenerSedesTransporte,
+  sedeGranelDesdeUsuario,
   sedesEspecialesPorUsuario
 } = require("../utils/sedes");
 const { agregarFiltroPlacaSql } = require("../utils/placas");
@@ -76,6 +77,7 @@ async function obtenerSedesPermitidas(req) {
 
 async function obtenerSedesPermitidasRutas(req) {
   const sedes = await obtenerSedesPermitidas(req);
+  if (sedeGranelDesdeUsuario(req.session.user)) return sedes;
   return sedes.length ? expandirSedesOperativasRepuestosAceites(sedes) : [];
 }
 

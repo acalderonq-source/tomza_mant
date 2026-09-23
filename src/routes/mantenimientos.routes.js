@@ -17,6 +17,7 @@ const {
   etiquetaSede,
   expandirSedesEquivalentes,
   getSedesPermitidas,
+  sedeGranelDesdeUsuario,
   sedeOperativaRepuestosAceites
 } = require("../utils/sedes");
 const { agregarFiltroPlacaSql } = require("../utils/placas");
@@ -63,6 +64,8 @@ function puedeRegistrarTrabajoSinPlaca(user) {
 // =====================================================
 function obtenerSedeFiltro(req) {
   if (!req.session.user) return null;
+  const sedeGranel = sedeGranelDesdeUsuario(req.session.user);
+  if (sedeGranel) return sedeGranel;
   if (esUsuarioMecanicoSede(req.session.user)) return null;
   if (esUsuarioTodasSedes(req.session.user) || esUsuarioPesados(req.session.user)) {
     if (req.session.sedeSeleccionada && req.session.sedeSeleccionada !== "TODAS")
