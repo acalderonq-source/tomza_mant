@@ -2177,8 +2177,7 @@ async function obtenerResumenCajaChica() {
     LEFT JOIN usuarios u ON u.id = cd.confirmado_por
     WHERE cd.corte_id IS NULL
       AND cd.estado = 'CONFIRMADA'
-    ORDER BY cd.fecha DESC, cd.id DESC
-    LIMIT 500
+    ORDER BY cd.id ASC
   `);
 
   const [cortes] = await queryWithRetry(`
@@ -5853,111 +5852,76 @@ router.post("/facturas/caja-chica/documentos/:id/eliminar", requireAuth, allowRo
   return res.redirect("/compras/facturas/caja-chica");
 });
 
-router.post("/facturas/caja-chica/cortes", requireAuth, allowRoles(...ROLES_GESTION_FACTURAS), async (req, res) => {
-  let connection;
+router.post("/facturas/caja-chica/descargar", requireAuth, allowRoles(...ROLES_GESTION_FACTURAS), async (req, res) => {
   try {
     await ensureCajaChicaFlujoSchema();
-    const documentoIds = [...new Set(toArray(req.body.documento_ids)
-      .map(value => Number(value))
-      .filter(value => Number.isInteger(value) && value > 0))];
+    const empresa = req.body.empresa === EMPRESA_GAS_TOMZA ? EMPRESA_GAS_TOMZA
+      : req.body.empresa === EMPRESA_SUPER_GAS ? EMPRESA_SUPER_GAS : null;
+    const rawIds = toArray(req.body.documento_ids);
+    const documentoIds = [...new Set(rawIds.map(value => Number(value)))];
     const fecha = String(req.body.fecha || "").trim();
-    const baseCaja = centavosCaja(req.body.base_caja ?? '900000') / 100;
-    const valesTotal = centavosCaja(req.body.vales_total || '0') / 100;
-
-    if (!documentoIds.length || documentoIds.length > 500 || !fechaCajaValida(fecha) || baseCaja <= 0) {
-      req.session.error = "Seleccione al menos una factura e indique una fecha y base válidas.";
-      return res.redirect("/compras/facturas/caja-chica");
+    if (!empresa || !rawIds.length || documentoIds.length > 1000 ||
+        documentoIds.some(id => !Number.isSafeInteger(id) || id <= 0) || !fechaCajaValida(fecha)) {
+      return res.status(400).send("Seleccione facturas y una fecha válidas para descargar.");
     }
-
+    const baseCaja = centavosCaja(req.body.base_caja ?? "900000") / 100;
+    const valesTotal = centavosCaja(req.body.vales_total || "0") / 100;
+    if (baseCaja <= 0) return res.status(400).send("La base de caja debe ser mayor que cero.");
     const efectivo = DENOMINACIONES_CAJA_CHICA.reduce((result, denominacion) => {
       const cantidad = Number(req.body[`efectivo_${denominacion}`] || 0);
-      if (!Number.isInteger(cantidad) || cantidad < 0 || cantidad > 100000) throw new Error('La cantidad de billetes y monedas debe ser un entero entre 0 y 100000.');
+      if (!Number.isInteger(cantidad) || cantidad < 0 || cantidad > 100000) {
+        throw new Error("La cantidad de billetes y monedas debe ser un entero entre 0 y 100000.");
+      }
       result[denominacion] = cantidad;
       return result;
     }, {});
-
-    connection = await pool.getConnection();
-    await connection.beginTransaction();
-    const [documentos] = await connection.query(
-      `SELECT *
-       FROM caja_chica_documentos
-       WHERE id IN (?)
-         AND corte_id IS NULL
-         AND estado = 'CONFIRMADA'
-       FOR UPDATE`,
+    const [documentos] = await queryWithRetry(
+      `SELECT * FROM caja_chica_documentos
+       WHERE id IN (?) AND corte_id IS NULL AND estado = 'CONFIRMADA'
+       ORDER BY id ASC`,
       [documentoIds]
     );
-
     if (documentos.length !== documentoIds.length) {
-      await connection.rollback();
-      req.session.error = "Una de las facturas seleccionadas ya fue incluida en otro corte. Actualice la página.";
-      return res.redirect("/compras/facturas/caja-chica");
+      return res.status(409).send("Una factura ya no está disponible. Actualice la caja chica.");
     }
-
     const idsElectronicas = documentos.map(item => item.factura_electronica_id).filter(Boolean);
     if (idsElectronicas.length) {
-      const [electronicas] = await connection.query('SELECT * FROM facturas_electronicas_cruce WHERE id IN (?) FOR UPDATE', [idsElectronicas]);
-      const validas = electronicas.filter(item => item.estado_hacienda === 'ACEPTADA' && !item.orden_compra_id && !item.factura_id && monedaCRC(item.moneda));
-      if (validas.length !== idsElectronicas.length) throw new Error('Una factura cambió de estado o ya está ligada a una orden. Retírela de la preparación y revise el documento.');
+      const [electronicas] = await queryWithRetry(
+        "SELECT id, estado_hacienda, orden_compra_id, factura_id, moneda FROM facturas_electronicas_cruce WHERE id IN (?)",
+        [idsElectronicas]
+      );
+      const validas = electronicas.filter(item => item.estado_hacienda === "ACEPTADA" &&
+        !item.orden_compra_id && !item.factura_id && monedaCRC(item.moneda));
+      if (validas.length !== idsElectronicas.length) {
+        return res.status(409).send("Una factura electrónica cambió de estado. Revísela antes de descargar.");
+      }
     }
-
-    const totalGasTomza = documentos
-      .filter(documento => documento.empresa === EMPRESA_GAS_TOMZA)
-      .reduce((sum, documento) => sum + centavosCaja(documento.monto), 0) / 100;
-    const totalSuperGas = documentos
-      .filter(documento => documento.empresa === EMPRESA_SUPER_GAS)
-      .reduce((sum, documento) => sum + centavosCaja(documento.monto), 0) / 100;
-    const totalDocumentos = Math.round((totalGasTomza + totalSuperGas) * 100) / 100;
-
-    const [corteResult] = await connection.query(
-      `INSERT INTO caja_chica_cortes (
-         fecha, base_caja, vales_total, efectivo_json, total_gas_tomza,
-         total_super_gas, total_documentos, observacion, creado_por
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        fecha,
-        baseCaja,
-        valesTotal,
-        JSON.stringify(efectivo),
-        totalGasTomza,
-        totalSuperGas,
-        totalDocumentos,
-        String(req.body.observacion || "").trim().slice(0, 2000) || null,
-        req.session.user.id || null
-      ]
-    );
-    const corteId = corteResult.insertId;
-
-    await connection.query(
-      `UPDATE caja_chica_documentos
-       SET corte_id = ?, estado = 'INCLUIDA'
-       WHERE id IN (?)`,
-      [corteId, documentoIds]
-    );
-
-    const [reintegroResult] = await connection.query(
-      `INSERT INTO caja_chica_reintegros (fecha, monto, observacion, creado_por)
-       VALUES (?, ?, ?, ?)`,
-      [
-        fecha,
-        totalDocumentos,
-        `Corte de caja chica #${corteId}: Gas Tomza ₡${totalGasTomza.toFixed(2)}; Súper Gas ₡${totalSuperGas.toFixed(2)}`,
-        req.session.user.id || null
-      ]
-    );
-    await connection.query("UPDATE caja_chica_cortes SET reintegro_id = ? WHERE id = ?", [reintegroResult.insertId, corteId]);
-
-    await connection.commit();
-    req.session.success = `Corte #${corteId} generado con ${documentos.length} factura(s). Ya puede descargar ambos Excel.`;
-    return res.redirect("/compras/facturas/caja-chica#cortes");
+    if (!documentos.some(item => item.empresa === empresa)) {
+      return res.status(400).send("No hay facturas seleccionadas de esa empresa.");
+    }
+    const totalEmpresa = nombre => documentos.filter(item => item.empresa === nombre)
+      .reduce((sum, item) => sum + centavosCaja(item.monto), 0) / 100;
+    const corte = {
+      fecha, base_caja: baseCaja, vales_total: valesTotal, efectivo_json: JSON.stringify(efectivo),
+      total_gas_tomza: totalEmpresa(EMPRESA_GAS_TOMZA),
+      total_super_gas: totalEmpresa(EMPRESA_SUPER_GAS)
+    };
+    const workbook = await crearLibroCajaChica({ empresa, corte, documentos });
+    const buffer = await workbook.xlsx.writeBuffer();
+    const empresaArchivo = empresa === EMPRESA_SUPER_GAS ? "Super_Gas" : "Gas_Tomza";
+    const filename = `Caja_Chica_${empresaArchivo}_${fechaArchivoCajaChica(fecha)}_borrador.xlsx`;
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    return res.send(Buffer.from(buffer));
   } catch (error) {
-    await connection?.rollback();
-    console.error("Error generando corte de caja chica:", error);
-    req.session.error = error.code ? 'No se pudo generar el corte de caja chica.' : error.message;
-    return res.redirect("/compras/facturas/caja-chica");
-  } finally {
-    connection?.release();
+    console.error("Error descargando caja chica abierta:", error);
+    return res.status(400).send(error.message || "No se pudo descargar la caja chica.");
   }
+});
+
+router.post("/facturas/caja-chica/cortes", requireAuth, allowRoles(...ROLES_GESTION_FACTURAS), (req, res) => {
+  req.session.error = "La caja chica permanece abierta. Use las descargas de borrador.";
+  return res.redirect("/compras/facturas/caja-chica#preparar");
 });
 
 router.get("/facturas/caja-chica/cortes/:id/excel/:empresa", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER", "CONTABILIDAD"), async (req, res) => {
@@ -5975,7 +5939,7 @@ router.get("/facturas/caja-chica/cortes/:id/excel/:empresa", requireAuth, allowR
       `SELECT *
        FROM caja_chica_documentos
        WHERE corte_id = ?
-       ORDER BY fecha ASC, id ASC`,
+       ORDER BY id ASC`,
       [corteId]
     );
     const corteNormalizado = { ...corte, fecha: fechaSoloSql(corte.fecha) };

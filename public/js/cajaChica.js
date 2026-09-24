@@ -24,7 +24,8 @@
     showAmount('monto-efectivo', cash);
     showAmount('total-caja', total);
     showAmount('diferencia', cents(byId('base-caja')?.value) - total);
-    if (byId('generar-corte')) byId('generar-corte').disabled = !selected.length;
+    if (byId('descargar-tomza')) byId('descargar-tomza').disabled = tomza <= 0;
+    if (byId('descargar-super')) byId('descargar-super').disabled = superGas <= 0;
     const visible = selections.filter(input => !input.closest('tr').hidden);
     const checked = visible.filter(input => input.checked).length;
     if (byId('seleccionar-todas')) {
@@ -78,11 +79,9 @@
   }));
   byId('form-corte')?.addEventListener('submit', event => {
     const selected = selections.filter(input => input.checked);
-    if (!selected.length || !window.confirm(`¿Cerrar la caja con ${selected.length} factura(s), por ${format(selected.reduce((total, input) => total + cents(input.dataset.monto), 0))}? Las facturas del corte quedarán bloqueadas para edición.`)) {
+    if (!selected.some(input => input.dataset.empresa === event.submitter?.value)) {
       event.preventDefault();
-      return;
     }
-    byId('generar-corte').disabled = true;
   });
 
   function activateTab() {

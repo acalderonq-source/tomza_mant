@@ -1,5 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const ExcelJS = require('exceljs');
 
 // In-memory query doubles: tests must never connect to the operational database.
 let query;
@@ -29,8 +30,8 @@ const data = { empresa: 'GAS TOMZA', fecha: '2026-09-22', monto: '100.10', prove
 async function request(path, body = {}, params = {}, role = 'ADMIN') {
   const route = router.stack.find(layer => layer.route && [layer.route.path].flat().includes(path)).route;
   const req = { path, body, params, session: { user: { id: 1, rol: role } } };
-  const result = { status: 200 };
-  const res = { render: (view, locals) => { result.view = view; result.locals = locals; }, redirect: url => { result.redirect = url; }, status: code => { result.status = code; return res; }, send: value => { result.body = value; } };
+  const result = { status: 200, headers: {} };
+  const res = { render: (view, locals) => { result.view = view; result.locals = locals; }, redirect: url => { result.redirect = url; }, status: code => { result.status = code; return res; }, send: value => { result.body = value; }, setHeader: (name, value) => { result.headers[name] = value; } };
   for (const layer of route.stack) {
     let allowed = false;
     await layer.handle(req, res, () => { allowed = true; });
@@ -79,37 +80,46 @@ test('unlinked foreign-currency invoice cannot enter a CRC cash cut', async () =
   assert.match(result.session.error, /colones/);
   assert.equal(committed, false);
 });
-test('cut persists both companies and only one reimbursement in the same transaction', async () => {
-  query = async (sql, params) => {
-    if (/SELECT \*/.test(sql)) {
-      assert.match(sql, /FOR UPDATE/);
-      return [[{ id: 1, empresa: 'GAS TOMZA', monto: '0.10' }, { id: 2, empresa: 'SUPER GAS', monto: '0.20' }]];
-    }
-    if (/INSERT INTO caja_chica_cortes/.test(sql)) { assert.deepEqual(params.slice(4, 7), [0.1, 0.2, 0.3]); return [{ insertId: 10 }]; }
-    if (/INSERT INTO caja_chica_reintegros/.test(sql)) { assert.equal(params[1], 0.3); return [{ insertId: 20 }]; }
-    if (/UPDATE caja_chica/.test(sql)) return [{ affectedRows: 1 }];
-    throw new Error(sql);
+test('draft Excel preserves entry order and leaves the cash box open', async () => {
+  query = async sql => {
+    assert.match(sql, /ORDER BY id ASC/);
+    return [[
+      { id: 1, empresa: 'GAS TOMZA', fecha: '2026-09-22', numero_factura: 'PRIMERA', proveedor: 'A', monto: '100.10' },
+      { id: 2, empresa: 'SUPER GAS', fecha: '2026-09-21', numero_factura: 'OTRA', proveedor: 'B', monto: '200.20' },
+      { id: 3, empresa: 'GAS TOMZA', fecha: '2026-09-20', numero_factura: 'SEGUNDA', proveedor: 'C', monto: '300.30' }
+    ]];
   };
-  const result = await request('/facturas/caja-chica/cortes', { fecha: '2026-09-22', base_caja: '900000', documento_ids: ['1', '2', '1'] });
-  assert.equal(committed, true);
-  assert.match(result.redirect, /#cortes$/);
-  assert.equal(statements.filter(item => /INSERT INTO caja_chica_reintegros/.test(item.sql)).length, 1);
-});
-test('stale selection cannot close the same invoice twice', async () => {
-  query = async sql => { assert.match(sql, /corte_id IS NULL/); return [[]]; };
-  const result = await request('/facturas/caja-chica/cortes', { fecha: '2026-09-22', base_caja: '900000', documento_ids: ['1'] });
-  assert.match(result.session.error, /otro corte/);
+  const result = await request('/facturas/caja-chica/descargar', {
+    empresa: 'GAS TOMZA', fecha: '2026-09-22', base_caja: '900000',
+    documento_ids: ['3', '1', '2'], vales_total: '50'
+  });
+  assert.equal(result.status, 200);
+  assert.match(result.headers['Content-Disposition'], /Gas_Tomza.*borrador\.xlsx/);
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.load(result.body);
+  const sheet = workbook.worksheets[0];
+  assert.equal(sheet.getCell('C4').value, 'PRIMERA');
+  assert.equal(sheet.getCell('C5').value, 'SEGUNDA');
+  assert.equal(sheet.getCell('G6').value.result, 400.4);
   assert.equal(committed, false);
-  assert.equal(rolledBack, true);
+  assert.equal(statements.some(item => /INSERT|UPDATE|DELETE/i.test(item.sql)), false);
 });
-test('invoice acceptance is checked again before closing a cut', async () => {
+test('stale or rejected invoices cannot enter a draft Excel', async () => {
+  query = async sql => /FROM caja_chica_documentos/.test(sql) ? [[]] : (() => { throw new Error(sql); })();
+  const stale = await request('/facturas/caja-chica/descargar', { empresa: 'GAS TOMZA', fecha: '2026-09-22', base_caja: '900000', documento_ids: ['1'] });
+  assert.equal(stale.status, 409);
   query = async sql => /FROM caja_chica_documentos/.test(sql)
     ? [[{ id: 1, factura_electronica_id: 1, empresa: 'GAS TOMZA', monto: '100' }]]
     : [[{ id: 1, estado_hacienda: 'RECHAZADA', moneda: 'CRC' }]];
-  const result = await request('/facturas/caja-chica/cortes', { fecha: '2026-09-22', base_caja: '900000', documento_ids: ['1'] });
-  assert.match(result.session.error, /cambi/);
-  assert.equal(committed, false);
-  assert.equal(rolledBack, true);
+  const rejected = await request('/facturas/caja-chica/descargar', { empresa: 'GAS TOMZA', fecha: '2026-09-22', base_caja: '900000', documento_ids: ['1'] });
+  assert.equal(rejected.status, 409);
+  assert.equal(statements.some(item => /INSERT|UPDATE|DELETE/i.test(item.sql)), false);
+});
+test('old close endpoint cannot lock invoices', async () => {
+  const result = await request('/facturas/caja-chica/cortes', { documento_ids: ['1'] });
+  assert.match(result.session.error, /permanece abierta/);
+  assert.equal(result.redirect, '/compras/facturas/caja-chica#preparar');
+  assert.equal(statements.length, 0);
 });
 test('closed documents cannot be edited or removed', async () => {
   query = async sql => { assert.match(sql, /corte_id IS NULL/); return [{ affectedRows: 0 }]; };
@@ -176,6 +186,7 @@ test('editing a manually entered invoice preserves its selected type', async () 
 test('cash screen no longer queries or preloads imported invoice listings', async () => {
   query = async sql => {
     assert.doesNotMatch(sql, /FROM facturas_electronicas_cruce/);
+    if (/FROM caja_chica_documentos cd/.test(sql)) assert.match(sql, /ORDER BY cd.id ASC/);
     return [[]];
   };
   const result = await request('/facturas/caja-chica');

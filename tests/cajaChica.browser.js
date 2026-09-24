@@ -9,10 +9,15 @@ const { injectSecurityAssets } = require('../src/middleware/security');
 async function main() {
   const app = express();
   const submitted = [];
+  const drafts = [];
   app.use(express.urlencoded({ extended: true }));
   app.post('/compras/facturas/caja-chica/documentos/manual', (req, res) => {
     submitted.push(req.body);
     res.redirect('/');
+  });
+  app.post('/compras/facturas/caja-chica/descargar', (req, res) => {
+    drafts.push(req.body);
+    res.attachment('Caja_Chica_Gas_Tomza_borrador.xlsx').send(Buffer.from('excel-test'));
   });
   app.use('/js', express.static(path.join(__dirname, '../public/js')));
   app.get('/', async (req, res) => {
@@ -66,6 +71,16 @@ async function main() {
     await page.locator('#doc-tipo').selectOption('SIMPLIFICADO');
     await page.locator('#documento').getByRole('button', { name: 'Cancelar', exact: true }).click();
     await page.locator('#tab-preparar').click();
+    assert.equal(await page.locator('.js-seleccion:checked').count(), 2);
+    assert.equal(await page.getByText('Cerrar caja y preparar Excel').count(), 0);
+    const [download] = await Promise.all([
+      page.waitForEvent('download'),
+      page.locator('#descargar-tomza').click()
+    ]);
+    assert.match(download.suggestedFilename(), /borrador\.xlsx$/);
+    assert.equal(drafts[0].empresa, 'GAS TOMZA');
+    assert.deepEqual(drafts[0].documento_ids, ['1', '2']);
+    assert.equal(await page.locator('.js-seleccion:checked').count(), 2);
     await page.locator('#seleccionar-todas').check();
     assert.equal(await page.locator('#cantidad-seleccion').textContent(), '2');
     assert.match(await page.locator('#monto-total').textContent(), /300,30/);
