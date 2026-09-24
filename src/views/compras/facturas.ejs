@@ -593,7 +593,7 @@
     if (filtros.orden) reporteParams.set('orden', filtros.orden);
     const reporteFacturasUrl = '/compras/facturas/reporte/pdf' + (reporteParams.toString() ? `?${reporteParams.toString()}` : '');
     const reporteFacturasExcelUrl = '/compras/facturas/reporte/excel' + (reporteParams.toString() ? `?${reporteParams.toString()}` : '');
-    const asientoPasivosExcelUrl = '/compras/facturas/asiento-pasivos/excel' + (reporteParams.toString() ? `?${reporteParams.toString()}` : '');
+    const asientosPasivosUrl = '/compras/facturas/asientos' + (reporteParams.toString() ? `?${reporteParams.toString()}` : '');
     const listaParams = new URLSearchParams(reporteParams);
     if (filtros.pagada) listaParams.set('pagada', filtros.pagada);
     if (paginacionFacturas.porPagina) listaParams.set('por_pagina', paginacionFacturas.porPagina);
@@ -677,8 +677,8 @@
         <a href="<%= reporteFacturasExcelUrl %>" class="btn btn-outline-success btn-sm">
           <i class="bi bi-file-earmark-excel"></i> Excel facturas
         </a>
-        <a href="<%= asientoPasivosExcelUrl %>" class="btn btn-success btn-sm">
-          <i class="bi bi-table"></i> Asiento pasivos 01
+        <a href="<%= asientosPasivosUrl %>" class="btn btn-success btn-sm">
+          <i class="bi bi-journal-check"></i> Asientos
         </a>
       </div>
     </div>

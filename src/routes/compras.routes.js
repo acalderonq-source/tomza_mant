@@ -363,6 +363,49 @@ async function ensureFacturasSchema() {
   await ensureFacturasState.promise;
 }
 
+const ensureAsientosState = { ready: false, promise: null };
+
+async function ensureAsientosPasivosTables() {
+  if (ensureAsientosState.ready) return;
+  if (!ensureAsientosState.promise) {
+    ensureAsientosState.promise = (async () => {
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS asientos_pasivos_lotes (
+          id BIGINT AUTO_INCREMENT PRIMARY KEY,
+          creado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          creado_por INT NULL,
+          cantidad_facturas INT NOT NULL,
+          monto_total DECIMAL(18,2) NOT NULL,
+          archivo_nombre VARCHAR(180) NOT NULL,
+          archivo_xlsx LONGBLOB NOT NULL,
+          INDEX idx_asientos_pasivos_fecha (creado_en)
+        )
+      `);
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS asientos_pasivos_facturas (
+          id BIGINT AUTO_INCREMENT PRIMARY KEY,
+          lote_id BIGINT NOT NULL,
+          factura_tipo ENUM('orden','independiente') NOT NULL,
+          factura_id INT NOT NULL,
+          clave_electronica VARCHAR(80) NULL,
+          identidad_documento VARCHAR(255) NULL,
+          numero_factura VARCHAR(100) NULL,
+          proveedor_nombre VARCHAR(180) NULL,
+          fecha_factura DATE NULL,
+          monto_asiento DECIMAL(18,2) NOT NULL,
+          creado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE KEY uq_asiento_pasivos_factura (factura_tipo, factura_id),
+          UNIQUE KEY uq_asiento_pasivos_clave (clave_electronica),
+          UNIQUE KEY uq_asiento_pasivos_documento (identidad_documento),
+          INDEX idx_asiento_pasivos_lote (lote_id)
+        )
+      `);
+      ensureAsientosState.ready = true;
+    })().finally(() => { ensureAsientosState.promise = null; });
+  }
+  await ensureAsientosState.promise;
+}
+
 async function columnExists(tableName, columnName) {
   const [[row]] = await queryWithRetry(
     `SELECT COUNT(*) AS count
@@ -2519,6 +2562,7 @@ function construirConsultaFacturas(filtros = {}, modo = "full") {
       o.po_numero,
       COALESCE(o.factura_fecha, o.fecha) as fecha,
       o.total as monto,
+      COALESCE((SELECT fe.moneda FROM facturas_electronicas_cruce fe WHERE fe.orden_compra_id = o.id AND fe.moneda IS NOT NULL ORDER BY fe.id DESC LIMIT 1), o.moneda, 'CRC') AS moneda,
       o.factura as numero_factura,
       o.fecha_vencimiento_factura,
       o.pagada,
@@ -2557,6 +2601,7 @@ function construirConsultaFacturas(filtros = {}, modo = "full") {
       NULL as po_numero,
       f.fecha,
       f.monto,
+      COALESCE((SELECT fe.moneda FROM facturas_electronicas_cruce fe WHERE fe.factura_id = f.id AND fe.moneda IS NOT NULL ORDER BY fe.id DESC LIMIT 1), 'CRC') AS moneda,
       f.numero_factura,
       NULL as fecha_vencimiento_factura,
       f.pagada,
@@ -2602,6 +2647,15 @@ function construirConsultaFacturas(filtros = {}, modo = "full") {
   `;
   const paramsOrdenes = [];
   const paramsIndependientes = [];
+
+  if (Array.isArray(filtros.orden_ids)) {
+    sqlOrdenes += filtros.orden_ids.length ? " AND o.id IN (?)" : " AND 1 = 0";
+    if (filtros.orden_ids.length) paramsOrdenes.push(filtros.orden_ids);
+  }
+  if (Array.isArray(filtros.independiente_ids)) {
+    sqlIndependientes += filtros.independiente_ids.length ? " AND f.id IN (?)" : " AND 1 = 0";
+    if (filtros.independiente_ids.length) paramsIndependientes.push(filtros.independiente_ids);
+  }
 
   if (proveedor_id && proveedor_id !== "") {
     sqlOrdenes += ` AND o.proveedor_id = ?`;
@@ -2667,7 +2721,7 @@ async function contarFacturasCompras(filtros = {}) {
   return Number(row?.total || 0);
 }
 
-async function obtenerFacturasCompras(filtros = {}) {
+async function obtenerFacturasCompras(filtros = {}, connection = null) {
   const hoy = new Date();
   hoy.setHours(0, 0, 0, 0);
 
@@ -2676,6 +2730,7 @@ async function obtenerFacturasCompras(filtros = {}) {
   const orderDirection = orden === "asc" ? "ASC" : "DESC";
   let finalSql = `(${sqlOrdenes}) UNION ALL (${sqlIndependientes}) ORDER BY fecha ${orderDirection}, id ${orderDirection}`;
   const queryParams = [...params];
+  const consultar = connection ? (sql, values) => connection.query(sql, values) : queryWithRetry;
   const limit = parseInt(filtros.limit, 10);
   const offset = parseInt(filtros.offset, 10);
 
@@ -2684,7 +2739,7 @@ async function obtenerFacturasCompras(filtros = {}) {
     queryParams.push(Math.min(limit, 500), Number.isFinite(offset) && offset > 0 ? offset : 0);
   }
 
-  const [facturasUnidas] = await queryWithRetry(finalSql, queryParams);
+  const [facturasUnidas] = await consultar(finalSql, queryParams);
   const ordenesFacturaIds = [...new Set(facturasUnidas
     .filter(f => f.tipo === "orden")
     .map(f => Number(f.id))
@@ -2692,7 +2747,7 @@ async function obtenerFacturasCompras(filtros = {}) {
   )];
   const lineasPorOrdenFactura = new Map();
   if (ordenesFacturaIds.length) {
-    const [lineasFactura] = await queryWithRetry(
+    const [lineasFactura] = await consultar(
       `SELECT orden_compra_id, codigo, codigo_producto, descripcion
        FROM ordenes_compra_detalle
        WHERE orden_compra_id IN (?)`,
@@ -2717,7 +2772,7 @@ async function obtenerFacturasCompras(filtros = {}) {
   )];
   const sedePorPlacaFactura = new Map();
   if (placasFacturas.length) {
-    const [unidadesFactura] = await queryWithRetry(
+    const [unidadesFactura] = await consultar(
       "SELECT placa, sede FROM unidades WHERE REPLACE(REPLACE(UPPER(placa), '-', ''), ' ', '') IN (?)",
       [placasFacturas]
     );
@@ -3188,6 +3243,19 @@ function montoAsientoFactura(factura) {
   return Math.max(montoOriginal - notaCredito, 0);
 }
 
+function identidadFacturaAsiento(factura) {
+  const clave = textoAsiento(factura.clave_electronica).replace(/[^A-Za-z0-9]/g, "").toUpperCase() || null;
+  const numero = textoAsiento(factura.consecutivo_electronico || factura.numero_factura)
+    .replace(/[^A-Za-z0-9]/g, "").toUpperCase();
+  const proveedor = factura.proveedor_id
+    ? `ID${factura.proveedor_id}`
+    : `N${normalizarClaveAsiento(factura.proveedor_nombre).slice(0, 100)}`;
+  return {
+    clave,
+    documento: numero && proveedor !== "N" ? `${proveedor}:${numero}`.slice(0, 255) : null
+  };
+}
+
 async function cargarCatalogoAsientoPasivos() {
   const archivo = ASIENTO_PASIVOS_TEMPLATE_PATHS.find(filePath => filePath && fs.existsSync(filePath));
   const resultado = {
@@ -3434,7 +3502,7 @@ function construirFilasAsientoPasivos(facturas = [], lineasPorOrden = new Map())
   return filas;
 }
 
-async function obtenerLineasOrdenesFacturadas(facturas = []) {
+async function obtenerLineasOrdenesFacturadas(facturas = [], connection = null) {
   const ids = [...new Set(facturas
     .filter(factura => factura.tipo === "orden")
     .map(factura => Number(factura.id))
@@ -3442,7 +3510,7 @@ async function obtenerLineasOrdenesFacturadas(facturas = []) {
   )];
   if (!ids.length) return new Map();
 
-  const [lineas] = await queryWithRetry(
+  const [lineas] = await (connection ? connection.query.bind(connection) : queryWithRetry)(
     `SELECT orden_compra_id, codigo, codigo_producto, descripcion, cantidad, precio_unitario, subtotal
      FROM ordenes_compra_detalle
      WHERE orden_compra_id IN (?)
@@ -3458,10 +3526,10 @@ async function obtenerLineasOrdenesFacturadas(facturas = []) {
   }, new Map());
 }
 
-async function generarExcelAsientoPasivos({ facturas = [], filtros = {} } = {}) {
+async function generarExcelAsientoPasivos({ facturas = [], filtros = {}, connection = null } = {}) {
   const catalogo = await cargarCatalogoAsientoPasivos();
   const templateWorksheet = await cargarWorksheetPlantillaAsiento();
-  const lineasPorOrden = await obtenerLineasOrdenesFacturadas(facturas);
+  const lineasPorOrden = await obtenerLineasOrdenesFacturadas(facturas, connection);
   const filas = construirFilasAsientoPasivos(facturas, lineasPorOrden);
 
   filas.forEach(fila => {
@@ -6759,40 +6827,180 @@ router.get("/facturas/reporte/excel", requireAuth, allowRoles("ADMIN", "TALLER",
   }
 });
 
-router.get("/facturas/asiento-pasivos/excel", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER", "CONTABILIDAD"), async (req, res) => {
+const ROLES_ASIENTOS_PASIVOS = ["ADMIN", "TALLER", "PROVEEDURIA_TALLER", "CONTABILIDAD"];
+
+router.get("/facturas/asientos", requireAuth, allowRoles(...ROLES_ASIENTOS_PASIVOS), async (req, res) => {
   try {
     await ensureFacturasSchema();
-
-    const { proveedor_id, fecha_desde, fecha_hasta, vencida, periodo_cierre } = req.query;
-    const pagada = normalizarFiltroPagadaReporte(req.query.pagada);
-    const orden = req.query.orden === "desc" ? "desc" : "asc";
+    await ensureAsientosPasivosTables();
     const filtros = {
-      proveedor_id,
-      fecha_desde,
-      fecha_hasta,
-      pagada,
-      vencida,
-      periodo_cierre: normalizarPeriodoCierre(periodo_cierre),
-      orden
+      proveedor_id: req.query.proveedor_id || "",
+      fecha_desde: req.query.fecha_desde || "",
+      fecha_hasta: req.query.fecha_hasta || "",
+      q: textoAsiento(req.query.q).slice(0, 120),
+      estado: ["pendiente", "incluida"].includes(req.query.estado) ? req.query.estado : "todos"
     };
-
-    let facturas = await obtenerFacturasCompras(filtros);
-    if (pagada === "0") {
-      facturas = facturas.filter(factura => parseMonto(factura.saldo) > 0 && !factura.cubierta_por_nc);
-    }
-
-    const buffer = await generarExcelAsientoPasivos({ facturas, filtros });
-    const desdeArchivo = fecha_desde || filtros.periodo_cierre || "inicio";
-    const hastaArchivo = fecha_hasta || filtros.periodo_cierre || "hoy";
-    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-    res.setHeader(
-      "Content-Disposition",
-      `attachment; filename=asiento_pasivos_${desdeArchivo}_${hastaArchivo}_${new Date().toISOString().slice(0, 19).replace(/:/g, "-")}.xlsx`
+    const [proveedores] = await queryWithRetry("SELECT id, nombre FROM proveedores ORDER BY nombre");
+    const facturas = await obtenerFacturasCompras({ ...filtros, orden: "desc" });
+    const [registradas] = await queryWithRetry(
+      "SELECT factura_tipo, factura_id, lote_id, clave_electronica, identidad_documento FROM asientos_pasivos_facturas"
     );
-    res.send(Buffer.from(buffer));
+    const lotePorFactura = new Map(registradas.map(item => [`${item.factura_tipo}:${item.factura_id}`, item.lote_id]));
+    const lotePorClave = new Map(registradas.filter(item => item.clave_electronica).map(item => [item.clave_electronica, item.lote_id]));
+    const lotePorDocumento = new Map(registradas.filter(item => item.identidad_documento).map(item => [item.identidad_documento, item.lote_id]));
+    const q = filtros.q.toLocaleLowerCase("es-CR");
+    const facturasVisibles = facturas
+      .map(factura => {
+        const identidad = identidadFacturaAsiento(factura);
+        return { ...factura, lote_asiento_id: lotePorFactura.get(`${factura.tipo}:${factura.id}`)
+          || lotePorClave.get(identidad.clave) || lotePorDocumento.get(identidad.documento) || null };
+      })
+      .filter(factura => !q || [factura.numero_factura, factura.consecutivo_electronico, factura.proveedor_nombre, factura.po_numero, factura.placa_recepcion]
+        .some(value => String(value || "").toLocaleLowerCase("es-CR").includes(q)))
+      .filter(factura => filtros.estado === "todos" || (filtros.estado === "incluida") === Boolean(factura.lote_asiento_id));
+    const [[conteo]] = await queryWithRetry("SELECT COUNT(*) AS total FROM asientos_pasivos_lotes");
+    const paginaHistorial = Math.max(parseInt(req.query.pagina_historial, 10) || 1, 1);
+    const totalPaginas = Math.max(Math.ceil(Number(conteo.total || 0) / 50), 1);
+    const paginaActual = Math.min(paginaHistorial, totalPaginas);
+    const [historial] = await queryWithRetry(`
+      SELECT l.id, l.creado_en, l.cantidad_facturas, l.monto_total, l.archivo_nombre,
+             u.usuario AS creado_por_usuario
+      FROM asientos_pasivos_lotes l
+      LEFT JOIN usuarios u ON u.id = l.creado_por
+      ORDER BY l.id DESC LIMIT 50 OFFSET ?
+    `, [(paginaActual - 1) * 50]);
+    const creadoId = Number(req.query.creado);
+    const descargarCreado = Number.isSafeInteger(creadoId) && historial.some(item => Number(item.id) === creadoId) ? creadoId : null;
+    const success = req.session.success || "";
+    const error = req.session.error || "";
+    delete req.session.success;
+    delete req.session.error;
+    res.render("compras/asientos_pasivos", {
+      user: req.session.user, facturas: facturasVisibles, proveedores, filtros, historial,
+      paginaHistorial: paginaActual, totalPaginas, totalHistorial: Number(conteo.total || 0),
+      descargarCreado, success, error, montoAsientoFactura,
+      plantillaDisponible: ASIENTO_PASIVOS_TEMPLATE_PATHS.some(filePath => fs.existsSync(filePath))
+    });
   } catch (error) {
-    console.error("Error generando asiento de pasivos:", error);
-    res.status(500).send("Error generando asiento de pasivos");
+    console.error("Error cargando asientos de pasivos:", error);
+    res.status(500).send("Error cargando asientos de pasivos");
+  }
+});
+
+router.get("/facturas/asiento-pasivos/excel", requireAuth, allowRoles(...ROLES_ASIENTOS_PASIVOS), (req, res) => {
+  const params = new URLSearchParams();
+  for (const key of ["proveedor_id", "fecha_desde", "fecha_hasta"]) {
+    if (req.query[key]) params.set(key, String(req.query[key]));
+  }
+  res.redirect(`/compras/facturas/asientos${params.size ? `?${params}` : ""}`);
+});
+
+router.post("/facturas/asientos", requireAuth, allowRoles(...ROLES_ASIENTOS_PASIVOS), async (req, res) => {
+  let connection;
+  try {
+    await ensureFacturasSchema();
+    await ensureAsientosPasivosTables();
+    const raw = toArray(req.body.factura_ref);
+    if (!raw.length || raw.length > 1000) throw new Error("Seleccione entre 1 y 1000 facturas.");
+    const referencias = raw.map(parseFacturaRef);
+    if (referencias.some(ref => !ref || !Number.isSafeInteger(Number(ref.id)) || Number(ref.id) < 1)) {
+      throw new Error("La selección contiene una factura inválida.");
+    }
+    const claves = referencias.map(ref => `${ref.tipo}:${Number(ref.id)}`);
+    if (new Set(claves).size !== claves.length) throw new Error("La selección contiene facturas repetidas.");
+    const ordenIds = referencias.filter(ref => ref.tipo === "orden").map(ref => Number(ref.id)).sort((a, b) => a - b);
+    const independienteIds = referencias.filter(ref => ref.tipo === "independiente").map(ref => Number(ref.id)).sort((a, b) => a - b);
+    connection = await pool.getConnection();
+    await connection.beginTransaction();
+    if (ordenIds.length) {
+      const [rows] = await connection.query("SELECT id FROM ordenes_compra WHERE id IN (?) AND facturada = 1 ORDER BY id FOR UPDATE", [ordenIds]);
+      if (rows.length !== ordenIds.length) throw new Error("Una orden ya no tiene factura. Actualice la lista.");
+    }
+    if (independienteIds.length) {
+      const [rows] = await connection.query("SELECT id FROM facturas WHERE id IN (?) ORDER BY id FOR UPDATE", [independienteIds]);
+      if (rows.length !== independienteIds.length) throw new Error("Una factura ya no existe. Actualice la lista.");
+    }
+    const [existentes] = await connection.query(
+      "SELECT factura_tipo, factura_id FROM asientos_pasivos_facturas WHERE (factura_tipo = 'orden' AND factura_id IN (?)) OR (factura_tipo = 'independiente' AND factura_id IN (?)) LIMIT 1",
+      [ordenIds.length ? ordenIds : [0], independienteIds.length ? independienteIds : [0]]
+    );
+    if (existentes.length) throw new Error("Una factura seleccionada ya pertenece a otro asiento.");
+    const facturas = await obtenerFacturasCompras({ orden_ids: ordenIds, independiente_ids: independienteIds, orden: "asc" }, connection);
+    if (facturas.length !== referencias.length) throw new Error("La selección cambió. Actualice la lista.");
+    if (facturas.some(factura => montoAsientoFactura(factura) <= 0)) {
+      throw new Error("Hay facturas sin monto neto positivo; revise notas de crédito y selección.");
+    }
+    if (facturas.some(factura => !monedaCRC(factura.moneda))) {
+      throw new Error("El asiento 01 se genera en colones. Quite las facturas en otra moneda o registre primero su conversión.");
+    }
+    const identidades = facturas.map(identidadFacturaAsiento);
+    for (const key of ["clave", "documento"]) {
+      const values = identidades.map(item => item[key]).filter(Boolean);
+      if (new Set(values).size !== values.length) throw new Error("La selección contiene la misma factura en dos registros.");
+    }
+    const buffer = Buffer.from(await generarExcelAsientoPasivos({ facturas, connection }));
+    const montoTotal = Number(facturas.reduce((sum, factura) => sum + montoAsientoFactura(factura), 0).toFixed(2));
+    const archivoNombre = `asiento_pasivos_01_${new Date().toISOString().slice(0, 19).replace(/:/g, "-")}.xlsx`;
+    const [result] = await connection.query(
+      "INSERT INTO asientos_pasivos_lotes (creado_por, cantidad_facturas, monto_total, archivo_nombre, archivo_xlsx) VALUES (?, ?, ?, ?, ?)",
+      [req.session.user.id, facturas.length, montoTotal, archivoNombre, buffer]
+    );
+    await connection.query(
+      "INSERT INTO asientos_pasivos_facturas (lote_id, factura_tipo, factura_id, clave_electronica, identidad_documento, numero_factura, proveedor_nombre, fecha_factura, monto_asiento) VALUES ?",
+      [facturas.map((factura, index) => [result.insertId, factura.tipo, factura.id,
+        identidades[index].clave, identidades[index].documento,
+        factura.consecutivo_electronico || factura.numero_factura || factura.po_numero || null,
+        factura.proveedor_nombre || null, fechaSoloSql(factura.fecha), montoAsientoFactura(factura)])]
+    );
+    await connection.commit();
+    req.session.success = `Asiento #${result.insertId} guardado con ${facturas.length} factura(s).`;
+    res.redirect(`/compras/facturas/asientos?creado=${result.insertId}`);
+  } catch (error) {
+    if (connection) await connection.rollback();
+    console.error("Error guardando asiento de pasivos:", error);
+    req.session.error = error.code === "ER_DUP_ENTRY"
+      ? "Una factura seleccionada ya fue incluida en otro asiento. Actualice la lista."
+      : error.message || "No se pudo generar el asiento.";
+    res.redirect("/compras/facturas/asientos");
+  } finally {
+    if (connection) connection.release();
+  }
+});
+
+router.get("/facturas/asientos/:id/excel", requireAuth, allowRoles(...ROLES_ASIENTOS_PASIVOS), async (req, res) => {
+  try {
+    await ensureAsientosPasivosTables();
+    const id = Number(req.params.id);
+    if (!Number.isSafeInteger(id) || id < 1) return res.status(404).send("Asiento no encontrado.");
+    const [[lote]] = await queryWithRetry("SELECT archivo_nombre, archivo_xlsx FROM asientos_pasivos_lotes WHERE id = ?", [id]);
+    if (!lote) return res.status(404).send("Asiento no encontrado.");
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    res.setHeader("Content-Disposition", `attachment; filename="${lote.archivo_nombre}"`);
+    res.send(lote.archivo_xlsx);
+  } catch (error) {
+    console.error("Error descargando asiento guardado:", error);
+    res.status(500).send("No se pudo descargar el asiento.");
+  }
+});
+
+router.get("/facturas/asientos/:id", requireAuth, allowRoles(...ROLES_ASIENTOS_PASIVOS), async (req, res) => {
+  try {
+    await ensureAsientosPasivosTables();
+    const id = Number(req.params.id);
+    if (!Number.isSafeInteger(id) || id < 1) return res.status(404).send("Asiento no encontrado.");
+    const [[lote]] = await queryWithRetry(`
+      SELECT l.id, l.creado_en, l.cantidad_facturas, l.monto_total, l.archivo_nombre, u.usuario AS creado_por_usuario
+      FROM asientos_pasivos_lotes l LEFT JOIN usuarios u ON u.id = l.creado_por WHERE l.id = ?
+    `, [id]);
+    if (!lote) return res.status(404).send("Asiento no encontrado.");
+    const [facturas] = await queryWithRetry(
+      "SELECT factura_tipo, factura_id, numero_factura, proveedor_nombre, fecha_factura, monto_asiento FROM asientos_pasivos_facturas WHERE lote_id = ? ORDER BY id",
+      [id]
+    );
+    res.render("compras/asiento_pasivos_detalle", { user: req.session.user, lote, facturas });
+  } catch (error) {
+    console.error("Error cargando detalle de asiento:", error);
+    res.status(500).send("Error cargando asiento.");
   }
 });
 
