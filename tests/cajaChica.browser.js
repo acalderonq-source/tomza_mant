@@ -30,7 +30,9 @@ async function main() {
       cajaChica: {
         resumen: { total_mes: 0, total: 0 },
         flujoResumen: { monto_gas_tomza: 100.1, monto_super_gas: 200.2, documentos_listos: 2 },
-        documentosListos: ready, cortes: [], historial: []
+        documentosListos: ready,
+        cortes: [{ id: 1, fecha: '2026-09-23', estado: 'GENERADO', documentos: 42, total_gas_tomza: 272683.16, total_super_gas: 17000, total_documentos: 289683.16 }],
+        historial: []
       }
     });
     res.send(injectSecurityAssets(html, 'test-csrf'));
@@ -92,6 +94,10 @@ async function main() {
     await page.locator('#seleccionar-todas').uncheck();
     assert.equal(await page.locator('#cantidad-seleccion').textContent(), '1');
     await page.locator('#empresa-listas').selectOption('');
+    await page.locator('#tab-cortes').click();
+    assert.equal(await page.getByRole('button', { name: 'Reabrir' }).count(), 1);
+    assert.equal(await page.locator('.js-reabrir input[name="_csrf"]').inputValue(), 'test-csrf');
+    await page.locator('#tab-preparar').click();
     await page.screenshot({ path: path.join(os.tmpdir(), 'caja-chica-desktop.png'), fullPage: true });
     await page.setViewportSize({ width: 390, height: 844 });
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
@@ -100,6 +106,8 @@ async function main() {
     await page.locator('#preparar.active').waitFor();
     assert.equal(await page.locator('#generar-corte').count(), 0);
     assert.equal(await page.locator('#documento').count(), 0);
+    await page.locator('#tab-cortes').click();
+    assert.equal(await page.getByRole('button', { name: 'Reabrir' }).count(), 0);
     assert.deepEqual(errors, []);
     console.log('Browser checks passed: modal, CSRF, totals, filters, mobile width and read-only role.');
     console.log(path.join(os.tmpdir(), 'caja-chica-desktop.png'));

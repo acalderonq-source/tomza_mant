@@ -12,6 +12,7 @@ const { construirResumenFinanciero } = require("../utils/resumenFinanciero");
 const { esSedeTransportadoraDetalle } = require("../utils/sedes");
 const { ensureUploadDirectory } = require("../utils/uploadStorage");
 const { fechaValida: fechaCajaValida, centavos: centavosCaja, datosDocumento: validarDocumentoCaja, monedaCRC } = require('../utils/cajaChicaValidacion');
+const { asegurarColumnasReapertura, reabrirCorteCajaChica } = require('../utils/cajaChicaReapertura');
 const {
   crearLibroCajaChica,
   fechaArchivo: fechaArchivoCajaChica,
@@ -765,6 +766,7 @@ async function crearCajaChicaFlujoSchema() {
       INDEX idx_caja_chica_documentos_fecha (fecha)
     )
   `);
+  await asegurarColumnasReapertura(pool);
 }
 
 async function ensureReintegroGastosTable() {
@@ -2152,21 +2154,24 @@ async function obtenerResumenCajaChica() {
       COUNT(*) AS registros,
       COALESCE(SUM(monto), 0) AS total,
       COALESCE(SUM(CASE WHEN YEAR(fecha) = YEAR(CURDATE()) AND MONTH(fecha) = MONTH(CURDATE()) THEN monto ELSE 0 END), 0) AS total_mes
-    FROM caja_chica_reintegros
+    FROM caja_chica_reintegros cc
+    WHERE NOT EXISTS (SELECT 1 FROM caja_chica_cortes corte WHERE corte.reintegro_id = cc.id AND corte.estado = 'REABIERTO')
   `);
 
   const [porMes] = await queryWithRetry(`
     SELECT DATE_FORMAT(fecha, '%Y-%m') AS mes, COUNT(*) AS registros, COALESCE(SUM(monto), 0) AS total
-    FROM caja_chica_reintegros
+    FROM caja_chica_reintegros cc
+    WHERE NOT EXISTS (SELECT 1 FROM caja_chica_cortes corte WHERE corte.reintegro_id = cc.id AND corte.estado = 'REABIERTO')
     GROUP BY DATE_FORMAT(fecha, '%Y-%m')
     ORDER BY mes DESC
     LIMIT 12
   `);
 
   const [historial] = await queryWithRetry(`
-    SELECT c.*, u.usuario AS creado_por_usuario
+    SELECT c.*, u.usuario AS creado_por_usuario, corte.estado AS corte_estado
     FROM caja_chica_reintegros c
     LEFT JOIN usuarios u ON u.id = c.creado_por
+    LEFT JOIN caja_chica_cortes corte ON corte.reintegro_id = c.id
     ORDER BY c.fecha DESC, c.id DESC
     LIMIT 300
   `);
@@ -2181,7 +2186,8 @@ async function obtenerResumenCajaChica() {
   `);
 
   const [cortes] = await queryWithRetry(`
-    SELECT cc.*, u.usuario AS creado_por_usuario, COALESCE(cd.documentos, 0) AS documentos
+    SELECT cc.*, u.usuario AS creado_por_usuario,
+           COALESCE(cd.documentos, JSON_LENGTH(cc.documentos_snapshot_json), 0) AS documentos
     FROM caja_chica_cortes cc
     LEFT JOIN usuarios u ON u.id = cc.creado_por
     LEFT JOIN (
@@ -2360,7 +2366,7 @@ async function obtenerDashboardFinancieroFacturas(filtros = {}) {
     ? `WHERE ${wherePagos.join(" AND ")} AND COALESCE(pp.pagada, 0) = 1`
     : "WHERE COALESCE(pp.pagada, 0) = 1";
 
-  const whereCaja = [];
+  const whereCaja = ["NOT EXISTS (SELECT 1 FROM caja_chica_cortes corte WHERE corte.reintegro_id = cc.id AND corte.estado = 'REABIERTO')"];
   const paramsCaja = [];
   agregarFiltroFecha(whereCaja, paramsCaja, "cc.fecha", fecha_desde, fecha_hasta);
   const whereCajaSql = whereCaja.length ? `WHERE ${whereCaja.join(" AND ")}` : "";
@@ -5924,6 +5930,23 @@ router.post("/facturas/caja-chica/cortes", requireAuth, allowRoles(...ROLES_GEST
   return res.redirect("/compras/facturas/caja-chica#preparar");
 });
 
+router.post("/facturas/caja-chica/cortes/:id/reabrir", requireAuth, allowRoles("ADMIN"), async (req, res) => {
+  try {
+    await ensureCajaChicaFlujoSchema();
+    const resultado = await reabrirCorteCajaChica(pool, {
+      corteId: Number(req.params.id),
+      usuarioId: req.session.user.id,
+      documentosEsperados: Number(req.body.documentos_esperados)
+    });
+    req.session.success = `Corte #${resultado.corteId} reabierto: ${resultado.documentos} facturas vuelven a caja chica.`;
+    return res.redirect("/compras/facturas/caja-chica#preparar");
+  } catch (error) {
+    console.error("Error reabriendo corte de caja chica:", error);
+    req.session.error = error.message || "No se pudo reabrir el corte.";
+    return res.redirect("/compras/facturas/caja-chica#cortes");
+  }
+});
+
 router.get("/facturas/caja-chica/cortes/:id/excel/:empresa", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER", "CONTABILIDAD"), async (req, res) => {
   try {
     await ensureCajaChicaFlujoSchema();
@@ -5935,13 +5958,11 @@ router.get("/facturas/caja-chica/cortes/:id/excel/:empresa", requireAuth, allowR
     const [[corte]] = await queryWithRetry("SELECT * FROM caja_chica_cortes WHERE id = ? LIMIT 1", [corteId]);
     if (!corte) return res.status(404).send("Corte de caja chica no encontrado");
 
-    const [documentos] = await queryWithRetry(
-      `SELECT *
-       FROM caja_chica_documentos
-       WHERE corte_id = ?
-       ORDER BY id ASC`,
-      [corteId]
+    const [documentosActuales] = await queryWithRetry(
+      "SELECT * FROM caja_chica_documentos WHERE corte_id = ? ORDER BY id ASC", [corteId]
     );
+    const documentos = corte.estado === "REABIERTO"
+      ? JSON.parse(corte.documentos_snapshot_json || "[]") : documentosActuales;
     const corteNormalizado = { ...corte, fecha: fechaSoloSql(corte.fecha) };
     const workbook = await crearLibroCajaChica({ empresa, corte: corteNormalizado, documentos });
     const buffer = await workbook.xlsx.writeBuffer();

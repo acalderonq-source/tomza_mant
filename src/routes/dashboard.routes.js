@@ -1102,7 +1102,8 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro, pe
 
   const cajaParams = [];
   const condicionesCaja = armarFiltrosFecha("cc.fecha", fechaDesde, fechaHasta, cajaParams);
-  const whereCaja = condicionesCaja.length ? `WHERE ${condicionesCaja.join(" AND ")}` : "";
+  condicionesCaja.push("NOT EXISTS (SELECT 1 FROM caja_chica_cortes corte WHERE corte.reintegro_id = cc.id AND corte.estado = 'REABIERTO')");
+  const whereCaja = `WHERE ${condicionesCaja.join(" AND ")}`;
   const cajaChica = await safeQuery(`
     SELECT
       'CAJA_CHICA' AS fuente,

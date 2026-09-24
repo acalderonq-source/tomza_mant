@@ -121,6 +121,29 @@ test('old close endpoint cannot lock invoices', async () => {
   assert.equal(result.redirect, '/compras/facturas/caja-chica#preparar');
   assert.equal(statements.length, 0);
 });
+test('only admin can reopen a historical cash cut', async () => {
+  for (const role of ['CONTABILIDAD', 'TALLER', 'MECANICO']) {
+    const result = await request('/facturas/caja-chica/cortes/:id/reabrir', { documentos_esperados: '42' }, { id: '1' }, role);
+    assert.equal(result.status, 403);
+  }
+  assert.equal(statements.length, 0);
+});
+test('reopened cut still downloads its historical invoice snapshot', async () => {
+  query = async sql => {
+    if (/FROM caja_chica_cortes WHERE id/.test(sql)) return [[{
+      id: 1, estado: 'REABIERTO', fecha: new Date('2026-09-23T12:00:00Z'),
+      total_gas_tomza: '100.10', total_super_gas: '0', vales_total: '0',
+      documentos_snapshot_json: JSON.stringify([{ id: 9, empresa: 'GAS TOMZA', fecha: '2026-09-22', numero_factura: 'HISTORICA', proveedor: 'Prueba', monto: '100.10' }])
+    }]];
+    if (/FROM caja_chica_documentos/.test(sql)) return [[]];
+    throw new Error(sql);
+  };
+  const result = await request('/facturas/caja-chica/cortes/:id/excel/:empresa', {}, { id: '1', empresa: 'gas-tomza' });
+  assert.equal(result.status, 200);
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.load(result.body);
+  assert.equal(workbook.worksheets[0].getCell('C4').value, 'HISTORICA');
+});
 test('closed documents cannot be edited or removed', async () => {
   query = async sql => { assert.match(sql, /corte_id IS NULL/); return [{ affectedRows: 0 }]; };
   for (const action of ['actualizar', 'eliminar']) {

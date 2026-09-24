@@ -77,6 +77,12 @@
     form.action = `${base}/documentos/${button.dataset.id}/eliminar`;
     form.submit();
   }));
+  document.querySelectorAll('.js-reabrir').forEach(form => form.addEventListener('submit', event => {
+    const count = form.querySelector('[name="documentos_esperados"]')?.value || 'las';
+    if (!window.confirm(`¿Reabrir este corte y devolver ${count} facturas a la caja editable? El reintegro anterior dejará de sumar en los reportes.`)) {
+      event.preventDefault();
+    }
+  }));
   byId('form-corte')?.addEventListener('submit', event => {
     const selected = selections.filter(input => input.checked);
     if (!selected.some(input => input.dataset.empresa === event.submitter?.value)) {
