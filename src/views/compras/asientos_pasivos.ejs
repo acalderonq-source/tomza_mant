@@ -7,17 +7,27 @@
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
   <style>
-    body { background: #f3f6fb; color: #17243a; }
+    body { background: #eef2f7; color: #17243a; font-family: 'Segoe UI', Roboto, sans-serif; }
     .shell { max-width: 1500px; }
     .topbar { background: #123872; color: white; }
     .panel { background: white; border: 1px solid #d9e2ef; border-radius: 8px; overflow: hidden; }
-    .table-wrap { max-height: 62vh; overflow: auto; }
-    .table-wrap th { background: #f2f6fc; font-size: .76rem; position: sticky; top: 0; z-index: 1; white-space: nowrap; }
-    .table-wrap td { vertical-align: middle; }
+    .table-wrap { max-height: 62vh; overflow: auto; border: 1px solid #e2e8f0; border-radius: 8px; margin: 1rem; }
+    .table-facturas { font-size: .9rem; min-width: 1220px; }
+    .table-facturas th { background: #f8fafc; color: #334155; font-size: .72rem; letter-spacing: .02em; position: sticky; text-transform: uppercase; top: 0; z-index: 1; }
+    .table-facturas td { vertical-align: middle; }
     .invoice-included { background: #f4f7fb; color: #657387; }
     .code { font-weight: 700; white-space: nowrap; }
     .amount { font-variant-numeric: tabular-nums; white-space: nowrap; }
     .selection-bar { background: #eaf2ff; border-top: 1px solid #cfdef4; }
+    .badge-negocio { border-radius: 999px; display: inline-flex; font-size: .68rem; font-weight: 800; padding: .28rem .55rem; text-transform: uppercase; }
+    .badge-negocio.cilindrero { background: #dbeafe; color: #1e40af; }
+    .badge-negocio.transportadora { background: #ede9fe; color: #6d28d9; }
+    .badge-negocio.granel { background: #dcfce7; color: #166534; }
+    .badge-negocio.otros { background: #f1f5f9; color: #475569; }
+    .badge-electronica { background: #e0f2fe; color: #075985; border: 1px solid #bae6fd; }
+    .badge-electronica-ok { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
+    .badge-pagada { background: #198754; }
+    .badge-pendiente { background: #fff3cd; color: #78350f; }
     @media (max-width: 700px) { .table-wrap { max-height: 58vh; } }
   </style>
 </head>
@@ -53,21 +63,33 @@
       </form>
       <form method="POST" action="/compras/facturas/asientos" id="crear-asiento">
         <div class="table-wrap">
-          <table class="table table-sm table-hover mb-0">
-            <thead><tr><th class="ps-3"><input type="checkbox" id="seleccionar-todas" title="Seleccionar facturas disponibles"></th><th>Fecha</th><th>Tipo</th><th>N. factura</th><th>PO</th><th>Proveedor</th><th>Placa</th><th class="text-end">Monto neto</th><th>Asiento</th></tr></thead>
+          <table class="table table-hover align-middle table-facturas mb-0">
+            <thead><tr><th class="ps-2"><input type="checkbox" id="seleccionar-todas" title="Seleccionar facturas disponibles" aria-label="Seleccionar facturas disponibles"></th><th>PO Número</th><th>Proveedor</th><th>Fecha</th><th>Recepción</th><th>N° Factura</th><th>Factura electrónica</th><th class="text-end">Monto</th><th>Fecha Vencimiento</th><th>Estado</th><th>Acciones</th></tr></thead>
             <tbody>
-              <% if (!facturas.length) { %><tr><td colspan="9" class="text-center text-muted py-4">No hay facturas con esos filtros.</td></tr><% } %>
-              <% facturas.forEach(f => { const monto = montoAsientoFactura(f); const enColones = ['CRC', 'COLONES', 'COLON', '₡'].includes(String(f.moneda || 'CRC').trim().toUpperCase()); const disponible = !f.lote_asiento_id && monto > 0 && enColones; %>
+              <% if (!facturas.length) { %><tr><td colspan="11" class="text-center text-muted py-4">No hay facturas con esos filtros.</td></tr><% } %>
+              <% facturas.forEach(f => { const monto = montoAsientoFactura(f); const enColones = ['CRC', 'COLONES', 'COLON', '₡'].includes(String(f.moneda || 'CRC').trim().toUpperCase()); const disponible = !f.lote_asiento_id && monto > 0 && enColones; const negocio = String(f.negocio_recepcion || '').toLowerCase(); const claseNegocio = negocio.includes('cilindrero') ? 'cilindrero' : negocio.includes('transportadora') ? 'transportadora' : negocio.includes('granel') ? 'granel' : 'otros'; %>
                 <tr class="<%= f.lote_asiento_id ? 'invoice-included' : '' %>">
-                  <td class="ps-3"><input type="checkbox" class="factura-check" name="factura_ref" value="<%= f.tipo %>:<%= f.id %>" data-monto="<%= monto %>" aria-label="Seleccionar factura <%= f.consecutivo_electronico || f.numero_factura || f.po_numero || f.id %>" <%= disponible ? '' : 'disabled' %>></td>
-                  <td class="small text-nowrap"><%= f.fecha ? new Date(f.fecha).toLocaleDateString('es-CR', { timeZone: 'UTC' }) : '-' %></td>
-                  <td><%= f.tipo === 'orden' ? 'Orden' : 'Independiente' %></td>
-                  <td class="code"><%= f.consecutivo_electronico || f.numero_factura || '-' %></td>
-                  <td><%= f.po_numero || '-' %></td>
-                  <td><%= f.proveedor_nombre || '-' %></td>
-                  <td><%= f.placa_recepcion || '-' %></td>
-                  <td class="text-end amount"><%= enColones ? '₡' : String(f.moneda).toUpperCase() + ' ' %><%= monto.toLocaleString('es-CR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %></td>
-                  <td><% if (f.lote_asiento_id) { %><a href="/compras/facturas/asientos/<%= f.lote_asiento_id %>" class="badge text-bg-secondary text-decoration-none">#<%= f.lote_asiento_id %></a><% } else if (monto <= 0) { %><span class="badge text-bg-warning">Sin monto neto</span><% } else if (!enColones) { %><span class="badge text-bg-warning">Requiere conversión</span><% } else { %><span class="badge text-bg-success">Pendiente</span><% } %></td>
+                  <td class="ps-2"><input type="checkbox" class="factura-check" name="factura_ref" value="<%= f.tipo %>:<%= f.id %>" data-monto="<%= monto %>" aria-label="Seleccionar factura <%= f.numero_factura || f.po_numero || f.id %>" <%= disponible ? '' : 'disabled' %>></td>
+                  <td><%= f.po_numero || '—' %></td>
+                  <td><%= f.proveedor_nombre || '—' %></td>
+                  <td class="text-nowrap"><%= f.fecha ? new Date(f.fecha).toLocaleDateString('es-CR', { timeZone: 'UTC' }) : '—' %></td>
+                  <td class="small">
+                    <span class="badge-negocio <%= claseNegocio %>"><%= f.negocio_recepcion || 'Por clasificar' %></span>
+                    <% if (f.placa_recepcion || f.sede_recepcion) { %><div class="text-muted mt-1"><%= f.placa_recepcion || 'Sin placa' %><% if (f.sede_recepcion) { %> · <%= f.sede_recepcion %><% } %></div><% } %>
+                    <% if (f.factura_foto_producto) { %><div class="mt-1"><a href="<%= f.factura_foto_producto %>" target="_blank" rel="noopener noreferrer">Ver foto</a></div><% } %>
+                    <% if (f.factura_observacion) { %><div class="text-muted mt-1"><%= f.factura_observacion %></div><% } %>
+                    <% if (!f.factura_foto_producto && !f.factura_observacion) { %><div class="text-muted mt-1">Sin evidencia</div><% } %>
+                  </td>
+                  <td class="code"><%= f.numero_factura || '—' %></td>
+                  <td><% if (f.clave_electronica || f.consecutivo_electronico) { %>
+                    <span class="badge <%= f.estado_hacienda === 'ACEPTADA' ? 'badge-electronica-ok' : 'badge-electronica' %>"><%= f.estado_hacienda || 'PENDIENTE' %></span>
+                    <div class="small fw-semibold mt-1"><%= f.consecutivo_electronico || '—' %></div>
+                    <div class="small text-muted text-truncate" style="max-width: 180px" title="<%= f.clave_electronica || '' %>"><%= f.clave_electronica || '—' %></div>
+                  <% } else { %><span class="badge badge-electronica">Sin cruce</span><% } %></td>
+                  <td class="text-end amount fw-bold"><%= enColones ? '₡' : String(f.moneda).toUpperCase() + ' ' %><%= monto.toLocaleString('es-CR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %><% if (Number(f.nota_credito_monto || 0) > 0) { %><div class="small fw-normal text-muted">NC aplicada</div><% } %></td>
+                  <td class="text-nowrap"><%= f.fecha_vencimiento_factura ? new Date(f.fecha_vencimiento_factura).toLocaleDateString('es-CR', { timeZone: 'UTC' }) : '—' %><% if (f.vencida) { %><div><span class="badge text-bg-danger">Vencida</span></div><% } %></td>
+                  <td><% if (f.cubierta_por_nc) { %><span class="badge badge-electronica">Cubierta por NC</span><% } else if (f.pagada) { %><span class="badge badge-pagada">Pagada</span><% } else { %><span class="badge badge-pendiente">Pendiente</span><% } %></td>
+                  <td class="text-nowrap"><% if (f.lote_asiento_id) { %><a href="/compras/facturas/asientos/<%= f.lote_asiento_id %>" class="btn btn-outline-secondary btn-sm">Asiento #<%= f.lote_asiento_id %></a><% } else if (monto <= 0) { %><span class="badge text-bg-warning">Sin monto neto</span><% } else if (!enColones) { %><span class="badge text-bg-warning">Requiere conversión</span><% } else { %><span class="badge text-bg-success">Sin asiento</span><% } %></td>
                 </tr>
               <% }) %>
             </tbody>
