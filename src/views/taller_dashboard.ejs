@@ -630,11 +630,11 @@
   </section>
 
   <section class="dashboard-layout">
-      <section class="panel priority-panel">
+      <section class="panel priority-panel" id="taller-priority-panel">
         <div class="tv-panel-title priority-title d-flex justify-content-between align-items-center gap-2 flex-wrap">
           <span><i class="bi bi-exclamation-octagon me-1"></i> Prioridades activas</span>
           <div class="d-flex align-items-center gap-2 flex-wrap">
-            <span class="badge text-bg-light text-dark">Hasta hoy <%= fechaPrioridadActual || '' %> · <%= prioridadesVisiblesLista.length %></span>
+            <span class="badge text-bg-light text-dark">Hasta hoy <%= fechaPrioridadActual || '' %> · <span id="taller-priority-count"><%= prioridadesVisiblesLista.length %></span></span>
             <a href="/taller/prioridades-historial" class="btn btn-sm btn-outline-light fw-bold py-0">
               <i class="bi bi-clock-history"></i> Historial
             </a>
@@ -646,10 +646,10 @@
           </div>
         </div>
 
+        <div class="compact-panel-body priority-groups" id="taller-priority-groups" aria-live="polite">
         <% if (!prioridadesVisiblesLista.length) { %>
           <div class="empty-state">No hay prioridades pendientes activas para hoy.</div>
         <% } else { %>
-          <div class="compact-panel-body priority-groups">
             <% if (mostrarPrioridadesPesados) { %>
               <div class="priority-group">
                 <div class="priority-group-title">
@@ -753,8 +753,8 @@
                 <% } %>
               </div>
             <% }) %>
-          </div>
         <% } %>
+        </div>
       </section>
 
       <section class="panel parts-panel">
@@ -800,6 +800,7 @@
 </main>
 
 <% if (puedeEditarPrioridades) { %>
+  <div id="taller-priority-modals">
   <%
   const prioridadesEdicion = Array.from(
       new Map(prioridadesVisiblesLista.map(p => [String(p.id), p])).values()
@@ -937,6 +938,7 @@
       </div>
     </div>
   <% }) %>
+  </div>
 <% } %>
 
 <script>
@@ -965,9 +967,72 @@
   actualizarRelojTaller();
   setInterval(actualizarRelojTaller, 1000);
 
-  setTimeout(() => {
-    if (!document.hidden) window.location.reload();
-  }, 45000);
+  (() => {
+    const eventos = new EventSource('/taller/eventos-prioridades');
+    let actualizando = false;
+    let pendiente = false;
+
+    async function actualizarPrioridades() {
+      if (actualizando) {
+        pendiente = true;
+        return;
+      }
+      if (document.hidden) {
+        pendiente = true;
+        return;
+      }
+      const modales = document.getElementById('taller-priority-modals');
+      if (modales?.querySelector('.modal.show') || document.activeElement?.closest('#taller-priority-panel')) {
+        pendiente = true;
+        return;
+      }
+
+      actualizando = true;
+      pendiente = false;
+      try {
+        const url = new URL(window.location.href);
+        url.searchParams.set('silencioso', '1');
+        const response = await fetch(url, { cache: 'no-store', headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+        if (!response.ok) return;
+        const html = await response.text();
+        const incoming = new DOMParser().parseFromString(html, 'text/html');
+        const currentGroups = document.getElementById('taller-priority-groups');
+        const incomingGroups = incoming.getElementById('taller-priority-groups');
+        if (currentGroups && incomingGroups && currentGroups.innerHTML !== incomingGroups.innerHTML) {
+          const scrollTop = currentGroups.scrollTop;
+          currentGroups.innerHTML = incomingGroups.innerHTML;
+          currentGroups.scrollTop = scrollTop;
+        }
+
+        const currentCount = document.getElementById('taller-priority-count');
+        const incomingCount = incoming.getElementById('taller-priority-count');
+        if (currentCount && incomingCount) currentCount.textContent = incomingCount.textContent;
+
+        const incomingModals = incoming.getElementById('taller-priority-modals');
+        if (modales && incomingModals && modales.innerHTML !== incomingModals.innerHTML) {
+          modales.innerHTML = incomingModals.innerHTML;
+        }
+      } catch (_) {
+        pendiente = true;
+      } finally {
+        actualizando = false;
+        if (pendiente && !document.hidden && !document.querySelector('#taller-priority-modals .modal.show')) {
+          window.setTimeout(actualizarPrioridades, 250);
+        }
+      }
+    }
+
+    eventos.addEventListener('prioridades', actualizarPrioridades);
+    document.addEventListener('focusout', () => {
+      if (pendiente) window.setTimeout(actualizarPrioridades, 0);
+    });
+    document.addEventListener('hidden.bs.modal', () => {
+      if (pendiente) actualizarPrioridades();
+    });
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden && pendiente) actualizarPrioridades();
+    });
+  })();
 </script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>

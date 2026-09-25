@@ -29,6 +29,7 @@ router.use(requireAuth);
 const ROLES_VER_TALLER = ["ADMIN", "TALLER", "MECANICO", "SUPERVISOR", "SUPERVISOR_PESADO"];
 const ROLES_GESTION_TALLER = ["ADMIN", "TALLER", "MECANICO"];
 const ROLES_PRIORIDADES_TALLER = ["ADMIN", "TALLER", "SUPERVISOR_PESADO"];
+const clientesPrioridadesEnVivo = new Set();
 const SQL_SEDE_TRANSPORTE_EXPR = "UPPER(TRIM(COALESCE(NULLIF(tp.sede, ''), un.sede, '')))";
 const SQL_ES_SEDE_TRANSPORTE = `(${SQL_SEDE_TRANSPORTE_EXPR} IN ('TRANSPORTADORA', 'GRANEL', 'GRANEL_CARTAGO', 'CABEZALES', 'CISTERNAS', 'CARRETAS', 'TANDEM', 'TÁNDEM', 'TAMDEN') OR ${SQL_SEDE_TRANSPORTE_EXPR} LIKE 'GRANEL_%')`;
 
@@ -116,6 +117,16 @@ function esPrioridadPesados(prioridad) {
     esSedeTransporte(prioridad.sede) ||
     String(prioridad.creado_por_nombre || "").trim().toLowerCase().includes("pesado")
   );
+}
+
+function notificarPrioridadesEnVivo() {
+  for (const cliente of clientesPrioridadesEnVivo) {
+    if (cliente.writableEnded || cliente.destroyed) {
+      clientesPrioridadesEnVivo.delete(cliente);
+      continue;
+    }
+    cliente.write(`event: prioridades\ndata: ${Date.now()}\n\n`);
+  }
 }
 
 async function columnExists(tableName, columnName) {
@@ -718,6 +729,32 @@ router.get("/prioridades-historial", async (req, res) => {
   }
 });
 
+router.get("/eventos-prioridades", (req, res) => {
+  if (!puedeVerTaller(req.session.user)) {
+    return res.status(403).end();
+  }
+
+  res.set({
+    "Content-Type": "text/event-stream; charset=utf-8",
+    "Cache-Control": "no-cache, no-transform",
+    Connection: "keep-alive",
+    "X-Accel-Buffering": "no"
+  });
+  res.flushHeaders?.();
+  res.write(": conectado\n\n");
+  clientesPrioridadesEnVivo.add(res);
+
+  const keepAlive = setInterval(() => {
+    if (!res.writableEnded && !res.destroyed) res.write(": keep-alive\n\n");
+  }, 25000);
+  keepAlive.unref?.();
+
+  res.on("close", () => {
+    clearInterval(keepAlive);
+    clientesPrioridadesEnVivo.delete(res);
+  });
+});
+
 router.get("/dashboard", async (req, res) => {
   try {
     if (!puedeVerTaller(req.session.user)) {
@@ -900,10 +937,13 @@ router.get("/dashboard", async (req, res) => {
     ({ sql: resumenSql, params: resumenParams } = aplicarFiltroSedes(resumenSql, resumenParams, sedesPermitidas, "u"));
     const [[resumenRow]] = await pool.query(resumenSql, resumenParams);
 
-    const success = req.session.success;
-    const error = req.session.error;
-    delete req.session.success;
-    delete req.session.error;
+    const silencioso = req.query.silencioso === "1";
+    const success = silencioso ? "" : req.session.success;
+    const error = silencioso ? "" : req.session.error;
+    if (!silencioso) {
+      delete req.session.success;
+      delete req.session.error;
+    }
 
     res.render("taller_dashboard", {
       user: req.session.user,
@@ -1010,6 +1050,7 @@ router.post("/prioridades", async (req, res) => {
       [placa, sedeAsignada, fechaPrioridad, observacion, req.session.user.id,
         esAdmin ? Number(req.body.mostrar_operativos === "1") : 1]
     );
+    notificarPrioridadesEnVivo();
 
     req.session.success = `Prioridad agregada para la unidad ${placa} el ${fechaPrioridad}.`;
     res.redirect("/taller/dashboard");
@@ -1155,6 +1196,7 @@ router.post("/prioridades/:id", async (req, res) => {
       : "No se encontró la prioridad o ya fue cerrada.";
 
     if (result.affectedRows) {
+      notificarPrioridadesEnVivo();
       try {
         await pool.query(
           `UPDATE logistica_taller
@@ -1258,6 +1300,8 @@ router.post("/prioridades/:id/atendida", async (req, res) => {
          AND estado = 'PENDIENTE'`,
       [req.session.user.id, normalizarFechaHoraSalida(req.body.fecha_salida), id]
     );
+
+    if (result.affectedRows) notificarPrioridadesEnVivo();
 
     req.session[result.affectedRows ? "success" : "error"] = result.affectedRows
       ? "Unidad marcada como salida de taller. El registro quedó en historial."
