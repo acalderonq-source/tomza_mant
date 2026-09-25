@@ -8,10 +8,12 @@ const unidad = { id: 1, placa: 'C164528' };
 
 test('Campos y catálogos de las plantillas', () => {
   assert.equal(a.campos('unidades').length, 12);
-  assert.equal(a.campos('operacion').length, 51);
+  assert.equal(a.campos('operacion').length, 52);
+  assert.equal(a.campos('operacion').find(f => f.id === 'depreciacion_mensual').label, 'Depreciación mensual (CRC)');
+  assert.ok(a.secciones.operacion.columns.includes('depreciacion_mensual'));
   assert.deepEqual(Object.keys(a.tipos), ['1', '2', '3', '4']);
   assert.deepEqual(Object.keys(a.mediciones), ['1', '2', '3']);
-  assert.equal(a.campos('operacion')[46].id, 'costo_peaje');
+  assert.equal(a.campos('operacion').find(f => f.id === 'costo_peaje').id, 'costo_peaje');
   assert.equal(a.mostrar('unidades', 'anio', 2016), '2016');
 });
 test('Roles y protección de planillas', () => {
@@ -73,7 +75,7 @@ test('Excel A7 mantiene plantilla, códigos y datos de cada columna', async () =
   assert.equal(wb.getWorksheet('Control').getCell('C4').value, 'Completo');
 });
 test('Excel de costos no conserva datos de ejemplo y calcula sólo datos conocidos', async () => {
-  const op = a.validar('operacion', { ruta: 'Prueba', marchamo: '200', costo_peaje: '100' }, '2026-09', unidad);
+  const op = a.validar('operacion', { ruta: 'Prueba', marchamo: '200', costo_peaje: '100', depreciacion_mensual: '250000' }, '2026-09', unidad);
   const rows = [{ seccion: 'operacion', datos: op, version: 1 },
     { seccion: 'ventas', datos: { sede: 'Cartago', litros: 100, ruta: 70, planta: 30 }, version: 1 },
     { seccion: 'planilla', datos: { nombre: '=HYPERLINK("bad")', identificacion: '001', salario_base: 100, comision: 0, salario_reportado: 100, tasa_ccss: 5 }, version: 1 }];
@@ -84,6 +86,8 @@ test('Excel de costos no conserva datos de ejemplo y calcula sólo datos conocid
   assert.equal(opSheet.getCell('AU8').value, 100);
   assert.equal(opSheet.getCell('AV8').value, 200);
   assert.equal(opSheet.getCell('AV7').value, 'Monto Marchamo 2026');
+  assert.equal(opSheet.getCell('AZ7').value, 'Depreciación mensual (CRC)');
+  assert.equal(opSheet.getCell('AZ8').value, 250000);
   const p = wb.getWorksheet('Planilla 1 mes');
   assert.equal(p.getCell('A3').value, '=HYPERLINK("bad")');
   assert.equal(p.getCell('H3').result, 5);

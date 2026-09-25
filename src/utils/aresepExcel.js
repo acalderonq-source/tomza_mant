@@ -41,10 +41,18 @@ async function generarExcel(tipo, periodo, rows, incluirPlanilla) {
     sheet.views = [{ state: 'frozen', ySplit: 1 }];
   } else {
     const op = wb.getWorksheet('Datos operacion');
-    limpiar(op, 8, 51);
+    limpiar(op, 8, 52);
     op.getCell('AV7').value = `Monto Marchamo ${periodo.slice(0, 4)}`;
     op.getCell('AW7').value = `Monto Dekra ${periodo.slice(0, 4)}`;
-    de('operacion').forEach((r, i) => fila(op, i + 8, a.campos('operacion').map(f => valor(f, r.datos)), 8));
+    const camposOperacion = a.campos('operacion');
+    const depreciacion = camposOperacion.find(f => f.id === 'depreciacion_mensual');
+    const camposExcel = camposOperacion.filter(f => f.id !== 'depreciacion_mensual');
+    if (depreciacion) camposExcel.push(depreciacion);
+    op.getCell('AZ7').value = depreciacion?.label || 'Depreciación mensual (CRC)';
+    op.getCell('AZ7').style = structuredClone(op.getCell('AY7').style);
+    op.getCell('AZ8').style = structuredClone(op.getCell('AY8').style);
+    op.getColumn(52).width = Math.max(op.getColumn(51).width || 18, 24);
+    de('operacion').forEach((r, i) => fila(op, i + 8, camposExcel.map(f => valor(f, r.datos)), 8));
     op.views = [{ state: 'frozen', ySplit: 7, xSplit: 2 }];
     const planilla = wb.getWorksheet('Planilla 1 mes');
     if (!incluirPlanilla) wb.removeWorksheet(planilla.id);

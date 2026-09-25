@@ -22,7 +22,7 @@ const secciones = {
     ])]
   },
   operacion: {
-    title: 'Operación y costos', unidad: true, columns: ['placa', 'ruta', 'km_mes', 'litros_vendidos', 'monto_facturado'],
+    title: 'Operación y costos', unidad: true, columns: ['placa', 'ruta', 'km_mes', 'litros_vendidos', 'monto_facturado', 'depreciacion_mensual'],
     groups: [
       grupo('Ruta y actividad comercial', [campo('ruta', 'Ruta', 'text', { required: true }),
         campo('placa', 'Id camión / placa', 'text', { readonly: true }), campo('tipo', 'Tipo'),
@@ -32,6 +32,7 @@ const secciones = {
         entero('clientes_venta', 'Clientes con venta'), num('litros_vendidos', 'Litros vendidos'), num('monto_facturado', 'Monto facturado (CRC)')]),
       grupo('Activo y recorrido', [num('valor_unidad', 'Valor de la unidad (CRC)'), fecha('fecha_compra', 'Fecha de compra'),
         num('vida_util', 'Vida útil (años)'), num('valor_libros', 'Valor en libros (CRC)'), num('km_mes', 'Kilómetros recorridos en el mes'),
+        num('depreciacion_mensual', 'Depreciación mensual (CRC)'),
         campo('rutas_detalle', 'Rutas del mes'), campo('definicion', 'Definición / unidad de medida de carga')]),
       grupo('Combustible y llantas', [num('combustible', 'Combustible usado (litros)'), num('precio_combustible', 'Precio promedio por litro (CRC)'),
         entero('llantas_camion', 'Cantidad de llantas por camión'), num('km_llantas', 'Kilómetros entre cambio de llantas'), num('precio_llanta', 'Costo por llanta (CRC)')]),
