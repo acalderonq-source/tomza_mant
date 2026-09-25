@@ -568,7 +568,7 @@
         </div>
         <div class="table-responsive">
           <table class="table table-sm table-modern align-middle">
-            <thead><tr><th>Fecha</th><th>Tipo</th><th>Artículo</th><th>Cant.</th><th>Responsable</th></tr></thead>
+            <thead><tr><th>Fecha</th><th>Tipo</th><th>Artículo</th><th>Cant.</th><th>Destino / responsable</th></tr></thead>
             <tbody>
               <% if (!movimientos.length) { %><tr><td colspan="5" class="empty-row">Sin movimientos recientes.</td></tr><% } %>
               <% movimientos.slice(0, 6).forEach(m => { %>
@@ -577,7 +577,7 @@
                   <td><span class="pill"><%= m.tipo_movimiento %></span></td>
                   <td><span class="code-badge me-1"><%= m.codigo_taller || '----' %></span><strong><%= m.articulo_nombre %></strong><div class="small muted"><%= origenTexto(m.origen_inventario) %></div></td>
                   <td class="money"><%= fmt(m.cantidad) %> <%= m.unidad_medida %></td>
-                  <td><%= m.mecanico || m.proveedor_nombre || m.usuario_nombre || '-' %></td>
+                  <td><%= m.tipo_movimiento === 'ENTRADA' ? (m.placa || (m.destino_recepcion === 'GENERALES' ? 'Generales' : '-')) : (m.placa || m.mecanico || '-') %><div class="small muted"><%= m.proveedor_nombre || m.usuario_nombre || '-' %></div></td>
                 </tr>
               <% }) %>
             </tbody>
@@ -846,6 +846,8 @@
             <div class="col-md-4"><label class="form-label">Cantidad</label><input class="form-control" type="number" step="0.01" min="0.01" name="cantidad" required></div>
             <div class="col-md-4"><label class="form-label">Precio unitario</label><input class="form-control" type="number" step="0.01" min="0" name="precio_unitario"></div>
             <div class="col-md-4"><label class="form-label">Fecha</label><input class="form-control" type="date" name="fecha"></div>
+            <div class="col-md-6"><label class="form-label">Destino de la recepción</label><select class="form-select" name="destino_recepcion" id="destino-recepcion"><option value="GENERALES">Generales</option><option value="PLACA">Por placa</option></select></div>
+            <div class="col-md-6 d-none" id="recepcion-placa-wrap"><label class="form-label">Placa de la unidad</label><input class="form-control placa-search" id="recepcion-placa" name="placa" placeholder="Escriba para buscar la placa" autocomplete="off" autocapitalize="characters" spellcheck="false" disabled></div>
             <div class="col-md-6"><label class="form-label">Origen de inventario</label><select class="form-select" name="origen_inventario"><option value="PROPIO">Inventario nuestro</option><option value="CONSIGNACION">Consignación Maxi Repuestos</option></select></div>
             <div class="col-md-6"><label class="form-label">Proveedor</label><select class="form-select" name="proveedor_id"><option value="">Seleccione</option><% proveedores.forEach(p => { %><option value="<%= p.id %>"><%= p.nombre %></option><% }) %></select></div>
             <div class="col-md-6"><label class="form-label">Proveedor manual</label><input class="form-control" name="proveedor_nombre" placeholder="Si no está en lista"></div>
@@ -1041,7 +1043,7 @@
                   <td><span class="pill"><%= m.tipo_movimiento %></span></td>
                   <td><span class="pill <%= origenClase(m.origen_inventario) %>"><%= origenTexto(m.origen_inventario) %></span></td>
                   <td><span class="code-badge me-1"><%= m.codigo_taller || '----' %></span><strong><%= m.articulo_nombre %></strong><div class="small muted">Prov. <%= m.codigo || '-' %></div></td>
-                  <td><%= m.placa || '-' %><div class="small muted"><%= m.mecanico || m.proveedor_nombre || '-' %></div></td>
+                  <td><%= m.placa || (m.tipo_movimiento === 'ENTRADA' && m.destino_recepcion === 'GENERALES' ? 'Generales' : '-') %><div class="small muted"><%= m.mecanico || m.proveedor_nombre || '-' %></div></td>
                   <td class="money"><%= fmt(m.cantidad) %> <%= m.unidad_medida %></td>
                   <td><%= fmt(m.existencia_anterior) %> → <strong><%= fmt(m.existencia_nueva) %></strong></td>
                   <td><%= m.usuario_nombre || '-' %></td>
@@ -1214,6 +1216,23 @@
   };
 
   document.querySelectorAll('.placa-search').forEach(prepararBuscadorPlaca);
+
+  const destinoRecepcion = document.getElementById('destino-recepcion');
+  const recepcionPlacaWrap = document.getElementById('recepcion-placa-wrap');
+  const recepcionPlaca = document.getElementById('recepcion-placa');
+  destinoRecepcion?.addEventListener('change', () => {
+    const porPlaca = destinoRecepcion.value === 'PLACA';
+    recepcionPlacaWrap?.classList.toggle('d-none', !porPlaca);
+    if (recepcionPlaca) {
+      recepcionPlaca.disabled = !porPlaca;
+      recepcionPlaca.required = porPlaca;
+      if (!porPlaca) {
+        recepcionPlaca.value = '';
+        recepcionPlaca.dataset.placaValidada = '';
+        recepcionPlaca.setCustomValidity('');
+      }
+    }
+  });
 
   const normalizarBusquedaArticulo = (value) => String(value || '')
     .normalize('NFD')

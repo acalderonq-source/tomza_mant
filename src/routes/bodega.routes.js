@@ -295,6 +295,7 @@ async function ensureBodegaTables() {
       existencia_anterior DECIMAL(12,2) NOT NULL DEFAULT 0,
       existencia_nueva DECIMAL(12,2) NOT NULL DEFAULT 0,
       placa VARCHAR(50) NULL,
+      destino_recepcion ENUM('GENERALES','PLACA') NOT NULL DEFAULT 'GENERALES',
       mecanico VARCHAR(120) NULL,
       tipo_trabajo VARCHAR(50) NULL,
       proveedor_id INT NULL,
@@ -312,6 +313,13 @@ async function ensureBodegaTables() {
     await pool.query(`
       ALTER TABLE bodega_movimientos
       ADD COLUMN origen_inventario ENUM('PROPIO','CONSIGNACION') NOT NULL DEFAULT 'PROPIO' AFTER tipo_movimiento
+    `);
+  }
+
+  if (!(await columnExists("bodega_movimientos", "destino_recepcion"))) {
+    await pool.query(`
+      ALTER TABLE bodega_movimientos
+      ADD COLUMN destino_recepcion ENUM('GENERALES','PLACA') NOT NULL DEFAULT 'GENERALES' AFTER placa
     `);
   }
 
@@ -1238,6 +1246,11 @@ router.post("/recibir", async (req, res) => {
     const proveedor = await obtenerProveedor(req.body.proveedor_id, req.body.proveedor_nombre);
     const origen = origenInventario(req.body.origen_inventario);
     await conn.beginTransaction();
+    const destinoRecepcion = upper(req.body.destino_recepcion || "GENERALES");
+    if (!["GENERALES", "PLACA"].includes(destinoRecepcion)) throw new Error("Seleccione Generales o Por placa.");
+    const placaSolicitada = destinoRecepcion === "PLACA" ? limpiar(req.body.placa) : "";
+    const unidad = placaSolicitada ? await obtenerUnidadPorPlaca(conn, placaSolicitada, true) : null;
+    if (destinoRecepcion === "PLACA" && !unidad) throw new Error("Seleccione una placa activa de la lista de unidades.");
     const articulo = await articuloParaMovimiento(conn, articuloId);
     const anterior = Number(articulo.stock_actual || 0);
     const nueva = anterior + cantidad;
@@ -1262,14 +1275,16 @@ router.post("/recibir", async (req, res) => {
     await conn.query(
       `INSERT INTO bodega_movimientos (
         articulo_id, tipo_movimiento, origen_inventario, cantidad, existencia_anterior, existencia_nueva,
-        proveedor_id, proveedor_nombre, numero_factura, orden_compra_id, precio_unitario, motivo, creado_por
-      ) VALUES (?, 'ENTRADA', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        placa, destino_recepcion, proveedor_id, proveedor_nombre, numero_factura, orden_compra_id, precio_unitario, motivo, creado_por
+      ) VALUES (?, 'ENTRADA', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         articulo.id,
         origen,
         cantidad,
         anterior,
         nueva,
+        unidad?.placa || null,
+        destinoRecepcion,
         proveedor.id,
         proveedor.nombre,
         limpiar(req.body.numero_factura) || null,
