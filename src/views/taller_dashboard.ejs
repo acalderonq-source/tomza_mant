@@ -493,14 +493,39 @@
   const prioridadesPesadosLista = esPantallaPesados && !prioridadesPesadosBase.length
     ? prioridadesLista
     : prioridadesPesadosBase;
-  const prioridadesMecanicoLista = esPantallaMecanico && !prioridadesMecanicoBase.length
+  const prioridadesMecanicoBaseLista = esPantallaMecanico && !prioridadesMecanicoBase.length
     ? prioridadesLista
     : prioridadesMecanicoBase;
   const mostrarPrioridadesPesados = esPantallaPesados || (!esPantallaPesados && !esPantallaMecanico);
   const mostrarPrioridadesMecanico = esPantallaMecanico || (!esPantallaPesados && !esPantallaMecanico);
+  const normalizarSedePrioridad = sede => String(sede || 'Sin sede')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toUpperCase();
+  const prioridadesMecanicoLista = esAdminPrioridades
+    ? prioridadesMecanicoBaseLista.filter(p => ['CARTAGO', 'TALLER'].includes(normalizarSedePrioridad(p.sede)))
+    : prioridadesMecanicoBaseLista;
+  const prioridadesSedesMap = new Map();
+  if (esAdminPrioridades) {
+    prioridadesMecanicoBaseLista
+      .filter(p => !['CARTAGO', 'TALLER'].includes(normalizarSedePrioridad(p.sede)))
+      .forEach(p => {
+        const sede = p.sede || 'Sin sede';
+        if (!prioridadesSedesMap.has(sede)) prioridadesSedesMap.set(sede, []);
+        prioridadesSedesMap.get(sede).push(p);
+      });
+  }
+  const prioridadesMecanicoGrupos = mostrarPrioridadesMecanico
+    ? esAdminPrioridades
+      ? [
+          { titulo: 'Mecánico / Taller', prioridades: prioridadesMecanicoLista },
+          ...[...prioridadesSedesMap.entries()]
+            .sort(([sedeA], [sedeB]) => sedeA.localeCompare(sedeB, 'es'))
+            .map(([sede, items]) => ({ titulo: sede, prioridades: items }))
+        ]
+      : [{ titulo: 'Mecánico / Taller', prioridades: prioridadesMecanicoLista }]
+    : [];
   const prioridadesVisiblesLista = [
     ...(mostrarPrioridadesPesados ? prioridadesPesadosLista : []),
-    ...(mostrarPrioridadesMecanico ? prioridadesMecanicoLista : [])
+    ...prioridadesMecanicoGrupos.flatMap(grupo => grupo.prioridades)
   ];
   const repuestosLista = Array.isArray(solicitudesRepuestos) ? solicitudesRepuestos : [];
   const fechaPrioridadModal = typeof fechaPrioridadDefault !== 'undefined' && fechaPrioridadDefault ? fechaPrioridadDefault : '';
@@ -677,17 +702,17 @@
               </div>
             <% } %>
 
-            <% if (mostrarPrioridadesMecanico) { %>
+            <% prioridadesMecanicoGrupos.forEach(grupo => { %>
               <div class="priority-group">
                 <div class="priority-group-title">
-                  <span><%= esAdminPrioridades ? 'Mecánico / Taller y otras sedes' : 'Mecánico / Taller' %></span>
-                  <span><%= prioridadesMecanicoLista.length %></span>
+                  <span><%= grupo.titulo %></span>
+                  <span><%= grupo.prioridades.length %></span>
                 </div>
-                <% if (!prioridadesMecanicoLista.length) { %>
+                <% if (!grupo.prioridades.length) { %>
                   <div class="empty-state py-2">Sin prioridades de mecánico.</div>
                 <% } else { %>
                   <div class="priority-card-grid">
-                    <% prioridadesMecanicoLista.forEach(p => { %>
+                    <% grupo.prioridades.forEach(p => { %>
                       <article class="priority-card">
                         <div>
                           <span class="priority-plate"><%= p.placa %></span>
@@ -727,7 +752,7 @@
                   </div>
                 <% } %>
               </div>
-            <% } %>
+            <% }) %>
           </div>
         <% } %>
       </section>
