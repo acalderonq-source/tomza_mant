@@ -669,7 +669,7 @@
           <i class="bi bi-cash-stack"></i> Reintegro gastos
         </a>
         <a href="/compras/facturas/recibo-preview" target="_blank" class="btn btn-outline-dark btn-sm">
-          <i class="bi bi-receipt"></i> Vista recibo
+          <i class="bi bi-receipt"></i> Vista colilla de pago
         </a>
         <a href="<%= reporteFacturasUrl %>" class="btn btn-outline-danger btn-sm">
           <i class="bi bi-file-earmark-pdf"></i> PDF facturas
@@ -683,7 +683,7 @@
       </div>
     </div>
 
-    <form method="POST" action="/compras/facturas/pagar-multiple" id="multiplePagoForm">
+    <form method="POST" action="/compras/facturas/pagar-multiple" id="multiplePagoForm" target="colillaDownloadFrame">
       <div class="table-scroll">
         <table class="table table-hover align-middle table-facturas mb-0">
           <thead class="table-light">
@@ -801,6 +801,11 @@
                   <% if (f.tiene_abono && !f.pagada) { %>
                     <div class="mt-2">
                       <span class="badge bg-success">Con abono</span>
+                    </div>
+                  <% } %>
+                  <% if (f.comprobante_pago_numero || f.comprobante_pago_archivo) { %>
+                    <div class="small mt-2">Comprobante: <%= f.comprobante_pago_numero || 'Sin número' %>
+                      <% if (f.comprobante_pago_archivo) { %><a href="<%= f.comprobante_pago_archivo %>" target="_blank" rel="noopener">Ver adjunto</a><% } %>
                     </div>
                   <% } %>
                 </td>
@@ -1161,7 +1166,7 @@
   <div class="modal fade" id="pagarFacturaModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog">
     <div class="modal-content">
-      <form method="POST" id="pagarFacturaForm">
+      <form method="POST" id="pagarFacturaForm" target="colillaDownloadFrame">
         <div class="modal-header">
           <div>
             <h5 class="modal-title"><i class="bi bi-check-circle me-1"></i> Pagar factura</h5>
@@ -1181,6 +1186,17 @@
           <div class="mb-3">
             <label class="form-label">Periodo de cierre</label>
             <input type="month" name="periodo_cierre" id="pagarFacturaPeriodo" class="form-control" value="<%= hoy.slice(0, 7) %>">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">N.° de comprobante</label>
+            <input type="text" name="comprobante_numero" id="pagarComprobanteNumero" class="form-control" maxlength="120">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Adjuntar comprobante (PDF o JPG)</label>
+            <input type="file" id="pagarComprobanteArchivo" class="form-control" accept="application/pdf,image/jpeg,.pdf,.jpg,.jpeg">
+            <input type="hidden" name="comprobante_data" id="pagarComprobanteData">
+            <input type="hidden" name="comprobante_nombre" id="pagarComprobanteNombre">
+            <small class="text-muted">Opcional, máximo 5 MB.</small>
           </div>
           <small class="text-muted">Puede pagar el 01/08 y dejar periodo cierre 2026-07 si pertenece al cierre de julio.</small>
         </div>
@@ -1215,11 +1231,22 @@
           <label class="form-label">Periodo de cierre</label>
           <input type="month" name="periodo_cierre" id="pagarMultiplePeriodo" class="form-control" value="<%= hoy.slice(0, 7) %>" form="multiplePagoForm">
         </div>
+        <div class="mb-3">
+          <label class="form-label">N.° de comprobante</label>
+          <input type="text" name="comprobante_numero" id="pagarMultipleComprobanteNumero" class="form-control" maxlength="120" form="multiplePagoForm">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Adjuntar comprobante (PDF o JPG)</label>
+          <input type="file" id="pagarMultipleComprobanteArchivo" class="form-control" accept="application/pdf,image/jpeg,.pdf,.jpg,.jpeg">
+          <input type="hidden" name="comprobante_data" id="pagarMultipleComprobanteData" form="multiplePagoForm">
+          <input type="hidden" name="comprobante_nombre" id="pagarMultipleComprobanteNombre" form="multiplePagoForm">
+          <small class="text-muted">Opcional, máximo 5 MB.</small>
+        </div>
         <small class="text-muted">La misma fecha y periodo se aplicará a todas las facturas seleccionadas.</small>
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-        <button type="submit" class="btn btn-success" form="multiplePagoForm">Confirmar y descargar recibo</button>
+        <button type="submit" class="btn btn-success" form="multiplePagoForm">Confirmar y descargar colilla</button>
       </div>
     </div>
   </div>
@@ -1271,7 +1298,7 @@
   <div class="modal fade" id="abonoFacturaModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog">
     <div class="modal-content">
-      <form method="POST" id="abonoFacturaForm">
+      <form method="POST" id="abonoFacturaForm" target="colillaDownloadFrame">
         <div class="modal-header">
           <div>
             <h5 class="modal-title"><i class="bi bi-cash-coin me-1"></i> Registrar abono</h5>
@@ -1302,6 +1329,17 @@
             <label class="form-label">Observación</label>
             <textarea name="observacion_abono" id="abonoObservacion" class="form-control" rows="3" placeholder="Ej: transferencia parcial, pago programado, abono de caja..."></textarea>
           </div>
+          <div class="mb-3">
+            <label class="form-label">N.° de comprobante</label>
+            <input type="text" name="comprobante_numero" id="abonoComprobanteNumero" class="form-control" maxlength="120">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Adjuntar comprobante (PDF o JPG)</label>
+            <input type="file" id="abonoComprobanteArchivo" class="form-control" accept="application/pdf,image/jpeg,.pdf,.jpg,.jpeg">
+            <input type="hidden" name="comprobante_data" id="abonoComprobanteData">
+            <input type="hidden" name="comprobante_nombre" id="abonoComprobanteNombre">
+            <small class="text-muted">Opcional, máximo 5 MB.</small>
+          </div>
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
@@ -1312,6 +1350,8 @@
   </div>
   </div>
 <% } %>
+
+<iframe name="colillaDownloadFrame" title="Descarga de colilla de pago" class="d-none"></iframe>
 
 <!-- Modal para recepción de factura ligada a orden de compra -->
 <% if (puedeRecibirFacturas) { %>
@@ -1447,6 +1487,61 @@
     const element = document.getElementById(id);
     if (element) element.textContent = value || '';
   }
+
+  [
+    ['pagarComprobanteArchivo', 'pagarComprobanteData', 'pagarComprobanteNombre'],
+    ['pagarMultipleComprobanteArchivo', 'pagarMultipleComprobanteData', 'pagarMultipleComprobanteNombre'],
+    ['abonoComprobanteArchivo', 'abonoComprobanteData', 'abonoComprobanteNombre']
+  ].forEach(([fileId, dataId, nameId]) => {
+    const input = document.getElementById(fileId);
+    if (!input) return;
+    input.addEventListener('change', () => {
+      const file = input.files && input.files[0];
+      setValue(dataId, '');
+      setValue(nameId, '');
+      if (!file) return;
+      const validType = ['application/pdf', 'image/jpeg'].includes(file.type) || /\.(pdf|jpe?g)$/i.test(file.name);
+      if (!validType || file.size > 5 * 1024 * 1024) {
+        input.value = '';
+        alert('Adjunte un PDF o JPG de máximo 5 MB.');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = () => {
+        setValue(dataId, reader.result);
+        setValue(nameId, file.name);
+      };
+      reader.readAsDataURL(file);
+    });
+  });
+
+  [
+    ['pagarFacturaForm', 'pagarComprobanteArchivo', 'pagarComprobanteData', 'pagarComprobanteNombre'],
+    ['multiplePagoForm', 'pagarMultipleComprobanteArchivo', 'pagarMultipleComprobanteData', 'pagarMultipleComprobanteNombre'],
+    ['abonoFacturaForm', 'abonoComprobanteArchivo', 'abonoComprobanteData', 'abonoComprobanteNombre']
+  ].forEach(([formId, fileId, dataId, nameId]) => {
+    const form = document.getElementById(formId);
+    if (!form) return;
+    form.addEventListener('submit', event => {
+      if (form.dataset.fileReady === '1') {
+        form.dataset.fileReady = '0';
+        return;
+      }
+      const file = document.getElementById(fileId)?.files?.[0];
+      const dataInput = document.getElementById(dataId);
+      if (!file || dataInput?.value) return;
+      event.preventDefault();
+      const reader = new FileReader();
+      reader.onload = () => {
+        setValue(dataId, reader.result);
+        setValue(nameId, file.name);
+        form.dataset.fileReady = '1';
+        form.requestSubmit(event.submitter || undefined);
+      };
+      reader.onerror = () => alert('No se pudo leer el comprobante. Intente de nuevo.');
+      reader.readAsDataURL(file);
+    });
+  });
 
   function periodoDesdeFecha(fecha) {
     return /^\d{4}-\d{2}-\d{2}$/.test(String(fecha || '')) ? fecha.slice(0, 7) : '<%= hoy.slice(0, 7) %>';

@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<title>Recibo de Pago</title>
+<title>Colilla de Pago a Proveedores</title>
 <style>
   * { box-sizing: border-box; }
   @page { size: Letter; margin: 0; }
@@ -257,7 +257,7 @@
           </div>
         </td>
         <td>
-          <div class="title">Recibo de pago</div>
+          <div class="title">Colilla de pago a proveedores</div>
           <div class="subtitle">Control de facturas pagadas - Departamento de compras</div>
         </td>
       </tr>
@@ -268,7 +268,7 @@
   <table class="meta-table">
     <tr>
       <td style="width:25%;">
-        <span class="label">Recibo No.</span>
+        <span class="label">Colilla No.</span>
         <span class="value"><%= reciboNumero || '-' %></span>
       </td>
       <td style="width:25%;">
@@ -328,7 +328,7 @@
     </thead>
     <tbody>
       <% if (!resumenProveedores.length) { %>
-        <tr><td colspan="3" class="text-center muted">No hay facturas en este recibo.</td></tr>
+        <tr><td colspan="3" class="text-center muted">No hay facturas en esta colilla.</td></tr>
       <% } %>
       <% resumenProveedores.forEach(item => { %>
         <tr>
@@ -408,7 +408,7 @@
   </table>
 
   <div class="footer">
-    Documento generado automáticamente por el sistema interno de Gas Tomza. Este recibo respalda el pago de las facturas indicadas y debe conservarse junto con los comprobantes bancarios correspondientes.
+    Documento generado automáticamente por el sistema interno de Gas Tomza. Esta colilla respalda los pagos o abonos de las facturas indicadas y debe conservarse junto con los comprobantes bancarios correspondientes.
   </div>
   </div>
 </div>

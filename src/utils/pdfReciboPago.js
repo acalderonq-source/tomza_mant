@@ -97,7 +97,7 @@ function generarFilasDetalle(facturas) {
 
   return facturas.map(factura => {
     const notaCredito = toNumber(factura.nota_credito_monto);
-    const abono = toNumber(factura.abono_monto);
+    const montoEnColilla = toNumber(factura.monto_pago ?? factura.total);
     const observacion = observacionFactura(factura);
 
     return [
@@ -113,7 +113,8 @@ function generarFilasDetalle(facturas) {
       {
         stack: [
           { text: `NC: CRC ${formatMoney(notaCredito)}`, style: "smallMuted", alignment: "right" },
-          { text: `Abono: CRC ${formatMoney(abono)}`, style: "smallMuted", alignment: "right" }
+          { text: `Abono previo: CRC ${formatMoney(factura.abonos_previos ?? factura.abono_monto)}`, style: "smallMuted", alignment: "right" },
+          { text: `Monto en colilla: CRC ${formatMoney(montoEnColilla)}`, style: "smallMuted", alignment: "right" }
         ]
       },
       { text: `CRC ${formatMoney(factura.total)}`, style: "bodyStrong", alignment: "right" }
@@ -127,6 +128,7 @@ async function generarPDFReciboPago({
   totalPagado = 0,
   logoDataUri = "",
   reciboNumero = "-",
+  comprobanteNumero = "-",
   generadoPor = "Sistema"
 } = {}) {
   const safeFacturas = Array.isArray(facturas) ? facturas : [];
@@ -147,7 +149,7 @@ async function generarPDFReciboPago({
       return {
         margin: [28, 0, 28, 0],
         columns: [
-          { text: "Sistema interno Gas Tomza - recibo generado automaticamente", color: "#64748b", fontSize: 7 },
+          { text: "Sistema interno Gas Tomza - colilla generada automaticamente", color: "#64748b", fontSize: 7 },
           { text: `Pagina ${currentPage} de ${pageCount}`, alignment: "right", color: "#64748b", fontSize: 7 }
         ]
       };
@@ -162,7 +164,7 @@ async function generarPDFReciboPago({
               : { text: "GAS TOMZA", bold: true, color: "#ffffff", margin: [8, 22, 8, 8] },
             {
               stack: [
-                { text: "RECIBO DE PAGO", style: "title" },
+                { text: "COLILLA DE PAGO A PROVEEDORES", style: "title" },
                 { text: "Control de facturas pagadas", style: "subtitle" },
                 { text: "Departamento de compras / proveeduria", style: "subtitle" }
               ],
@@ -172,7 +174,7 @@ async function generarPDFReciboPago({
               table: {
                 widths: ["*"],
                 body: [
-                  [{ text: "RECIBO No.", style: "headerLabel" }],
+                  [{ text: "COLILLA No.", style: "headerLabel" }],
                   [{ text: text(reciboNumero), style: "headerValue" }],
                   [{ text: "FECHA DE PAGO", style: "headerLabel" }],
                   [{ text: formatDate(fechaPago), style: "headerValue" }]
@@ -197,19 +199,21 @@ async function generarPDFReciboPago({
       },
       {
         table: {
-          widths: ["*", "*", "*", "*"],
+          widths: ["*", "*", "*", "*", "*"],
           body: [
             [
               { text: "Empresa", style: "metaLabel" },
               { text: "Generado por", style: "metaLabel" },
               { text: "Facturas", style: "metaLabel" },
-              { text: "Estado", style: "metaLabel" }
+              { text: "Estado", style: "metaLabel" },
+              { text: "N.° comprobante", style: "metaLabel" }
             ],
             [
               { text: "Gas Tomza de Costa Rica S.A.", style: "metaValue" },
               { text: text(generadoPor, "Sistema"), style: "metaValue" },
               { text: String(safeFacturas.length), style: "metaValue" },
-              { text: "PAGADO", style: "paidBadge", alignment: "center" }
+              { text: "PAGADO / ABONO", style: "paidBadge", alignment: "center" },
+              { text: text(comprobanteNumero), style: "metaValue" }
             ]
           ]
         },
@@ -278,7 +282,7 @@ async function generarPDFReciboPago({
               { text: String(item.facturas), style: "bodyCell", alignment: "center" },
               { text: `CRC ${formatMoney(item.total)}`, style: "bodyStrong", alignment: "right" }
             ]) : [[
-              { text: "No hay proveedores en este recibo.", colSpan: 3, alignment: "center", color: "#64748b" },
+              { text: "No hay proveedores en esta colilla.", colSpan: 3, alignment: "center", color: "#64748b" },
               {}, {}
             ]])
           ]
@@ -296,7 +300,7 @@ async function generarPDFReciboPago({
       {
         table: {
           widths: ["*"],
-          body: [[{ text: "DETALLE DE FACTURAS PAGADAS", style: "sectionTitle" }]]
+          body: [[{ text: "DETALLE DE FACTURAS PAGADAS / ABONADAS", style: "sectionTitle" }]]
         },
         layout: "noBorders",
         margin: [0, 6, 0, 0]
@@ -312,7 +316,7 @@ async function generarPDFReciboPago({
               { text: "Factura", style: "tableHeader" },
               { text: "Vence", style: "tableHeader" },
               { text: "Ajustes", style: "tableHeader", alignment: "right" },
-              { text: "Pagado", style: "tableHeader", alignment: "right" }
+              { text: "Monto colilla", style: "tableHeader", alignment: "right" }
             ],
             ...generarFilasDetalle(safeFacturas)
           ]
@@ -331,7 +335,7 @@ async function generarPDFReciboPago({
         stack: [
           { text: "Notas", style: "noteHeader" },
           {
-            text: "Este documento respalda el pago de las facturas indicadas. Debe conservarse junto con los comprobantes bancarios correspondientes.",
+            text: "Esta colilla respalda los pagos o abonos de las facturas indicadas. Conserve el comprobante bancario adjunto.",
             style: "noteText"
           },
           {

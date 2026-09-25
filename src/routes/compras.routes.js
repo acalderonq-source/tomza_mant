@@ -355,6 +355,7 @@ async function ensureFacturasSchema() {
       await ensurePeriodoCierreColumns();
       await ensureNotaCreditoColumns();
       await ensureAbonoColumns();
+      await ensurePagoComprobanteColumns();
       await ensureFacturacionElectronicaSchema();
       ensureFacturasState.ready = true;
     })().finally(() => {
@@ -483,6 +484,20 @@ async function ensureAbonoColumns() {
   ];
 
   for (const table of tables) {
+    for (const [column, definition] of columns) {
+      if (!(await columnExists(table, column))) {
+        await queryWithRetry(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+      }
+    }
+  }
+}
+
+async function ensurePagoComprobanteColumns() {
+  const columns = [
+    ["comprobante_pago_numero", "VARCHAR(120) NULL"],
+    ["comprobante_pago_archivo", "VARCHAR(255) NULL"]
+  ];
+  for (const table of ["ordenes_compra", "facturas"]) {
     for (const [column, definition] of columns) {
       if (!(await columnExists(table, column))) {
         await queryWithRetry(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
@@ -871,6 +886,20 @@ function guardarCotizacionOrden(dataUrl, originalName, mimeType, usuarioId) {
     nombre: String(originalName || `cotizacion.${extension}`).trim().slice(0, 255),
     tipo: String(mimeType || tipo).trim().slice(0, 100)
   };
+}
+
+function guardarComprobantePago(dataUrl, nombreOriginal, usuarioId) {
+  if (!dataUrl) return null;
+  const match = String(dataUrl).match(/^data:(application\/pdf|image\/jpeg|image\/jpg);base64,([A-Za-z0-9+/=]+)$/);
+  if (!match) throw new Error("El comprobante debe ser un archivo PDF o JPG.");
+  const buffer = Buffer.from(match[2], "base64");
+  if (!buffer.length || buffer.length > 5 * 1024 * 1024) {
+    throw new Error("El comprobante debe pesar 5 MB o menos.");
+  }
+  const extension = match[1] === "application/pdf" ? "pdf" : "jpg";
+  const fileName = `comprobante_pago_${Date.now()}_${usuarioId || "user"}_${Math.round(Math.random() * 1e6)}.${extension}`;
+  fs.writeFileSync(path.join(ensureUploadDirectory("facturas"), fileName), buffer);
+  return { path: `/uploads/facturas/${fileName}`, name: String(nombreOriginal || fileName).slice(0, 255) };
 }
 
 function parseMonto(value) {
@@ -2577,6 +2606,8 @@ function construirConsultaFacturas(filtros = {}, modo = "full") {
       o.abono_monto,
       o.abono_fecha,
       o.abono_observacion,
+      o.comprobante_pago_numero,
+      o.comprobante_pago_archivo,
       o.factura_fecha_recepcion,
       o.factura_tipo_entrega,
       o.factura_entregado_por,
@@ -2616,6 +2647,8 @@ function construirConsultaFacturas(filtros = {}, modo = "full") {
       f.abono_monto,
       f.abono_fecha,
       f.abono_observacion,
+      f.comprobante_pago_numero,
+      f.comprobante_pago_archivo,
       f.factura_fecha_recepcion,
       f.factura_tipo_entrega,
       f.factura_entregado_por,
@@ -7439,7 +7472,7 @@ router.post("/facturas/:id/abono", requireAuth, allowRoles("ADMIN", "TALLER", "P
     await ensureFacturasSchema();
 
     const id = req.params.id;
-    const { tipo, monto_abono, fecha_abono, observacion_abono, periodo_cierre } = req.body;
+    const { tipo, monto_abono, fecha_abono, observacion_abono, periodo_cierre, comprobante_numero, comprobante_data, comprobante_nombre } = req.body;
     const montoAbono = parseMonto(monto_abono);
     const fechaAbono = fecha_abono || new Date().toISOString().slice(0, 10);
     const periodoCierre = normalizarPeriodoCierre(periodo_cierre, fechaAbono);
@@ -7487,12 +7520,15 @@ router.post("/facturas/:id/abono", requireAuth, allowRoles("ADMIN", "TALLER", "P
 
     const nuevoAbono = saldos.abonoMonto + montoAbono;
     const pagadaCompleta = nuevoAbono >= saldos.basePagar;
+    const comprobante = guardarComprobantePago(comprobante_data, comprobante_nombre, req.session.user?.id);
 
     await pool.query(
       `UPDATE ${table}
        SET abono_monto = ?,
            abono_fecha = ?,
            abono_observacion = ?,
+           comprobante_pago_numero = ?,
+           comprobante_pago_archivo = COALESCE(?, comprobante_pago_archivo),
            pagada = CASE WHEN ? THEN 1 ELSE pagada END,
            fecha_pago = CASE WHEN ? THEN ? ELSE fecha_pago END,
            periodo_cierre = CASE WHEN ? THEN ? ELSE periodo_cierre END
@@ -7501,6 +7537,8 @@ router.post("/facturas/:id/abono", requireAuth, allowRoles("ADMIN", "TALLER", "P
         nuevoAbono,
         fechaAbono,
         observacion_abono || null,
+        String(comprobante_numero || "").trim() || null,
+        comprobante?.path || null,
         pagadaCompleta,
         pagadaCompleta,
         fechaAbono,
@@ -7510,10 +7548,23 @@ router.post("/facturas/:id/abono", requireAuth, allowRoles("ADMIN", "TALLER", "P
       ]
     );
 
-    req.session.success = pagadaCompleta
-      ? "Abono registrado. La factura quedó pagada completamente."
-      : "Abono registrado correctamente.";
-    res.redirect("/compras/facturas");
+    const [detalle] = tipo === "orden"
+      ? await pool.query(`SELECT o.po_numero, o.factura, o.fecha_vencimiento_factura, p.nombre AS proveedor_nombre FROM ordenes_compra o JOIN proveedores p ON p.id = o.proveedor_id WHERE o.id = ?`, [id])
+      : await pool.query(`SELECT NULL AS po_numero, f.numero_factura AS factura, NULL AS fecha_vencimiento_factura, f.proveedor_nombre FROM facturas f WHERE f.id = ?`, [id]);
+    const { generarPDFReciboPago } = require("../utils/pdfReciboPago");
+    const reciboNumero = `CP-${fechaAbono.replace(/-/g, "")}-${String(Date.now()).slice(-6)}`;
+    const buffer = await generarPDFReciboPago({
+      facturas: [{ ...detalle[0], tipo, nota_credito_monto: factura.nota_credito_monto, abono_monto: saldos.abonoMonto, abonos_previos: saldos.abonoMonto, monto_pago: montoAbono, total: montoAbono, observacion: observacion_abono }],
+      fechaPago: fechaAbono,
+      totalPagado: montoAbono,
+      reciboNumero,
+      comprobanteNumero: comprobante_numero,
+      generadoPor: req.session.user?.usuario || "Sistema"
+    });
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename=colilla_pago_proveedor_${reciboNumero}.pdf`);
+    res.setHeader("Cache-Control", "no-store");
+    return res.end(buffer);
   } catch (error) {
     console.error("Error registrando abono:", error);
     req.session.error = "Error interno al registrar el abono.";
@@ -7528,10 +7579,22 @@ router.post("/facturas/:id/pagar", requireAuth, allowRoles("ADMIN", "TALLER", "P
     const { tipo } = req.body;
     const fechaPago = String(req.body.fecha_pago || "").trim();
     const periodoCierre = normalizarPeriodoCierre(req.body.periodo_cierre, fechaPago);
+    const comprobanteNumero = String(req.body.comprobante_numero || "").trim();
 
     if (!/^\d{4}-\d{2}-\d{2}$/.test(fechaPago)) {
       req.session.error = "Debe indicar una fecha de pago válida.";
       return res.redirect("/compras/facturas");
+    }
+
+    const comprobante = guardarComprobantePago(req.body.comprobante_data, req.body.comprobante_nombre, req.session.user?.id);
+
+    let montoPagoReal = 0;
+    if (tipo === "orden") {
+      const [[saldoAntes]] = await pool.query(`SELECT total, COALESCE(nota_credito_monto, 0) AS nota_credito_monto, COALESCE(abono_monto, 0) AS abono_monto FROM ordenes_compra WHERE id = ? AND facturada = 1`, [id]);
+      if (saldoAntes) montoPagoReal = Math.max(parseMonto(saldoAntes.total) - parseMonto(saldoAntes.nota_credito_monto) - parseMonto(saldoAntes.abono_monto), 0);
+    } else if (tipo === "independiente") {
+      const [[saldoAntes]] = await pool.query(`SELECT monto, COALESCE(nota_credito_monto, 0) AS nota_credito_monto, COALESCE(abono_monto, 0) AS abono_monto FROM facturas WHERE id = ?`, [id]);
+      if (saldoAntes) montoPagoReal = Math.max(parseMonto(saldoAntes.monto) - parseMonto(saldoAntes.nota_credito_monto) - parseMonto(saldoAntes.abono_monto), 0);
     }
 
     if (tipo === 'orden') {
@@ -7540,13 +7603,15 @@ router.post("/facturas/:id/pagar", requireAuth, allowRoles("ADMIN", "TALLER", "P
          SET pagada = 1,
              fecha_pago = ?,
              periodo_cierre = ?,
+             comprobante_pago_numero = ?,
+             comprobante_pago_archivo = COALESCE(?, comprobante_pago_archivo),
              abono_monto = GREATEST(total - COALESCE(nota_credito_monto, 0), COALESCE(abono_monto, 0)),
              abono_fecha = ?
          WHERE id = ?
            AND facturada = 1
            AND COALESCE(pagada, 0) = 0
            AND GREATEST(total - COALESCE(nota_credito_monto, 0) - COALESCE(abono_monto, 0), 0) > 0`,
-        [fechaPago, periodoCierre || fechaPago.slice(0, 7), fechaPago, id]
+        [fechaPago, periodoCierre || fechaPago.slice(0, 7), comprobanteNumero || null, comprobante?.path || null, fechaPago, id]
       );
       if (!result.affectedRows) {
         req.session.error = "La factura de orden no existe, ya estaba pagada o no tiene saldo pendiente.";
@@ -7558,12 +7623,14 @@ router.post("/facturas/:id/pagar", requireAuth, allowRoles("ADMIN", "TALLER", "P
          SET pagada = 1,
              fecha_pago = ?,
              periodo_cierre = ?,
+             comprobante_pago_numero = ?,
+             comprobante_pago_archivo = COALESCE(?, comprobante_pago_archivo),
              abono_monto = GREATEST(monto - COALESCE(nota_credito_monto, 0), COALESCE(abono_monto, 0)),
              abono_fecha = ?
          WHERE id = ?
            AND COALESCE(pagada, 0) = 0
            AND GREATEST(monto - COALESCE(nota_credito_monto, 0) - COALESCE(abono_monto, 0), 0) > 0`,
-        [fechaPago, periodoCierre || fechaPago.slice(0, 7), fechaPago, id]
+        [fechaPago, periodoCierre || fechaPago.slice(0, 7), comprobanteNumero || null, comprobante?.path || null, fechaPago, id]
       );
       if (!result.affectedRows) {
         req.session.error = "La factura independiente no existe, ya estaba pagada o no tiene saldo pendiente.";
@@ -7574,8 +7641,23 @@ router.post("/facturas/:id/pagar", requireAuth, allowRoles("ADMIN", "TALLER", "P
       return res.redirect("/compras/facturas");
     }
 
-    req.session.success = `Factura marcada como pagada el ${new Date(`${fechaPago}T00:00:00`).toLocaleDateString("es-CR")}.`;
-    res.redirect("/compras/facturas");
+    const [detalle] = tipo === "orden"
+      ? await pool.query(`SELECT o.po_numero, o.factura, o.fecha_vencimiento_factura, o.total - COALESCE(o.nota_credito_monto, 0) AS total, COALESCE(o.nota_credito_monto, 0) AS nota_credito_monto, p.nombre AS proveedor_nombre FROM ordenes_compra o JOIN proveedores p ON p.id = o.proveedor_id WHERE o.id = ?`, [id])
+      : await pool.query(`SELECT NULL AS po_numero, f.numero_factura AS factura, NULL AS fecha_vencimiento_factura, f.monto - COALESCE(f.nota_credito_monto, 0) AS total, COALESCE(f.nota_credito_monto, 0) AS nota_credito_monto, f.proveedor_nombre FROM facturas f WHERE f.id = ?`, [id]);
+    const { generarPDFReciboPago } = require("../utils/pdfReciboPago");
+    const reciboNumero = `CP-${fechaPago.replace(/-/g, "")}-${String(Date.now()).slice(-6)}`;
+    const buffer = await generarPDFReciboPago({
+      facturas: [{ ...detalle[0], tipo, monto_pago: montoPagoReal, total: montoPagoReal }],
+      fechaPago,
+      totalPagado: montoPagoReal,
+      reciboNumero,
+      comprobanteNumero,
+      generadoPor: req.session.user?.usuario || "Sistema"
+    });
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename=colilla_pago_proveedor_${reciboNumero}.pdf`);
+    res.setHeader("Cache-Control", "no-store");
+    return res.end(buffer);
   } catch (error) {
     console.error("Error al pagar factura:", error);
     req.session.error = "Error interno al pagar la factura.";
@@ -7645,6 +7727,7 @@ router.post("/facturas/pagar-multiple", requireAuth, allowRoles("ADMIN", "TALLER
     const seleccionadas = toArray(facturas_ids).map(parseFacturaRef).filter(Boolean);
     const fechaPago = String(req.body.fecha_pago || "").trim();
     const periodoCierre = normalizarPeriodoCierre(req.body.periodo_cierre, fechaPago);
+    const comprobanteNumero = String(req.body.comprobante_numero || "").trim();
 
     if (!seleccionadas.length) {
       req.session.error = "No seleccionó ninguna factura.";
@@ -7655,6 +7738,8 @@ router.post("/facturas/pagar-multiple", requireAuth, allowRoles("ADMIN", "TALLER
       req.session.error = "Debe indicar una fecha de pago válida.";
       return res.redirect("/compras/facturas");
     }
+
+    const comprobante = guardarComprobantePago(req.body.comprobante_data, req.body.comprobante_nombre, req.session.user?.id);
 
     const ordenIds = seleccionadas.filter(f => f.tipo === 'orden').map(f => f.id);
     const independientesIds = seleccionadas.filter(f => f.tipo === 'independiente').map(f => f.id);
@@ -7735,13 +7820,15 @@ router.post("/facturas/pagar-multiple", requireAuth, allowRoles("ADMIN", "TALLER
          SET pagada = 1,
              fecha_pago = ?,
              periodo_cierre = ?,
+             comprobante_pago_numero = ?,
+             comprobante_pago_archivo = COALESCE(?, comprobante_pago_archivo),
              abono_monto = GREATEST(total - COALESCE(nota_credito_monto, 0), COALESCE(abono_monto, 0)),
              abono_fecha = ?
          WHERE id IN (${placeholders})
            AND facturada = 1
            AND COALESCE(pagada, 0) = 0
            AND GREATEST(total - COALESCE(nota_credito_monto, 0) - COALESCE(abono_monto, 0), 0) > 0`,
-        [fechaPago, periodoCierre || fechaPago.slice(0, 7), fechaPago, ...ordenIds]
+        [fechaPago, periodoCierre || fechaPago.slice(0, 7), comprobanteNumero || null, comprobante?.path || null, fechaPago, ...ordenIds]
       );
     }
 
@@ -7752,12 +7839,14 @@ router.post("/facturas/pagar-multiple", requireAuth, allowRoles("ADMIN", "TALLER
          SET pagada = 1,
              fecha_pago = ?,
              periodo_cierre = ?,
+             comprobante_pago_numero = ?,
+             comprobante_pago_archivo = COALESCE(?, comprobante_pago_archivo),
              abono_monto = GREATEST(monto - COALESCE(nota_credito_monto, 0), COALESCE(abono_monto, 0)),
              abono_fecha = ?
          WHERE id IN (${placeholders})
            AND COALESCE(pagada, 0) = 0
            AND GREATEST(monto - COALESCE(nota_credito_monto, 0) - COALESCE(abono_monto, 0), 0) > 0`,
-        [fechaPago, periodoCierre || fechaPago.slice(0, 7), fechaPago, ...independientesIds]
+        [fechaPago, periodoCierre || fechaPago.slice(0, 7), comprobanteNumero || null, comprobante?.path || null, fechaPago, ...independientesIds]
       );
     }
 
@@ -7774,11 +7863,13 @@ router.post("/facturas/pagar-multiple", requireAuth, allowRoles("ADMIN", "TALLER
       totalPagado,
       logoDataUri,
       reciboNumero,
+      comprobanteNumero,
       generadoPor: req.session.user?.usuario || "Sistema"
     });
 
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename=recibo_pago_${new Date().toISOString().slice(0,19).replace(/:/g, '-')}.pdf`);
+    res.setHeader('Content-Disposition', `attachment; filename=colilla_pago_proveedores_${reciboNumero}.pdf`);
+    res.setHeader('Cache-Control', 'no-store');
     res.setHeader('Content-Length', buffer.length);
     res.end(buffer);
   } catch (error) {
