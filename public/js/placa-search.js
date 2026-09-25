@@ -155,7 +155,9 @@
     if (cached) cache.delete(key);
     if (pending.has(key)) return pending.get(key);
 
-    const request = fetch(`${url}?q=${encodeURIComponent(query)}`, {
+    const searchUrl = new URL(url, window.location.href);
+    searchUrl.searchParams.set("q", query);
+    const request = fetch(searchUrl.toString(), {
       cache: "no-store",
       headers: { Accept: "application/json", "Cache-Control": "no-cache" },
       signal

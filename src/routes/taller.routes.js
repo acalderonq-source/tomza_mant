@@ -17,6 +17,7 @@ const {
   sedesEspecialesPorUsuario
 } = require("../utils/sedes");
 const { agregarFiltroPlacaSql, expresionPlacaSql, normalizarPlaca, variantesPlaca } = require("../utils/placas");
+const { ensurePrioridadesVisibilidad } = require("../utils/prioridadesVisibilidad");
 
 function requireAuth(req, res, next) {
   if (!req.session.user) return res.redirect("/login");
@@ -152,6 +153,7 @@ async function ensurePrioridadesTallerTable() {
       fecha_prioridad DATE NULL,
       observacion TEXT NOT NULL,
       estado ENUM('PENDIENTE','ATENDIDA') NOT NULL DEFAULT 'PENDIENTE',
+      mostrar_operativos TINYINT(1) NOT NULL DEFAULT 1,
       creado_por INT NULL,
       creado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
       atendido_por INT NULL,
@@ -175,6 +177,7 @@ async function ensurePrioridadesTallerTable() {
   if (!(await columnExists("taller_prioridades", "atendido_en"))) {
     await pool.query("ALTER TABLE taller_prioridades ADD COLUMN atendido_en DATETIME NULL AFTER atendido_por");
   }
+  await ensurePrioridadesVisibilidad(pool);
 }
 
 async function obtenerSedesPermitidas(req) {
@@ -784,6 +787,9 @@ router.get("/dashboard", async (req, res) => {
     const ultimosCorrectivos = await obtenerUltimosTrabajosAgrupados(sedesPermitidas);
     const fechaPrioridadHoy = fechaCostaRica();
     const fechaPrioridadDefault = fechaCostaRica(1);
+    const [sedesPrioridades] = req.session.user.rol === "ADMIN"
+      ? await pool.query("SELECT DISTINCT sede FROM unidades WHERE sede IS NOT NULL AND TRIM(sede) <> '' ORDER BY sede")
+      : [[]];
 
     let prioridadesSql = `
       SELECT
@@ -801,6 +807,7 @@ router.get("/dashboard", async (req, res) => {
         DATEDIFF(?, COALESCE(tp.fecha_prioridad, DATE(tp.creado_en))) + 1 AS dias_pendiente,
         tp.observacion,
         tp.estado,
+        tp.mostrar_operativos,
         tp.creado_en,
         usr.usuario AS creado_por_nombre
       FROM taller_prioridades tp
@@ -810,7 +817,10 @@ router.get("/dashboard", async (req, res) => {
         AND COALESCE(tp.fecha_prioridad, DATE(tp.creado_en)) <= ?
     `;
     let prioridadesParams = [fechaPrioridadHoy, fechaPrioridadHoy];
-    if (sedesPermitidas.length > 0 && !esUsuarioPesados(req.session.user)) {
+    if (req.session.user.rol !== "ADMIN") {
+      prioridadesSql += " AND tp.mostrar_operativos = 1";
+    }
+    if (sedesPermitidas.length > 0 && !esUsuarioPesados(req.session.user) && req.session.user.rol !== "ADMIN") {
       prioridadesSql += " AND (UPPER(TRIM(COALESCE(NULLIF(tp.sede, ''), un.sede))) IN (?) OR tp.sede IS NULL OR tp.sede = '')";
       prioridadesParams.push(sedesPermitidas.map(sede => String(sede).trim().toUpperCase()));
     }
@@ -911,6 +921,7 @@ router.get("/dashboard", async (req, res) => {
       etiquetaEstadoRepuesto,
       fechaPrioridadHoy,
       fechaPrioridadDefault,
+      sedesPrioridades: sedesPrioridades.map(row => row.sede),
       fechaSalidaDefault: fechaHoraCostaRicaInput(),
       sedeSeleccionada: sedesPermitidas.length > 1 && sedesPermitidas.some(sede => SEDES_TRANSPORTE.includes(sede))
         ? "Transportadora + Granel"
@@ -939,6 +950,7 @@ router.post("/prioridades", async (req, res) => {
       ? req.body.fecha_prioridad
       : fechaCostaRica(1);
     const sedesPermitidas = expandirSedesTransporte(await obtenerSedesPermitidas(req));
+    const esAdmin = req.session.user.rol === "ADMIN";
 
     if (!placa || !observacion) {
       req.session.error = "Debe indicar placa y observación para la prioridad.";
@@ -950,14 +962,29 @@ router.post("/prioridades", async (req, res) => {
       [variantesPlaca(placa)]
     );
 
+    if (esAdmin && !unidadPrioridad?.sede && !req.body.sede) {
+      req.session.error = "La placa no está registrada: seleccione su sede.";
+      return res.redirect("/taller/dashboard");
+    }
+
     let sedeAsignada = unidadPrioridad?.sede || (
+      esAdmin && req.body.sede ? String(req.body.sede).trim() : null
+    ) || (
       req.session.sedeSeleccionada && req.session.sedeSeleccionada !== "TODAS"
       ? req.session.sedeSeleccionada
       : req.session.user.sede || null
     );
 
-    if (!unidadPrioridad?.sede && sedesPermitidas.length === 1) {
+    if (!unidadPrioridad?.sede && !esAdmin && sedesPermitidas.length === 1) {
       sedeAsignada = sedesPermitidas[0];
+    }
+
+    if (esAdmin && !unidadPrioridad?.sede && req.body.sede) {
+      const [[sedeValida]] = await pool.query("SELECT 1 AS existe FROM unidades WHERE sede = ? LIMIT 1", [sedeAsignada]);
+      if (!sedeValida) {
+        req.session.error = "Seleccione una sede registrada para la prioridad.";
+        return res.redirect("/taller/dashboard");
+      }
     }
 
     if (!unidadPrioridad?.sede && esUsuarioPesados(req.session.user)) {
@@ -977,9 +1004,10 @@ router.post("/prioridades", async (req, res) => {
     }
 
     await pool.query(
-      `INSERT INTO taller_prioridades (placa, sede, fecha_prioridad, observacion, creado_por)
-       VALUES (?, ?, ?, ?, ?)`,
-      [placa, sedeAsignada, fechaPrioridad, observacion, req.session.user.id]
+      `INSERT INTO taller_prioridades (placa, sede, fecha_prioridad, observacion, creado_por, mostrar_operativos)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [placa, sedeAsignada, fechaPrioridad, observacion, req.session.user.id,
+        esAdmin ? Number(req.body.mostrar_operativos === "1") : 1]
     );
 
     req.session.success = `Prioridad agregada para la unidad ${placa} el ${fechaPrioridad}.`;
@@ -1005,6 +1033,7 @@ router.post("/prioridades/:id", async (req, res) => {
       ? req.body.fecha_prioridad
       : fechaCostaRica(0);
     const sedesPermitidas = expandirSedesTransporte(await obtenerSedesPermitidas(req));
+    const esAdmin = req.session.user.rol === "ADMIN";
 
     if (!Number.isInteger(id) || !placa || !observacion) {
       req.session.error = "Debe indicar placa y observación para actualizar la prioridad.";
@@ -1017,6 +1046,7 @@ router.post("/prioridades/:id", async (req, res) => {
          tp.placa AS placa_actual,
          tp.sede AS sede_guardada,
          tp.observacion AS observacion_actual,
+         tp.mostrar_operativos,
          COALESCE(NULLIF(tp.sede, ''), un.sede) AS sede,
          usr.usuario AS creado_por_nombre
        FROM taller_prioridades tp
@@ -1033,6 +1063,10 @@ router.post("/prioridades/:id", async (req, res) => {
       return res.redirect("/taller/dashboard");
     }
 
+    if (!esAdmin && !Number(prioridadActual.mostrar_operativos)) {
+      return res.status(403).send("No autorizado");
+    }
+
     if (esUsuarioPesados(req.session.user) && !esPrioridadPesados(prioridadActual)) {
       req.session.error = "El usuario de Pesados solo puede editar prioridades de Granel o Transportadora.";
       return res.redirect("/taller/dashboard");
@@ -1044,7 +1078,7 @@ router.post("/prioridades/:id", async (req, res) => {
     }
 
     if (
-      sedesPermitidas.length > 0 &&
+      !esAdmin && sedesPermitidas.length > 0 &&
       prioridadActual.sede &&
       !sedesPermitidas
         .map(sede => String(sede).trim().toUpperCase())
@@ -1059,9 +1093,19 @@ router.post("/prioridades/:id", async (req, res) => {
       [variantesPlaca(placa)]
     );
 
-    let sedeAsignada = unidadNueva?.sede || prioridadActual.sede_guardada || prioridadActual.sede || null;
+    let sedeAsignada = unidadNueva?.sede || (
+      esAdmin && req.body.sede ? String(req.body.sede).trim() : null
+    ) || prioridadActual.sede_guardada || prioridadActual.sede || null;
 
-    if (!unidadNueva?.sede && sedesPermitidas.length === 1) {
+    if (esAdmin && !unidadNueva?.sede && req.body.sede) {
+      const [[sedeValida]] = await pool.query("SELECT 1 AS existe FROM unidades WHERE sede = ? LIMIT 1", [sedeAsignada]);
+      if (!sedeValida) {
+        req.session.error = "Seleccione una sede registrada para la prioridad.";
+        return res.redirect("/taller/dashboard");
+      }
+    }
+
+    if (!unidadNueva?.sede && !esAdmin && sedesPermitidas.length === 1) {
       sedeAsignada = sedesPermitidas[0];
     }
 
@@ -1082,7 +1126,7 @@ router.post("/prioridades/:id", async (req, res) => {
     }
 
     if (
-      sedesPermitidas.length > 0 &&
+      !esAdmin && sedesPermitidas.length > 0 &&
       sedeAsignada &&
       !sedesPermitidas
         .map(sede => String(sede).trim().toUpperCase())
@@ -1097,10 +1141,12 @@ router.post("/prioridades/:id", async (req, res) => {
        SET placa = ?,
            sede = ?,
            fecha_prioridad = ?,
-           observacion = ?
+           observacion = ?,
+           mostrar_operativos = ?
        WHERE id = ?
          AND estado = 'PENDIENTE'`,
-      [placa, sedeAsignada, fechaPrioridad, observacion, id]
+      [placa, sedeAsignada, fechaPrioridad, observacion,
+        esAdmin ? Number(req.body.mostrar_operativos === "1") : Number(prioridadActual.mostrar_operativos), id]
     );
 
     req.session[result.affectedRows ? "success" : "error"] = result.affectedRows
@@ -1160,6 +1206,7 @@ router.post("/prioridades/:id/atendida", async (req, res) => {
     const [[prioridadActual]] = await pool.query(
       `SELECT
          tp.id,
+         tp.mostrar_operativos,
          COALESCE(NULLIF(tp.sede, ''), un.sede) AS sede,
          usr.usuario AS creado_por_nombre
        FROM taller_prioridades tp
@@ -1176,6 +1223,10 @@ router.post("/prioridades/:id/atendida", async (req, res) => {
       return res.redirect("/taller/dashboard");
     }
 
+    if (req.session.user.rol !== "ADMIN" && !Number(prioridadActual.mostrar_operativos)) {
+      return res.status(403).send("No autorizado");
+    }
+
     if (esUsuarioPesados(req.session.user) && !esPrioridadPesados(prioridadActual)) {
       req.session.error = "El usuario de Pesados solo puede atender prioridades de Granel o Transportadora.";
       return res.redirect("/taller/dashboard");
@@ -1187,7 +1238,7 @@ router.post("/prioridades/:id/atendida", async (req, res) => {
     }
 
     if (
-      sedesPermitidas.length > 0 &&
+      req.session.user.rol !== "ADMIN" && sedesPermitidas.length > 0 &&
       prioridadActual.sede &&
       !sedesPermitidas
         .map(sede => String(sede).trim().toUpperCase())

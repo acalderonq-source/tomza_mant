@@ -434,9 +434,10 @@
                 <div>
                   <div class="priority-plate"><%= p.placa %></div>
                   <div class="small-muted"><%= p.sede || 'Sin sede' %></div>
+                  <% if (user.rol === 'ADMIN' && !Number(p.mostrar_operativos)) { %><span class="badge text-bg-secondary">Solo ADMIN</span><% } %>
                 </div>
                 <div class="priority-note"><%= p.observacion %></div>
-                <div class="priority-meta"><%= fechaHoraCorta(p.creado_en) %><br><%= p.creado_por_nombre || 'Taller' %></div>
+                <div class="priority-meta"><%= Number(p.dias_pendiente || 1) %> día(s)<br><%= p.creado_por_nombre || 'Taller' %></div>
               </div>
             <% }) %>
           </div>

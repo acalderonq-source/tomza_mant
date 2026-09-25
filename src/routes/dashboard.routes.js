@@ -18,6 +18,7 @@ const { extraerPlacasTexto, normalizarPlaca } = require("../utils/placas");
 const { ensureNumeroMantenimientoColumn } = require("../utils/mantenimientosNumero");
 const { ensureTipoMantenimientoColumns, normalizarTipoMantenimiento } = require("../utils/tipoMantenimiento");
 const { construirResumenFinanciero, auditarResumenFinanciero } = require("../utils/resumenFinanciero");
+const { ensurePrioridadesVisibilidad } = require("../utils/prioridadesVisibilidad");
 
 const DB_CONNECTION_ERRORS = new Set(["ECONNRESET", "PROTOCOL_CONNECTION_LOST", "ETIMEDOUT", "ENOTFOUND", "ECONNREFUSED"]);
 const RESUMEN_EJECUTIVO_CACHE_MS = Number(process.env.RESUMEN_EJECUTIVO_CACHE_MS || 1000 * 60);
@@ -2431,22 +2432,29 @@ router.get("/", async (req, res) => {
       } : null
     ].filter(Boolean);
 
+    await ensurePrioridadesVisibilidad(pool);
     let prioridadesSql = `
       SELECT
         tp.id,
         tp.placa,
-        tp.sede,
+        COALESCE(NULLIF(tp.sede, ''), un.sede) AS sede,
         tp.observacion,
+        tp.mostrar_operativos,
+        DATEDIFF(?, COALESCE(tp.fecha_prioridad, DATE(tp.creado_en))) + 1 AS dias_pendiente,
         tp.creado_en,
         u.usuario AS creado_por_nombre
       FROM taller_prioridades tp
       LEFT JOIN usuarios u ON u.id = tp.creado_por
+      LEFT JOIN unidades un ON UPPER(TRIM(un.placa)) = UPPER(TRIM(tp.placa))
       WHERE tp.estado = 'PENDIENTE'
         AND COALESCE(tp.fecha_prioridad, DATE(tp.creado_en)) <= ?
     `;
-    const prioridadesParams = [fechaHoy];
-    if (sedesFiltro.length) {
-      prioridadesSql += " AND (tp.sede IN (?) OR tp.sede IS NULL OR tp.sede = '')";
+    const prioridadesParams = [fechaHoy, fechaHoy];
+    if (req.session.user.rol !== "ADMIN") {
+      prioridadesSql += " AND tp.mostrar_operativos = 1";
+    }
+    if (sedesFiltro.length && req.session.user.rol !== "ADMIN") {
+      prioridadesSql += " AND (COALESCE(NULLIF(tp.sede, ''), un.sede) IN (?) OR COALESCE(NULLIF(tp.sede, ''), un.sede) IS NULL)";
       prioridadesParams.push(sedesFiltro);
     }
     prioridadesSql += " ORDER BY COALESCE(tp.fecha_prioridad, DATE(tp.creado_en)) ASC, tp.creado_en DESC, tp.id DESC LIMIT 8";

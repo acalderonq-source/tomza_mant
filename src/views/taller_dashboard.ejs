@@ -481,6 +481,7 @@
   const prioridadesLista = Array.isArray(prioridades) ? prioridades : [];
   const usuarioDashboard = String(user.usuario || '').trim().toLowerCase();
   const rolDashboard = String(user.rol || '').trim().toUpperCase();
+  const esAdminPrioridades = rolDashboard === 'ADMIN';
   const esPantallaPesados = usuarioDashboard.includes('pesado') || rolDashboard === 'SUPERVISOR_PESADO';
   const esPantallaMecanico = !esPantallaPesados && (
     usuarioDashboard === 'mecanico' ||
@@ -639,6 +640,7 @@
                         <div>
                           <span class="priority-plate"><%= p.placa %></span>
                           <div class="muted priority-meta"><%= p.sede || 'Sin sede' %></div>
+                          <% if (esAdminPrioridades && !Number(p.mostrar_operativos)) { %><span class="badge text-bg-secondary">Solo ADMIN</span><% } %>
                         </div>
                         <div>
                           <div class="priority-note"><%= p.observacion %></div>
@@ -678,7 +680,7 @@
             <% if (mostrarPrioridadesMecanico) { %>
               <div class="priority-group">
                 <div class="priority-group-title">
-                  <span>Mecánico / Taller</span>
+                  <span><%= esAdminPrioridades ? 'Mecánico / Taller y otras sedes' : 'Mecánico / Taller' %></span>
                   <span><%= prioridadesMecanicoLista.length %></span>
                 </div>
                 <% if (!prioridadesMecanicoLista.length) { %>
@@ -690,6 +692,7 @@
                         <div>
                           <span class="priority-plate"><%= p.placa %></span>
                           <div class="muted priority-meta"><%= p.sede || 'Sin sede' %></div>
+                          <% if (esAdminPrioridades && !Number(p.mostrar_operativos)) { %><span class="badge text-bg-secondary">Solo ADMIN</span><% } %>
                         </div>
                         <div>
                           <div class="priority-note"><%= p.observacion %></div>
@@ -797,12 +800,29 @@
             </div>
             <div class="mb-3">
               <label class="form-label fw-bold">Placa</label>
-              <input type="text" name="placa" class="form-control text-uppercase" placeholder="C173368" data-placa-autocomplete data-placa-mode="placa" data-placa-allow-free="true" required>
+              <input type="text" name="placa" class="form-control text-uppercase" placeholder="C173368" data-placa-autocomplete data-placa-mode="placa" data-placa-allow-free="true" <% if (esAdminPrioridades) { %>data-placa-url="/api/unidades/buscar?todas=1"<% } %> required>
             </div>
+            <% if (esAdminPrioridades) { %>
+              <div class="mb-3">
+                <label class="form-label fw-bold" for="sedePrioridadNueva">Sede</label>
+                <select id="sedePrioridadNueva" name="sede" class="form-select">
+                  <option value="">Automática según la placa</option>
+                  <% (sedesPrioridades || []).forEach(sede => { %>
+                    <option value="<%= sede %>"><%= sede %></option>
+                  <% }) %>
+                </select>
+              </div>
+            <% } %>
             <div>
               <label class="form-label fw-bold">Observación</label>
               <textarea name="observacion" class="form-control" rows="3" placeholder="Prioridad para el día programado" required></textarea>
             </div>
+            <% if (esAdminPrioridades) { %>
+              <div class="form-check mt-3">
+                <input class="form-check-input" type="checkbox" name="mostrar_operativos" value="1" id="mostrarOperativosNuevo">
+                <label class="form-check-label" for="mostrarOperativosNuevo">Mostrar en dashboard de mecánicos y Pesados</label>
+              </div>
+            <% } %>
           </div>
           <div class="modal-footer">
             <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
@@ -832,12 +852,29 @@
               </div>
               <div class="mb-3">
                 <label class="form-label fw-bold">Placa</label>
-                <input type="text" name="placa" class="form-control text-uppercase" value="<%= p.placa %>" data-placa-autocomplete data-placa-mode="placa" data-placa-allow-free="true" required>
+                <input type="text" name="placa" class="form-control text-uppercase" value="<%= p.placa %>" data-placa-autocomplete data-placa-mode="placa" data-placa-allow-free="true" <% if (esAdminPrioridades) { %>data-placa-url="/api/unidades/buscar?todas=1"<% } %> required>
               </div>
+              <% if (esAdminPrioridades) { %>
+                <div class="mb-3">
+                  <label class="form-label fw-bold" for="sedePrioridad<%= p.id %>">Sede</label>
+                  <select id="sedePrioridad<%= p.id %>" name="sede" class="form-select">
+                    <option value="">Automática según la placa</option>
+                    <% (sedesPrioridades || []).forEach(sede => { %>
+                      <option value="<%= sede %>" <%= sede === p.sede ? 'selected' : '' %>><%= sede %></option>
+                    <% }) %>
+                  </select>
+                </div>
+              <% } %>
               <div>
                 <label class="form-label fw-bold">Observación</label>
                 <textarea name="observacion" class="form-control" rows="3" required><%= p.observacion %></textarea>
               </div>
+              <% if (esAdminPrioridades) { %>
+                <div class="form-check mt-3">
+                  <input class="form-check-input" type="checkbox" name="mostrar_operativos" value="1" id="mostrarOperativos<%= p.id %>" <%= Number(p.mostrar_operativos) ? 'checked' : '' %>>
+                  <label class="form-check-label" for="mostrarOperativos<%= p.id %>">Mostrar en dashboard de mecánicos y Pesados</label>
+                </div>
+              <% } %>
             </div>
             <div class="modal-footer">
               <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>

@@ -107,7 +107,9 @@ router.get("/unidades/buscar", requireAuth, async (req, res) => {
     const q = String(req.query.q || "").trim();
     if (q.length < 2) return res.json({ unidades: [] });
 
-    const sedes = await sedesPermitidasUsuario(req);
+    const sedes = req.session.user.rol === "ADMIN" && req.query.todas === "1"
+      ? []
+      : await sedesPermitidasUsuario(req);
     const condiciones = ["COALESCE(activa, 1) = 1", "placa IS NOT NULL", "TRIM(placa) <> ''"];
     const params = [];
 
