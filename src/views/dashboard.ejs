@@ -611,6 +611,12 @@
           <span class="module-icon icon-red"><i class="bi bi-receipt"></i></span>
           <div><div class="module-title">Facturas</div><p class="module-copy">Pendientes, pagos y reportes.</p></div>
         </a>
+        <% if (user.rol === 'CONTABILIDAD') { %>
+          <a href="/compras/facturas/asientos" class="module-card">
+            <span class="module-icon icon-blue"><i class="bi bi-journal-check"></i></span>
+            <div><div class="module-title">Asientos de pasivos</div><p class="module-copy">Seleccionar facturas, generar el Excel y consultar el historial.</p></div>
+          </a>
+        <% } %>
         <% if (user.rol !== 'CONTABILIDAD') { %>
           <a href="/compras/dashboard" class="module-card">
             <span class="module-icon icon-blue"><i class="bi bi-bar-chart"></i></span>
