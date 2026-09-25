@@ -340,6 +340,9 @@ async function obtenerSedesGestionAceite(sedesPermitidas) {
 async function consumirAceitePorSede(connection, { sede, litros, cambioAceiteId = null, unidadId, placa, userId, descripcion = null }) {
   const sedeInventario = sedeInventarioAceite(sede);
   const sedesBusqueda = expandirSedeInventarioAceite(sede);
+  // Inventory and movement quantities are DECIMAL(10,2), so consume in that same precision.
+  let pendienteCentilitros = Math.round(Number(litros || 0) * 100);
+  if (pendienteCentilitros <= 0) throw new Error("La cantidad de aceite debe ser mayor a cero.");
   const [estanones] = await connection.query(
     `SELECT id, litros_restantes
      FROM aceite_estanones
@@ -351,25 +354,33 @@ async function consumirAceitePorSede(connection, { sede, litros, cambioAceiteId 
     [sedesBusqueda]
   );
 
-  const disponible = estanones.reduce((total, item) => total + Number(item.litros_restantes || 0), 0);
-  if (disponible + 0.001 < litros) {
+  const disponibleCentilitros = estanones.reduce(
+    (total, item) => total + Math.round(Number(item.litros_restantes || 0) * 100),
+    0
+  );
+  if (disponibleCentilitros < pendienteCentilitros) {
+    const disponible = disponibleCentilitros / 100;
     throw new Error(`No hay suficiente aceite registrado en ${etiquetaSedeInventarioAceite(sede)}. Disponible: ${(disponible / GALON_A_LITROS).toFixed(2)} galones.`);
   }
 
-  let pendiente = litros;
   for (const estanon of estanones) {
-    if (pendiente <= 0) break;
-    const restanteActual = Number(estanon.litros_restantes || 0);
-    const consumo = Math.min(restanteActual, pendiente);
-    const nuevoRestante = Math.max(0, restanteActual - consumo);
+    if (pendienteCentilitros <= 0) break;
+    const restanteCentilitros = Math.max(0, Math.round(Number(estanon.litros_restantes || 0) * 100));
+    const consumoCentilitros = Math.min(restanteCentilitros, pendienteCentilitros);
+    const nuevoRestanteCentilitros = restanteCentilitros - consumoCentilitros;
+    const consumo = consumoCentilitros / 100;
+    const nuevoRestante = nuevoRestanteCentilitros / 100;
 
-    await connection.query(
+    const [actualizacion] = await connection.query(
       `UPDATE aceite_estanones
        SET litros_restantes = ?,
            estado = CASE WHEN ? <= 0.001 THEN 'AGOTADO' ELSE estado END
        WHERE id = ?`,
       [nuevoRestante, nuevoRestante, estanon.id]
     );
+    if (actualizacion.affectedRows !== 1) {
+      throw new Error(`No se pudo actualizar el saldo del estañón ${estanon.id}. El relleno no se guardó.`);
+    }
 
     await connection.query(
       `INSERT INTO aceite_movimientos
@@ -387,7 +398,11 @@ async function consumirAceitePorSede(connection, { sede, litros, cambioAceiteId 
       ]
     );
 
-    pendiente -= consumo;
+    pendienteCentilitros -= consumoCentilitros;
+  }
+
+  if (pendienteCentilitros > 0) {
+    throw new Error("No se pudo descontar toda la cantidad del relleno. No se guardaron cambios.");
   }
 }
 

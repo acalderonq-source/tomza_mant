@@ -54,9 +54,10 @@ test('a fill without a plate deducts stock and stores null vehicle identifiers',
   assert.match(result.session.success, /sin placa/);
   assert.match(reads[0].sql, /FOR UPDATE/);
   const update = writes.find(item => /UPDATE/.test(item.sql));
-  assert.equal(update.params[0], 100 - 3.78541);
+  assert.equal(update.params[0], 96.21);
   const movement = writes.find(item => /INSERT/.test(item.sql));
-  assert.deepEqual(movement.params, [1, null, 'Guapiles', 3.78541, 'Relleno de aceite - Nivel bajo', null, null, 1]);
+  assert.deepEqual(movement.params, [1, null, 'Guapiles', 3.79, 'Relleno de aceite - Nivel bajo', null, null, 1]);
+  assert.equal(update.params[0], available - movement.params[3]);
 });
 test('shared San Carlos inventory consumes Guapiles stock without a vehicle', async () => {
   const result = await fill({ sede: 'San Carlos', galones_usados: '0,5' }, { id: 2, rol: 'MECANICO', usuario: 'mecanico_guapiles' });
