@@ -34,6 +34,7 @@
     .status-active { background: #dcfce7; color: #166534; }
     .status-inactive { background: #e2e8f0; color: #475569; }
     .status-stopped { background: #fee2e2; color: #991b1b; }
+    .status-comodin { background: #fef3c7; color: #92400e; }
     .status-ok { background: #dbeafe; color: #1d4ed8; }
     .reason-box { min-width: 260px; }
     .sede-form { min-width: 230px; }
@@ -139,6 +140,7 @@
     .mini-ok { background: #dcfce7; color: #166534; }
     .mini-off { background: #e2e8f0; color: #475569; }
     .mini-stop { background: #fee2e2; color: #991b1b; }
+    .mini-comodin { background: #fef3c7; color: #92400e; }
     .delete-unit-btn {
       border-radius: 999px;
       font-weight: 850;
@@ -169,7 +171,7 @@
     <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
       <div>
         <h1 class="hero-title">Control de unidades</h1>
-        <p class="hero-copy">Sede actual: <strong><%= sedeSeleccionada %></strong> · Activas, inactivas y unidades varadas.</p>
+        <p class="hero-copy">Sede actual: <strong><%= sedeSeleccionada %></strong> · Activas, inactivas, varadas y comodines.</p>
       </div>
       <span class="badge text-bg-light text-dark"><%= user.usuario || user.rol %> · <%= user.rol %></span>
     </div>
@@ -260,6 +262,8 @@
                             <% } %>
                             <% if (Number(unidad.varada) === 1) { %>
                               <span class="mini-pill mini-stop">Varada</span>
+                            <% } else if (Number(unidad.comodin) === 1) { %>
+                              <span class="mini-pill mini-comodin">Comodín</span>
                             <% } else if (Number(unidad.activa) === 1) { %>
                               <span class="mini-pill mini-ok">Activa</span>
                             <% } else { %>
@@ -294,11 +298,12 @@
         </select>
       </div>
       <div class="col-md-3">
-        <label class="filter-label">Varadas</label>
+        <label class="filter-label">Condición</label>
         <select name="varado" class="form-select form-select-sm">
           <option value="" <%= filtros.varado === '' ? 'selected' : '' %>>Todas</option>
           <option value="1" <%= filtros.varado === '1' ? 'selected' : '' %>>Solo varadas</option>
-          <option value="0" <%= filtros.varado === '0' ? 'selected' : '' %>>Sin varar</option>
+          <option value="comodin" <%= filtros.varado === 'comodin' ? 'selected' : '' %>>Solo comodines</option>
+          <option value="0" <%= filtros.varado === '0' ? 'selected' : '' %>>Sin varar ni comodín</option>
         </select>
       </div>
       <div class="col-md-2">
@@ -372,6 +377,8 @@
               <i class="bi bi-save me-1"></i>Guardar cambios
             </button>
           <% } %>
+          <a href="/unidades/varadas" class="btn btn-outline-danger btn-sm fw-bold"><i class="bi bi-exclamation-triangle me-1"></i>Varadas</a>
+          <a href="/unidades/comodines" class="btn btn-outline-warning btn-sm fw-bold"><i class="bi bi-arrow-repeat me-1"></i>Comodines</a>
         </div>
       </div>
 
@@ -487,12 +494,15 @@
                 </td>
                 <td>
                   <% if (puedeEditar) { %>
-                    <select name="unidades[<%= u.id %>][varada]" class="form-select form-select-sm">
-                      <option value="0" <%= Number(u.varada) === 0 ? 'selected' : '' %>>Sin varar</option>
-                      <option value="1" <%= Number(u.varada) === 1 ? 'selected' : '' %>>Varada</option>
+                    <select name="unidades[<%= u.id %>][condicion]" class="form-select form-select-sm">
+                      <option value="normal" <%= Number(u.varada) === 0 && Number(u.comodin) === 0 ? 'selected' : '' %>>Sin varar</option>
+                      <option value="varada" <%= Number(u.varada) === 1 ? 'selected' : '' %>>Varada</option>
+                      <option value="comodin" <%= Number(u.varada) === 0 && Number(u.comodin) === 1 ? 'selected' : '' %>>Comodín</option>
                     </select>
                   <% } else if (Number(u.varada) === 1) { %>
                     <span class="status-pill status-stopped"><i class="bi bi-exclamation-triangle me-1"></i>Varada</span>
+                  <% } else if (Number(u.comodin) === 1) { %>
+                    <span class="status-pill status-comodin"><i class="bi bi-arrow-repeat me-1"></i>Comodín</span>
                   <% } else { %>
                     <span class="status-pill status-ok">Sin varar</span>
                   <% } %>

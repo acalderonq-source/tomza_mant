@@ -57,6 +57,7 @@ async function ensureUnidadEstadoColumns() {
   const columns = [
     ["activa", "TINYINT(1) NOT NULL DEFAULT 1"],
     ["varada", "TINYINT(1) NOT NULL DEFAULT 0"],
+    ["comodin", "TINYINT(1) NOT NULL DEFAULT 0"],
     ["razon_varada", "TEXT NULL"],
     ["marca", "VARCHAR(100) NULL"],
     ["modelo", "VARCHAR(120) NULL"],
@@ -313,7 +314,10 @@ function crearResumenGrupoUnidades(nombre, subgrupoBase = []) {
 }
 
 function obtenerCambiosUnidadesDesdeBody(body = {}) {
-  const cambios = body.unidades && typeof body.unidades === "object" ? { ...body.unidades } : {};
+  const filas = body.unidades;
+  const cambios = Array.isArray(filas)
+    ? Object.fromEntries(filas.filter(fila => fila && /^\d+$/.test(String(fila.id || ""))).map(fila => [String(fila.id), fila]))
+    : filas && typeof filas === "object" ? { ...filas } : {};
 
   Object.entries(body || {}).forEach(([key, value]) => {
     const match = key.match(/^unidades\[(\d+)\]\[([^\]]+)\]$/);
@@ -386,7 +390,7 @@ function agruparUnidadesPorNegocio(unidades) {
 async function obtenerUnidadAutorizada(req, id) {
   const sedesPermitidas = await obtenerSedesPermitidas(req);
   const [[unidad]] = await pool.query(
-    `SELECT id, placa, sede, activa, varada, razon_varada, marca, modelo, anio
+    `SELECT id, placa, sede, activa, varada, comodin, razon_varada, marca, modelo, anio
      FROM unidades
      WHERE id = ?
      LIMIT 1`,
@@ -416,7 +420,7 @@ router.get("/", async (req, res) => {
     const placaFiltro = String(req.query.placa || "").trim();
 
     let sql = `
-      SELECT id, placa, sede, activa, varada, razon_varada, marca, modelo, anio
+      SELECT id, placa, sede, activa, varada, comodin, razon_varada, marca, modelo, anio
       FROM unidades
       WHERE 1=1
     `;
@@ -436,7 +440,9 @@ router.get("/", async (req, res) => {
     if (varadoFiltro === "1") {
       sql += " AND varada = 1";
     } else if (varadoFiltro === "0") {
-      sql += " AND varada = 0";
+      sql += " AND varada = 0 AND comodin = 0";
+    } else if (varadoFiltro === "comodin") {
+      sql += " AND comodin = 1";
     }
 
     if (placaFiltro) {
@@ -500,6 +506,45 @@ router.get("/", async (req, res) => {
     res.status(500).send("Error interno");
   }
 });
+
+async function mostrarUnidadesPorCondicion(req, res, tipo) {
+  try {
+    await ensureUnidadEstadoColumns();
+    const sedesPermitidas = esUsuarioTodasSedes(req.session.user) ? [] : await obtenerSedesPermitidas(req);
+    const condicionSql = tipo === "varadas" ? "varada = 1" : "comodin = 1 AND varada = 0";
+    let sql = `SELECT placa, sede, marca, modelo, anio, razon_varada
+      FROM unidades WHERE activa = 1 AND ${condicionSql}`;
+    const params = [];
+    if (!esUsuarioTodasSedes(req.session.user) && !sedesPermitidas.length) {
+      sql += " AND 1 = 0";
+    } else if (sedesPermitidas.length) {
+      sql += " AND sede IN (?)";
+      params.push(sedesPermitidas);
+    }
+    sql += " ORDER BY sede, placa";
+    const [unidades] = await pool.query(sql, params);
+    const porSede = new Map();
+    unidades.forEach(unidad => {
+      const sede = unidad.sede || "Sin sede";
+      if (!porSede.has(sede)) porSede.set(sede, []);
+      porSede.get(sede).push(unidad);
+    });
+    res.render("unidades_condicion", {
+      tipo,
+      grupos: [...porSede].map(([sede, unidadesSede]) => ({
+        sede: etiquetaSede(sede) || sede,
+        unidades: unidadesSede
+      })),
+      total: unidades.length
+    });
+  } catch (error) {
+    console.error(`ERROR unidades ${tipo}:`, error);
+    res.status(500).send("Error cargando unidades");
+  }
+}
+
+router.get("/varadas", (req, res) => mostrarUnidadesPorCondicion(req, res, "varadas"));
+router.get("/comodines", (req, res) => mostrarUnidadesPorCondicion(req, res, "comodines"));
 
 async function agregarUnidad(req, res) {
   try {
@@ -625,7 +670,7 @@ router.post("/guardar-masivo", async (req, res) => {
     const sedesPermitidas = await obtenerSedesPermitidas(req);
     const sedesEditables = await obtenerSedesEditables(req);
     const [actuales] = await pool.query(
-      `SELECT id, placa, sede, activa, varada, razon_varada, marca, modelo, anio
+      `SELECT id, placa, sede, activa, varada, comodin, razon_varada, marca, modelo, anio
        FROM unidades
        WHERE id IN (?)`,
       [ids]
@@ -673,7 +718,13 @@ router.post("/guardar-masivo", async (req, res) => {
       }
 
       let activa = cambio.activa === "0" ? 0 : 1;
-      let varada = cambio.varada === "1" ? 1 : 0;
+      const condicion = String(cambio.condicion || (cambio.varada === "1" ? "varada" : "normal"));
+      if (!["normal", "varada", "comodin"].includes(condicion)) {
+        await conn.rollback();
+        return redirectUnidades(req, res, { error: `Condición inválida para ${unidad.placa}.` });
+      }
+      let varada = condicion === "varada" ? 1 : 0;
+      let comodin = condicion === "comodin" ? 1 : 0;
       let razon = String(cambio.razon_varada || "").trim();
 
       if (varada === 0) {
@@ -682,6 +733,7 @@ router.post("/guardar-masivo", async (req, res) => {
 
       if (activa === 0) {
         varada = 0;
+        comodin = 0;
         razon = "";
       }
 
@@ -699,12 +751,13 @@ router.post("/guardar-masivo", async (req, res) => {
       const cambioSede = String(unidad.sede || "") !== sedeNueva;
       const cambioEstado = Number(unidad.activa || 0) !== activa;
       const cambioVarada = Number(unidad.varada || 0) !== varada;
+      const cambioComodin = Number(unidad.comodin || 0) !== comodin;
       const cambioRazon = String(unidad.razon_varada || "") !== razon;
       const cambioMarca = String(unidad.marca || "") !== marcaNueva;
       const cambioModelo = String(unidad.modelo || "") !== modeloNueva;
       const cambioAnio = (unidad.anio === null || unidad.anio === undefined ? null : Number(unidad.anio)) !== anioNuevo;
 
-      if (!cambioPlaca && !cambioSede && !cambioEstado && !cambioVarada && !cambioRazon && !cambioMarca && !cambioModelo && !cambioAnio) {
+      if (!cambioPlaca && !cambioSede && !cambioEstado && !cambioVarada && !cambioComodin && !cambioRazon && !cambioMarca && !cambioModelo && !cambioAnio) {
         continue;
       }
 
@@ -731,9 +784,10 @@ router.post("/guardar-masivo", async (req, res) => {
              anio = ?,
              activa = ?,
              varada = ?,
+             comodin = ?,
              razon_varada = ?
          WHERE id = ?`,
-        [placaNueva, sedeNueva, marcaNueva || null, modeloNueva || null, anioNuevo, activa, varada, razon || null, unidad.id]
+        [placaNueva, sedeNueva, marcaNueva || null, modeloNueva || null, anioNuevo, activa, varada, comodin, razon || null, unidad.id]
       );
 
       if (cambioSede) {
@@ -847,9 +901,10 @@ router.post("/:id/estado", async (req, res) => {
       `UPDATE unidades
        SET activa = ?,
            varada = CASE WHEN ? = 0 THEN 0 ELSE varada END,
+           comodin = CASE WHEN ? = 0 THEN 0 ELSE comodin END,
            razon_varada = CASE WHEN ? = 0 THEN NULL ELSE razon_varada END
        WHERE id = ?`,
-      [activa, activa, activa, id]
+      [activa, activa, activa, activa, id]
     );
 
     return redirectUnidades(req, res, {
@@ -954,10 +1009,11 @@ router.post("/:id/varada", async (req, res) => {
     await pool.query(
       `UPDATE unidades
        SET varada = ?,
+           comodin = CASE WHEN ? = 1 THEN 0 ELSE comodin END,
            razon_varada = ?,
            activa = CASE WHEN ? = 1 THEN 1 ELSE activa END
        WHERE id = ?`,
-      [varada, varada ? razon : null, varada, id]
+      [varada, varada, varada ? razon : null, varada, id]
     );
 
     return redirectUnidades(req, res, {

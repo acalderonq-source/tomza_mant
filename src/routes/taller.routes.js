@@ -134,6 +134,7 @@ async function ensureUnidadEstadoColumns() {
   const columns = [
     ["activa", "TINYINT(1) NOT NULL DEFAULT 1"],
     ["varada", "TINYINT(1) NOT NULL DEFAULT 0"],
+    ["comodin", "TINYINT(1) NOT NULL DEFAULT 0"],
     ["razon_varada", "TEXT NULL"]
   ];
 
@@ -1291,8 +1292,8 @@ router.post("/unidades/:id/estado", async (req, res) => {
       return res.redirect("/taller/dashboard");
     }
 
-    let sql = "UPDATE unidades u SET u.varada = ?, u.razon_varada = ? WHERE u.id = ?";
-    let params = [varada, varada ? razon : null, id];
+    let sql = "UPDATE unidades u SET u.varada = ?, u.comodin = CASE WHEN ? = 1 THEN 0 ELSE u.comodin END, u.razon_varada = ? WHERE u.id = ?";
+    let params = [varada, varada, varada ? razon : null, id];
     ({ sql, params } = aplicarFiltroSedes(sql, params, sedesPermitidas, "u"));
 
     const [result] = await pool.query(sql, params);

@@ -623,6 +623,7 @@ async function ensureUnidadEstadoColumns() {
   const columns = [
     ["activa", "TINYINT(1) NOT NULL DEFAULT 1"],
     ["varada", "TINYINT(1) NOT NULL DEFAULT 0"],
+    ["comodin", "TINYINT(1) NOT NULL DEFAULT 0"],
     ["razon_varada", "TEXT NULL"]
   ];
 
@@ -1191,6 +1192,7 @@ router.post("/correctivos", requireAuth, async (req, res) => {
       await pool.query(
         `UPDATE unidades
          SET varada = 1,
+             comodin = 0,
              razon_varada = ?
          WHERE id = ?`,
         [`Pendiente de taller: ${pendienteTexto}`, unidad_id]
