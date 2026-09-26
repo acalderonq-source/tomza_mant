@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "nodemon src/server.js",
     "start": "node src/server.js",
-    "migrate": "node src/scripts/runMigrations.js"
+    "migrate": "node src/scripts/runMigrations.js",
+    "test": "node --test"
   },
   "dependencies": {
     "@sendgrid/mail": "^8.1.6",
@@ -17,16 +18,22 @@
     "exceljs": "^4.4.0",
     "express": "^4.22.1",
     "express-mysql-session": "^3.0.3",
+    "express-rate-limit": "^8.7.0",
     "express-session": "^1.19.0",
     "jsonwebtoken": "^9.0.2",
     "mysql2": "^3.16.2",
     "node-cron": "^4.2.1",
-    "nodemailer": "^8.0.9",
+    "nodemailer": "^10.0.10",
     "pdfmake": "^0.2.7",
-    "web-push": "^3.6.7",
-    "xlsx": "^0.18.5"
+    "web-push": "^3.6.7"
   },
   "devDependencies": {
-    "nodemon": "^3.1.4"
+    "nodemon": "^3.1.4",
+    "xlsx": "^0.18.5"
+  },
+  "overrides": {
+    "exceljs": {
+      "uuid": "^11.1.1"
+    }
   }
 }

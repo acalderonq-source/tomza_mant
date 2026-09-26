@@ -120,9 +120,11 @@
                 <a href="/compras/proveedores/editar/<%= p.id %>" class="btn btn-sm btn-warning">
                   <i class="bi bi-pencil"></i> Editar
                 </a>
-                <a href="/compras/proveedores/eliminar/<%= p.id %>" class="btn btn-sm btn-danger" onclick="return confirm('¿Eliminar este proveedor?')">
-                  <i class="bi bi-trash"></i> Eliminar
-                </a>
+                <form method="post" action="/compras/proveedores/eliminar/<%= p.id %>" class="d-inline" onsubmit="return confirm('¿Eliminar este proveedor?')">
+                  <button type="submit" class="btn btn-sm btn-danger">
+                    <i class="bi bi-trash"></i> Eliminar
+                  </button>
+                </form>
               </td>
             </tr>
             <% }) %>

@@ -46,7 +46,7 @@ process.on("uncaughtException", error => {
 });
 
 if (isProduction && !process.env.SESSION_SECRET) {
-  console.warn("SESSION_SECRET no esta configurado. Configure esta variable en produccion.");
+  throw new Error("SESSION_SECRET es obligatorio en produccion.");
 }
 
 if (isProduction) {
@@ -57,12 +57,19 @@ if (isProduction) {
 app.use(express.urlencoded({ extended: true, limit: "10mb", parameterLimit: 5000 }));
 app.use(express.json({ limit: "10mb" }));
 seedBundledUploads();
-app.use("/uploads", express.static(UPLOAD_ROOT));
-// ✅ CORREGIDO: Apunta a la carpeta public en la raíz del proyecto
-app.use(express.static(path.join(__dirname, "..", "public")));
 
 app.get("/health", (_req, res) => {
   res.status(200).json({ status: "ok" });
+});
+
+app.get("/ready", async (_req, res) => {
+  try {
+    await pool.query("SELECT 1");
+    res.status(200).json({ status: "ready", database: "connected" });
+  } catch (error) {
+    console.error("Readiness check fallo:", error.code || error.message);
+    res.status(503).json({ status: "not_ready", database: "unavailable" });
+  }
 });
 
 app.get("/.well-known/assetlinks.json", (req, res) => {
@@ -144,6 +151,10 @@ app.use(session({
     maxAge: sessionMaxAge
   }
 }));
+
+app.use("/uploads", require("./routes/uploads.routes"));
+// Serve public assets only after the private uploads handler has enforced access.
+app.use(express.static(path.join(__dirname, "..", "public")));
 
 app.use(ensureCsrfToken);
 

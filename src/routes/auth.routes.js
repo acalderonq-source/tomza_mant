@@ -1,8 +1,19 @@
 const express = require("express");
 const bcrypt = require("bcryptjs");
+const { rateLimit } = require("express-rate-limit");
 const pool = require("../db");
 
 const router = express.Router();
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (req, res) => res.status(429).render("login", {
+    error: "Demasiados intentos. Espere 15 minutos antes de volver a intentarlo.",
+    next: getSafeNextUrl(req.body?.next)
+  })
+});
 
 /**
  * MOSTRAR LOGIN
@@ -14,7 +25,7 @@ router.get("/login", (req, res) => {
 /**
  * PROCESAR LOGIN
  */
-router.post("/login", async (req, res) => {
+router.post("/login", loginLimiter, async (req, res) => {
   try {
     const { usuario, password } = req.body;
     const nextUrl = getSafeNextUrl(req.body.next);

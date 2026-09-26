@@ -41,10 +41,10 @@ async function ensureMigrationsTable() {
 
 async function migrationAlreadyRan(filename) {
   const [rows] = await pool.query(
-    "SELECT id FROM schema_migrations WHERE filename = ? LIMIT 1",
+    "SELECT checksum FROM schema_migrations WHERE filename = ? LIMIT 1",
     [filename]
   );
-  return rows.length > 0;
+  return rows[0]?.checksum || null;
 }
 
 async function runMigration(filename) {
@@ -86,7 +86,12 @@ async function main() {
   }
 
   for (const filename of files) {
-    if (await migrationAlreadyRan(filename)) {
+    const appliedChecksum = await migrationAlreadyRan(filename);
+    if (appliedChecksum) {
+      const content = fs.readFileSync(path.join(migrationsDir, filename), "utf8");
+      if (appliedChecksum !== checksum(content)) {
+        throw new Error(`La migracion aplicada ${filename} fue modificada. Cree una nueva migracion en lugar de editar la existente.`);
+      }
       console.log(`Ya aplicada: ${filename}`);
       continue;
     }

@@ -4029,7 +4029,7 @@ router.post("/proveedores", requireAuth, allowRoles("ADMIN", "PROVEEDURIA_TALLER
   }
 });
 
-router.get("/proveedores/eliminar/:id", requireAuth, allowRoles("ADMIN", "PROVEEDURIA_TALLER"), async (req, res) => {
+router.post("/proveedores/eliminar/:id", requireAuth, allowRoles("ADMIN", "PROVEEDURIA_TALLER"), async (req, res) => {
   try {
     await pool.query("DELETE FROM proveedores WHERE id = ?", [req.params.id]);
     res.redirect("/compras/proveedores");
