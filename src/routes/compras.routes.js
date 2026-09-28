@@ -42,7 +42,7 @@ const ROLES_MENSAJERO_FACTURAS = ["MENSAJERO", "MENSAJERIA", "MENSAJERO_FACTURAS
 const ROLES_RECEPCION_FACTURAS = [
   ...ROLES_GESTION_FACTURAS
 ];
-const ROLES_VER_ORDENES = [...ROLES_GESTION_FACTURAS, "CONTABILIDAD", ...ROLES_MENSAJERO_FACTURAS];
+const ROLES_VER_ORDENES = [...ROLES_GESTION_FACTURAS, "CONTABILIDAD", "BODEGUERO", ...ROLES_MENSAJERO_FACTURAS];
 const ROLES_REGISTRAR_FACTURA_ORDEN = [...ROLES_GESTION_FACTURAS, ...ROLES_MENSAJERO_FACTURAS];
 const PDF_FONTS = {
   Helvetica: {
@@ -4495,7 +4495,7 @@ router.get("/ordenes", requireAuth, allowRoles(...ROLES_VER_ORDENES), async (req
   }
 });
 
-router.get("/ordenes/reporte/pdf", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER", "CONTABILIDAD"), async (req, res) => {
+router.get("/ordenes/reporte/pdf", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER", "CONTABILIDAD", "BODEGUERO"), async (req, res) => {
   try {
     await ensureOrdenPlacaColumn();
     await ensureOrdenDetalleCodigoProductoColumn();
@@ -4558,7 +4558,7 @@ router.get("/ordenes/reporte/pdf", requireAuth, allowRoles("ADMIN", "TALLER", "P
   }
 });
 
-router.get("/ordenes/reporte/excel", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER", "CONTABILIDAD"), async (req, res) => {
+router.get("/ordenes/reporte/excel", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER", "CONTABILIDAD", "BODEGUERO"), async (req, res) => {
   try {
     await ensureOrdenPlacaColumn();
     await ensureOrdenDetalleCodigoProductoColumn();
@@ -4954,7 +4954,7 @@ router.get("/ordenes/:id/detalle", requireAuth, allowRoles(...ROLES_VER_ORDENES)
   }
 });
 
-router.get("/ordenes/:id/pdf", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER", "CONTABILIDAD"), async (req, res) => {
+router.get("/ordenes/:id/pdf", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER", "CONTABILIDAD", "BODEGUERO"), async (req, res) => {
   try {
     await ensureOrdenPlacaColumn();
     await ensureOrdenCotizacionColumns();

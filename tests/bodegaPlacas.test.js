@@ -105,7 +105,10 @@ test("Bodega suggests active plates and rejects invented plates before changing 
     assert.equal(devolucion.params[5], 1);
 
     session.user.rol = "BODEGUERO";
-    assert.equal((await post("/bodega/articulos", { nombre: "No autorizado" })).status, 403);
+    const writesBeforeBodeguero = writes.length;
+    assert.equal((await post("/bodega/articulos", { nombre: "Nuevo filtro", stock_actual: "0" })).status, 302);
+    assert.equal(writes.length, writesBeforeBodeguero + 1);
+    assert.match(session.success, /Artículo creado/);
   } finally {
     pool.query = originalQuery;
     pool.getConnection = originalConnection;

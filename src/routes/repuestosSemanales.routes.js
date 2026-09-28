@@ -22,7 +22,7 @@ const { normalizarPlaca: normalizarPlacaSistema, agregarFiltroPlacaSql } = requi
 const { generarPdfPedidoCedis, dividirRepuestosSeleccionables } = require("../utils/pdfPedidoCedis");
 
 const ROLES_PROVEEDURIA = ["PROVEEDURIA_TALLER", "PROVEEDURIA"];
-const ROLES_VER = ["ADMIN", "TALLER", "MECANICO", "SUPERVISOR_PESADO", ...ROLES_PROVEEDURIA];
+const ROLES_VER = ["ADMIN", "TALLER", "MECANICO", "SUPERVISOR_PESADO", "BODEGUERO", ...ROLES_PROVEEDURIA];
 const ROLES_GESTION = ["ADMIN", "TALLER", ...ROLES_PROVEEDURIA];
 const SEDE_RECOPE_LIMON = "RECOPE_LIMON";
 const SEDE_RECOPE_UNIDADES = "Transportadora";
@@ -457,6 +457,7 @@ router.get("/", async (req, res) => {
       fechaHoy: fechaCostaRica(),
       fechaProximaSemana: proximaSemanaCostaRica(),
       puedeGestionar: ROLES_GESTION.includes(req.session.user.rol),
+      puedeMarcarLlegada: req.session.user.rol === "BODEGUERO",
       etiquetaEstadoSemanal,
       etiquetaSede: etiquetaSedePedido,
       sedeRecopeLimon: SEDE_RECOPE_LIMON,
@@ -633,6 +634,60 @@ router.post("/:id/marcado", requireGestion, async (req, res) => {
   } catch (error) {
     console.error("Error actualizando marcado semanal:", error);
     req.session.error = "Error actualizando el marcado.";
+    redirectConFiltros(req, res);
+  }
+});
+
+router.post("/:id/llegada", async (req, res) => {
+  if (req.session.user.rol !== "BODEGUERO") return res.status(403).send("No autorizado");
+
+  try {
+    await ensureRepuestosSemanalesTable(pool);
+
+    const sedes = await sedesDisponibles(req);
+    if (!sedes.length) {
+      req.session.error = "No hay sedes autorizadas para actualizar.";
+      return redirectConFiltros(req, res);
+    }
+
+    const [actuales] = await pool.query(
+      `SELECT solicitud, no_compra
+       FROM repuestos_semanales
+       WHERE id = ? AND sede IN (?) AND estado <> 'COMPLETO'
+       LIMIT 1`,
+      [req.params.id, sedes]
+    );
+    if (!actuales.length) {
+      req.session.error = "Registro no encontrado, sin permiso o ya completo.";
+      return redirectConFiltros(req, res);
+    }
+
+    const noCompra = textoGuardadoASet(actuales[0].no_compra);
+    const partesPermitidas = new Set(
+      dividirRepuestosSeleccionables(actuales[0])
+        .filter(parte => !noCompra.has(textoComparable(parte)))
+        .map(textoComparable)
+    );
+    const marcadoRojo = textoLista(req.body.marcado_rojo_items || req.body.marcado_rojo)
+      .split(/\r?\n/)
+      .filter(parte => partesPermitidas.has(textoComparable(parte)))
+      .join("\n");
+    const estado = marcadoRojo ? "LLEGANDO" : "PENDIENTE";
+    const [result] = await pool.query(
+      `UPDATE repuestos_semanales
+       SET marcado_rojo = ?,
+           estado = ?
+       WHERE id = ? AND sede IN (?) AND estado <> 'COMPLETO'`,
+      [marcadoRojo || null, estado, req.params.id, sedes]
+    );
+
+    req.session[result.affectedRows ? "success" : "error"] = result.affectedRows
+      ? "Llegada de repuestos actualizada."
+      : "Registro no encontrado, sin permiso o ya completo.";
+    redirectConFiltros(req, res);
+  } catch (error) {
+    console.error("Error actualizando llegada semanal:", error);
+    req.session.error = "Error actualizando la llegada.";
     redirectConFiltros(req, res);
   }
 });

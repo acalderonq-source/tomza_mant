@@ -522,7 +522,7 @@
   <span class="navbar-brand fw-semibold"><i class="bi bi-calendar-week me-2"></i>Repuestos semanales</span>
   <div class="text-white d-flex align-items-center gap-2 flex-wrap">
     <span class="small"><%= user.usuario %> · <%= user.rol %></span>
-    <a href="/repuestos" class="btn btn-outline-light btn-sm rounded-pill px-3">Solicitud de repuestos</a>
+    <% if (user.rol !== 'BODEGUERO') { %><a href="/repuestos" class="btn btn-outline-light btn-sm rounded-pill px-3">Solicitud de repuestos</a><% } %>
     <a href="/dashboard" class="btn btn-outline-light btn-sm rounded-pill px-3">Dashboard</a>
     <a href="/logout" class="btn btn-warning btn-sm rounded-pill px-3">Salir</a>
   </div>
@@ -610,11 +610,11 @@
               <th>Va llegando / no compra</th>
               <th>Estado</th>
               <th>Creado por</th>
-              <% if (puedeGestionar) { %><th>Acciones</th><% } %>
+              <% if (puedeGestionar || puedeMarcarLlegada) { %><th>Acciones</th><% } %>
             </tr>
           </thead>
           <tbody>
-            <% const columnas = puedeGestionar ? 7 : 6; %>
+            <% const columnas = (puedeGestionar || puedeMarcarLlegada) ? 7 : 6; %>
             <% gruposListado.forEach(grupo => { %>
               <tr class="sede-row">
                 <td colspan="<%= columnas %>"><%= grupo.fecha || '-' %> · <%= mostrarSede(grupo.sede) %></td>
@@ -638,9 +638,10 @@
                     <span class="estado-badge estado-<%= estadoClase(item.estado) %>"><%= estadoTexto(item.estado) %></span>
                   </td>
                   <td data-label="Creado por"><%= item.creado_por_usuario || '-' %></td>
-                  <% if (puedeGestionar) { %>
+                  <% if (puedeGestionar || puedeMarcarLlegada) { %>
                     <td data-label="Acciones">
                       <div class="actions-grid">
+                        <% if (puedeGestionar) { %>
                         <button
                           type="button"
                           class="btn btn-sm btn-outline-primary js-editar-semanal"
@@ -655,18 +656,21 @@
                           data-marcado="<%- textoSeguroData(item.marcado_rojo) %>">
                           <i class="bi bi-pencil-square"></i> Editar
                         </button>
+                        <% } %>
                         <button
                           type="button"
-                          class="btn btn-sm btn-outline-danger js-marcar-rojo"
+                          class="btn btn-sm <%= puedeMarcarLlegada && !puedeGestionar ? 'btn-outline-primary' : 'btn-outline-danger' %> js-marcar-rojo"
                           data-bs-toggle="modal"
                           data-bs-target="#marcadoRojoModal"
                           data-id="<%= item.id %>"
                           data-placa="<%= item.placa %>"
                           data-solicitud="<%- textoSeguroData(item.solicitud) %>"
                           data-marcado="<%- textoSeguroData(item.marcado_rojo) %>"
-                          data-no-compra="<%- textoSeguroData(item.no_compra) %>">
-                          <i class="bi bi-highlighter"></i> Marcar / no compra
+                          data-no-compra="<%- textoSeguroData(item.no_compra) %>"
+                          <%= item.estado === 'COMPLETO' ? 'disabled' : '' %>>
+                          <i class="bi bi-highlighter"></i> <%= puedeMarcarLlegada && !puedeGestionar ? 'Marcar llegada' : 'Marcar / no compra' %>
                         </button>
+                        <% if (puedeGestionar) { %>
                         <form method="POST" action="/repuestos-semanales/<%= item.id %>/estado">
                           <input type="hidden" name="fecha" value="<%= filtros.fecha || '' %>">
                           <input type="hidden" name="sede" value="<%= filtros.sede || '' %>">
@@ -684,6 +688,7 @@
                           <input type="hidden" name="placa" value="<%= filtros.placa || '' %>">
                           <button class="btn btn-sm btn-outline-danger w-100"><i class="bi bi-trash"></i> Eliminar</button>
                         </form>
+                        <% } %>
                       </div>
                     </td>
                   <% } %>
@@ -885,7 +890,9 @@
       </div>
     </div>
   </div>
+<% } %>
 
+<% if (puedeGestionar || puedeMarcarLlegada) { %>
   <div class="modal fade" id="marcadoRojoModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
       <div class="modal-content">
@@ -895,15 +902,17 @@
           <input type="hidden" name="placa" value="<%= filtros.placa || '' %>">
           <div class="modal-header">
             <div>
-              <h5 class="modal-title fw-bold mb-0"><i class="bi bi-highlighter me-1"></i> Marcar en rojo</h5>
-              <div class="small opacity-75" id="marcadoRojoResumen">Seleccione los repuestos. No hace falta escribirlos.</div>
+              <h5 class="modal-title fw-bold mb-0"><i class="bi bi-highlighter me-1"></i> <%= puedeMarcarLlegada && !puedeGestionar ? 'Marcar llegada' : 'Marcar repuestos' %></h5>
+              <div class="small opacity-75" id="marcadoRojoResumen">Seleccione los repuestos que van llegando.</div>
             </div>
             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
           </div>
           <div class="modal-body">
             <div class="alert alert-light border mb-3">
               Marque <strong class="text-danger">Rojo / va llegando</strong> para pintar el repuesto.
+              <% if (puedeGestionar) { %>
               Marque <strong>No se compra</strong> para dejarlo fuera del pedido.
+              <% } %>
             </div>
             <div id="marcadoRojoOpciones" class="mark-options">
               <div class="pedido-empty">Seleccione una solicitud.</div>
@@ -911,7 +920,7 @@
           </div>
           <div class="modal-footer">
             <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
-            <button class="btn btn-danger"><i class="bi bi-save"></i> Guardar selección</button>
+            <button class="btn <%= puedeMarcarLlegada && !puedeGestionar ? 'btn-primary' : 'btn-danger' %>"><i class="bi bi-save"></i> Guardar selección</button>
           </div>
         </form>
       </div>
@@ -938,6 +947,7 @@
     try { return JSON.parse(document.getElementById('pedidoCedisData')?.textContent || '[]'); }
     catch (_) { return []; }
   })();
+  const SOLO_MARCAR_LLEGADA = <%= puedeMarcarLlegada && !puedeGestionar ? 'true' : 'false' %>;
 
   function limpiarPlacaVista(value) {
     return String(value || '').trim().toUpperCase().replace(/\s+/g, '').replace(/-/g, '');
@@ -1035,7 +1045,7 @@
       const form = document.getElementById('marcadoRojoForm');
       const resumen = document.getElementById('marcadoRojoResumen');
       if (!form) return;
-      form.action = `/repuestos-semanales/${button.dataset.id}/marcado`;
+      form.action = `/repuestos-semanales/${button.dataset.id}/${SOLO_MARCAR_LLEGADA ? 'llegada' : 'marcado'}`;
       if (resumen) resumen.textContent = `${button.dataset.placa || ''} · ${button.dataset.solicitud || 'Solicitud'}`;
       const item = pedidosCedis.find(pedido => String(pedido.id) === String(button.dataset.id));
       renderMarcadoRojoOpciones(item || {
@@ -1093,13 +1103,13 @@
           <div class="mark-option-title">${escapeHtml(texto)}</div>
           <div class="d-flex gap-3 flex-wrap">
             <div class="form-check">
-              <input class="form-check-input js-mark-red-check" type="checkbox" id="${rojoId}" name="marcado_rojo_items" value="${value}" ${parte.marcado && !noCompraChecked ? 'checked' : ''}>
+              <input class="form-check-input js-mark-red-check" type="checkbox" id="${rojoId}" name="marcado_rojo_items" value="${value}" ${parte.marcado && !noCompraChecked ? 'checked' : ''} ${SOLO_MARCAR_LLEGADA && noCompraChecked ? 'disabled' : ''}>
               <label class="form-check-label fw-bold text-danger" for="${rojoId}">Rojo / va llegando</label>
             </div>
-            <div class="form-check">
+            ${SOLO_MARCAR_LLEGADA ? '' : `<div class="form-check">
               <input class="form-check-input js-no-compra-check" type="checkbox" id="${noCompraId}" name="no_compra_items" value="${value}" ${noCompraChecked ? 'checked' : ''}>
               <label class="form-check-label fw-bold text-secondary" for="${noCompraId}">No se compra</label>
-            </div>
+            </div>`}
           </div>
         </div>
       `;
