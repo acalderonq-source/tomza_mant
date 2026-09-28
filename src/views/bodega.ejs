@@ -391,11 +391,15 @@
   const grupoTexto = (value) => value === 'SUMINISTRO' ? 'Suministro' : 'Inventario';
   const articulosDisponibles = (Array.isArray(articulosEntrega) ? articulosEntrega : articulos || []).filter(a => Number(a.stock_actual || 0) > 0);
   const paginaActual = pagina || 'inicio';
-  const pageUrl = (page) => page === 'inicio' ? '/bodega' : `/bodega/${page}`;
+  const pageUrl = (page) => {
+    const url = page === 'inicio' ? '/bodega' : `/bodega/${page}`;
+    return sedeBodega ? `${url}?${new URLSearchParams({ sede: sedeBodega })}` : url;
+  };
   const mostrar = (...pages) => pages.includes(paginaActual);
   const urlConsignacion = proveedor => {
     const params = new URLSearchParams();
     if (q) params.set('q', q);
+    if (sedeBodega) params.set('sede', sedeBodega);
     if (proveedor) params.set('proveedor', proveedor);
     return `/bodega/consignacion${params.size ? `?${params}` : ''}`;
   };
@@ -403,7 +407,24 @@
   if (q) inventarioExportParams.set('q', q);
   if (origen) inventarioExportParams.set('origen', origen);
   if (grupo) inventarioExportParams.set('grupo', grupo);
+  if (sedeBodega) inventarioExportParams.set('sede', sedeBodega);
   const urlInventarioExportar = `/bodega/inventario/exportar.xlsx${inventarioExportParams.size ? `?${inventarioExportParams}` : ''}`;
+  const paginaInventarioUrl = pagina => {
+    const params = new URLSearchParams();
+    if (q) params.set('q', q);
+    if (origen) params.set('origen', origen);
+    if (grupo) params.set('grupo', grupo);
+    if (sedeBodega) params.set('sede', sedeBodega);
+    params.set('pagina', String(pagina));
+    return `/bodega/inventario?${params}`;
+  };
+  const paginaMovimientosUrl = pagina => {
+    const params = new URLSearchParams();
+    if (q) params.set('q', q);
+    if (sedeBodega) params.set('sede', sedeBodega);
+    params.set('mov_pagina', String(pagina));
+    return `/bodega/movimientos?${params}`;
+  };
   const pageInfo = {
     inicio: {
       titulo: 'Centro de control de bodega',
@@ -464,6 +485,10 @@
           <option value="PROPIO" <%= origen === 'PROPIO' ? 'selected' : '' %>>Nuestro</option>
           <option value="CONSIGNACION" <%= origen === 'CONSIGNACION' ? 'selected' : '' %>>Consignación</option>
         </select><% } %>
+        <select class="form-select" name="sede" style="width: 210px" aria-label="Filtrar por sede">
+          <option value="">Todas las sedes</option>
+          <% sedesDisponibles.forEach(sede => { %><option value="<%= sede %>" <%= sedeBodega === sede ? 'selected' : '' %>><%= sede === 'POR_CLASIFICAR' ? 'Existencia por clasificar' : sede %></option><% }) %>
+        </select>
         <% if (paginaActual === 'inventario') { %><select class="form-select" name="grupo" style="width: 180px">
           <option value="" <%= !grupo ? 'selected' : '' %>>Todos los grupos</option>
           <option value="INVENTARIO" <%= grupo === 'INVENTARIO' ? 'selected' : '' %>>Inventario</option>
@@ -539,7 +564,7 @@
           </div>
           <a href="/bodega/movimientos" class="btn btn-outline-dark btn-sm fw-bold">Ver todo</a>
         </div>
-        <div class="table-responsive">
+      <div class="table-responsive">
           <table class="table table-sm table-modern align-middle">
             <thead><tr><th>Artículo</th><th>Actual</th><th>Mín.</th><th>Comprar</th></tr></thead>
             <tbody>
@@ -603,6 +628,7 @@
     </div>
     <form method="GET" action="/bodega/consignacion/consumos.xlsx" class="panel-body border-bottom d-flex align-items-end gap-2 flex-wrap">
       <% if (proveedorConsignacionSeleccionado) { %><input type="hidden" name="proveedor" value="<%= proveedorConsignacionSeleccionado %>"><% } %>
+      <% if (sedeBodega) { %><input type="hidden" name="sede" value="<%= sedeBodega %>"><% } %>
       <div><label class="form-label" for="consumo-desde">Consumo desde</label><input class="form-control form-control-sm" id="consumo-desde" type="date" name="fecha_desde" value="<%= periodoReporte.desde %>" required></div>
       <div><label class="form-label" for="consumo-hasta">Hasta</label><input class="form-control form-control-sm" id="consumo-hasta" type="date" name="fecha_hasta" value="<%= periodoReporte.hasta %>" required></div>
       <button class="btn btn-outline-primary btn-sm fw-bold"><i class="bi bi-download"></i> Consumo consignación Excel</button>
@@ -768,8 +794,9 @@
                 <input class="form-control placa-search" id="placa-entrega" name="placa" placeholder="C173517" autocomplete="off" autocapitalize="characters" spellcheck="false" required>
                 <div class="form-check mt-2"><input class="form-check-input" type="checkbox" id="sin-placa-entrega" name="sin_placa" value="1"><label class="form-check-label small" for="sin-placa-entrega">Sin placa (movimiento general)</label></div>
               </div>
-              <div class="col-md-5"><label class="form-label">Mecánico</label><input class="form-control" name="mecanico" placeholder="Nombre del mecánico" required></div>
-              <div class="col-md-3 d-grid align-items-end"><label class="form-label">&nbsp;</label><button class="btn btn-primary fw-bold">Entregar</button></div>
+              <div class="col-md-3"><label class="form-label">Sede de salida</label><select class="form-select" name="sede" required><option value="">Seleccione</option><% sedesDisponibles.forEach(sede => { %><option value="<%= sede %>" <%= sedeBodega === sede ? 'selected' : '' %>><%= sede === 'POR_CLASIFICAR' ? 'Por clasificar' : sede %></option><% }) %></select></div>
+              <div class="col-md-4"><label class="form-label">Mecánico</label><input class="form-control" name="mecanico" placeholder="Nombre del mecánico" required></div>
+              <div class="col-md-1 d-grid align-items-end"><label class="form-label">&nbsp;</label><button class="btn btn-primary fw-bold">Entregar</button></div>
             </div>
 
             <div id="lineas-entrega">
@@ -798,14 +825,6 @@
                       </select>
                       <div class="articulo-search-status mt-1">Escriba para filtrar el listado.</div>
                     </div>
-                  </div>
-                  <div class="col-md-2">
-                    <label class="form-label">Sale de</label>
-                    <select class="form-select" name="origen_salida">
-                      <option value="">Según artículo</option>
-                      <option value="PROPIO">Nuestro</option>
-                      <option value="CONSIGNACION">Consignación</option>
-                    </select>
                   </div>
                   <div class="col-md-3"><label class="form-label">Cantidad</label><input class="form-control" type="number" step="0.01" min="0.01" name="cantidad" value="1" required></div>
                 </div>
@@ -848,6 +867,7 @@
               </div>
             </div>
             <div class="col-md-4"><label class="form-label">Cantidad</label><input class="form-control" type="number" step="0.01" min="0.01" name="cantidad" required></div>
+            <div class="col-md-8"><label class="form-label">Sede de recepción</label><select class="form-select" name="sede" required><option value="">Seleccione</option><% sedesDisponibles.forEach(sede => { %><option value="<%= sede %>" <%= sedeBodega === sede ? 'selected' : '' %>><%= sede === 'POR_CLASIFICAR' ? 'Por clasificar' : sede %></option><% }) %></select></div>
             <div class="col-md-4"><label class="form-label">Precio unitario</label><input class="form-control" type="number" step="0.01" min="0" name="precio_unitario"></div>
             <div class="col-md-4"><label class="form-label">Fecha</label><input class="form-control" type="date" name="fecha"></div>
             <div class="col-md-6"><label class="form-label">Destino de la recepción</label><select class="form-select" name="destino_recepcion" id="destino-recepcion"><option value="GENERALES">Generales</option><option value="PLACA">Por placa</option></select></div>
@@ -868,40 +888,13 @@
   <div class="row g-3 mt-1 <%= (mostrar('entregas') || mostrar('herramientas')) ? '' : 'd-none' %>">
     <div class="<%= mostrar('entregas') ? 'col-xl-4' : 'd-none' %>">
       <section class="panel" id="devolver">
-        <div class="panel-head"><div><h2 class="panel-title">Devolución de repuesto</h2><p class="panel-copy">Para artículos que salieron pero no se utilizaron.</p></div></div>
+        <div class="panel-head"><div><h2 class="panel-title">Devolución de repuesto</h2><p class="panel-copy">Seleccione la salida original; la devolución conserva la sede, la placa y el costo de esa entrega.</p></div></div>
         <div class="panel-body">
           <form method="POST" action="/bodega/devolver" class="row g-2 form-card">
             <input type="hidden" name="redirect_to" value="entregas">
-            <div class="col-12">
-              <label class="form-label">Artículo</label>
-              <div class="articulo-picker">
-                <input class="form-control articulo-search mb-1" type="search" placeholder="Buscar por código, nombre, marca, categoría o ubicación" autocomplete="off">
-                <select class="form-select articulo-select" name="articulo_id" required>
-                  <option value="">Seleccione</option>
-                  <% articulos.forEach(a => { %>
-                    <option value="<%= a.id %>" data-search="<%= [
-                      a.codigo_taller,
-                      a.codigo,
-                      a.nombre,
-                      a.categoria,
-                      a.marca,
-                      a.numero_parte,
-                      a.tipo_unidad,
-                      a.ubicacion,
-                      origenTexto(a.origen_inventario)
-                    ].filter(Boolean).join(' ') %>"><%= a.codigo_taller || '----' %> · <%= a.nombre %> · Stock <%= fmt(a.stock_actual) %> <%= a.unidad_medida %></option>
-                  <% }) %>
-                </select>
-                <div class="articulo-search-status mt-1">Escriba para filtrar el listado.</div>
-              </div>
-            </div>
-            <div class="col-md-4"><label class="form-label">Cantidad</label><input class="form-control" type="number" step="0.01" min="0.01" name="cantidad" value="1" required></div>
-            <div class="col-md-4">
-              <label class="form-label" for="placa-devolucion">Placa</label>
-              <input class="form-control placa-search" id="placa-devolucion" name="placa" autocomplete="off" autocapitalize="characters" spellcheck="false" required>
-              <div class="form-check mt-2"><input class="form-check-input" type="checkbox" id="sin-placa-devolucion" name="sin_placa" value="1"><label class="form-check-label small" for="sin-placa-devolucion">Sin placa (devolución general)</label></div>
-            </div>
-            <div class="col-md-4"><label class="form-label">Mecánico</label><input class="form-control" name="mecanico"></div>
+            <div class="col-12"><label class="form-label" for="salida-origen">Salida pendiente de devolución</label><select class="form-select" id="salida-origen" name="movimiento_origen_id" required><option value="">Cargando salidas...</option></select></div>
+            <div class="col-md-6"><label class="form-label">Cantidad a devolver</label><input class="form-control" id="cantidad-devolucion" type="number" step="0.01" min="0.01" name="cantidad" value="1" required></div>
+            <div class="col-md-6"><label class="form-label">Pendiente</label><input class="form-control" id="pendiente-devolucion" readonly></div>
             <div class="col-12"><label class="form-label">Motivo</label><input class="form-control" name="motivo" placeholder="No utilizado"></div>
             <div class="col-12 d-grid"><button class="btn btn-warning fw-bold">Registrar devolución</button></div>
           </form>
@@ -926,6 +919,7 @@
                   <td class="text-end">
                     <form method="POST" action="/bodega/prestamos/<%= p.id %>/devolver" class="d-inline-flex gap-1">
                       <input type="hidden" name="redirect_to" value="herramientas">
+                      <input class="form-control form-control-sm" type="number" name="cantidad" min="0.01" max="<%= Number(p.cantidad || 0) - Number(p.cantidad_devuelta || 0) %>" step="0.01" value="<%= Number(p.cantidad || 0) - Number(p.cantidad_devuelta || 0) %>" aria-label="Cantidad devuelta" style="width: 85px">
                       <input class="form-control form-control-sm" name="recibido_por" placeholder="Recibió" style="width: 120px">
                       <button class="btn btn-sm btn-success fw-bold">Devolver</button>
                     </form>
@@ -948,10 +942,27 @@
       </div>
     </div>
     <form method="GET" action="/bodega/inventario/propio.pdf" class="panel-body border-bottom d-flex align-items-end gap-2 flex-wrap">
+      <% if (sedeBodega) { %><input type="hidden" name="sede" value="<%= sedeBodega %>"><% } %>
       <div><label class="form-label" for="propio-desde">Consumo propio desde</label><input class="form-control form-control-sm" id="propio-desde" type="date" name="fecha_desde" value="<%= periodoReporte.desde %>" required></div>
       <div><label class="form-label" for="propio-hasta">Hasta</label><input class="form-control form-control-sm" id="propio-hasta" type="date" name="fecha_hasta" value="<%= periodoReporte.hasta %>" required></div>
       <button class="btn btn-outline-dark btn-sm fw-bold"><i class="bi bi-file-earmark-pdf"></i> Inventario propio y costo PDF</button>
     </form>
+    <div class="panel-body border-bottom">
+      <details>
+        <summary class="fw-bold">Trasladar existencia entre sedes</summary>
+        <% if (puedeAjustar) { %>
+          <form method="POST" action="/bodega/trasladar" class="row g-2 form-card mt-2">
+            <input type="hidden" name="redirect_to" value="inventario">
+            <div class="col-lg-4"><label class="form-label">Artículo</label><select class="form-select" name="articulo_id" required><option value="">Seleccione</option><% articulosTransferencia.forEach(a => { %><option value="<%= a.id %>"><%= a.codigo_taller || '----' %> · <%= a.codigo || 'Sin código proveedor' %> · <%= a.nombre %></option><% }) %></select></div>
+            <div class="col-lg-2"><label class="form-label">Sede origen</label><select class="form-select" name="sede_origen" required><option value="">Seleccione</option><% sedesDisponibles.forEach(sede => { %><option value="<%= sede %>" <%= sedeBodega === sede ? 'selected' : '' %>><%= sede === 'POR_CLASIFICAR' ? 'Por clasificar' : sede %></option><% }) %></select></div>
+            <div class="col-lg-2"><label class="form-label">Sede destino</label><select class="form-select" name="sede_destino" required><option value="">Seleccione</option><% sedesDisponibles.forEach(sede => { %><option value="<%= sede %>"><%= sede === 'POR_CLASIFICAR' ? 'Por clasificar' : sede %></option><% }) %></select></div>
+            <div class="col-lg-2"><label class="form-label">Cantidad</label><input class="form-control" type="number" name="cantidad" min="0.01" step="0.01" required></div>
+            <div class="col-lg-2"><label class="form-label">Motivo</label><input class="form-control" name="motivo" placeholder="Opcional"></div>
+            <div class="col-12 d-grid d-md-flex justify-content-md-end"><button class="btn btn-primary fw-bold">Registrar traslado</button></div>
+          </form>
+        <% } else { %><p class="small muted mb-0 mt-2">Solo ADMIN y TALLER pueden trasladar existencias entre sedes.</p><% } %>
+      </details>
+    </div>
     <div class="collapse" id="crear-articulo">
       <div class="panel-body border-bottom">
         <form method="POST" action="/bodega/articulos" class="row g-2 form-card">
@@ -971,7 +982,7 @@
           <div class="col-md-2"><label class="form-label">N° parte</label><input class="form-control" name="numero_parte"></div>
           <div class="col-md-2"><label class="form-label">Tipo unidad</label><input class="form-control" name="tipo_unidad" placeholder="Hino, Isuzu..."></div>
           <div class="col-md-1"><label class="form-label">Unidad</label><input class="form-control" name="unidad_medida" value="UND"></div>
-          <div class="col-md-1"><label class="form-label">Stock</label><input class="form-control" type="number" step="0.01" name="stock_actual" value="0"></div>
+          <div class="col-md-1"><label class="form-label">Stock inicial</label><input class="form-control" value="0" readonly><div class="small muted">Regístrelo como entrada.</div></div>
           <div class="col-md-1"><label class="form-label">Mín.</label><input class="form-control" type="number" step="0.01" name="stock_minimo" value="0"></div>
           <div class="col-md-1"><label class="form-label">Máx.</label><input class="form-control" type="number" step="0.01" name="stock_maximo" value="0"></div>
           <div class="col-md-2"><label class="form-label">Ubicación</label><input class="form-control" name="ubicacion" placeholder="A-03-02"></div>
@@ -1007,6 +1018,7 @@
                   <form method="POST" action="/bodega/ajustar" class="d-flex gap-1">
                     <input type="hidden" name="redirect_to" value="inventario">
                     <input type="hidden" name="articulo_id" value="<%= a.id %>">
+                    <select class="form-select form-select-sm" name="sede" required style="max-width: 130px"><option value="">Sede</option><% sedesDisponibles.forEach(sede => { %><option value="<%= sede %>" <%= sedeBodega === sede ? 'selected' : '' %>><%= sede === 'POR_CLASIFICAR' ? 'Por clasificar' : sede %></option><% }) %></select>
                     <input class="form-control form-control-sm" type="number" step="0.01" name="conteo_fisico" placeholder="Conteo" style="width: 85px">
                     <input class="form-control form-control-sm" name="motivo" placeholder="Motivo" style="width: 120px">
                     <button class="btn btn-sm btn-outline-dark">OK</button>
@@ -1018,6 +1030,15 @@
         </tbody>
       </table>
     </div>
+    <% if (paginasInventario > 1) { %>
+      <div class="panel-body border-top d-flex justify-content-between align-items-center gap-2">
+        <span class="small muted">Página <%= paginaInventario %> de <%= paginasInventario %> · <%= articulos.length %> artículos en esta página</span>
+        <div class="btn-group btn-group-sm">
+          <a class="btn btn-outline-primary <%= paginaInventario <= 1 ? 'disabled' : '' %>" href="<%= paginaInventarioUrl(Math.max(1, paginaInventario - 1)) %>">Anterior</a>
+          <a class="btn btn-outline-primary <%= paginaInventario >= paginasInventario ? 'disabled' : '' %>" href="<%= paginaInventarioUrl(Math.min(paginasInventario, paginaInventario + 1)) %>">Siguiente</a>
+        </div>
+      </div>
+    <% } %>
   </section>
 
   <div class="row g-3 mt-1 <%= mostrar('movimientos') ? '' : 'd-none' %>">
@@ -1042,15 +1063,16 @@
         <div class="panel-head"><div><h2 class="panel-title">Historial de movimientos</h2><p class="panel-copy">Entradas, salidas, devoluciones, ajustes y herramientas.</p></div></div>
         <div class="table-responsive">
           <table class="table table-sm table-modern align-middle">
-            <thead><tr><th>Fecha</th><th>Tipo</th><th>Origen</th><th>Artículo</th><th>Placa / mecánico</th><th>Cant.</th><th>Stock</th><th>Usuario</th></tr></thead>
+            <thead><tr><th>Fecha</th><th>Tipo</th><th>Sede / traslado</th><th>Origen</th><th>Artículo</th><th>Placa / mecánico</th><th>Cant.</th><th>Stock sede</th><th>Usuario</th></tr></thead>
             <tbody>
-              <% if (!movimientos.length) { %><tr><td colspan="8" class="empty-row">Sin movimientos todavía.</td></tr><% } %>
+              <% if (!movimientos.length) { %><tr><td colspan="9" class="empty-row">Sin movimientos todavía.</td></tr><% } %>
               <% movimientos.forEach(m => { %>
                 <tr>
                   <td><%= fecha(m.creado_en) %></td>
                   <td><span class="pill"><%= m.tipo_movimiento %></span></td>
+                  <td><%= m.sede === 'POR_CLASIFICAR' ? 'Por clasificar' : (m.sede || '-') %><% if (m.sede_destino) { %> → <%= m.sede_destino %><% } %></td>
                   <td><span class="pill <%= origenClase(m.origen_inventario) %>"><%= origenTexto(m.origen_inventario) %></span></td>
-                  <td><span class="code-badge me-1"><%= m.codigo_taller || '----' %></span><strong><%= m.articulo_nombre %></strong><div class="small muted">Prov. <%= m.codigo || '-' %></div></td>
+                  <td><span class="code-badge me-1"><%= m.codigo_taller_snapshot || m.codigo_taller || '----' %></span><strong><%= m.descripcion_snapshot || m.articulo_nombre %></strong><div class="small muted">Prov. <%= m.codigo_proveedor_snapshot || m.codigo || '-' %></div></td>
                   <td><%= m.placa || (m.tipo_movimiento === 'ENTRADA' ? (m.destino_recepcion === 'GENERALES' ? 'Generales' : '-') : (['SALIDA', 'DEVOLUCION', 'PRESTAMO'].includes(m.tipo_movimiento) ? 'Sin placa' : '-')) %><div class="small muted"><%= m.mecanico || m.proveedor_nombre || '-' %></div></td>
                   <td class="money"><%= fmt(m.cantidad) %> <%= m.unidad_medida %></td>
                   <td><%= fmt(m.existencia_anterior) %> → <strong><%= fmt(m.existencia_nueva) %></strong></td>
@@ -1060,6 +1082,15 @@
             </tbody>
           </table>
         </div>
+        <% if (paginasMovimientos > 1) { %>
+          <div class="panel-body border-top d-flex justify-content-between align-items-center gap-2">
+            <span class="small muted">Página <%= paginaMovimientos %> de <%= paginasMovimientos %> · historial filtrable por sede</span>
+            <div class="btn-group btn-group-sm">
+              <a class="btn btn-outline-primary <%= paginaMovimientos <= 1 ? 'disabled' : '' %>" href="<%= paginaMovimientosUrl(Math.max(1, paginaMovimientos - 1)) %>">Anterior</a>
+              <a class="btn btn-outline-primary <%= paginaMovimientos >= paginasMovimientos ? 'disabled' : '' %>" href="<%= paginaMovimientosUrl(Math.min(paginasMovimientos, paginaMovimientos + 1)) %>">Siguiente</a>
+            </div>
+          </div>
+        <% } %>
       </section>
     </div>
   </div>
@@ -1091,14 +1122,6 @@
           </select>
           <div class="articulo-search-status mt-1">Escriba para filtrar el listado.</div>
         </div>
-      </div>
-      <div class="col-md-2">
-        <label class="form-label">Sale de</label>
-        <select class="form-select" name="origen_salida">
-          <option value="">Según artículo</option>
-          <option value="PROPIO">Nuestro</option>
-          <option value="CONSIGNACION">Consignación</option>
-        </select>
       </div>
       <div class="col-md-2"><label class="form-label">Cantidad</label><input class="form-control" type="number" step="0.01" min="0.01" name="cantidad" value="1" required></div>
       <div class="col-md-1 d-grid"><label class="form-label">&nbsp;</label><button type="button" class="btn btn-outline-danger remove-linea"><i class="bi bi-x"></i></button></div>
@@ -1441,6 +1464,33 @@
   });
   servicioCompatible?.addEventListener('change', renderCompatibilidad);
 
+  const salidaOrigen = document.getElementById('salida-origen');
+  const pendienteDevolucion = document.getElementById('pendiente-devolucion');
+  const cantidadDevolucion = document.getElementById('cantidad-devolucion');
+  const cargarSalidasPendientes = async () => {
+    if (!salidaOrigen) return;
+    try {
+      const response = await fetch('/bodega/api/salidas-pendientes', { headers: { Accept: 'application/json' } });
+      const rows = await response.json();
+      if (!response.ok) throw new Error(rows.error || 'No se pudieron cargar las salidas.');
+      salidaOrigen.innerHTML = '<option value="">Seleccione una salida original</option>' + rows.map(row => {
+        const fecha = new Date(row.creado_en).toLocaleDateString('es-CR');
+        const placa = row.placa || 'Sin placa';
+        const label = `#${row.id} · ${fecha} · ${placa} · ${row.codigo_taller || ''} ${row.descripcion} · Pendiente ${row.pendiente}`;
+        return `<option value="${Number(row.id)}" data-pendiente="${Number(row.pendiente)}">${escaparHtml(label)}</option>`;
+      }).join('');
+    } catch (error) {
+      salidaOrigen.innerHTML = `<option value="">${escaparHtml(error.message)}</option>`;
+    }
+  };
+  salidaOrigen?.addEventListener('change', () => {
+    const pendiente = Number(salidaOrigen.selectedOptions[0]?.dataset.pendiente || 0);
+    pendienteDevolucion.value = pendiente ? String(pendiente) : '';
+    cantidadDevolucion.max = pendiente || '';
+    if (pendiente) cantidadDevolucion.value = String(pendiente);
+  });
+  cargarSalidasPendientes();
+
   cargarDespacho?.addEventListener('click', () => {
     const seleccionados = Array.from(resultadoCompatible?.querySelectorAll('.compatible-check:checked') || []).map(check => {
       const row = check.closest('tr');
@@ -1468,10 +1518,8 @@
       }
       const select = linea.querySelector('[name="articulo_id"]');
       const cantidad = linea.querySelector('[name="cantidad"]');
-      const origen = linea.querySelector('[name="origen_salida"]');
       select.value = item.articuloId;
       cantidad.value = item.cantidad;
-      origen.value = item.origen;
       select.dispatchEvent(new Event('change', { bubbles: true }));
     });
 

@@ -42,7 +42,7 @@ test("Bodega groups consignment by supplier and alerts only own supplies", async
     const inventario = await fetch(base + "/bodega/inventario?grupo=SUMINISTRO");
     assert.equal(inventario.status, 200);
     assert.equal((await inventario.json()).grupo, "SUMINISTRO");
-    const listado = queries.find(item => item.sql.includes("ORDER BY") && item.sql.includes("LIMIT 300"));
+    const listado = queries.find(item => item.sql.includes("ORDER BY") && item.sql.includes("LIMIT ? OFFSET ?"));
     assert.match(listado.sql, /grupo_bodega = \?/);
     assert.ok(listado.params.includes("SUMINISTRO"));
 

@@ -4,9 +4,11 @@ const pool = require("../db");
 const { ensureGastosOperativosTables, registrarAuditoriaSistema, registrarGastoOperativo } = require("../utils/gastosOperativos");
 const { enviarNotificacionAdmins } = require("../utils/notificacionesPush");
 const { defaultPeriod, reportPeriod, consumption, inventoryXlsx, consignmentXlsx, ownInventoryPdf } = require("../utils/bodegaReportes");
+const { TODAS_SEDES } = require("../utils/sedes");
 
 const ROLES_BODEGA = ["ADMIN", "TALLER", "PROVEEDURIA_TALLER", "BODEGA", "BODEGUERO"];
 const ROLES_AJUSTE = ["ADMIN", "TALLER"];
+const ROLES_CATALOGO = ["ADMIN", "TALLER", "PROVEEDURIA_TALLER"];
 const TIPOS_ARTICULO = ["REPUESTO", "CONSUMIBLE", "HERRAMIENTA", "OTRO"];
 const ORIGENES_INVENTARIO = ["PROPIO", "CONSIGNACION"];
 const PROVEEDOR_CONSIGNACION_DEFAULT = "MAXI REPUESTOS";
@@ -23,6 +25,12 @@ function requireBodega(req, res, next) {
 
 function puedeAjustar(user) {
   return user && ROLES_AJUSTE.includes(user.rol);
+}
+
+function requiereRol(roles, req, res) {
+  if (req.session.user && roles.includes(req.session.user.rol)) return true;
+  res.status(403).send("No tiene permisos para realizar esta acción en Bodega.");
+  return false;
 }
 
 function toArray(value) {
@@ -156,7 +164,7 @@ async function asignarCodigosTallerPendientes(conn = pool) {
   }
 }
 
-async function ensureBodegaTables() {
+async function createBodegaTablesIfNeeded() {
   if (!(await columnExists("unidades", "motor"))) {
     await pool.query(`
       ALTER TABLE unidades
@@ -379,6 +387,17 @@ async function ensureBodegaTables() {
   }
 }
 
+let bodegaTablesPromise;
+async function ensureBodegaTables() {
+  if (!bodegaTablesPromise) {
+    bodegaTablesPromise = createBodegaTablesIfNeeded().catch(error => {
+      bodegaTablesPromise = null;
+      throw error;
+    });
+  }
+  return bodegaTablesPromise;
+}
+
 async function obtenerUnidadPorPlaca(conn, placa, bloquear = false) {
   const placaIngresada = upper(placa).replace(/\s+/g, "");
   if (!placaIngresada) return null;
@@ -444,12 +463,63 @@ async function articuloParaMovimiento(conn, articuloId) {
   return articulo;
 }
 
+async function sedesBodega(conn = pool) {
+  const [rows] = await conn.query(`
+    SELECT DISTINCT TRIM(sede) AS sede
+    FROM unidades
+    WHERE COALESCE(activa, 1) = 1 AND sede IS NOT NULL AND TRIM(sede) <> ''
+    ORDER BY sede
+  `);
+  const sedesNoOperativas = new Set(["Cabezales", "Cisternas", "Carretas", "Gruas", "Grúas", "Tandem", "Tándem", "Tamden"]);
+  const values = [...new Set([
+    ...TODAS_SEDES.filter(sede => !sedesNoOperativas.has(sede)),
+    ...rows.map(row => limpiar(row.sede)).filter(sede => !sedesNoOperativas.has(sede)),
+    "POR_CLASIFICAR"
+  ])].filter(Boolean);
+  return values;
+}
+
+async function validarSedeBodega(conn, value) {
+  const sede = limpiar(value);
+  const sedes = await sedesBodega(conn);
+  if (!sede || !sedes.includes(sede)) throw new Error("Seleccione una sede válida para el movimiento.");
+  return sede;
+}
+
+async function aplicarCambioExistencia(conn, articulo, sede, ubicacion, delta) {
+  const lugar = limpiar(ubicacion);
+  await conn.query(`
+    INSERT INTO bodega_existencias (articulo_id, sede, ubicacion, cantidad)
+    VALUES (?, ?, ?, 0)
+    ON DUPLICATE KEY UPDATE articulo_id = VALUES(articulo_id)
+  `, [articulo.id, sede, lugar]);
+  const [[existencia]] = await conn.query(
+    `SELECT id, cantidad FROM bodega_existencias
+     WHERE articulo_id = ? AND sede = ? AND ubicacion = ? FOR UPDATE`,
+    [articulo.id, sede, lugar]
+  );
+  const anterior = Number(existencia?.cantidad || 0);
+  const nueva = anterior + Number(delta);
+  if (nueva < -0.000001) throw new Error(`${articulo.nombre} no tiene suficiente existencia en ${sede}. Disponible: ${anterior}.`);
+  await conn.query("UPDATE bodega_existencias SET cantidad = ? WHERE id = ?", [Math.max(0, nueva), existencia.id]);
+  const [[total]] = await conn.query(
+    "SELECT COALESCE(SUM(cantidad), 0) AS total FROM bodega_existencias WHERE articulo_id = ?",
+    [articulo.id]
+  );
+  await conn.query("UPDATE bodega_articulos SET stock_actual = ? WHERE id = ?", [Number(total.total || 0), articulo.id]);
+  return { anterior, nueva: Math.max(0, nueva), total: Number(total.total || 0), ubicacion: lugar };
+}
+
 function redirectBodega(req, res) {
   const q = limpiar(req.body.q || req.query.q);
+  const sede = limpiar(req.body.sede || req.body.sede_origen || req.query.sede);
   const pagina = limpiar(req.body.redirect_to || req.query.redirect_to);
   const paginas = new Set(["entregas", "compatibilidad", "consignacion", "inventario", "herramientas", "movimientos"]);
   const base = paginas.has(pagina) ? `/bodega/${pagina}` : "/bodega";
-  res.redirect(`${base}${q ? `?q=${encodeURIComponent(q)}` : ""}`);
+  const params = new URLSearchParams();
+  if (q) params.set("q", q);
+  if (sede) params.set("sede", sede);
+  res.redirect(`${base}${params.size ? `?${params}` : ""}`);
 }
 
 router.use(requireAuth, requireBodega);
@@ -458,6 +528,13 @@ async function renderBodega(req, res, pagina = "inicio") {
   try {
     await ensureBodegaTables();
     const q = limpiar(req.query.q);
+    const paginaInventario = Math.max(1, Number.parseInt(req.query.pagina, 10) || 1);
+    const limiteInventario = 100;
+    const paginaMovimientos = Math.max(1, Number.parseInt(req.query.mov_pagina, 10) || 1);
+    const limiteMovimientos = 100;
+    const sedesDisponibles = await sedesBodega();
+    const sedeSolicitada = limpiar(req.query.sede);
+    const sedeBodega = sedeSolicitada && sedesDisponibles.includes(sedeSolicitada) ? sedeSolicitada : "";
     const origen = origenInventario(req.query.origen, "");
     const grupo = pagina === "inventario" && ["SUMINISTRO", "INVENTARIO"].includes(upper(req.query.grupo))
       ? upper(req.query.grupo) : "";
@@ -481,22 +558,38 @@ async function renderBodega(req, res, pagina = "inicio") {
       params.push(like, like, like, like, like, like, like, like, like);
     }
 
-    const [articulos] = await pool.query(
-      `SELECT *
-       FROM bodega_articulos
-       WHERE ${condiciones.join(" AND ")}
-       ORDER BY
-        CASE
-          WHEN stock_actual <= 0 THEN 0
-          WHEN stock_minimo > 0 AND stock_actual <= stock_minimo THEN 1
-          ELSE 2
-        END,
-        nombre ASC
-       LIMIT 300`,
+    const articulosSql = sedeBodega
+      ? `SELECT ba.*, COALESCE(SUM(be.cantidad), 0) AS stock_actual
+         FROM bodega_articulos ba
+         LEFT JOIN bodega_existencias be ON be.articulo_id = ba.id AND be.sede = ?
+         WHERE ${condiciones.map(item => item.replace(/\b(activo|origen_inventario|grupo_bodega|nombre|codigo|codigo_taller|numero_parte|categoria|marca|tipo_unidad|ubicacion|proveedor_consignacion)\b/g, "ba.$1")).join(" AND ")}
+         GROUP BY ba.id
+         ORDER BY CASE WHEN stock_actual <= 0 THEN 0 WHEN ba.stock_minimo > 0 AND stock_actual <= ba.stock_minimo THEN 1 ELSE 2 END, ba.nombre
+         LIMIT ? OFFSET ?`
+      : `SELECT * FROM bodega_articulos WHERE ${condiciones.join(" AND ")}
+         ORDER BY CASE WHEN stock_actual <= 0 THEN 0 WHEN stock_minimo > 0 AND stock_actual <= stock_minimo THEN 1 ELSE 2 END, nombre ASC
+         LIMIT ? OFFSET ?`;
+    const [articulos] = await pool.query(articulosSql,
+      [...(sedeBodega ? [sedeBodega] : []), ...params, limiteInventario, (paginaInventario - 1) * limiteInventario]);
+    const [[conteoArticulos]] = await pool.query(
+      `SELECT COUNT(*) AS total FROM bodega_articulos WHERE ${condiciones.join(" AND ")}`,
       params
     );
 
-    const [[stats]] = await pool.query(`
+    const statsSql = sedeBodega ? `
+      SELECT
+        COUNT(DISTINCT ba.id) AS articulos,
+        COUNT(DISTINCT CASE WHEN ba.grupo_bodega = 'SUMINISTRO' AND ba.origen_inventario = 'PROPIO' AND ba.stock_minimo > 0 AND be.cantidad > 0 AND be.cantidad <= ba.stock_minimo THEN ba.id END) AS stock_bajo,
+        COUNT(DISTINCT CASE WHEN ba.grupo_bodega = 'SUMINISTRO' AND ba.origen_inventario = 'PROPIO' AND be.cantidad <= 0 THEN ba.id END) AS agotados,
+        COUNT(DISTINCT CASE WHEN ba.origen_inventario = 'PROPIO' AND be.cantidad > 0 THEN ba.id END) AS propios,
+        COUNT(DISTINCT CASE WHEN ba.origen_inventario = 'CONSIGNACION' AND be.cantidad > 0 THEN ba.id END) AS consignacion,
+        SUM(COALESCE(be.cantidad, 0) * COALESCE(ba.precio_unitario, 0)) AS valor_total,
+        SUM(CASE WHEN ba.origen_inventario = 'PROPIO' THEN COALESCE(be.cantidad, 0) * COALESCE(ba.precio_unitario, 0) ELSE 0 END) AS valor_propio,
+        SUM(CASE WHEN ba.origen_inventario = 'CONSIGNACION' THEN COALESCE(be.cantidad, 0) * COALESCE(ba.precio_unitario, 0) ELSE 0 END) AS valor_consignacion
+      FROM bodega_existencias be
+      JOIN bodega_articulos ba ON ba.id = be.articulo_id
+      WHERE ba.activo = 1 AND be.sede = ?
+    ` : `
       SELECT
         COUNT(*) AS articulos,
         SUM(CASE WHEN activo = 1 AND grupo_bodega = 'SUMINISTRO' AND origen_inventario = 'PROPIO' AND stock_minimo > 0 AND stock_actual > 0 AND stock_actual <= stock_minimo THEN 1 ELSE 0 END) AS stock_bajo,
@@ -507,7 +600,8 @@ async function renderBodega(req, res, pagina = "inicio") {
         SUM(CASE WHEN activo = 1 AND origen_inventario = 'PROPIO' THEN COALESCE(stock_actual, 0) * COALESCE(precio_unitario, 0) ELSE 0 END) AS valor_propio,
         SUM(CASE WHEN activo = 1 AND origen_inventario = 'CONSIGNACION' THEN COALESCE(stock_actual, 0) * COALESCE(precio_unitario, 0) ELSE 0 END) AS valor_consignacion
       FROM bodega_articulos
-    `);
+    `;
+    const [[stats]] = await pool.query(statsSql, sedeBodega ? [sedeBodega] : []);
 
     const [[movHoy]] = await pool.query(
       "SELECT COUNT(*) AS total FROM bodega_movimientos WHERE DATE(creado_en) = ?",
@@ -557,20 +651,38 @@ async function renderBodega(req, res, pagina = "inicio") {
         condicionesConsignacion.push("(nombre LIKE ? OR codigo LIKE ? OR codigo_taller LIKE ? OR numero_parte LIKE ? OR categoria LIKE ? OR proveedor_consignacion LIKE ?)");
         paramsConsignacion.push(...Array(6).fill(`%${q}%`));
       }
-      [articulosConsignacion] = await pool.query(
-        `SELECT * FROM bodega_articulos WHERE ${condicionesConsignacion.join(" AND ")} ORDER BY nombre, codigo_taller`,
-        paramsConsignacion
-      );
+      [articulosConsignacion] = sedeBodega
+        ? await pool.query(
+          `SELECT ba.*, COALESCE(SUM(be.cantidad), 0) AS stock_actual
+           FROM bodega_articulos ba
+           LEFT JOIN bodega_existencias be ON be.articulo_id = ba.id AND be.sede = ?
+           WHERE ${condicionesConsignacion.map(item => item.replace(/\b(activo|origen_inventario|nombre|codigo|codigo_taller|numero_parte|categoria|proveedor_consignacion)\b/g, "ba.$1")).join(" AND ")}
+           GROUP BY ba.id ORDER BY ba.nombre, ba.codigo_taller`,
+          [sedeBodega, ...paramsConsignacion]
+        )
+        : await pool.query(
+          `SELECT * FROM bodega_articulos WHERE ${condicionesConsignacion.join(" AND ")} ORDER BY nombre, codigo_taller`,
+          paramsConsignacion
+        );
     }
 
     const [movimientos] = await pool.query(`
-      SELECT bm.*, ba.nombre AS articulo_nombre, ba.codigo, ba.codigo_taller, ba.unidad_medida, u.usuario AS usuario_nombre
+      SELECT bm.*,
+             COALESCE(bm.descripcion_snapshot, ba.nombre) AS articulo_nombre,
+             COALESCE(bm.codigo_proveedor_snapshot, ba.codigo) AS codigo,
+             COALESCE(bm.codigo_taller_snapshot, ba.codigo_taller) AS codigo_taller,
+             ba.unidad_medida, u.usuario AS usuario_nombre
       FROM bodega_movimientos bm
       JOIN bodega_articulos ba ON ba.id = bm.articulo_id
       LEFT JOIN usuarios u ON u.id = bm.creado_por
+      WHERE (? = '' OR bm.sede = ?)
       ORDER BY bm.creado_en DESC, bm.id DESC
-      LIMIT 80
-    `);
+      LIMIT ? OFFSET ?
+    `, [sedeBodega, sedeBodega, limiteMovimientos, (paginaMovimientos - 1) * limiteMovimientos]);
+    const [[conteoMovimientos]] = await pool.query(
+      "SELECT COUNT(*) AS total FROM bodega_movimientos WHERE (? = '' OR sede = ?)",
+      [sedeBodega, sedeBodega]
+    );
 
     const [prestamos] = await pool.query(`
       SELECT bh.*, ba.nombre AS articulo_nombre, ba.codigo, ba.codigo_taller, ba.ubicacion
@@ -588,9 +700,22 @@ async function renderBodega(req, res, pagina = "inicio") {
       WHERE activo = 1 AND grupo_bodega = 'INVENTARIO'
       ORDER BY nombre
     `);
-    const [articulosEntrega] = await pool.query(`
-      SELECT *
-      FROM bodega_articulos
+    const [articulosTransferencia] = await pool.query(`
+      SELECT id, codigo_taller, codigo, nombre, unidad_medida, grupo_bodega, origen_inventario, stock_actual
+      FROM bodega_articulos WHERE activo = 1
+      ORDER BY nombre LIMIT 2000
+    `);
+    const [articulosEntrega] = sedeBodega ? await pool.query(`
+      SELECT ba.*, COALESCE(SUM(be.cantidad), 0) AS stock_actual
+      FROM bodega_articulos ba
+      LEFT JOIN bodega_existencias be ON be.articulo_id = ba.id AND be.sede = ?
+      WHERE ba.activo = 1
+      GROUP BY ba.id
+      HAVING stock_actual > 0
+      ORDER BY CASE WHEN ba.grupo_bodega = 'SUMINISTRO' THEN 0 ELSE 1 END, ba.nombre
+      LIMIT 1000
+    `, [sedeBodega]) : await pool.query(`
+      SELECT * FROM bodega_articulos
       WHERE activo = 1
         AND stock_actual > 0
       ORDER BY
@@ -656,12 +781,19 @@ async function renderBodega(req, res, pagina = "inicio") {
     res.render("bodega", {
       user: req.session.user,
       q,
+      sedeBodega,
+      sedesDisponibles,
+      paginaInventario,
+      paginasInventario: Math.max(1, Math.ceil(Number(conteoArticulos.total || 0) / limiteInventario)),
+      paginaMovimientos,
+      paginasMovimientos: Math.max(1, Math.ceil(Number(conteoMovimientos.total || 0) / limiteMovimientos)),
       origen,
       grupo,
       periodoReporte: defaultPeriod(fechaCostaRica()),
       articulos,
       proveedores,
       articulosCompatibilidad,
+      articulosTransferencia,
       articulosEntrega,
       compatibilidades,
       articulosSinCompatibilidad,
@@ -711,23 +843,30 @@ router.get("/inventario", (req, res) => renderBodega(req, res, "inventario"));
 router.get("/herramientas", (req, res) => renderBodega(req, res, "herramientas"));
 router.get("/movimientos", (req, res) => renderBodega(req, res, "movimientos"));
 
-async function movimientosConsumo(origen, period, proveedor = "") {
+async function movimientosConsumo(origen, period, proveedor = "", sede = "") {
   const params = [origen, period.desde, period.hasta];
   let proveedorSql = "";
   if (proveedor) {
-    proveedorSql = " AND COALESCE(NULLIF(TRIM(ba.proveedor_consignacion), ''), NULLIF(TRIM(ba.proveedor_nombre), ''), ?) = ?";
+    proveedorSql = " AND COALESCE(NULLIF(TRIM(bm.proveedor_snapshot), ''), NULLIF(TRIM(bm.proveedor_nombre), ''), NULLIF(TRIM(ba.proveedor_consignacion), ''), NULLIF(TRIM(ba.proveedor_nombre), ''), ?) = ?";
     params.push(PROVEEDOR_CONSIGNACION_DEFAULT, proveedor);
   }
+  const sedeSql = sede ? " AND bm.sede = ?" : "";
+  if (sede) params.push(sede);
   const [rows] = await pool.query(`
     SELECT bm.articulo_id, bm.tipo_movimiento, bm.cantidad, bm.precio_unitario, bm.creado_en,
-           bm.placa, bm.mecanico, ba.codigo_taller, ba.codigo, ba.nombre, ba.unidad_medida,
+           bm.placa, bm.mecanico,
+           COALESCE(bm.codigo_taller_snapshot, ba.codigo_taller) AS codigo_taller,
+           COALESCE(bm.codigo_proveedor_snapshot, ba.codigo) AS codigo,
+           COALESCE(bm.descripcion_snapshot, ba.nombre) AS nombre,
+           ba.unidad_medida,
            ba.precio_unitario AS precio_actual,
-           COALESCE(NULLIF(TRIM(ba.proveedor_consignacion), ''), NULLIF(TRIM(ba.proveedor_nombre), ''), ?) AS proveedor
+           COALESCE(NULLIF(TRIM(bm.proveedor_snapshot), ''), NULLIF(TRIM(bm.proveedor_nombre), ''),
+                    NULLIF(TRIM(ba.proveedor_consignacion), ''), NULLIF(TRIM(ba.proveedor_nombre), ''), ?) AS proveedor
     FROM bodega_movimientos bm
     JOIN bodega_articulos ba ON ba.id = bm.articulo_id
     WHERE bm.origen_inventario = ?
       AND bm.tipo_movimiento IN ('SALIDA', 'DEVOLUCION')
-      AND DATE(bm.creado_en) BETWEEN ? AND ?${proveedorSql}
+      AND DATE(bm.creado_en) BETWEEN ? AND ?${proveedorSql}${sedeSql}
     ORDER BY bm.creado_en, bm.id
   `, [PROVEEDOR_CONSIGNACION_DEFAULT, ...params]);
   return consumption(rows);
@@ -739,6 +878,8 @@ router.get("/inventario/exportar.xlsx", async (req, res) => {
     const q = limpiar(req.query.q);
     const origen = origenInventario(req.query.origen, "");
     const grupo = ["SUMINISTRO", "INVENTARIO"].includes(upper(req.query.grupo)) ? upper(req.query.grupo) : "";
+    const sedes = await sedesBodega();
+    const sede = sedes.includes(limpiar(req.query.sede)) ? limpiar(req.query.sede) : "";
     const conditions = ["activo = 1"];
     const params = [];
     if (origen) { conditions.push("origen_inventario = ?"); params.push(origen); }
@@ -747,14 +888,21 @@ router.get("/inventario/exportar.xlsx", async (req, res) => {
       conditions.push("(nombre LIKE ? OR codigo LIKE ? OR codigo_taller LIKE ? OR numero_parte LIKE ? OR categoria LIKE ? OR marca LIKE ? OR tipo_unidad LIKE ? OR ubicacion LIKE ? OR proveedor_consignacion LIKE ?)");
       params.push(...Array(9).fill(`%${q}%`));
     }
-    const [articles] = await pool.query(
+    const [articles] = sede ? await pool.query(
+      `SELECT ba.codigo_taller, ba.codigo, ba.nombre, ba.origen_inventario, ba.grupo_bodega, ba.unidad_medida,
+              ba.ubicacion, ba.proveedor_consignacion, ba.proveedor_nombre, COALESCE(SUM(be.cantidad), 0) AS stock_actual,
+              ba.stock_minimo, ba.stock_maximo, ba.precio_unitario
+       FROM bodega_articulos ba LEFT JOIN bodega_existencias be ON be.articulo_id = ba.id AND be.sede = ?
+       WHERE ${conditions.map(item => item.replace(/\b(activo|origen_inventario|grupo_bodega|nombre|codigo|codigo_taller|numero_parte|categoria|marca|tipo_unidad|ubicacion|proveedor_consignacion)\b/g, "ba.$1")).join(" AND ")}
+       GROUP BY ba.id ORDER BY ba.origen_inventario, ba.nombre, ba.codigo_taller`, [sede, ...params]
+    ) : await pool.query(
       `SELECT codigo_taller, codigo, nombre, origen_inventario, grupo_bodega, unidad_medida,
               ubicacion, proveedor_consignacion, proveedor_nombre, stock_actual, stock_minimo,
               stock_maximo, precio_unitario
        FROM bodega_articulos WHERE ${conditions.join(" AND ")}
        ORDER BY origen_inventario, nombre, codigo_taller`, params
     );
-    const buffer = await inventoryXlsx(articles, [origen, grupo, q].filter(Boolean).join(" · "));
+    const buffer = await inventoryXlsx(articles, [sede, origen, grupo, q].filter(Boolean).join(" · "));
     res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
     res.setHeader("Content-Disposition", `attachment; filename="inventario_bodega_${fechaCostaRica()}.xlsx"`);
     res.send(buffer);
@@ -771,8 +919,10 @@ router.get("/consignacion/consumos.xlsx", async (req, res) => {
   try {
     await ensureBodegaTables();
     const proveedor = limpiar(req.query.proveedor);
-    const data = await movimientosConsumo("CONSIGNACION", period, proveedor);
-    const buffer = await consignmentXlsx(data, period, proveedor);
+    const sedes = await sedesBodega();
+    const sede = sedes.includes(limpiar(req.query.sede)) ? limpiar(req.query.sede) : "";
+    const data = await movimientosConsumo("CONSIGNACION", period, proveedor, sede);
+    const buffer = await consignmentXlsx(data, period, [proveedor, sede].filter(Boolean).join(" · "));
     res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
     res.setHeader("Content-Disposition", `attachment; filename="consumo_consignacion_${period.desde}_${period.hasta}.xlsx"`);
     res.send(buffer);
@@ -788,13 +938,21 @@ router.get("/inventario/propio.pdf", async (req, res) => {
   catch (error) { return res.status(400).send(error.message); }
   try {
     await ensureBodegaTables();
-    const [articles] = await pool.query(`
+    const sedes = await sedesBodega();
+    const sede = sedes.includes(limpiar(req.query.sede)) ? limpiar(req.query.sede) : "";
+    const [articles] = sede ? await pool.query(`
+      SELECT ba.id, ba.codigo_taller, ba.codigo, ba.nombre, COALESCE(SUM(be.cantidad), 0) AS stock_actual, ba.precio_unitario
+      FROM bodega_articulos ba
+      LEFT JOIN bodega_existencias be ON be.articulo_id = ba.id AND be.sede = ?
+      WHERE ba.activo = 1 AND ba.origen_inventario = 'PROPIO'
+      GROUP BY ba.id ORDER BY ba.nombre, ba.codigo_taller
+    `, [sede]) : await pool.query(`
       SELECT id, codigo_taller, codigo, nombre, stock_actual, precio_unitario
       FROM bodega_articulos
       WHERE activo = 1 AND origen_inventario = 'PROPIO'
       ORDER BY nombre, codigo_taller
     `);
-    const data = await movimientosConsumo("PROPIO", period);
+    const data = await movimientosConsumo("PROPIO", period, "", sede);
     const buffer = await ownInventoryPdf(articles, data, period);
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `attachment; filename="inventario_propio_${period.desde}_${period.hasta}.pdf"`);
@@ -822,6 +980,31 @@ router.get("/api/placas", async (req, res) => {
   } catch (error) {
     console.error("ERROR buscando placas en bodega:", error);
     res.status(500).json({ error: "No se pudieron consultar las placas." });
+  }
+});
+
+router.get("/api/salidas-pendientes", async (_req, res) => {
+  try {
+    const [rows] = await pool.query(`
+      SELECT bm.id, bm.articulo_id, bm.cantidad, bm.placa, bm.mecanico, bm.sede, bm.ubicacion,
+             bm.creado_en, bm.precio_unitario,
+             COALESCE(bm.descripcion_snapshot, ba.nombre) AS descripcion,
+             COALESCE(bm.codigo_taller_snapshot, ba.codigo_taller) AS codigo_taller,
+             bm.cantidad - COALESCE(SUM(br.cantidad), 0) AS pendiente
+      FROM bodega_movimientos bm
+      JOIN bodega_articulos ba ON ba.id = bm.articulo_id
+      LEFT JOIN bodega_movimientos br
+        ON br.movimiento_origen_id = bm.id AND br.tipo_movimiento = 'DEVOLUCION'
+      WHERE bm.tipo_movimiento = 'SALIDA'
+      GROUP BY bm.id
+      HAVING pendiente > 0
+      ORDER BY bm.creado_en DESC, bm.id DESC
+      LIMIT 200
+    `);
+    res.json(rows);
+  } catch (error) {
+    console.error("ERROR salidas pendientes de devolución:", error);
+    res.status(500).json({ error: "No se pudieron consultar las salidas pendientes." });
   }
 });
 
@@ -878,6 +1061,7 @@ router.get("/api/compatibilidad/:placa", async (req, res) => {
 });
 
 router.post("/compatibilidad", async (req, res) => {
+  if (!requiereRol(ROLES_CATALOGO, req, res)) return;
   const conn = await pool.getConnection();
   try {
     await ensureBodegaTables();
@@ -944,6 +1128,7 @@ router.post("/compatibilidad", async (req, res) => {
 });
 
 router.post("/compatibilidad/:id/eliminar", async (req, res) => {
+  if (!requiereRol(ROLES_CATALOGO, req, res)) return;
   try {
     await ensureBodegaTables();
     await pool.query("UPDATE bodega_compatibilidades SET activo = 0 WHERE id = ?", [Number(req.params.id)]);
@@ -956,6 +1141,7 @@ router.post("/compatibilidad/:id/eliminar", async (req, res) => {
 });
 
 router.post("/articulos", async (req, res) => {
+  if (!requiereRol(ROLES_CATALOGO, req, res)) return;
   try {
     await ensureBodegaTables();
     const proveedor = await obtenerProveedor(req.body.proveedor_id, req.body.proveedor_nombre);
@@ -965,6 +1151,7 @@ router.post("/articulos", async (req, res) => {
     const codigoInterno = codigoTaller(req.body.codigo_taller) || await siguienteCodigoTaller();
     const codigo = limpiar(req.body.codigo) || null;
     const nombre = limpiar(req.body.nombre);
+    if (numero(req.body.stock_actual) !== 0) throw new Error("El artículo se crea sin existencia. Registre el saldo mediante una entrada para conservar trazabilidad.");
     if (!nombre) {
       req.session.error = "Debe escribir el nombre del artículo.";
       return redirectBodega(req, res);
@@ -988,7 +1175,7 @@ router.post("/articulos", async (req, res) => {
         limpiar(req.body.numero_parte) || null,
         limpiar(req.body.tipo_unidad) || null,
         limpiar(req.body.unidad_medida) || "UND",
-        numero(req.body.stock_actual),
+        0,
         numero(req.body.stock_minimo),
         numero(req.body.stock_maximo),
         limpiar(req.body.ubicacion) || null,
@@ -1005,17 +1192,19 @@ router.post("/articulos", async (req, res) => {
     req.session.success = "Artículo creado correctamente.";
   } catch (error) {
     console.error("ERROR crear artículo bodega:", error);
-    req.session.error = error.code === "ER_DUP_ENTRY" ? "Ya existe un artículo con ese código." : "No se pudo crear el artículo.";
+    req.session.error = error.code === "ER_DUP_ENTRY" ? "Ya existe un artículo con ese código." : (error.message || "No se pudo crear el artículo.");
   }
   redirectBodega(req, res);
 });
 
 router.post("/suministros", async (req, res) => {
+  if (!requiereRol(ROLES_CATALOGO, req, res)) return;
   try {
     await ensureBodegaTables();
     const proveedor = await obtenerProveedor(req.body.proveedor_id, req.body.proveedor_nombre);
     const codigoInterno = codigoTaller(req.body.codigo_taller) || await siguienteCodigoTaller();
     const nombre = limpiar(req.body.nombre);
+    if (numero(req.body.stock_actual) !== 0) throw new Error("El suministro se crea sin existencia. Registre el saldo mediante una entrada para conservar trazabilidad.");
     if (!nombre) {
       req.session.error = "Debe escribir el nombre del suministro.";
       return redirectBodega(req, res);
@@ -1036,7 +1225,7 @@ router.post("/suministros", async (req, res) => {
         limpiar(req.body.numero_parte) || null,
         limpiar(req.body.tipo_unidad) || null,
         limpiar(req.body.unidad_medida) || "UND",
-        numero(req.body.stock_actual),
+        0,
         numero(req.body.stock_minimo),
         numero(req.body.stock_maximo),
         limpiar(req.body.ubicacion) || null,
@@ -1052,7 +1241,7 @@ router.post("/suministros", async (req, res) => {
     req.session.success = "Suministro agregado correctamente.";
   } catch (error) {
     console.error("ERROR crear suministro bodega:", error);
-    req.session.error = error.code === "ER_DUP_ENTRY" ? "Ya existe un artículo con ese código." : "No se pudo agregar el suministro.";
+    req.session.error = error.code === "ER_DUP_ENTRY" ? "Ya existe un artículo con ese código." : (error.message || "No se pudo agregar el suministro.");
   }
   res.redirect("/bodega/inventario?grupo=SUMINISTRO");
 });
@@ -1066,6 +1255,7 @@ router.post("/entregar", async (req, res) => {
     const sinPlaca = String(req.body.sin_placa || "") === "1";
     const placaSolicitada = sinPlaca ? "" : limpiar(req.body.placa);
     const mecanico = limpiar(req.body.mecanico);
+    const sede = await validarSedeBodega(conn, req.body.sede);
     const tipoTrabajo = "OTRO";
     const observacion = limpiar(req.body.observacion) || null;
     const articuloIds = toArray(req.body.articulo_id);
@@ -1097,37 +1287,41 @@ router.post("/entregar", async (req, res) => {
 
     for (const linea of lineas) {
       const articulo = await articuloParaMovimiento(conn, linea.id);
-      const anterior = Number(articulo.stock_actual || 0);
-      if (anterior < linea.cantidad) {
-        throw new Error(`${articulo.nombre} no tiene suficiente existencia.`);
+      const origenSalida = articulo.origen_inventario || "PROPIO";
+      if (linea.origen_salida && linea.origen_salida !== origenSalida) {
+        throw new Error(`La procedencia seleccionada para ${articulo.nombre} no coincide con su inventario.`);
       }
-      const nueva = anterior - linea.cantidad;
-      await conn.query("UPDATE bodega_articulos SET stock_actual = ? WHERE id = ?", [nueva, articulo.id]);
-      const origenSalida = linea.origen_salida || articulo.origen_inventario || "PROPIO";
+      const saldo = await aplicarCambioExistencia(conn, articulo, sede, articulo.ubicacion || "", -linea.cantidad);
+      const anterior = saldo.anterior;
+      const nueva = saldo.nueva;
 
       let prestamoId = null;
       const tipoMovimiento = articulo.tipo_articulo === "HERRAMIENTA" ? "PRESTAMO" : "SALIDA";
       if (articulo.tipo_articulo === "HERRAMIENTA") {
         const [prestamoResult] = await conn.query(
           `INSERT INTO bodega_prestamos_herramientas
-            (articulo_id, mecanico, placa, cantidad, observacion, creado_por)
-           VALUES (?, ?, ?, ?, ?, ?)`,
-          [articulo.id, mecanico, placa, linea.cantidad, observacion, req.session.user.id]
+            (articulo_id, mecanico, placa, sede, ubicacion, cantidad, observacion, creado_por)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          [articulo.id, mecanico, placa, sede, articulo.ubicacion || "", linea.cantidad, observacion, req.session.user.id]
         );
         prestamoId = prestamoResult.insertId;
       }
 
       const [movimientoResult] = await conn.query(
         `INSERT INTO bodega_movimientos (
-          articulo_id, entrega_id, prestamo_id, tipo_movimiento, origen_inventario, cantidad, existencia_anterior, existencia_nueva,
-          placa, mecanico, tipo_trabajo, precio_unitario, motivo, creado_por
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          articulo_id, entrega_id, prestamo_id, tipo_movimiento, origen_inventario, sede, ubicacion,
+          cantidad, existencia_anterior, existencia_nueva, placa, mecanico, tipo_trabajo,
+          precio_unitario, motivo, creado_por, codigo_taller_snapshot, codigo_proveedor_snapshot,
+          descripcion_snapshot, proveedor_snapshot
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           articulo.id,
           entregaId,
           prestamoId,
           tipoMovimiento,
           origenSalida,
+          sede,
+          articulo.ubicacion || "",
           linea.cantidad,
           anterior,
           nueva,
@@ -1136,7 +1330,11 @@ router.post("/entregar", async (req, res) => {
           tipoTrabajo,
           Number(articulo.precio_unitario || 0),
           observacion,
-          req.session.user.id
+          req.session.user.id,
+          articulo.codigo_taller || null,
+          articulo.codigo || null,
+          articulo.nombre,
+          articulo.proveedor_consignacion || articulo.proveedor_nombre || null
         ]
       );
       const movimientoId = movimientoResult.insertId;
@@ -1147,7 +1345,7 @@ router.post("/entregar", async (req, res) => {
         detalle_id: articulo.id,
         fecha: new Date(),
         placa,
-        sede: unidadEntrega?.sede || "",
+        sede,
         rubro: "",
         categoria: articulo.categoria || "",
         tipo_trabajo: tipoTrabajo,
@@ -1164,7 +1362,8 @@ router.post("/entregar", async (req, res) => {
           codigo_proveedor: articulo.codigo || "",
           origen_inventario: origenSalida,
           tipo_movimiento: tipoMovimiento,
-          mecanico
+          mecanico,
+          sede
         }
       }, conn, { ensure: false });
 
@@ -1189,6 +1388,7 @@ router.post("/entregar", async (req, res) => {
         mecanico,
         tipo_trabajo: tipoTrabajo,
         observacion,
+        sede,
         articulos: articulosNotificacion
       },
       usuario_id: req.session.user.id,
@@ -1247,27 +1447,31 @@ router.post("/recibir", async (req, res) => {
     const proveedor = await obtenerProveedor(req.body.proveedor_id, req.body.proveedor_nombre);
     const origen = origenInventario(req.body.origen_inventario);
     await conn.beginTransaction();
+    const sede = await validarSedeBodega(conn, req.body.sede);
     const destinoRecepcion = upper(req.body.destino_recepcion || "GENERALES");
     if (!["GENERALES", "PLACA"].includes(destinoRecepcion)) throw new Error("Seleccione Generales o Por placa.");
     const placaSolicitada = destinoRecepcion === "PLACA" ? limpiar(req.body.placa) : "";
     const unidad = placaSolicitada ? await obtenerUnidadPorPlaca(conn, placaSolicitada, true) : null;
     if (destinoRecepcion === "PLACA" && !unidad) throw new Error("Seleccione una placa activa de la lista de unidades.");
     const articulo = await articuloParaMovimiento(conn, articuloId);
-    const anterior = Number(articulo.stock_actual || 0);
-    const nueva = anterior + cantidad;
-    const precio = numero(req.body.precio_unitario) || Number(articulo.precio_unitario || 0);
+    if (origen !== articulo.origen_inventario) {
+      throw new Error("El origen seleccionado no coincide con el artículo. Cree un código de inventario separado si la procedencia es diferente.");
+    }
+    const saldo = await aplicarCambioExistencia(conn, articulo, sede, articulo.ubicacion || "", cantidad);
+    const anterior = saldo.anterior;
+    const nueva = saldo.nueva;
+    const precioIngresado = limpiar(req.body.precio_unitario);
+    const precio = precioIngresado ? numero(precioIngresado) : Number(articulo.precio_unitario || 0);
 
     await conn.query(
       `UPDATE bodega_articulos
-       SET stock_actual = ?, precio_unitario = ?, proveedor_id = ?, proveedor_nombre = ?, proveedor_consignacion = ?, origen_inventario = ?, fecha_ultima_compra = ?
+       SET precio_unitario = ?, proveedor_id = ?, proveedor_nombre = ?, proveedor_consignacion = ?, fecha_ultima_compra = ?
        WHERE id = ?`,
       [
-        nueva,
         precio,
         proveedor.id,
         proveedor.nombre,
         origen === "CONSIGNACION" ? (proveedor.nombre || articulo.proveedor_consignacion || PROVEEDOR_CONSIGNACION_DEFAULT) : articulo.proveedor_consignacion,
-        origen,
         req.body.fecha || fechaCostaRica(),
         articulo.id
       ]
@@ -1275,12 +1479,15 @@ router.post("/recibir", async (req, res) => {
 
     await conn.query(
       `INSERT INTO bodega_movimientos (
-        articulo_id, tipo_movimiento, origen_inventario, cantidad, existencia_anterior, existencia_nueva,
-        placa, destino_recepcion, proveedor_id, proveedor_nombre, numero_factura, orden_compra_id, precio_unitario, motivo, creado_por
-      ) VALUES (?, 'ENTRADA', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        articulo_id, tipo_movimiento, origen_inventario, sede, ubicacion, cantidad, existencia_anterior, existencia_nueva,
+        placa, destino_recepcion, proveedor_id, proveedor_nombre, numero_factura, orden_compra_id, precio_unitario, motivo, creado_por,
+        codigo_taller_snapshot, codigo_proveedor_snapshot, descripcion_snapshot, proveedor_snapshot
+      ) VALUES (?, 'ENTRADA', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         articulo.id,
         origen,
+        sede,
+        articulo.ubicacion || "",
         cantidad,
         anterior,
         nueva,
@@ -1292,7 +1499,11 @@ router.post("/recibir", async (req, res) => {
         Number(req.body.orden_compra_id) || null,
         precio,
         limpiar(req.body.motivo) || "Entrada de mercadería",
-        req.session.user.id
+        req.session.user.id,
+        articulo.codigo_taller || null,
+        articulo.codigo || null,
+        articulo.nombre,
+        proveedor.nombre || (origen === "CONSIGNACION" ? articulo.proveedor_consignacion : null) || null
       ]
     );
 
@@ -1312,38 +1523,53 @@ router.post("/devolver", async (req, res) => {
   const conn = await pool.getConnection();
   try {
     await ensureBodegaTables();
-    const articuloId = Number(req.body.articulo_id);
+    const movimientoOrigenId = Number(req.body.movimiento_origen_id);
     const cantidad = numero(req.body.cantidad);
-    if (!articuloId || cantidad <= 0) {
-      req.session.error = "Debe seleccionar un artículo y la cantidad a devolver.";
+    if (!movimientoOrigenId || cantidad <= 0) {
+      req.session.error = "Seleccione la salida original y una cantidad válida para devolver.";
       return redirectBodega(req, res);
     }
 
     await conn.beginTransaction();
-    const sinPlaca = String(req.body.sin_placa || "") === "1";
-    const placaSolicitada = sinPlaca ? "" : limpiar(req.body.placa);
-    if (!sinPlaca && !placaSolicitada) throw new Error("Indique una placa o marque Sin placa.");
-    const unidad = placaSolicitada ? await obtenerUnidadPorPlaca(conn, placaSolicitada, true) : null;
-    if (placaSolicitada && !unidad) throw new Error("Seleccione una placa activa de la lista de unidades.");
-    const articulo = await articuloParaMovimiento(conn, articuloId);
-    const anterior = Number(articulo.stock_actual || 0);
-    const nueva = anterior + cantidad;
-    await conn.query("UPDATE bodega_articulos SET stock_actual = ? WHERE id = ?", [nueva, articulo.id]);
+    const [[salida]] = await conn.query(
+      "SELECT * FROM bodega_movimientos WHERE id = ? AND tipo_movimiento = 'SALIDA' FOR UPDATE",
+      [movimientoOrigenId]
+    );
+    if (!salida) throw new Error("La salida original no existe o no permite devoluciones.");
+    const [[devuelto]] = await conn.query(
+      "SELECT COALESCE(SUM(cantidad), 0) AS total FROM bodega_movimientos WHERE movimiento_origen_id = ? AND tipo_movimiento = 'DEVOLUCION'",
+      [salida.id]
+    );
+    const pendiente = Number(salida.cantidad || 0) - Number(devuelto.total || 0);
+    if (cantidad > pendiente) throw new Error(`La salida solo tiene ${pendiente} pendiente(s) de devolución.`);
+    const articulo = await articuloParaMovimiento(conn, salida.articulo_id);
+    const sede = salida.sede || "POR_CLASIFICAR";
+    const ubicacion = salida.ubicacion ?? articulo.ubicacion ?? "";
+    const saldo = await aplicarCambioExistencia(conn, articulo, sede, ubicacion, cantidad);
     await conn.query(
       `INSERT INTO bodega_movimientos (
-        articulo_id, tipo_movimiento, origen_inventario, cantidad, existencia_anterior, existencia_nueva,
-        placa, mecanico, motivo, creado_por
-      ) VALUES (?, 'DEVOLUCION', ?, ?, ?, ?, ?, ?, ?, ?)`,
+        articulo_id, tipo_movimiento, origen_inventario, sede, ubicacion, movimiento_origen_id,
+        cantidad, existencia_anterior, existencia_nueva, placa, mecanico, precio_unitario, motivo, creado_por,
+        codigo_taller_snapshot, codigo_proveedor_snapshot, descripcion_snapshot, proveedor_snapshot
+      ) VALUES (?, 'DEVOLUCION', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         articulo.id,
-        articulo.origen_inventario || "PROPIO",
+        salida.origen_inventario || articulo.origen_inventario || "PROPIO",
+        sede,
+        ubicacion,
+        salida.id,
         cantidad,
-        anterior,
-        nueva,
-        unidad?.placa || null,
-        limpiar(req.body.mecanico) || null,
+        saldo.anterior,
+        saldo.nueva,
+        salida.placa || null,
+        salida.mecanico || null,
+        Number(salida.precio_unitario || 0),
         limpiar(req.body.motivo) || "Devolución",
-        req.session.user.id
+        req.session.user.id,
+        salida.codigo_taller_snapshot || articulo.codigo_taller || null,
+        salida.codigo_proveedor_snapshot || articulo.codigo || null,
+        salida.descripcion_snapshot || articulo.nombre,
+        salida.proveedor_snapshot || articulo.proveedor_consignacion || articulo.proveedor_nombre || null
       ]
     );
     await conn.commit();
@@ -1369,32 +1595,47 @@ router.post("/prestamos/:id/devolver", async (req, res) => {
     );
     if (!prestamo) throw new Error("Préstamo no encontrado.");
     const articulo = await articuloParaMovimiento(conn, prestamo.articulo_id);
-    const anterior = Number(articulo.stock_actual || 0);
-    const nueva = anterior + Number(prestamo.cantidad || 0);
+    const cantidadDevueltaAntes = Number(prestamo.cantidad_devuelta || 0);
+    const cantidadPrestamo = Number(prestamo.cantidad || 0);
+    const cantidadDevuelta = numero(req.body.cantidad) || (cantidadPrestamo - cantidadDevueltaAntes);
+    if (cantidadDevuelta <= 0 || cantidadDevuelta > cantidadPrestamo - cantidadDevueltaAntes) {
+      throw new Error("La cantidad devuelta debe ser positiva y no puede superar el saldo prestado.");
+    }
+    const saldo = await aplicarCambioExistencia(conn, articulo, prestamo.sede || "POR_CLASIFICAR", prestamo.ubicacion || articulo.ubicacion || "", cantidadDevuelta);
+    const anterior = saldo.anterior;
+    const nueva = saldo.nueva;
+    const totalDevuelto = cantidadDevueltaAntes + cantidadDevuelta;
+    const estadoDevolucion = totalDevuelto >= cantidadPrestamo ? "DEVUELTO" : "PRESTADO";
 
-    await conn.query("UPDATE bodega_articulos SET stock_actual = ? WHERE id = ?", [nueva, articulo.id]);
     await conn.query(
       `UPDATE bodega_prestamos_herramientas
-       SET estado = 'DEVUELTO', devolucion_en = CURRENT_TIMESTAMP, recibido_por = ?, actualizado_por = ?
+       SET cantidad_devuelta = ?, estado = ?, devolucion_en = CASE WHEN ? = 'DEVUELTO' THEN CURRENT_TIMESTAMP ELSE NULL END,
+           recibido_por = ?, actualizado_por = ?
        WHERE id = ?`,
-      [limpiar(req.body.recibido_por) || req.session.user.usuario, req.session.user.id, prestamo.id]
+      [totalDevuelto, estadoDevolucion, estadoDevolucion, limpiar(req.body.recibido_por) || req.session.user.usuario, req.session.user.id, prestamo.id]
     );
     await conn.query(
       `INSERT INTO bodega_movimientos (
-        articulo_id, prestamo_id, tipo_movimiento, origen_inventario, cantidad, existencia_anterior, existencia_nueva,
-        placa, mecanico, motivo, creado_por
-      ) VALUES (?, ?, 'DEVOLUCION_HERRAMIENTA', ?, ?, ?, ?, ?, ?, ?, ?)`,
+        articulo_id, prestamo_id, tipo_movimiento, origen_inventario, sede, ubicacion, cantidad, existencia_anterior, existencia_nueva,
+        placa, mecanico, motivo, creado_por, codigo_taller_snapshot, codigo_proveedor_snapshot, descripcion_snapshot, proveedor_snapshot
+      ) VALUES (?, ?, 'DEVOLUCION_HERRAMIENTA', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         articulo.id,
         prestamo.id,
         articulo.origen_inventario || "PROPIO",
-        Number(prestamo.cantidad || 0),
+        prestamo.sede || "POR_CLASIFICAR",
+        prestamo.ubicacion || articulo.ubicacion || "",
+        cantidadDevuelta,
         anterior,
         nueva,
         prestamo.placa,
         prestamo.mecanico,
         limpiar(req.body.motivo) || "Herramienta devuelta",
-        req.session.user.id
+        req.session.user.id,
+        articulo.codigo_taller || null,
+        articulo.codigo || null,
+        articulo.nombre,
+        articulo.proveedor_consignacion || articulo.proveedor_nombre || null
       ]
     );
     await conn.commit();
@@ -1403,6 +1644,48 @@ router.post("/prestamos/:id/devolver", async (req, res) => {
     await conn.rollback();
     console.error("ERROR devolver herramienta:", error);
     req.session.error = error.message || "No se pudo devolver la herramienta.";
+  } finally {
+    conn.release();
+  }
+  redirectBodega(req, res);
+});
+
+router.post("/trasladar", async (req, res) => {
+  if (!requiereRol(ROLES_AJUSTE, req, res)) return;
+  const conn = await pool.getConnection();
+  try {
+    await ensureBodegaTables();
+    const articuloId = Number(req.body.articulo_id);
+    const cantidad = numero(req.body.cantidad);
+    await conn.beginTransaction();
+    const origen = await validarSedeBodega(conn, req.body.sede_origen);
+    const destino = await validarSedeBodega(conn, req.body.sede_destino);
+    if (!articuloId || cantidad <= 0 || origen === destino) throw new Error("Indique artículo, cantidad positiva y dos sedes distintas.");
+    const articulo = await articuloParaMovimiento(conn, articuloId);
+    const salida = await aplicarCambioExistencia(conn, articulo, origen, articulo.ubicacion || "", -cantidad);
+    await aplicarCambioExistencia(conn, articulo, destino, articulo.ubicacion || "", cantidad);
+    await conn.query(`
+      INSERT INTO bodega_movimientos (
+        articulo_id, tipo_movimiento, origen_inventario, sede, ubicacion, sede_destino, ubicacion_destino,
+        cantidad, existencia_anterior, existencia_nueva, precio_unitario, motivo, creado_por,
+        codigo_taller_snapshot, codigo_proveedor_snapshot, descripcion_snapshot, proveedor_snapshot
+      ) VALUES (?, 'TRASLADO', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `, [articulo.id, articulo.origen_inventario || "PROPIO", origen, articulo.ubicacion || "", destino,
+      articulo.ubicacion || "", cantidad, salida.anterior, salida.nueva, Number(articulo.precio_unitario || 0),
+      limpiar(req.body.motivo) || "Traslado entre sedes", req.session.user.id, articulo.codigo_taller || null,
+      articulo.codigo || null, articulo.nombre, articulo.proveedor_consignacion || articulo.proveedor_nombre || null]);
+    await registrarAuditoriaSistema({
+      modulo: "Bodega", tabla: "bodega_existencias", registro_id: articulo.id, accion: "TRASLADO",
+      resumen: `Traslado de ${cantidad} ${articulo.unidad_medida} de ${origen} a ${destino}: ${articulo.nombre}`,
+      despues: { articulo_id: articulo.id, cantidad, sede_origen: origen, sede_destino: destino },
+      usuario_id: req.session.user.id, usuario_nombre: req.session.user.usuario
+    }, conn, { ensure: false });
+    await conn.commit();
+    req.session.success = "Traslado registrado y trazado en el historial.";
+  } catch (error) {
+    await conn.rollback();
+    console.error("ERROR trasladar inventario bodega:", error);
+    req.session.error = error.message || "No se pudo trasladar el inventario.";
   } finally {
     conn.release();
   }
@@ -1424,13 +1707,18 @@ router.post("/ajustar", async (req, res) => {
 
     await conn.beginTransaction();
     const articulo = await articuloParaMovimiento(conn, articuloId);
-    const anterior = Number(articulo.stock_actual || 0);
-    await conn.query("UPDATE bodega_articulos SET stock_actual = ? WHERE id = ?", [conteo, articulo.id]);
+    const sede = await validarSedeBodega(conn, req.body.sede);
+    const existenciaActual = await aplicarCambioExistencia(conn, articulo, sede, articulo.ubicacion || "", 0);
+    const anterior = existenciaActual.anterior;
+    const saldo = await aplicarCambioExistencia(conn, articulo, sede, articulo.ubicacion || "", conteo - anterior);
     await conn.query(
       `INSERT INTO bodega_movimientos (
-        articulo_id, tipo_movimiento, origen_inventario, cantidad, existencia_anterior, existencia_nueva, motivo, creado_por
-      ) VALUES (?, 'AJUSTE', ?, ?, ?, ?, ?, ?)`,
-      [articulo.id, articulo.origen_inventario || "PROPIO", conteo - anterior, anterior, conteo, motivo, req.session.user.id]
+        articulo_id, tipo_movimiento, origen_inventario, sede, ubicacion, cantidad, existencia_anterior, existencia_nueva,
+        motivo, creado_por, codigo_taller_snapshot, codigo_proveedor_snapshot, descripcion_snapshot, proveedor_snapshot
+      ) VALUES (?, 'AJUSTE', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [articulo.id, articulo.origen_inventario || "PROPIO", sede, articulo.ubicacion || "", conteo - anterior,
+        anterior, saldo.nueva, motivo, req.session.user.id, articulo.codigo_taller || null, articulo.codigo || null,
+        articulo.nombre, articulo.proveedor_consignacion || articulo.proveedor_nombre || null]
     );
     await conn.commit();
     req.session.success = "Ajuste de inventario guardado.";
