@@ -49,6 +49,16 @@ const MECANICOS_USUARIOS_CENTRALES = [
   "Roberto Montenegro",
   "Christian Maroto"
 ];
+const PLACA_TECNICOS_PESADOS = "EE38537";
+
+function esUnidadTecnicosPesados(user, placa) {
+  const placaNormalizada = String(placa || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+  return esUsuarioPesados(user) && placaNormalizada === PLACA_TECNICOS_PESADOS;
+}
+
+function puedeAccederUnidadMantenimiento(user, unidad, sedesPermitidas) {
+  return tieneSedePermitida(unidad?.sede, sedesPermitidas) || esUnidadTecnicosPesados(user, unidad?.placa);
+}
 
 function esUsuarioMecanicosCentrales(user) {
   const usuario = String(user?.usuario || "").trim().toLowerCase();
@@ -829,7 +839,14 @@ router.get("/correctivos", requireAuth, async (req, res) => {
     const sedeFiltro = obtenerSedeFiltro(req);
     const condiciones = [];
     const params = [];
-    const sedesFiltro = aplicarFiltroSedesPermitidas(req, condiciones, params, "c.sede", sedeFiltro);
+    let sedesFiltro;
+    if (esUsuarioPesados(req.session.user)) {
+      sedesFiltro = obtenerSedesFiltroUsuario(req, sedeFiltro);
+      condiciones.push("(c.sede IN (?) OR UPPER(REPLACE(TRIM(u.placa), '-', '')) = ?)");
+      params.push(sedesFiltro, PLACA_TECNICOS_PESADOS);
+    } else {
+      sedesFiltro = aplicarFiltroSedesPermitidas(req, condiciones, params, "c.sede", sedeFiltro);
+    }
     const where = condiciones.length ? "WHERE " + condiciones.join(" AND ") : "";
     const [rows] = await pool.query(
       `
@@ -1041,9 +1058,11 @@ router.get("/correctivos/nuevo", requireAuth, async (req, res) => {
     const [unidades] = await pool.query(
       `SELECT id, placa, sede
        FROM unidades
-       WHERE sede IN (?)
+       WHERE sede IN (?) ${esUsuarioPesados(req.session.user) ? "OR UPPER(REPLACE(TRIM(placa), '-', '')) = ?" : ""}
        ORDER BY sede, placa`,
-      [sedesFormulario]
+      esUsuarioPesados(req.session.user)
+        ? [sedesFormulario, PLACA_TECNICOS_PESADOS]
+        : [sedesFormulario]
     );
     const { sql: sqlMecanicos, params: paramsMecanicos } = obtenerFiltroMecanicosPorSede(sedeFiltro, false, req.session.user, sedesFormulario);
     const [mecanicos] = await pool.query(sqlMecanicos, paramsMecanicos);
@@ -1163,9 +1182,9 @@ router.post("/correctivos", requireAuth, async (req, res) => {
     }
 
     if (!unidad_id) return res.status(400).send("Debe seleccionar una unidad.");
-    const [[unidadCorrectivo]] = await pool.query("SELECT id, sede FROM unidades WHERE id = ?", [unidad_id]);
+    const [[unidadCorrectivo]] = await pool.query("SELECT id, placa, sede FROM unidades WHERE id = ?", [unidad_id]);
     if (!unidadCorrectivo) return res.status(400).send("Unidad no encontrada.");
-    if (!tieneSedePermitida(unidadCorrectivo.sede, sedesPermitidasCorrectivo)) {
+    if (!puedeAccederUnidadMantenimiento(req.session.user, unidadCorrectivo, sedesPermitidasCorrectivo)) {
       return res.status(403).send("Unidad no autorizada para este usuario.");
     }
     const sedeCorrectivo = sedeFiltro || unidadCorrectivo.sede;
@@ -1337,7 +1356,7 @@ router.get("/correctivos/:id/agregar", requireAuth, async (req, res) => {
     if (!correctivo) return res.status(404).send("Correctivo no encontrado");
     const sedeFiltro = obtenerSedeFiltro(req);
     const sedesPermitidas = obtenerSedesFiltroUsuario(req, sedeFiltro);
-    if (!tieneSedePermitida(correctivo.sede, sedesPermitidas)) {
+    if (!puedeAccederUnidadMantenimiento(req.session.user, correctivo, sedesPermitidas)) {
       return res.status(403).send("No autorizado para esta sede.");
     }
     const { sql: sqlMecanicos, params: paramsMecanicos } = obtenerFiltroMecanicosPorSede(sedeFiltro, false, req.session.user, sedesPermitidas);
@@ -1354,7 +1373,7 @@ router.post("/correctivos/:id/agregar", requireAuth, async (req, res) => {
     const correctivoId = req.params.id;
     const { mecanicos, trabajos, repuestos } = req.body;
     const [[correctivo]] = await pool.query(
-      `SELECT c.id, COALESCE(c.sede, u.sede) AS sede
+      `SELECT c.id, u.placa, COALESCE(c.sede, u.sede) AS sede
        FROM correctivos c
        JOIN unidades u ON u.id = c.unidad_id
        WHERE c.id = ?`,
@@ -1363,7 +1382,7 @@ router.post("/correctivos/:id/agregar", requireAuth, async (req, res) => {
     if (!correctivo) return res.status(404).send("Correctivo no encontrado");
     const sedeSesion = obtenerSedeFiltro(req);
     const sedesPermitidas = obtenerSedesFiltroUsuario(req, sedeSesion);
-    if (!tieneSedePermitida(correctivo.sede, sedesPermitidas)) {
+    if (!puedeAccederUnidadMantenimiento(req.session.user, correctivo, sedesPermitidas)) {
       return res.status(403).send("No autorizado para esta sede.");
     }
 
