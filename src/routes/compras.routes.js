@@ -10,6 +10,7 @@ const { agregarFiltroPlacaSql, normalizarPlaca: normalizarPlacaSistema } = requi
 const { ensureTipoMantenimientoColumns, normalizarTipoMantenimiento, detectarTipoMantenimiento } = require("../utils/tipoMantenimiento");
 const { construirResumenFinanciero } = require("../utils/resumenFinanciero");
 const { esSedeTransportadoraDetalle } = require("../utils/sedes");
+const { consumptionOrderLines, reportPeriod } = require("../utils/bodegaReportes");
 const { ensureUploadDirectory } = require("../utils/uploadStorage");
 const { fechaValida: fechaCajaValida, centavos: centavosCaja, datosDocumento: validarDocumentoCaja, monedaCRC } = require('../utils/cajaChicaValidacion');
 const { asegurarColumnasReapertura, reabrirCorteCajaChica } = require('../utils/cajaChicaReapertura');
@@ -4162,6 +4163,143 @@ router.post("/ordenes", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_
     await connection.rollback();
     console.error(error);
     res.status(500).send("Error guardando orden");
+  } finally {
+    connection.release();
+  }
+});
+
+router.post("/ordenes/consignacion-consumo", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER"), async (req, res) => {
+  let period;
+  try {
+    period = reportPeriod({ fecha_desde: req.body.fecha_desde, fecha_hasta: req.body.fecha_hasta }, new Date().toISOString().slice(0, 10));
+  } catch (error) {
+    req.session.error = error.message;
+    return res.redirect("/compras/ordenes");
+  }
+
+  const proveedorSolicitado = String(req.body.proveedor || "").trim();
+  const sede = String(req.body.sede || "").trim();
+  if (!proveedorSolicitado) {
+    req.session.error = "Seleccione un proveedor de consignación antes de generar la orden.";
+    return res.redirect("/bodega/consignacion");
+  }
+
+  const connection = await pool.getConnection();
+  let transaction = false;
+  try {
+    await ensureOrdenPlacaColumn();
+    await ensureOrdenDetalleCodigoProductoColumn();
+    await ensureTipoMantenimientoColumns(pool);
+
+    const [proveedores] = await connection.query("SELECT id, nombre FROM proveedores ORDER BY nombre");
+    const normalizarProveedor = value => normalizarTextoCompra(value).replace(/[^A-Z0-9]/g, "");
+    const solicitadoNormalizado = normalizarProveedor(proveedorSolicitado);
+    const proveedorExacto = proveedores.find(item => normalizarProveedor(item.nombre) === solicitadoNormalizado);
+    const candidatos = proveedorExacto ? [proveedorExacto] : proveedores.filter(item => {
+      const nombre = normalizarProveedor(item.nombre);
+      return nombre.startsWith(solicitadoNormalizado) || solicitadoNormalizado.startsWith(nombre);
+    });
+    if (candidatos.length !== 1) {
+      throw new Error(candidatos.length
+        ? "Hay más de un proveedor parecido. Corrija el proveedor asignado a los artículos de consignación."
+        : `El proveedor ${proveedorSolicitado} no está registrado en Compras.`);
+    }
+    const proveedor = candidatos[0];
+
+    await connection.beginTransaction();
+    transaction = true;
+    const [[existente]] = await connection.query(`
+      SELECT orden_compra_id FROM bodega_ordenes_consumo
+      WHERE proveedor_id = ? AND fecha_desde = ? AND fecha_hasta = ? AND sede = ?
+      LIMIT 1 FOR UPDATE
+    `, [proveedor.id, period.desde, period.hasta, sede]);
+    if (existente) {
+      await connection.rollback();
+      transaction = false;
+      req.session.success = "Ya existe una orden para ese proveedor, sede y período. Se descargó la orden existente.";
+      return res.redirect(`/compras/ordenes/${existente.orden_compra_id}/pdf`);
+    }
+
+    const [movimientos] = await connection.query(`
+      SELECT bm.id, bm.articulo_id, bm.tipo_movimiento, bm.cantidad, bm.placa, bm.precio_unitario,
+             bm.proveedor_id, bm.proveedor_nombre, bm.proveedor_snapshot, bm.creado_en, bm.sede,
+             COALESCE(bm.codigo_taller_snapshot, ba.codigo_taller) AS codigo_taller,
+             COALESCE(bm.codigo_proveedor_snapshot, ba.codigo) AS codigo,
+             COALESCE(bm.descripcion_snapshot, ba.nombre) AS nombre,
+             ba.unidad_medida, ba.precio_unitario AS precio_actual, ba.proveedor_id AS articulo_proveedor_id
+      FROM bodega_movimientos bm
+      JOIN bodega_articulos ba ON ba.id = bm.articulo_id
+      LEFT JOIN bodega_ordenes_consumo_movimientos bom ON bom.movimiento_id = bm.id
+      WHERE bm.origen_inventario = 'CONSIGNACION'
+        AND bm.tipo_movimiento IN ('SALIDA', 'DEVOLUCION')
+        AND DATE(bm.creado_en) BETWEEN ? AND ?
+        AND COALESCE(NULLIF(TRIM(bm.proveedor_snapshot), ''), NULLIF(TRIM(bm.proveedor_nombre), ''),
+                     NULLIF(TRIM(ba.proveedor_consignacion), ''), NULLIF(TRIM(ba.proveedor_nombre), ''), ?) = ?
+        AND (? = '' OR bm.sede = ?)
+        AND bom.movimiento_id IS NULL
+      ORDER BY bm.id
+      FOR UPDATE
+    `, [period.desde, period.hasta, "MAXI REPUESTOS", proveedorSolicitado, sede, sede]);
+
+    if (!movimientos.length) throw new Error("No hay consumos de consignación pendientes de ordenar para ese proveedor, sede y período.");
+    const idsProveedorArticulo = [...new Set(movimientos.map(row => Number(row.articulo_proveedor_id)).filter(Boolean))];
+    if (idsProveedorArticulo.some(id => id !== Number(proveedor.id))) {
+      throw new Error("Los artículos consumidos tienen un proveedor de Compras distinto al proveedor de consignación seleccionado.");
+    }
+    const lineas = consumptionOrderLines(movimientos);
+    if (!lineas.length) throw new Error("El período no tiene consumo neto positivo para incluir en una orden de compra.");
+
+    const fecha = new Date().toISOString().slice(0, 10);
+    const poNumero = await generarNumeroPO();
+    const subtotal = Math.round((lineas.reduce((sum, linea) => sum + linea.cantidad_neta * linea.precio_unitario, 0) + Number.EPSILON) * 100) / 100;
+    const iva = 13;
+    const montoIva = subtotal * iva / 100;
+    const total = subtotal + montoIva;
+    const placas = [...new Set(lineas.map(linea => linea.placa).filter(placa => placa !== "GENERAL"))];
+    const placaOrden = placas.length === 1 && lineas.every(linea => linea.placa === placas[0]) ? placas[0] : null;
+    const observaciones = `Orden generada desde consumo de consignación · Período ${period.desde} al ${period.hasta}${sede ? ` · Sede ${sede}` : " · Todas las sedes"}. Cada línea conserva la placa del consumo.`;
+    const [ordenResult] = await connection.query(`
+      INSERT INTO ordenes_compra
+        (po_numero, fecha, proveedor_id, forma_pago, moneda, placa_unidad, tipo_mantenimiento,
+         subtotal, descuento, transporte, iva, total, observaciones, creado_por, estado, empresa_destino)
+      VALUES (?, ?, ?, 'Crédito', 'CRC', ?, 'SUMINISTROS', ?, 0, 0, ?, ?, ?, ?, 'BORRADOR', 'GAS TOMZA')
+    `, [poNumero, fecha, proveedor.id, placaOrden, subtotal, iva, total, observaciones, req.session.user.id]);
+    const ordenId = ordenResult.insertId;
+
+    await connection.query(`
+      INSERT INTO bodega_ordenes_consumo
+        (orden_compra_id, proveedor_id, fecha_desde, fecha_hasta, sede, creado_por)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `, [ordenId, proveedor.id, period.desde, period.hasta, sede, req.session.user.id]);
+
+    for (const linea of lineas) {
+      await connection.query(`
+        INSERT INTO ordenes_compra_detalle
+          (orden_compra_id, codigo, codigo_producto, descripcion, cantidad, precio_unitario, subtotal)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `, [ordenId, linea.placa, linea.codigo_producto || null, linea.descripcion, linea.cantidad_neta,
+        linea.precio_unitario, linea.cantidad_neta * linea.precio_unitario]);
+      for (const movimientoId of linea.movimiento_ids) {
+        await connection.query(
+          "INSERT INTO bodega_ordenes_consumo_movimientos (movimiento_id, orden_compra_id) VALUES (?, ?)",
+          [movimientoId, ordenId]
+        );
+      }
+    }
+
+    await connection.commit();
+    transaction = false;
+    req.session.success = `Orden ${poNumero} creada como borrador con ${lineas.length} línea(s) y ${movimientos.length} movimiento(s) de consumo.`;
+    res.redirect(`/compras/ordenes/${ordenId}/pdf`);
+  } catch (error) {
+    if (transaction) await connection.rollback();
+    console.error("ERROR generar orden desde consumo de consignación:", error);
+    req.session.error = error.code === "ER_DUP_ENTRY"
+      ? "Uno o más consumos ya fueron incluidos en otra orden. No se duplicó el consumo."
+      : error.message || "No se pudo generar la orden desde el consumo.";
+    const params = new URLSearchParams({ proveedor: proveedorSolicitado, fecha_desde: period.desde, fecha_hasta: period.hasta });
+    if (sede) params.set("sede", sede);
+    res.redirect(`/bodega/consignacion?${params}`);
   } finally {
     connection.release();
   }

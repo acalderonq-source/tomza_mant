@@ -853,12 +853,12 @@ async function movimientosConsumo(origen, period, proveedor = "", sede = "") {
   const sedeSql = sede ? " AND bm.sede = ?" : "";
   if (sede) params.push(sede);
   const [rows] = await pool.query(`
-    SELECT bm.articulo_id, bm.tipo_movimiento, bm.cantidad, bm.precio_unitario, bm.creado_en,
+    SELECT bm.id, bm.articulo_id, bm.tipo_movimiento, bm.cantidad, bm.precio_unitario, bm.creado_en,
            bm.placa, bm.mecanico,
            COALESCE(bm.codigo_taller_snapshot, ba.codigo_taller) AS codigo_taller,
            COALESCE(bm.codigo_proveedor_snapshot, ba.codigo) AS codigo,
            COALESCE(bm.descripcion_snapshot, ba.nombre) AS nombre,
-           ba.unidad_medida,
+           ba.unidad_medida, ba.proveedor_id,
            ba.precio_unitario AS precio_actual,
            COALESCE(NULLIF(TRIM(bm.proveedor_snapshot), ''), NULLIF(TRIM(bm.proveedor_nombre), ''),
                     NULLIF(TRIM(ba.proveedor_consignacion), ''), NULLIF(TRIM(ba.proveedor_nombre), ''), ?) AS proveedor

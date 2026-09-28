@@ -70,9 +70,10 @@ function consumption(rows) {
       unidad_medida: row.unidad_medida || "UND",
       precio_actual: number(row.precio_actual),
       salidas: 0, devoluciones: 0, costo_salidas: 0, costo_devoluciones: 0,
-      sin_precio: false, precio_estimado: false
+      sin_precio: false, precio_estimado: false, placas: new Set()
     });
     const total = grouped.get(key);
+    total.placas.add(row.placa || "GENERAL");
     if (returned) {
       total.devoluciones += count;
       total.costo_devoluciones += amount;
@@ -85,12 +86,49 @@ function consumption(rows) {
   }
   const summary = [...grouped.values()].map(item => ({
     ...item,
+    placas: [...item.placas].sort((a, b) => a.localeCompare(b, "es")),
     cantidad_neta: cents(item.salidas - item.devoluciones),
     costo_salidas: cents(item.costo_salidas),
     costo_devoluciones: cents(item.costo_devoluciones),
     costo_neto: cents(item.costo_salidas - item.costo_devoluciones)
   })).sort((a, b) => a.proveedor.localeCompare(b.proveedor, "es") || a.nombre.localeCompare(b.nombre, "es"));
   return { details, summary, total: cents(summary.reduce((sum, item) => sum + item.costo_neto, 0)) };
+}
+
+function consumptionOrderLines(rows) {
+  const grouped = new Map();
+  for (const row of rows) {
+    const plate = row.placa || "GENERAL";
+    const key = `${row.articulo_id}:${plate}`;
+    if (!grouped.has(key)) grouped.set(key, {
+      articulo_id: row.articulo_id,
+      placa: plate,
+      codigo_taller: row.codigo_taller || "",
+      codigo_producto: row.codigo || "",
+      descripcion: row.nombre || "",
+      unidad_medida: row.unidad_medida || "UND",
+      cantidad_neta: 0,
+      costo_neto: 0,
+      movimiento_ids: []
+    });
+    const item = grouped.get(key);
+    const sign = row.tipo_movimiento === "DEVOLUCION" ? -1 : 1;
+    const quantity = number(row.cantidad);
+    const recordedPrice = number(row.precio_unitario);
+    const price = recordedPrice > 0 ? recordedPrice : number(row.precio_actual);
+    item.cantidad_neta += sign * quantity;
+    item.costo_neto += sign * cents(quantity * price);
+    if (row.id) item.movimiento_ids.push(Number(row.id));
+  }
+  return [...grouped.values()]
+    .filter(item => item.cantidad_neta > 0)
+    .map(item => ({
+      ...item,
+      cantidad_neta: cents(item.cantidad_neta),
+      costo_neto: cents(item.costo_neto),
+      precio_unitario: item.cantidad_neta > 0 ? cents(item.costo_neto / item.cantidad_neta) : 0
+    }))
+    .sort((a, b) => a.descripcion.localeCompare(b.descripcion, "es") || a.placa.localeCompare(b.placa, "es"));
 }
 
 function header(sheet, title, subtitle, labels) {
@@ -131,16 +169,26 @@ async function inventoryXlsx(articles, filterText = "") {
 async function consignmentXlsx(data, period, supplier = "") {
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet("Resumen semanal");
-  sheet.columns = [31, 16, 20, 44, 12, 14, 15, 14, 20, 20, 20].map(width => ({ width }));
+  sheet.columns = [31, 16, 20, 44, 12, 14, 15, 14, 25, 20, 20, 20].map(width => ({ width }));
   header(sheet, "Consumo de consignación", `${period.desde} al ${period.hasta} · ${supplier || "Todos los proveedores"}`,
-    ["Proveedor", "Código taller", "Código producto", "Descripción", "Unidad", "Salidas", "Devoluciones", "Neto", "Costo salidas", "Costo devoluciones", "Gasto neto"]);
+    ["Proveedor", "Código taller", "Código producto", "Descripción", "Unidad", "Salidas", "Devoluciones", "Neto", "Placas", "Costo salidas", "Costo devoluciones", "Gasto neto"]);
   for (const item of data.summary) {
-    const row = sheet.addRow([item.proveedor, item.codigo_taller, item.codigo, item.nombre, item.unidad_medida, item.salidas, item.devoluciones, item.cantidad_neta, item.costo_salidas, item.costo_devoluciones, item.costo_neto]);
-    for (const index of [6, 7, 8, 9, 10, 11]) row.getCell(index).numFmt = '#,##0.00';
+    const row = sheet.addRow([item.proveedor, item.codigo_taller, item.codigo, item.nombre, item.unidad_medida, item.salidas, item.devoluciones, item.cantidad_neta, item.placas.join(", "), item.costo_salidas, item.costo_devoluciones, item.costo_neto]);
+    for (const index of [6, 7, 8, 10, 11, 12]) row.getCell(index).numFmt = '#,##0.00';
   }
-  const total = sheet.addRow(["TOTAL", "", "", "", "", "", "", "", "", "", data.total]);
+  const total = sheet.addRow(["TOTAL", "", "", "", "", "", "", "", "", "", "", data.total]);
   total.font = { bold: true };
-  total.getCell(11).numFmt = '#,##0.00';
+  total.getCell(12).numFmt = '#,##0.00';
+
+  const byPlate = workbook.addWorksheet("Consumo por placa");
+  byPlate.columns = [23, 31, 16, 20, 44, 16, 15, 18, 19, 17, 28].map(width => ({ width }));
+  header(byPlate, "Consumo de consignación por placa", `${period.desde} al ${period.hasta} · ${supplier || "Todos los proveedores"}`,
+    ["Fecha", "Proveedor", "Placa", "Código taller", "Descripción", "Movimiento", "Cantidad neta", "Precio unitario", "Importe neto", "Código producto", "Mecánico"]);
+  for (const item of data.details) {
+    const row = byPlate.addRow([item.creado_en, item.proveedor, item.placa || "GENERAL", item.codigo_taller, item.nombre, item.tipo_movimiento, item.cantidad_neta, item.precio, item.costo_neto, item.codigo, item.mecanico || ""]);
+    if (item.creado_en instanceof Date) row.getCell(1).numFmt = 'dd/mm/yyyy hh:mm';
+    for (const index of [7, 8, 9]) row.getCell(index).numFmt = '#,##0.00';
+  }
 
   const detail = workbook.addWorksheet("Movimientos");
   detail.columns = [23, 31, 16, 20, 44, 16, 15, 18, 19, 17, 28].map(width => ({ width }));
@@ -212,4 +260,4 @@ function ownInventoryPdf(articles, data, period) {
   });
 }
 
-module.exports = { defaultPeriod, reportPeriod, consumption, inventoryXlsx, consignmentXlsx, ownInventoryPdf };
+module.exports = { defaultPeriod, reportPeriod, consumption, consumptionOrderLines, inventoryXlsx, consignmentXlsx, ownInventoryPdf };

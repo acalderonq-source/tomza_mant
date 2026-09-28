@@ -633,6 +633,16 @@
       <div><label class="form-label" for="consumo-hasta">Hasta</label><input class="form-control form-control-sm" id="consumo-hasta" type="date" name="fecha_hasta" value="<%= periodoReporte.hasta %>" required></div>
       <button class="btn btn-outline-primary btn-sm fw-bold"><i class="bi bi-download"></i> Consumo consignación Excel</button>
     </form>
+    <% if (proveedorConsignacionSeleccionado && ['ADMIN', 'TALLER', 'PROVEEDURIA_TALLER'].includes(user.rol)) { %>
+      <form id="form-orden-consumo" method="POST" action="/compras/ordenes/consignacion-consumo" class="panel-body border-bottom d-flex align-items-end gap-2 flex-wrap" onsubmit="return confirm('Se creará una orden borrador en Órdenes de Compra solo con los consumos netos del período y proveedor seleccionados. ¿Continuar?')">
+        <input type="hidden" name="proveedor" value="<%= proveedorConsignacionSeleccionado %>">
+        <input id="orden-consumo-desde" type="hidden" name="fecha_desde" value="<%= periodoReporte.desde %>">
+        <input id="orden-consumo-hasta" type="hidden" name="fecha_hasta" value="<%= periodoReporte.hasta %>">
+        <% if (sedeBodega) { %><input type="hidden" name="sede" value="<%= sedeBodega %>"><% } %>
+        <div class="small muted flex-grow-1">La orden incluirá artículo, código, cantidad neta y placa por consumo. Los movimientos no se volverán a incluir en otra orden.</div>
+        <button class="btn btn-success btn-sm fw-bold"><i class="bi bi-receipt"></i> Crear y descargar orden</button>
+      </form>
+    <% } %>
     <div class="table-responsive">
       <table class="table table-sm table-modern align-middle">
         <thead><tr><th>Cód. taller</th><th>Cód. proveedor</th><th>Repuesto</th><th>Proveedor consignación</th><th>Stock</th><th>Ubicación</th><th>Estado</th></tr></thead>
@@ -1465,6 +1475,10 @@
   servicioCompatible?.addEventListener('change', renderCompatibilidad);
 
   const salidaOrigen = document.getElementById('salida-origen');
+  document.getElementById('form-orden-consumo')?.addEventListener('submit', () => {
+    document.getElementById('orden-consumo-desde').value = document.getElementById('consumo-desde')?.value || '';
+    document.getElementById('orden-consumo-hasta').value = document.getElementById('consumo-hasta')?.value || '';
+  });
   const pendienteDevolucion = document.getElementById('pendiente-devolucion');
   const cantidadDevolucion = document.getElementById('cantidad-devolucion');
   const cargarSalidasPendientes = async () => {

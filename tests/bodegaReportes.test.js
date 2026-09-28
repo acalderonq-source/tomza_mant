@@ -4,7 +4,7 @@ const ExcelJS = require("exceljs");
 const express = require("express");
 const pool = require("../src/db");
 const router = require("../src/routes/bodega.routes");
-const { defaultPeriod, reportPeriod, consumption, inventoryXlsx, consignmentXlsx, ownInventoryPdf } = require("../src/utils/bodegaReportes");
+const { defaultPeriod, reportPeriod, consumption, consumptionOrderLines, inventoryXlsx, consignmentXlsx, ownInventoryPdf } = require("../src/utils/bodegaReportes");
 
 const article = {
   id: 7, codigo_taller: "0007", codigo: "PR-007", nombre: "Filtro de aceite",
@@ -22,9 +22,9 @@ test("report dates default to Monday-Sunday and reject invalid ranges", () => {
 
 test("consignment consumption uses dispatch prices and subtracts returns", async () => {
   const movements = [
-    { articulo_id: 7, codigo_taller: "0007", codigo: "PR-007", nombre: "Filtro de aceite", proveedor: "MAXI", unidad_medida: "UND", tipo_movimiento: "SALIDA", cantidad: 2, precio_unitario: 100, precio_actual: 110 },
-    { articulo_id: 7, codigo_taller: "0007", codigo: "PR-007", nombre: "Filtro de aceite", proveedor: "MAXI", unidad_medida: "UND", tipo_movimiento: "SALIDA", cantidad: 2, precio_unitario: 120, precio_actual: 110 },
-    { articulo_id: 7, codigo_taller: "0007", codigo: "PR-007", nombre: "Filtro de aceite", proveedor: "MAXI", unidad_medida: "UND", tipo_movimiento: "DEVOLUCION", cantidad: 1, precio_unitario: 0, precio_actual: 110 }
+    { id: 1, articulo_id: 7, codigo_taller: "0007", codigo: "PR-007", nombre: "Filtro de aceite", proveedor: "MAXI", unidad_medida: "UND", tipo_movimiento: "SALIDA", cantidad: 2, precio_unitario: 100, precio_actual: 110, placa: "C164528" },
+    { id: 2, articulo_id: 7, codigo_taller: "0007", codigo: "PR-007", nombre: "Filtro de aceite", proveedor: "MAXI", unidad_medida: "UND", tipo_movimiento: "SALIDA", cantidad: 2, precio_unitario: 120, precio_actual: 110, placa: "C164528" },
+    { id: 3, articulo_id: 7, codigo_taller: "0007", codigo: "PR-007", nombre: "Filtro de aceite", proveedor: "MAXI", unidad_medida: "UND", tipo_movimiento: "DEVOLUCION", cantidad: 1, precio_unitario: 0, precio_actual: 110, placa: "C164528" }
   ];
   const data = consumption(movements);
   assert.equal(data.summary[0].cantidad_neta, 3);
@@ -32,12 +32,21 @@ test("consignment consumption uses dispatch prices and subtracts returns", async
   assert.equal(data.summary[0].costo_devoluciones, 110);
   assert.equal(data.total, 330);
   assert.equal(data.summary[0].precio_estimado, true);
+  assert.deepEqual(data.summary[0].placas, ["C164528"]);
+  const orderLines = consumptionOrderLines(movements);
+  assert.equal(orderLines.length, 1);
+  assert.equal(orderLines[0].cantidad_neta, 3);
+  assert.equal(orderLines[0].costo_neto, 330);
+  assert.equal(orderLines[0].precio_unitario, 110);
+  assert.deepEqual(orderLines[0].movimiento_ids, [1, 2, 3]);
 
   const period = { desde: "2026-09-21", hasta: "2026-09-27" };
   const excel = new ExcelJS.Workbook();
   await excel.xlsx.load(await consignmentXlsx(data, period, "MAXI"));
   assert.equal(excel.getWorksheet("Resumen semanal").getCell("C5").value, "PR-007");
-  assert.equal(excel.getWorksheet("Resumen semanal").getCell("K5").value, 330);
+  assert.equal(excel.getWorksheet("Resumen semanal").getCell("I5").value, "C164528");
+  assert.equal(excel.getWorksheet("Resumen semanal").getCell("L5").value, 330);
+  assert.equal(excel.getWorksheet("Consumo por placa").getCell("C5").value, "C164528");
   assert.equal(excel.getWorksheet("Movimientos").rowCount, 7);
   assert.match(excel.getWorksheet("Resumen semanal").getCell("A3").value, /devoluciones valoradas/);
 });
