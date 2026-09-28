@@ -3,6 +3,7 @@ require("dotenv").config();
 const path = require("path");
 const ExcelJS = require("exceljs");
 const pool = require("../db");
+const { fechaActualCostaRica } = require("../utils/fechaCostaRica");
 
 const DEFAULT_FILE = "C:/Users/asist/Downloads/PAGOS JULIO EMILY.xlsx";
 
@@ -176,8 +177,8 @@ async function readWorkbook(filePath) {
         fila: row.number,
         proveedor_nombre: proveedor.trim(),
         numero_factura: numeroFactura.trim().slice(0, 100),
-        fecha: fechaSolicitud || fechaPago || new Date().toISOString().slice(0, 10),
-        fecha_pago: fechaPago || fechaSolicitud || new Date().toISOString().slice(0, 10),
+        fecha: fechaSolicitud || fechaPago || fechaActualCostaRica(),
+        fecha_pago: fechaPago || fechaSolicitud || fechaActualCostaRica(),
         monto,
         concepto: concepto || "Factura pagada",
         placa,

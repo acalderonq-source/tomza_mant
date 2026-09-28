@@ -6,6 +6,7 @@ const path = require("path");
 const PdfPrinter = require("pdfmake");
 const ExcelJS = require("exceljs");
 const { generarPDFOrden } = require('../utils/pdfOrdenCompra');
+const { fechaActualCostaRica } = require("../utils/fechaCostaRica");
 const { agregarFiltroPlacaSql, normalizarPlaca: normalizarPlacaSistema } = require("../utils/placas");
 const { ensureTipoMantenimientoColumns, normalizarTipoMantenimiento, detectarTipoMantenimiento } = require("../utils/tipoMantenimiento");
 const { construirResumenFinanciero } = require("../utils/resumenFinanciero");
@@ -4055,7 +4056,7 @@ router.get("/ordenes/nueva", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEED
       proveedores,
       user: req.session.user,
       siguientePO,
-      fechaActual: new Date().toISOString().slice(0, 10)
+      fechaActual: fechaActualCostaRica()
     });
   } catch (error) {
     console.error(error);
@@ -4100,7 +4101,7 @@ router.post("/ordenes", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_
     await connection.beginTransaction();
 
     const po_numero = await generarNumeroPO();
-    const fecha = new Date().toISOString().slice(0, 10);
+    const fecha = fechaActualCostaRica();
 
     const { proveedor_id, forma_pago, moneda, placa_unidad, lineas, observaciones, empresa_destino, cotizacion_data, cotizacion_nombre, cotizacion_tipo } = req.body;
     const lineasOrden = normalizarLineas(lineas);
@@ -4171,7 +4172,7 @@ router.post("/ordenes", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_
 router.post("/ordenes/consignacion-consumo", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER"), async (req, res) => {
   let period;
   try {
-    period = reportPeriod({ fecha_desde: req.body.fecha_desde, fecha_hasta: req.body.fecha_hasta }, new Date().toISOString().slice(0, 10));
+    period = reportPeriod({ fecha_desde: req.body.fecha_desde, fecha_hasta: req.body.fecha_hasta }, fechaActualCostaRica());
   } catch (error) {
     req.session.error = error.message;
     return res.redirect("/compras/ordenes");
@@ -4249,7 +4250,7 @@ router.post("/ordenes/consignacion-consumo", requireAuth, allowRoles("ADMIN", "T
     const lineas = consumptionOrderLines(movimientos);
     if (!lineas.length) throw new Error("El período no tiene consumo neto positivo para incluir en una orden de compra.");
 
-    const fecha = new Date().toISOString().slice(0, 10);
+    const fecha = fechaActualCostaRica();
     const poNumero = await generarNumeroPO();
     const subtotal = Math.round((lineas.reduce((sum, linea) => sum + linea.cantidad_neta * linea.precio_unitario, 0) + Number.EPSILON) * 100) / 100;
     const iva = 13;
@@ -4486,7 +4487,7 @@ router.get("/ordenes", requireAuth, allowRoles(...ROLES_VER_ORDENES), async (req
       resumenElectronico,
       success,
       error,
-      hoy: new Date().toISOString().slice(0, 10)
+      hoy: fechaActualCostaRica()
     });
   } catch (error) {
     console.error(error);
@@ -5196,7 +5197,7 @@ router.post("/ordenes/:id/factura", requireAuth, allowRoles(...ROLES_REGISTRAR_F
       return res.redirect(redirectUrl);
     }
 
-    const fechaBase = fecha_factura || new Date().toISOString().slice(0, 10);
+    const fechaBase = fecha_factura || fechaActualCostaRica();
     const fechaVencimiento = new Date(fechaBase);
     fechaVencimiento.setDate(fechaVencimiento.getDate() + 30);
     const fechaVencimientoStr = fechaVencimiento.toISOString().slice(0, 10);
@@ -5225,7 +5226,7 @@ router.post("/ordenes/:id/factura", requireAuth, allowRoles(...ROLES_REGISTRAR_F
         factura || null,
         fechaBase,
         fechaVencimientoStr,
-        fecha_recepcion || new Date().toISOString().slice(0, 10),
+        fecha_recepcion || fechaActualCostaRica(),
         tipo_entrega || null,
         entregado_por || null,
         recibido_por || req.session.user.usuario || null,
@@ -5321,7 +5322,7 @@ router.post("/facturas/agregar", requireAuth, allowRoles(...ROLES_RECEPCION_FACT
             factura,
             fecha_factura,
             fechaVencimientoStr,
-            fecha_recepcion || new Date().toISOString().slice(0, 10),
+            fecha_recepcion || fechaActualCostaRica(),
             tipo_entrega || null,
             entregado_por || null,
             recibido_por || req.session.user.usuario || null,
@@ -5370,7 +5371,7 @@ router.post("/facturas/agregar", requireAuth, allowRoles(...ROLES_RECEPCION_FACT
         proveedor_id,
         proveedor.nombre,
         req.session.user.id,
-        fecha_recepcion || new Date().toISOString().slice(0, 10),
+        fecha_recepcion || fechaActualCostaRica(),
         tipo_entrega || null,
         entregado_por || null,
         recibido_por || req.session.user.usuario || null,
@@ -5474,7 +5475,7 @@ router.post("/facturas/pagos-proveedor/:id/estado", requireAuth, allowRoles(...R
     if (accion === "pagado") {
       const fechaFinal = /^\d{4}-\d{2}-\d{2}$/.test(fechaPago)
         ? fechaPago
-        : new Date().toISOString().slice(0, 10);
+        : fechaActualCostaRica();
 
       const [result] = await queryWithRetry(
         "UPDATE pagos_proveedor SET pagada = 1, fecha_pago = ?, periodo_cierre = ? WHERE id = ?",
@@ -5827,7 +5828,7 @@ router.get("/facturas/caja-chica", requireAuth, allowRoles("ADMIN", "TALLER", "P
       cajaChica,
       success,
       error,
-      hoy: new Date().toISOString().slice(0, 10)
+      hoy: fechaActualCostaRica()
     });
   } catch (error) {
     console.error("Error cargando caja chica:", error);
@@ -5869,7 +5870,7 @@ router.post("/facturas/caja-chica/electronicas/:id/confirmar", requireAuth, allo
 
     const fecha = /^\d{4}-\d{2}-\d{2}$/.test(String(req.body.fecha || ""))
       ? String(req.body.fecha)
-      : fechaSoloSql(facturaElectronica.fecha_emision) || new Date().toISOString().slice(0, 10);
+      : fechaSoloSql(facturaElectronica.fecha_emision) || fechaActualCostaRica();
     const monto = parseMontoCotizacion(req.body.monto || facturaElectronica.monto_total);
     const empresa = normalizarEmpresaCajaChica(req.body.empresa);
     const numeroFactura = numeroFacturaCajaChica(req.body.numero_factura || facturaElectronica.numero_factura || facturaElectronica.consecutivo);
@@ -6194,7 +6195,7 @@ router.get("/facturas/reintegro-gastos", requireAuth, allowRoles("ADMIN", "TALLE
       reintegroGastos,
       success,
       error,
-      hoy: new Date().toISOString().slice(0, 10)
+      hoy: fechaActualCostaRica()
     });
   } catch (error) {
     console.error("Error cargando reintegro de gastos:", error);
@@ -7266,10 +7267,10 @@ router.post("/facturas/:id/editar", requireAuth, allowRoles(...ROLES_GESTION_FAC
     const notaCreditoMonto = parseMonto(monto_nc);
     const abonoMonto = parseMonto(monto_abono);
     const pagadaValue = pagada === "1" ? 1 : 0;
-    const fechaPagoFinal = pagadaValue ? (fecha_pago || new Date().toISOString().slice(0, 10)) : null;
+    const fechaPagoFinal = pagadaValue ? (fecha_pago || fechaActualCostaRica()) : null;
     const periodoCierreFinal = pagadaValue ? normalizarPeriodoCierre(periodo_cierre, fechaPagoFinal) : null;
-    const fechaNcFinal = notaCreditoMonto > 0 ? (fecha_nc || new Date().toISOString().slice(0, 10)) : null;
-    const fechaAbonoFinal = abonoMonto > 0 ? (fecha_abono || new Date().toISOString().slice(0, 10)) : null;
+    const fechaNcFinal = notaCreditoMonto > 0 ? (fecha_nc || fechaActualCostaRica()) : null;
+    const fechaAbonoFinal = abonoMonto > 0 ? (fecha_abono || fechaActualCostaRica()) : null;
     const claveElectronica = limpiarTextoFacturaElectronica(clave_electronica).slice(0, 80) || null;
     const consecutivoElectronico = limpiarTextoFacturaElectronica(consecutivo_electronico).slice(0, 40) || null;
     const estadoHacienda = normalizarEstadoFacturaElectronica(estado_hacienda || "PENDIENTE", "PENDIENTE");
@@ -7612,7 +7613,7 @@ router.post("/facturas/:id/abono", requireAuth, allowRoles("ADMIN", "TALLER", "P
     const id = req.params.id;
     const { tipo, monto_abono, fecha_abono, observacion_abono, periodo_cierre, comprobante_numero, comprobante_data, comprobante_nombre } = req.body;
     const montoAbono = parseMonto(monto_abono);
-    const fechaAbono = fecha_abono || new Date().toISOString().slice(0, 10);
+    const fechaAbono = fecha_abono || fechaActualCostaRica();
     const periodoCierre = normalizarPeriodoCierre(periodo_cierre, fechaAbono);
 
     if (!["orden", "independiente"].includes(tipo)) {
@@ -7805,7 +7806,7 @@ router.post("/facturas/:id/pagar", requireAuth, allowRoles("ADMIN", "TALLER", "P
 
 router.get("/facturas/recibo-preview", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER", "CONTABILIDAD"), async (req, res) => {
   try {
-    const fechaPago = new Date().toISOString().slice(0, 10);
+    const fechaPago = fechaActualCostaRica();
     const facturas = [
       {
         po_numero: "2026-1200",

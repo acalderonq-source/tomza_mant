@@ -1,4 +1,5 @@
 const pool = require("../db");
+const { fechaActualCostaRica } = require("./fechaCostaRica");
 const fs = require("fs");
 const path = require("path");
 
@@ -184,7 +185,7 @@ async function enviarNotificacionAdmins(payload) {
 async function enviarRecordatoriosMantenimientos(fechaObjetivo = null) {
   await ensurePushTables();
 
-  const fecha = fechaObjetivo || new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const fecha = fechaObjetivo || fechaActualCostaRica(new Date(Date.now() + 24 * 60 * 60 * 1000));
   const [mantenimientos] = await queryWithRetry(
     `SELECT
        m.id,

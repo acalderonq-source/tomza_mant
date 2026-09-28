@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const pool = require("../db");
+const { fechaActualCostaRica } = require("../utils/fechaCostaRica");
 const { getSedesPermitidas } = require("../utils/sedes");
 const { agregarFiltroPlacaSql } = require("../utils/placas");
 
@@ -46,7 +47,7 @@ function puedeCrearRevisionRuta(user) {
 }
 
 function hoyISO() {
-  return new Date().toISOString().slice(0, 10);
+  return fechaActualCostaRica();
 }
 
 function estadoValido(estado) {

@@ -1,4 +1,5 @@
 const pool = require("../db");
+const { fechaActualCostaRica } = require("./fechaCostaRica");
 const { esUsuarioTodasSedes } = require("./sedes");
 const { expresionPlacaSql, extraerPlacasTexto, variantesPlaca } = require("./placas");
 
@@ -171,7 +172,7 @@ async function obtenerContextoSistema(req, pregunta = "") {
   const sedeFiltro = obtenerSedeFiltro(req);
   const intencion = detectarIntencion(pregunta);
   const contexto = {
-    fecha: new Date().toISOString().slice(0, 10),
+    fecha: fechaActualCostaRica(),
     pregunta,
     intencion,
     usuario: {

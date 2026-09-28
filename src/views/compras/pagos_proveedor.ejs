@@ -297,7 +297,7 @@
       return Number.isNaN(date.getTime()) ? '—' : date.toLocaleDateString('es-CR');
     };
     const moneda = value => `₡${Number(value || 0).toLocaleString('es-CR', { maximumFractionDigits: 0 })}`;
-    const hoy = new Date().toISOString().slice(0, 10);
+    const hoy = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Costa_Rica', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
     const periodoActual = hoy.slice(0, 7);
     const excelParams = new URLSearchParams();
     if (filtrosActuales.periodo_cierre) excelParams.set('periodo_cierre', filtrosActuales.periodo_cierre);

@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const pool = require("../db");
+const { fechaActualCostaRica } = require("../utils/fechaCostaRica");
 const fs = require("fs");
 const path = require("path");
 const { generarPDFOrden } = require("../utils/pdfOrdenCompra");
@@ -260,7 +261,7 @@ router.get("/nueva", requireAuth, requireMotor, async (req, res) => {
       orden: null,
       lineas: [],
       siguientePO: await generarNumeroMotor(),
-      fechaActual: new Date().toISOString().slice(0, 10),
+      fechaActual: fechaActualCostaRica(),
       tituloOrden: "Nueva orden motor",
       subtituloOrden: "Mismo formato de orden de compra, pero separado del gasto normal.",
       volverUrl: "/ordenes-motor",
@@ -332,7 +333,7 @@ router.post("/", requireAuth, requireMotor, async (req, res) => {
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'BORRADOR', ?)`,
       [
         numero,
-        new Date().toISOString().slice(0, 10),
+        fechaActualCostaRica(),
         req.body.proveedor_id || null,
         placaOrden,
         tipoMantenimiento,
@@ -452,7 +453,7 @@ router.post("/:id/estado", requireAuth, requireMotor, async (req, res) => {
   try {
     await ensureOrdenesMotorTables();
     const estado = String(req.body.estado || "").trim().toUpperCase();
-    const fechaPago = new Date().toISOString().slice(0, 10);
+    const fechaPago = fechaActualCostaRica();
     const periodoCierre = fechaPago.slice(0, 7);
 
     if (["RECIBIDA_TOTAL", "PAGADA", "PAGADO", "CERRADA", "CERRADO"].includes(estado)) {

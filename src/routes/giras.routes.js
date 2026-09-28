@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const pool = require("../db");
 const ExcelJS = require("exceljs");
+const { fechaActualCostaRica } = require("../utils/fechaCostaRica");
 const { esUsuarioTodasSedes, TODAS_SEDES } = require("../utils/sedes");
 
 const ROLES_VER_GIRAS = ["ADMIN", "TALLER", "MECANICO", "SUPERVISOR", "SUPERVISOR_PESADO"];
@@ -614,7 +615,7 @@ router.get("/nuevo", async (req, res) => {
       sedesPermitidas: sedesPermitidasGiras(req),
       gira: null,
       recomendaciones: [],
-      hoy: new Date().toISOString().slice(0, 10)
+      hoy: fechaActualCostaRica()
     });
   } catch (error) {
     console.error("ERROR form gira:", error);
@@ -714,7 +715,7 @@ router.get("/:id/editar", async (req, res) => {
       sedesPermitidas,
       gira: { ...gira, fecha_input: fechaInput(gira.fecha) },
       recomendaciones,
-      hoy: new Date().toISOString().slice(0, 10)
+      hoy: fechaActualCostaRica()
     });
   } catch (error) {
     console.error("ERROR editar gira:", error);

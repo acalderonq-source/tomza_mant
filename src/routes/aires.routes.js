@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const pool = require("../db");
+const { fechaActualCostaRica } = require("../utils/fechaCostaRica");
 const { getSedesPermitidas } = require("../utils/sedes");
 const { agregarFiltroPlacaSql } = require("../utils/placas");
 
@@ -65,7 +66,7 @@ router.get("/", async (req, res) => {
     const sedesPermitidas = getSedesPermitidas(req);
     const placaFiltro = String(req.query.placa || "").trim();
     const tipoFiltro = normalizarTipoTrabajo(req.query.tipo);
-    const hoy = new Date().toISOString().slice(0, 10);
+    const hoy = fechaActualCostaRica();
 
     let sql = `
       SELECT
@@ -147,7 +148,7 @@ router.get("/nuevo", async (req, res) => {
     res.render("aires_nuevo", {
       unidades,
       mecanicos,
-      hoy: new Date().toISOString().slice(0, 10),
+      hoy: fechaActualCostaRica(),
       user: req.session.user
     });
   } catch (error) {
