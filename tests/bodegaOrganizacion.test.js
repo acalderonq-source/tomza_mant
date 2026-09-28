@@ -12,6 +12,9 @@ test("Bodega groups consignment by supplier and alerts only own supplies", async
     if (sql.includes("INFORMATION_SCHEMA.COLUMNS") || sql.includes("INFORMATION_SCHEMA.STATISTICS") && sql.includes("COUNT(*)")) return [[{ total: 1 }]];
     if (sql.includes("SELECT s.INDEX_NAME")) return [[]];
     if (sql.includes("MAX(CAST(codigo_taller")) return [[{ ultimo: 1 }]];
+    if (sql.includes("FROM bodega_articulos") && sql.includes("numero_parte, tipo_unidad, ubicacion, origen_inventario") && sql.includes("ORDER BY nombre, codigo_taller")) {
+      return [[{ id: 1, nombre: "Filtro de aceite" }, { id: 2, nombre: "Filtro agotado" }]];
+    }
     if (sql.includes("AS stock_bajo")) return [[{ articulos: 3, stock_bajo: 1, agotados: 0 }]];
     if (sql.includes("AS proveedor,") && sql.includes("total_articulos")) return [[
       { proveedor: "MAXI REPUESTOS", total_articulos: 2 },
@@ -41,7 +44,10 @@ test("Bodega groups consignment by supplier and alerts only own supplies", async
 
     const inventario = await fetch(base + "/bodega/inventario?grupo=SUMINISTRO");
     assert.equal(inventario.status, 200);
-    assert.equal((await inventario.json()).grupo, "SUMINISTRO");
+    const datosInventario = await inventario.json();
+    assert.equal(datosInventario.grupo, "SUMINISTRO");
+    assert.equal(datosInventario.articulosRecepcion.length, 2);
+    assert.match(queries.find(item => item.sql.includes("numero_parte, tipo_unidad, ubicacion, origen_inventario") && item.sql.includes("ORDER BY nombre, codigo_taller")).sql, /WHERE activo = 1/);
     const listado = queries.find(item => item.sql.includes("ORDER BY") && item.sql.includes("LIMIT ? OFFSET ?"));
     assert.match(listado.sql, /grupo_bodega = \?/);
     assert.ok(listado.params.includes("SUMINISTRO"));
@@ -52,7 +58,7 @@ test("Bodega groups consignment by supplier and alerts only own supplies", async
     assert.equal(data.proveedorConsignacionSeleccionado, "CONSIGNACION BATERIAS");
     assert.equal(data.proveedoresConsignacion.length, 2);
     assert.equal(data.articulosConsignacion[0].nombre, "Batería");
-    const consultaProveedor = queries.find(item => item.sql.includes("ORDER BY nombre, codigo_taller"));
+    const consultaProveedor = queries.find(item => item.sql.includes("COALESCE(NULLIF(TRIM(proveedor_consignacion), '')") && item.sql.includes("ORDER BY nombre, codigo_taller"));
     assert.ok(consultaProveedor.params.includes("CONSIGNACION BATERIAS"));
 
     const resumen = queries.find(item => item.sql.includes("AS stock_bajo"));

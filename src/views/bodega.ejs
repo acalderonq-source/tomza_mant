@@ -389,6 +389,7 @@
   const origenTexto = (value) => value === 'CONSIGNACION' ? 'Consignación' : 'Nuestro';
   const origenClase = (value) => value === 'CONSIGNACION' ? 'pill-consignacion' : 'pill-propio';
   const grupoTexto = (value) => value === 'SUMINISTRO' ? 'Suministro' : 'Inventario';
+  const catalogoRecepcion = Array.isArray(articulosRecepcion) ? articulosRecepcion : (articulos || []);
   const articulosDisponibles = (Array.isArray(articulosEntrega) ? articulosEntrega : articulos || []).filter(a => Number(a.stock_actual || 0) > 0);
   const paginaActual = pagina || 'inicio';
   const pageUrl = (page) => {
@@ -859,7 +860,7 @@
                 <input class="form-control articulo-search mb-1" type="search" placeholder="Buscar por código, nombre, marca, categoría o ubicación" autocomplete="off">
                 <select class="form-select articulo-select" name="articulo_id" required>
                   <option value="">Seleccione</option>
-                  <% articulos.forEach(a => { %>
+                  <% catalogoRecepcion.forEach(a => { %>
                     <option value="<%= a.id %>" data-search="<%= [
                       a.codigo_taller,
                       a.codigo,

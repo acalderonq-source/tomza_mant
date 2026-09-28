@@ -705,6 +705,12 @@ async function renderBodega(req, res, pagina = "inicio") {
       FROM bodega_articulos WHERE activo = 1
       ORDER BY nombre LIMIT 2000
     `);
+    const [articulosRecepcion] = await pool.query(`
+      SELECT id, codigo_taller, codigo, nombre, categoria, marca, numero_parte, tipo_unidad, ubicacion, origen_inventario
+      FROM bodega_articulos
+      WHERE activo = 1
+      ORDER BY nombre, codigo_taller
+    `);
     const [articulosEntrega] = sedeBodega ? await pool.query(`
       SELECT ba.*, COALESCE(SUM(be.cantidad), 0) AS stock_actual
       FROM bodega_articulos ba
@@ -794,6 +800,7 @@ async function renderBodega(req, res, pagina = "inicio") {
       proveedores,
       articulosCompatibilidad,
       articulosTransferencia,
+      articulosRecepcion,
       articulosEntrega,
       compatibilidades,
       articulosSinCompatibilidad,
