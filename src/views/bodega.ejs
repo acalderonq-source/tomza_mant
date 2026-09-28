@@ -577,7 +577,7 @@
                   <td><span class="pill"><%= m.tipo_movimiento %></span></td>
                   <td><span class="code-badge me-1"><%= m.codigo_taller || '----' %></span><strong><%= m.articulo_nombre %></strong><div class="small muted"><%= origenTexto(m.origen_inventario) %></div></td>
                   <td class="money"><%= fmt(m.cantidad) %> <%= m.unidad_medida %></td>
-                  <td><%= m.tipo_movimiento === 'ENTRADA' ? (m.placa || (m.destino_recepcion === 'GENERALES' ? 'Generales' : '-')) : (m.placa || m.mecanico || '-') %><div class="small muted"><%= m.proveedor_nombre || m.usuario_nombre || '-' %></div></td>
+                  <td><%= m.placa || (m.tipo_movimiento === 'ENTRADA' ? (m.destino_recepcion === 'GENERALES' ? 'Generales' : '-') : (['SALIDA', 'DEVOLUCION', 'PRESTAMO'].includes(m.tipo_movimiento) ? 'Sin placa' : '-')) %><div class="small muted"><%= m.mecanico || m.proveedor_nombre || m.usuario_nombre || '-' %></div></td>
                 </tr>
               <% }) %>
             </tbody>
@@ -763,7 +763,11 @@
           <form method="POST" action="/bodega/entregar" class="form-card" id="form-entrega">
             <input type="hidden" name="redirect_to" value="entregas">
             <div class="row g-2 mb-2">
-              <div class="col-md-4"><label class="form-label">Placa</label><input class="form-control placa-search" id="placa-entrega" name="placa" placeholder="C173517" autocomplete="off" autocapitalize="characters" spellcheck="false" required></div>
+              <div class="col-md-4">
+                <label class="form-label" for="placa-entrega">Placa</label>
+                <input class="form-control placa-search" id="placa-entrega" name="placa" placeholder="C173517" autocomplete="off" autocapitalize="characters" spellcheck="false" required>
+                <div class="form-check mt-2"><input class="form-check-input" type="checkbox" id="sin-placa-entrega" name="sin_placa" value="1"><label class="form-check-label small" for="sin-placa-entrega">Sin placa (movimiento general)</label></div>
+              </div>
               <div class="col-md-5"><label class="form-label">Mecánico</label><input class="form-control" name="mecanico" placeholder="Nombre del mecánico" required></div>
               <div class="col-md-3 d-grid align-items-end"><label class="form-label">&nbsp;</label><button class="btn btn-primary fw-bold">Entregar</button></div>
             </div>
@@ -892,7 +896,11 @@
               </div>
             </div>
             <div class="col-md-4"><label class="form-label">Cantidad</label><input class="form-control" type="number" step="0.01" min="0.01" name="cantidad" value="1" required></div>
-            <div class="col-md-4"><label class="form-label">Placa</label><input class="form-control placa-search" name="placa" autocomplete="off" autocapitalize="characters" spellcheck="false"></div>
+            <div class="col-md-4">
+              <label class="form-label" for="placa-devolucion">Placa</label>
+              <input class="form-control placa-search" id="placa-devolucion" name="placa" autocomplete="off" autocapitalize="characters" spellcheck="false" required>
+              <div class="form-check mt-2"><input class="form-check-input" type="checkbox" id="sin-placa-devolucion" name="sin_placa" value="1"><label class="form-check-label small" for="sin-placa-devolucion">Sin placa (devolución general)</label></div>
+            </div>
             <div class="col-md-4"><label class="form-label">Mecánico</label><input class="form-control" name="mecanico"></div>
             <div class="col-12"><label class="form-label">Motivo</label><input class="form-control" name="motivo" placeholder="No utilizado"></div>
             <div class="col-12 d-grid"><button class="btn btn-warning fw-bold">Registrar devolución</button></div>
@@ -1043,7 +1051,7 @@
                   <td><span class="pill"><%= m.tipo_movimiento %></span></td>
                   <td><span class="pill <%= origenClase(m.origen_inventario) %>"><%= origenTexto(m.origen_inventario) %></span></td>
                   <td><span class="code-badge me-1"><%= m.codigo_taller || '----' %></span><strong><%= m.articulo_nombre %></strong><div class="small muted">Prov. <%= m.codigo || '-' %></div></td>
-                  <td><%= m.placa || (m.tipo_movimiento === 'ENTRADA' && m.destino_recepcion === 'GENERALES' ? 'Generales' : '-') %><div class="small muted"><%= m.mecanico || m.proveedor_nombre || '-' %></div></td>
+                  <td><%= m.placa || (m.tipo_movimiento === 'ENTRADA' ? (m.destino_recepcion === 'GENERALES' ? 'Generales' : '-') : (['SALIDA', 'DEVOLUCION', 'PRESTAMO'].includes(m.tipo_movimiento) ? 'Sin placa' : '-')) %><div class="small muted"><%= m.mecanico || m.proveedor_nombre || '-' %></div></td>
                   <td class="money"><%= fmt(m.cantidad) %> <%= m.unidad_medida %></td>
                   <td><%= fmt(m.existencia_anterior) %> → <strong><%= fmt(m.existencia_nueva) %></strong></td>
                   <td><%= m.usuario_nombre || '-' %></td>
@@ -1233,6 +1241,25 @@
       }
     }
   });
+
+  const configurarPlacaOpcional = (checkboxId, inputId) => {
+    const checkbox = document.getElementById(checkboxId);
+    const input = document.getElementById(inputId);
+    if (!checkbox || !input) return;
+    const actualizar = () => {
+      input.disabled = checkbox.checked;
+      input.required = !checkbox.checked;
+      if (checkbox.checked) {
+        input.value = '';
+        input.dataset.placaValidada = '';
+        input.setCustomValidity('');
+      }
+    };
+    checkbox.addEventListener('change', actualizar);
+    actualizar();
+  };
+  configurarPlacaOpcional('sin-placa-entrega', 'placa-entrega');
+  configurarPlacaOpcional('sin-placa-devolucion', 'placa-devolucion');
 
   const normalizarBusquedaArticulo = (value) => String(value || '')
     .normalize('NFD')

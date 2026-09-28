@@ -1063,7 +1063,8 @@ router.post("/entregar", async (req, res) => {
   try {
     await ensureBodegaTables();
     await ensureGastosOperativosTables();
-    const placaSolicitada = limpiar(req.body.placa);
+    const sinPlaca = String(req.body.sin_placa || "") === "1";
+    const placaSolicitada = sinPlaca ? "" : limpiar(req.body.placa);
     const mecanico = limpiar(req.body.mecanico);
     const tipoTrabajo = "OTRO";
     const observacion = limpiar(req.body.observacion) || null;
@@ -1078,15 +1079,15 @@ router.post("/entregar", async (req, res) => {
       }))
       .filter(linea => linea.id && linea.cantidad > 0);
 
-    if (!placaSolicitada || !mecanico || !lineas.length) {
-      req.session.error = "Debe indicar placa, mecánico y al menos un artículo.";
+    if ((!sinPlaca && !placaSolicitada) || !mecanico || !lineas.length) {
+      req.session.error = "Indique una placa o marque Sin placa; también debe indicar mecánico y al menos un artículo.";
       return redirectBodega(req, res);
     }
 
     await conn.beginTransaction();
-    const unidadEntrega = await obtenerUnidadPorPlaca(conn, placaSolicitada, true);
-    if (!unidadEntrega) throw new Error("Seleccione una placa activa de la lista de unidades.");
-    const placa = unidadEntrega.placa;
+    const unidadEntrega = placaSolicitada ? await obtenerUnidadPorPlaca(conn, placaSolicitada, true) : null;
+    if (placaSolicitada && !unidadEntrega) throw new Error("Seleccione una placa activa de la lista de unidades.");
+    const placa = unidadEntrega?.placa || null;
     const [entregaResult] = await conn.query(
       "INSERT INTO bodega_entregas (placa, mecanico, tipo_trabajo, observacion, creado_por) VALUES (?, ?, ?, ?, ?)",
       [placa, mecanico, tipoTrabajo, observacion, req.session.user.id]
@@ -1182,7 +1183,7 @@ router.post("/entregar", async (req, res) => {
       tabla: "bodega_entregas",
       registro_id: entregaId,
       accion: "CREAR",
-      resumen: `Retiro de ${articulosNotificacion.length} articulo(s) para ${placa}`,
+      resumen: `Retiro de ${articulosNotificacion.length} articulo(s) para ${placa || "sin placa"}`,
       despues: {
         placa,
         mecanico,
@@ -1202,7 +1203,7 @@ router.post("/entregar", async (req, res) => {
     const extras = articulosNotificacion.length > 3 ? ` +${articulosNotificacion.length - 3} más` : "";
     notificacionRetiro = {
       title: "Retiro de material en bodega",
-      body: `${placa} · ${mecanico} · ${resumenArticulos}${extras}`,
+      body: `${placa || "Sin placa"} · ${mecanico} · ${resumenArticulos}${extras}`,
       icon: "/img/app-icon.svg",
       badge: "/img/app-icon.svg",
       url: "/bodega/movimientos",
@@ -1319,7 +1320,9 @@ router.post("/devolver", async (req, res) => {
     }
 
     await conn.beginTransaction();
-    const placaSolicitada = limpiar(req.body.placa);
+    const sinPlaca = String(req.body.sin_placa || "") === "1";
+    const placaSolicitada = sinPlaca ? "" : limpiar(req.body.placa);
+    if (!sinPlaca && !placaSolicitada) throw new Error("Indique una placa o marque Sin placa.");
     const unidad = placaSolicitada ? await obtenerUnidadPorPlaca(conn, placaSolicitada, true) : null;
     if (placaSolicitada && !unidad) throw new Error("Seleccione una placa activa de la lista de unidades.");
     const articulo = await articuloParaMovimiento(conn, articuloId);

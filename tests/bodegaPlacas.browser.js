@@ -71,6 +71,19 @@ async function main() {
     await input.fill("C16452X");
     await page.locator("#placa-entrega + .placa-options .placa-empty").waitFor();
     assert.equal(await input.evaluate(element => element.validity.valid), false);
+    await page.locator("#sin-placa-entrega").check();
+    assert.equal(await input.isDisabled(), true);
+    assert.equal(await input.getAttribute("required"), null);
+    await page.locator("#sin-placa-entrega").uncheck();
+    assert.equal(await input.isDisabled(), false);
+    assert.notEqual(await input.getAttribute("required"), null);
+    const returnPlate = page.locator("#placa-devolucion");
+    await page.locator("#sin-placa-devolucion").check();
+    assert.equal(await returnPlate.isDisabled(), true);
+    assert.equal(await returnPlate.getAttribute("required"), null);
+    await page.locator("#sin-placa-devolucion").uncheck();
+    assert.equal(await returnPlate.isDisabled(), false);
+    assert.notEqual(await returnPlate.getAttribute("required"), null);
 
     await page.setViewportSize({ width: 390, height: 844 });
     await input.fill("C1645");

@@ -27,6 +27,8 @@ test("Bodega suggests active plates and rejects invented plates before changing 
       return [[{ id: 1, stock_actual: 5, origen_inventario: "PROPIO" }]];
     }
     if (/^\s*(?:INSERT|UPDATE|DELETE)\b/.test(sql)) writes.push({ sql, params });
+    if (sql.includes("INSERT INTO bodega_entregas")) return [{ insertId: 501 }];
+    if (sql.includes("INSERT INTO bodega_movimientos")) return [{ insertId: 601 }];
     return [[]];
   };
   pool.getConnection = async () => ({
@@ -62,14 +64,30 @@ test("Bodega suggests active plates and rejects invented plates before changing 
       placa: "C16452X", articulo_id: "1", cantidad: "1"
     })).status, 302);
     assert.match(session.error, /placa activa/);
+    assert.equal((await post("/bodega/entregar", {
+      mecanico: "Prueba", articulo_id: "1", cantidad: "1"
+    })).status, 302);
+    assert.match(session.error, /marque Sin placa/);
+    assert.equal(writes.length, 0);
+
+    assert.equal((await post("/bodega/entregar", {
+      sin_placa: "1", mecanico: "Prueba", articulo_id: "1", cantidad: "1"
+    })).status, 302);
+    const entrega = writes.find(call => call.sql.includes("INSERT INTO bodega_entregas"));
+    const salida = writes.find(call => call.sql.includes("INSERT INTO bodega_movimientos"));
+    assert.ok(entrega);
+    assert.ok(salida);
+    assert.equal(entrega.params[0], null);
+    assert.equal(salida.params[8], null);
+    assert.equal(salida.params[9], "Prueba");
+
     assert.equal((await post("/bodega/compatibilidad", {
       placa: "C16452X", articulo_id: "1", cantidad: "1"
     })).status, 302);
     assert.match(session.error, /unidad activa/);
-    assert.equal(writes.length, 0);
 
-    assert.equal((await post("/bodega/devolver", { articulo_id: "1", cantidad: "1" })).status, 302);
-    const devolucion = writes.find(call => call.sql.includes("INSERT INTO bodega_movimientos"));
+    assert.equal((await post("/bodega/devolver", { sin_placa: "1", articulo_id: "1", cantidad: "1" })).status, 302);
+    const devolucion = writes.find(call => call.sql.includes("INSERT INTO bodega_movimientos") && call.sql.includes("'DEVOLUCION'"));
     assert.ok(devolucion);
     assert.equal(devolucion.params[5], null);
   } finally {
