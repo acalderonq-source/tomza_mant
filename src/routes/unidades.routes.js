@@ -6,6 +6,7 @@ const {
   clasificarSubgrupoTransportadora,
   etiquetaSede,
   esSedeTransporte,
+  esUsuarioPesados,
   esUsuarioMecanicoSede,
   esUsuarioTodasSedes,
   expandirSedesEquivalentes,
@@ -29,6 +30,7 @@ const SEDES_CILINDREROS = [
 ];
 
 const ORDEN_NEGOCIOS_UNIDADES = ["CILINDREROS", "GRANELES", "TRANSPORTADORA", "OTROS"];
+const PLACA_TECNICOS_PESADOS = "EE38537";
 
 function requireAuth(req, res, next) {
   if (!req.session.user) return res.redirect("/login");
@@ -100,8 +102,6 @@ async function obtenerSedesPermitidas(req) {
     return [];
   }
 
-  const esUsuarioPesados = user.rol === "SUPERVISOR_PESADO" ||
-    String(user.usuario || "").trim().toLowerCase() === "pesados";
   const sedeGranelUsuario = sedeGranelDesdeUsuario(user);
 
   if (sedeGranelUsuario) {
@@ -115,7 +115,7 @@ async function obtenerSedesPermitidas(req) {
     return expandirSedesEquivalentes(sedeGranelUsuario);
   }
 
-  if (esUsuarioPesados) {
+  if (esUsuarioPesados(user)) {
     if (
       req.session.sedeSeleccionada &&
       req.session.sedeSeleccionada !== "TODAS" &&
@@ -427,8 +427,11 @@ router.get("/", async (req, res) => {
     const params = [];
 
     if (sedesPermitidas.length > 0) {
-      sql += " AND sede IN (?)";
+      sql += esUsuarioPesados(user)
+        ? " AND (sede IN (?) OR UPPER(REPLACE(TRIM(placa), '-', '')) = ?)"
+        : " AND sede IN (?)";
       params.push(sedesPermitidas);
+      if (esUsuarioPesados(user)) params.push(PLACA_TECNICOS_PESADOS);
     }
 
     if (estadoFiltro === "activas") {
@@ -472,8 +475,11 @@ router.get("/", async (req, res) => {
     const resumenParams = [];
 
     if (sedesPermitidas.length > 0) {
-      resumenSql += " AND sede IN (?)";
+      resumenSql += esUsuarioPesados(user)
+        ? " AND (sede IN (?) OR UPPER(REPLACE(TRIM(placa), '-', '')) = ?)"
+        : " AND sede IN (?)";
       resumenParams.push(sedesPermitidas);
+      if (esUsuarioPesados(user)) resumenParams.push(PLACA_TECNICOS_PESADOS);
     }
 
     const [[resumen]] = await pool.query(resumenSql, resumenParams);

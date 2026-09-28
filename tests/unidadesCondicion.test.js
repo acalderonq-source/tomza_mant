@@ -76,6 +76,42 @@ test("una sede limitada no consulta unidades de otras sedes", async () => {
   }
 });
 
+test("Pesados ve EE38537 sin abrir el resto de la sede de técnicos", async () => {
+  const originalQuery = pool.query;
+  let listado;
+  let resumen;
+  pool.query = async (sql, params = []) => {
+    if (/INFORMATION_SCHEMA\.COLUMNS/i.test(sql)) return [[{ count: 1 }]];
+    if (sql.includes("SELECT DISTINCT sede")) return [[{ sede: "Transportadora" }, { sede: "Taller" }]];
+    if (/SELECT id, placa, sede, activa, varada, comodin/.test(sql)) {
+      listado = { sql, params };
+      return [[
+        { id: 38537, placa: "EE38537", sede: "Taller", activa: 1, varada: 0, comodin: 0 },
+        { id: 175979, placa: "C175979", sede: "Transportadora", activa: 1, varada: 0, comodin: 0 }
+      ]];
+    }
+    if (/SELECT\s+COUNT\(\*\) AS total/.test(sql)) {
+      resumen = { sql, params };
+      return [[{ total: 2, activas: 2, inactivas: 0, varadas: 0 }]];
+    }
+    return [[]];
+  };
+  try {
+    await withServer({ current: { id: 3, usuario: "pesados", rol: "SUPERVISOR_PESADO" } }, async base => {
+      const response = await fetch(`${base}/unidades`);
+      assert.equal(response.status, 200);
+      assert.match(await response.text(), /EE38537/);
+      assert.match(listado.sql, /sede IN \(\?\) OR UPPER\(REPLACE\(TRIM\(placa\), '-', ''\)\) = \?/);
+      assert.ok(listado.params[0].includes("Transportadora"));
+      assert.equal(listado.params[1], "EE38537");
+      assert.match(resumen.sql, /sede IN \(\?\) OR UPPER\(REPLACE\(TRIM\(placa\), '-', ''\)\) = \?/);
+      assert.equal(resumen.params[1], "EE38537");
+    });
+  } finally {
+    pool.query = originalQuery;
+  }
+});
+
 test("guardar cambios marca comodin, elimina varada y conserva el resto de datos", async () => {
   const originalQuery = pool.query;
   const originalConnection = pool.getConnection;

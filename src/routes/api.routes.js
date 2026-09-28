@@ -16,6 +16,7 @@ const { agregarFiltroPlacaSql, normalizarPlaca } = require("../utils/placas");
 
 const DB_CONNECTION_ERRORS = new Set(["ETIMEDOUT", "ECONNRESET", "ENOTFOUND", "ECONNREFUSED"]);
 const lastDbErrorLog = new Map();
+const PLACA_TECNICOS_PESADOS = "EE38537";
 
 function requireAuth(req, res, next) {
   if (!req.session.user) return res.status(401).json({ error: "No autorizado" });
@@ -110,12 +111,16 @@ router.get("/unidades/buscar", requireAuth, async (req, res) => {
     const sedes = req.session.user.rol === "ADMIN" && req.query.todas === "1"
       ? []
       : await sedesPermitidasUsuario(req);
+    const esPesados = esUsuarioPesados(req.session.user);
     const condiciones = ["COALESCE(activa, 1) = 1", "placa IS NOT NULL", "TRIM(placa) <> ''"];
     const params = [];
 
     if (sedes.length) {
-      condiciones.push("sede IN (?)");
+      condiciones.push(esPesados
+        ? "(sede IN (?) OR UPPER(REPLACE(TRIM(placa), '-', '')) = ?)"
+        : "sede IN (?)");
       params.push(sedes);
+      if (esPesados) params.push(PLACA_TECNICOS_PESADOS);
     }
 
     agregarFiltroPlacaSql(condiciones, params, "placa", q);
