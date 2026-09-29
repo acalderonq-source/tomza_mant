@@ -22,10 +22,10 @@ const secciones = {
     ])]
   },
   operacion: {
-    title: 'Operación y costos', unidad: true, columns: ['placa', 'ruta', 'km_mes', 'litros_vendidos', 'monto_facturado', 'depreciacion_mensual'],
+    title: 'Operación y costos', unidad: true, columns: ['placa', 'ruta', 'tipo', 'rutas_mes', 'lavados_mes', 'mantenimientos', 'alineamientos', 'afinamientos', 'frenos', 'costo_mantenimiento', 'costo_alineamiento', 'costo_afinamiento', 'costo_frenos', 'km_mes', 'litros_vendidos', 'monto_facturado', 'depreciacion_mensual'],
     groups: [
-      grupo('Ruta y actividad comercial', [campo('ruta', 'Ruta', 'text', { required: true }),
-        campo('placa', 'Id camión / placa', 'text', { readonly: true }), campo('tipo', 'Tipo'),
+      grupo('Ruta y actividad comercial', [campo('ruta', 'Ruta'),
+        campo('placa', 'Id camión / placa', 'text', { readonly: true }), campo('tipo', 'Tipo de ruta'),
         entero('rutas_mes', 'Rutas al mes'), entero('llantas', 'Cantidad de llantas'),
         num('carga_tecnica', 'Capacidad de carga técnica'), num('carga_comercial', 'Capacidad de carga comercial'),
         entero('clientes_ruta', 'Clientes en ruta'), entero('facturas', 'Cantidad de ventas / facturas'),

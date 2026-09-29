@@ -32,6 +32,11 @@
         <button class="btn btn-outline-success" type="submit"><i class="bi bi-truck"></i> Incorporar unidades activas<%= sede ? ' de ' + etiquetaSede(sede) : '' %></button>
       </form>
       <% } %>
+      <% if (seccion === 'operacion') { %>
+      <form method="post" action="/aresep/completar-operacion?<%= new URLSearchParams({ periodo, seccion, ...(sede ? { sede } : {}) }).toString() %>" onsubmit="return confirm('Se crearán filas para las unidades activas que aún no tengan registro este mes. Los registros existentes no se modificarán. ¿Continuar?')">
+        <button class="btn btn-outline-success" type="submit"><i class="bi bi-magic"></i> Completar desde el sistema<%= sede ? ' · ' + etiquetaSede(sede) : '' %></button>
+      </form>
+      <% } %>
       <a class="btn btn-success" href="/aresep/nuevo?<%= new URLSearchParams({ seccion, periodo, ...(sede ? { sede } : {}) }).toString() %>"><i class="bi bi-plus-lg"></i> Agregar registro</a>
     </div>
   </div>
@@ -43,6 +48,7 @@
     <div><label for="estado">Estado de los datos</label><select id="estado" name="estado" class="form-select"><option value="">Todos</option><option value="pendiente" <%= estado === 'pendiente' ? 'selected' : '' %>>Pendientes</option><option value="completo" <%= estado === 'completo' ? 'selected' : '' %>>Completos</option></select></div>
     <button class="btn btn-outline-success" type="submit">Consultar</button>
   </form>
+  <% if (seccion === 'operacion') { %><p class="aresep-note">Precarga por placa: ruta del mes, tipo registrado en la ficha A7, lavados, trabajos cerrados y costos de materiales retirados de bodega. Los registros existentes no se reemplazan; puede editar los campos pendientes antes de exportar.</p><% } %>
   <% if (registros.length) { %>
   <div class="aresep-table"><table><thead><tr>
     <th>Sede</th><% a.secciones[seccion].columns.forEach(key => { %><th><%= a.campos(seccion).find(f => f.id === key)?.label || a.extras[key] %></th><% }) %>

@@ -130,6 +130,23 @@ test('Rutas HTTP: permisos, CSRF, alta, edición, mes, duplicados y auditoría a
       assert.match(await (await get('?periodo=2026-09')).text(), /C164528/);
       assert.doesNotMatch(await (await get('?periodo=2026-10')).text(), /C164528/);
     });
+    await t.test('Completar Operación y costos crea una fila por unidad y conserva lo existente', async () => {
+      const url = '/completar-operacion?periodo=2026-09&seccion=operacion';
+      assert.equal((await post(url, {})).status, 302);
+      const rows = db.rows.filter(r => r.periodo === '2026-09' && r.seccion === 'operacion');
+      assert.equal(rows.length, 2);
+      const datos = JSON.parse(rows.find(r => r.unidad_id === 1).datos);
+      assert.equal(datos.placa, 'C164528');
+      assert.equal(datos.ruta, null);
+      assert.equal(datos.lavados_mes, 0);
+      assert.equal(datos.mantenimientos, 0);
+      assert.equal(datos.alineamientos, 0);
+      assert.equal(datos.afinamientos, 0);
+      assert.equal(datos.costo_mantenimiento, null);
+      assert.equal(db.history.filter(h => rows.some(r => r.id === h.registro_id)).length, 2);
+      assert.equal((await post(url, {})).status, 302);
+      assert.equal(db.rows.filter(r => r.periodo === '2026-09' && r.seccion === 'operacion').length, 2);
+    });
     await t.test('Filtro por sede afecta filas, apartados, descargas e importación', async () => {
       const html = await (await get('?periodo=2026-09&sede=Cartago')).text();
       assert.match(html, /C164528/);

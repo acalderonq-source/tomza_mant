@@ -3,10 +3,90 @@ const pool = require('../db');
 const a = require('../utils/aresep');
 const { TODAS_SEDES, etiquetaSede } = require('../utils/sedes');
 const { generarExcel } = require('../utils/aresepExcel');
+const { ensureGastosOperativosTables } = require('../utils/gastosOperativos');
 const router = express.Router();
 const envolver = fn => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 const idValido = value => /^\d+$/.test(String(value)) && Number.isSafeInteger(Number(value)) && Number(value) > 0;
 const urlLista = ({ periodo, seccion, sede = '' }) => `/aresep?${new URLSearchParams({ periodo, seccion, ...(sede ? { sede } : {}) })}`;
+const limpiarTexto = value => String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+function categoriaTrabajo(value) {
+  const texto = limpiarTexto(value);
+  if (/aline|alineacion/.test(texto)) return 'alineamiento';
+  if (/afin|afinamiento|afinacion/.test(texto)) return 'afinamiento';
+  if (/freno|revision|inspeccion|diagnost/.test(texto)) return 'frenos';
+  return 'mantenimiento';
+}
+function promedio(total, cantidad) { return cantidad ? Math.round((total / cantidad + Number.EPSILON) * 100) / 100 : null; }
+
+async function datosOperacionMes(conn, periodo, unidades) {
+  const inicio = `${periodo}-01`;
+  const fin = `${periodo}-${String(new Date(Number(periodo.slice(0, 4)), Number(periodo.slice(5)), 0).getDate()).padStart(2, '0')}`;
+  const ids = unidades.map(u => u.id);
+  if (!ids.length) return new Map();
+  const [rutas] = await conn.query(`SELECT unidad_id, placa_reportada, ruta, semana_inicio
+    FROM supervisor_rutas_semanales WHERE activo = 1 AND semana_inicio BETWEEN ? AND ? ORDER BY semana_inicio`, [inicio, fin]);
+  const [lavados] = await conn.query(`SELECT unidad_id, COUNT(*) AS total FROM lavado_unidades
+    WHERE fecha BETWEEN ? AND ? AND unidad_id IN (?) GROUP BY unidad_id`, [inicio, fin, ids]);
+  const [preventivos] = await conn.query(`SELECT m.unidad_id, m.tipo, m.plan, m.ejecucion
+    FROM mantenimientos m WHERE m.estado = 'CERRADO' AND DATE(m.fecha_programada) BETWEEN ? AND ? AND m.unidad_id IN (?)`, [inicio, fin, ids]);
+  const [correctivos] = await conn.query(`SELECT c.unidad_id, c.tipo_mantenimiento, c.trabajo_realizado,
+      GROUP_CONCAT(DISTINCT ct.trabajo SEPARATOR ' ') AS trabajos_detalle
+    FROM correctivos c LEFT JOIN correctivo_trabajos ct ON ct.correctivo_id = c.id
+    WHERE DATE(c.fecha) BETWEEN ? AND ? AND c.unidad_id IN (?)
+    GROUP BY c.id, c.unidad_id, c.tipo_mantenimiento, c.trabajo_realizado`, [inicio, fin, ids]);
+  const [gastos] = await conn.query(`SELECT placa, tipo_trabajo, descripcion, monto FROM gastos_operativos
+    WHERE periodo = ? AND estado = 'ACTIVO' AND placa IS NOT NULL`, [periodo]);
+  const [fichas] = await conn.query(`SELECT unidad_id, datos FROM aresep_registros
+    WHERE periodo = ? AND seccion = 'unidades' AND unidad_id IN (?)`, [periodo, ids]);
+  const fichaPorUnidad = new Map(fichas.map(row => [Number(row.unidad_id), typeof row.datos === 'string' ? JSON.parse(row.datos) : row.datos]));
+  const porId = new Map(unidades.map(u => [Number(u.id), { rutas: [], lavados: 0, trabajos: [], costos: { mantenimiento: 0, alineamiento: 0, afinamiento: 0, frenos: 0 }, rutasMes: 0 }]));
+  const idPorPlaca = new Map(unidades.map(u => [String(u.placa || '').replace(/[^a-z0-9]/gi, '').toUpperCase(), Number(u.id)]));
+  for (const row of rutas) {
+    const unidadId = Number(row.unidad_id) || idPorPlaca.get(String(row.placa_reportada || '').replace(/[^a-z0-9]/gi, '').toUpperCase());
+    const item = porId.get(Number(unidadId));
+    if (!item) continue;
+    item.rutas.push({ nombre: row.ruta, semana: String(row.semana_inicio).slice(0, 10) });
+  }
+  for (const row of lavados) if (porId.has(Number(row.unidad_id))) porId.get(Number(row.unidad_id)).lavados = Number(row.total || 0);
+  for (const row of [...preventivos, ...correctivos]) {
+    const item = porId.get(Number(row.unidad_id));
+    if (!item) continue;
+    const descripcion = [row.tipo, row.tipo_mantenimiento, row.plan, row.ejecucion, row.trabajo_realizado, row.trabajos_detalle].filter(Boolean).join(' ');
+    item.trabajos.push(categoriaTrabajo(descripcion));
+  }
+  for (const gasto of gastos) {
+    const unidadId = idPorPlaca.get(String(gasto.placa || '').replace(/[^a-z0-9]/gi, '').toUpperCase());
+    if (!unidadId) continue;
+    const tipo = limpiarTexto(gasto.tipo_trabajo);
+    if (!['correctivo', 'preventivo', 'mantenimiento', 'reparacion', 'emergencia'].includes(tipo)) continue;
+    const cat = categoriaTrabajo(gasto.descripcion);
+    porId.get(unidadId).costos[cat] += Number(gasto.monto || 0);
+  }
+  const resultados = new Map();
+  for (const unidad of unidades) {
+    const item = porId.get(Number(unidad.id));
+    const tiposRuta = [...new Set(item.rutas.map(r => r.nombre).filter(Boolean))];
+    const ultimaRuta = item.rutas[item.rutas.length - 1]?.nombre || '';
+    const frecuencias = Object.fromEntries(['mantenimiento', 'alineamiento', 'afinamiento', 'frenos'].map(cat => [cat, item.trabajos.filter(t => t === cat).length]));
+    const ficha = fichaPorUnidad.get(Number(unidad.id)) || {};
+    const datos = {
+      sede: unidad.sede || '', ruta: ultimaRuta, placa: unidad.placa,
+      tipo: a.tipos[String(ficha.tipo_transporte)] || unidad.negocio || '',
+      rutas_mes: new Set(item.rutas.map(r => r.semana)).size,
+      rutas_detalle: tiposRuta.join(', ').slice(0, 250), lavados_mes: item.lavados,
+      mantenimientos: item.trabajos.length,
+      alineamientos: frecuencias.alineamiento,
+      afinamientos: frecuencias.afinamiento,
+      frenos: frecuencias.frenos,
+      costo_mantenimiento: promedio(item.costos.mantenimiento, frecuencias.mantenimiento),
+      costo_alineamiento: promedio(item.costos.alineamiento, frecuencias.alineamiento),
+      costo_afinamiento: promedio(item.costos.afinamiento, frecuencias.afinamiento),
+      costo_frenos: promedio(item.costos.frenos, frecuencias.frenos)
+    };
+    resultados.set(Number(unidad.id), datos);
+  }
+  return resultados;
+}
 async function obtenerSedesYUnidades() {
   const [unidades] = await pool.query('SELECT id, sede FROM unidades');
   const porId = new Map(unidades.map(u => [u.id, u.sede]));
@@ -76,7 +156,8 @@ router.get('/', contexto, envolver(async (req, res) => {
     registros: visibles.slice((page - 1) * 50, page * 50), totalFiltrado: visibles.length, total: registros.length,
     completos: registros.filter(r => !r.pendientes.length).length,
     cuentas,
-    mensaje: req.query.guardado ? 'Registro guardado.' : req.query.incorporados ? 'Unidades incorporadas. Las fichas existentes no se modificaron.' : '',
+    mensaje: req.query.guardado ? 'Registro guardado.' : req.query.incorporados ? 'Unidades incorporadas. Las fichas existentes no se modificaron.'
+      : req.query.operacionCompletada !== undefined ? `${Number(req.query.operacionCompletada) || 0} registros de operación agregados desde el sistema. Los existentes se conservaron.` : '',
     error: ''
   });
 }));
@@ -156,6 +237,38 @@ router.post('/incorporar-unidades', contexto, envolver(async (req, res) => {
     }
     await conn.commit();
     res.redirect(`${urlLista({ periodo: req.periodoAresep, seccion: 'unidades', sede: req.sedeAresep })}&incorporados=1`);
+  } catch (error) { await conn.rollback(); throw error; } finally { conn.release(); }
+}));
+router.post('/completar-operacion', contexto, envolver(async (req, res) => {
+  if (req.seccionAresep !== 'operacion') return res.status(400).send('Seleccione Operación y costos.');
+  await ensureGastosOperativosTables();
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+    const [unidades] = await conn.query('SELECT id, placa, sede, negocio FROM unidades WHERE COALESCE(activa, 1) = 1 ORDER BY placa');
+    const incluidas = unidades.filter(u => !req.sedeAresep || u.sede === req.sedeAresep);
+    if (!incluidas.length) {
+      await conn.commit();
+      return res.redirect(`${urlLista({ periodo: req.periodoAresep, seccion: 'operacion', sede: req.sedeAresep })}&operacionCompletada=0`);
+    }
+    const datosPorUnidad = await datosOperacionMes(conn, req.periodoAresep, incluidas);
+    const [existentes] = await conn.query("SELECT unidad_id FROM aresep_registros WHERE periodo = ? AND seccion = 'operacion' AND unidad_id IN (?) FOR UPDATE", [req.periodoAresep, incluidas.map(u => u.id)]);
+    const idsExistentes = new Set(existentes.map(r => Number(r.unidad_id)));
+    const nuevas = incluidas.filter(u => !idsExistentes.has(Number(u.id)));
+    if (nuevas.length) {
+      const valores = nuevas.map(unidad => {
+        const datos = a.validar('operacion', datosPorUnidad.get(Number(unidad.id)), req.periodoAresep, unidad);
+        datos.sede = unidad.sede || '';
+        return [req.periodoAresep, 'operacion', a.clave('operacion', datos, unidad.id), unidad.id,
+          JSON.stringify(datos), req.session.user.id, req.session.user.id];
+      });
+      await conn.query('INSERT INTO aresep_registros (periodo, seccion, clave, unidad_id, datos, creado_por, actualizado_por) VALUES ?', [valores]);
+      await conn.query(`INSERT INTO aresep_historial (registro_id, version, datos, usuario_id)
+        SELECT id, version, datos, actualizado_por FROM aresep_registros
+        WHERE periodo = ? AND seccion = 'operacion' AND unidad_id IN (?)`, [req.periodoAresep, nuevas.map(u => u.id)]);
+    }
+    await conn.commit();
+    res.redirect(`${urlLista({ periodo: req.periodoAresep, seccion: 'operacion', sede: req.sedeAresep })}&operacionCompletada=${nuevas.length}`);
   } catch (error) { await conn.rollback(); throw error; } finally { conn.release(); }
 }));
 router.get('/exportar/:tipo', contexto, envolver(async (req, res) => {

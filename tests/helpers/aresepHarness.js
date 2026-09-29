@@ -10,6 +10,9 @@ function crearHarness() {
     async query(sql, args = []) {
       sql = sql.replace(/\s+/g, ' ').trim();
       this.calls.push({ sql, args });
+      if (sql.startsWith('CREATE TABLE IF NOT EXISTS gastos_operativos') || sql.startsWith('CREATE TABLE IF NOT EXISTS auditoria_sistema')) return [{ affectedRows: 0 }];
+      if (sql.includes('FROM supervisor_rutas_semanales') || sql.includes('FROM lavado_unidades')
+        || sql.includes('FROM mantenimientos m') || sql.includes('FROM correctivos c') || sql.includes('FROM gastos_operativos')) return [[]];
       if (sql.startsWith('SELECT') && sql.includes('FROM unidades')) return [sql.includes('WHERE id = ?') ? this.units.filter(u => u.id === Number(args[0]))
         : sql.includes('WHERE sede = ?') ? this.units.filter(u => u.sede === args[0]) : this.units];
       if (sql.startsWith('SELECT h.version')) return [this.history.filter(h => h.registro_id === Number(args[0])).map(h => ({ ...h, usuario: 'Administrador', creado_en: new Date() }))];
@@ -20,7 +23,8 @@ function crearHarness() {
       }
       if (sql.startsWith('SELECT') && sql.includes('FROM aresep_registros')) {
         if (sql.includes('WHERE id = ?')) return [this.rows.filter(r => r.id === Number(args[0]))];
-        const sections = sql.includes("seccion = 'unidades'") ? ['unidades'] : Array.isArray(args[1]) ? args[1] : [args[1]];
+        const section = sql.match(/seccion = '(unidades|operacion)'/)?.[1];
+        const sections = section ? [section] : Array.isArray(args[1]) ? args[1] : [args[1]];
         return [this.rows.filter(r => r.periodo === args[0] && sections.includes(r.seccion))];
       }
       if (sql.startsWith('INSERT INTO aresep_registros')) {
@@ -43,7 +47,8 @@ function crearHarness() {
       if (sql.startsWith('INSERT INTO aresep_historial')) {
         if (this.failAudit) throw Object.assign(new Error('Audit failed'), { code: 'TEST_AUDIT_FAILED' });
         if (sql.includes('SELECT id, version')) {
-          this.rows.filter(r => r.periodo === args[0] && r.seccion === 'unidades' && args[1].includes(r.unidad_id))
+          const seccion = sql.match(/seccion = '(unidades|operacion)'/)?.[1] || 'unidades';
+          this.rows.filter(r => r.periodo === args[0] && r.seccion === seccion && args[1].includes(r.unidad_id))
             .forEach(r => this.history.push({ registro_id: r.id, version: r.version, datos: r.datos, usuario_id: r.actualizado_por }));
         } else {
           const [registro_id, version, datos, usuario_id] = args;
