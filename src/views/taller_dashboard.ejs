@@ -585,7 +585,7 @@
     <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
       <div>
         <h1 class="page-title">Panel operativo</h1>
-        <div class="muted">Sede: <strong><%= sedeSeleccionada %></strong> · Se actualiza automáticamente cada 45 segundos · <%= user.usuario %> (<%= user.rol %>)</div>
+        <div class="muted">Sede: <strong><%= sedeSeleccionada %></strong> · Actualización automática · <%= user.usuario %> (<%= user.rol %>)</div>
       </div>
       <div class="d-flex gap-2 flex-wrap">
         <% if (puedeAccionar) { %>
@@ -598,7 +598,7 @@
     </div>
   </section>
 
-  <section class="kpi-grid mb-2">
+  <section class="kpi-grid mb-2" id="taller-dashboard-summary">
     <div class="kpi-card">
       <span class="kpi-icon"><i class="bi bi-tools"></i></span>
       <div>
@@ -757,7 +757,7 @@
         </div>
       </section>
 
-      <section class="panel parts-panel">
+      <section class="panel parts-panel" id="taller-parts-panel">
         <div class="tv-panel-title d-flex justify-content-between align-items-center gap-2 flex-wrap">
           <span><i class="bi bi-box-seam me-1"></i> Repuestos solicitados</span>
           <a href="/repuestos" class="btn btn-sm btn-light py-0">Abrir</a>
@@ -972,7 +972,7 @@
     let actualizando = false;
     let pendiente = false;
 
-    async function actualizarPrioridades() {
+    async function actualizarDashboard() {
       if (actualizando) {
         pendiente = true;
         return;
@@ -982,7 +982,8 @@
         return;
       }
       const modales = document.getElementById('taller-priority-modals');
-      if (modales?.querySelector('.modal.show') || document.activeElement?.closest('#taller-priority-panel')) {
+      const editorFocused = document.activeElement?.matches('input, select, textarea, [contenteditable="true"]');
+      if (modales?.querySelector('.modal.show') || editorFocused) {
         pendiente = true;
         return;
       }
@@ -996,6 +997,18 @@
         if (!response.ok) return;
         const html = await response.text();
         const incoming = new DOMParser().parseFromString(html, 'text/html');
+        for (const id of ['taller-dashboard-summary', 'taller-parts-panel']) {
+          const current = document.getElementById(id);
+          const next = incoming.getElementById(id);
+          if (current && next && current.innerHTML !== next.innerHTML) {
+            const scrollPositions = Array.from(current.querySelectorAll('.table-responsive'), node => node.scrollTop);
+            current.innerHTML = next.innerHTML;
+            current.querySelectorAll('.table-responsive').forEach((node, index) => {
+              node.scrollTop = scrollPositions[index] || 0;
+            });
+          }
+        }
+
         const currentGroups = document.getElementById('taller-priority-groups');
         const incomingGroups = incoming.getElementById('taller-priority-groups');
         if (currentGroups && incomingGroups && currentGroups.innerHTML !== incomingGroups.innerHTML) {
@@ -1013,24 +1026,25 @@
           modales.innerHTML = incomingModals.innerHTML;
         }
       } catch (_) {
-        pendiente = true;
+        // The next live event or scheduled check will retry.
       } finally {
         actualizando = false;
         if (pendiente && !document.hidden && !document.querySelector('#taller-priority-modals .modal.show')) {
-          window.setTimeout(actualizarPrioridades, 250);
+          window.setTimeout(actualizarDashboard, 250);
         }
       }
     }
 
-    eventos.addEventListener('prioridades', actualizarPrioridades);
+    eventos.addEventListener('prioridades', actualizarDashboard);
+    window.setInterval(actualizarDashboard, 10000);
     document.addEventListener('focusout', () => {
-      if (pendiente) window.setTimeout(actualizarPrioridades, 0);
+      if (pendiente) window.setTimeout(actualizarDashboard, 0);
     });
     document.addEventListener('hidden.bs.modal', () => {
-      if (pendiente) actualizarPrioridades();
+      if (pendiente) actualizarDashboard();
     });
     document.addEventListener('visibilitychange', () => {
-      if (!document.hidden && pendiente) actualizarPrioridades();
+      if (!document.hidden) actualizarDashboard();
     });
   })();
 </script>
