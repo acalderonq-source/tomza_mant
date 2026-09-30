@@ -94,7 +94,7 @@ test('insufficient oil rolls back without recording the fill', async () => {
   assert.equal(committed, false);
   assert.equal(writes.length, 0);
 });
-test('older forms with a unit still allocate the fill to its plate', async () => {
+test('bodeguero can allocate a fill to a selected unit plate', async () => {
   await fill({ unidad_id: '7', galones_usados: '1' });
   assert.equal(committed, true);
   assert.deepEqual(writes.at(-1).params.slice(5, 7), [7, 'C174021']);
@@ -104,16 +104,18 @@ test('supervisors cannot record oil fills', async () => {
   assert.equal(result.status, 403);
   assert.equal(connected, false);
 });
-test('rendered fill form requires a site and quantity but has no plate input', async () => {
+test('rendered fill form supports an optional plate and requires a site for general fills', async () => {
   const html = await ejs.renderFile(path.join(__dirname, '../src/views/aceite_listado.ejs'), {
     galonALitros: 3.78541, capacidadEstandar: 208.2, capacidadEstandarGalones: 55,
     etiquetaSede: value => value, etiquetaSedeInventario: value => value,
     estanones: [], movimientos: [], cambios: [], gastoPorPlaca: [], ordenesAceite: [], resumen: {},
-    sedesGestion: ['Guapiles'], fechaHoy: '2026-09-22', puedeGestionar: true, user: bodeguero, success: '', error: ''
+    sedesGestion: ['Guapiles'], unidadesRelleno: [{ id: 7, placa: 'C174021', sede: 'Cabezales', sede_inventario: 'Transportadora' }],
+    fechaHoy: '2026-09-22', puedeGestionar: true, user: bodeguero, success: '', error: ''
   });
   const form = html.match(/<form[^>]*action="\/aceite\/rellenos"[^>]*>[\s\S]*?<\/form>/)[0];
   assert.match(form, /name="sede"[^>]*required/);
+  assert.match(form, /name="unidad_id"/);
+  assert.match(form, /Sin placa · relleno general/);
   assert.match(form, /name="galones_usados"/);
-  assert.doesNotMatch(form, /name="unidad_id"|data-placa/);
   assert.match(form, /value="Guapiles" selected/);
 });

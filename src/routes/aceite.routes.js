@@ -680,6 +680,14 @@ router.get("/", async (req, res) => {
     const sedesPermitidas = await getSedesPermitidasAceite(req);
     const sedesInventario = expandirSedesInventarioAceite(sedesPermitidas);
     const sedesGestion = await obtenerSedesGestionAceite(sedesPermitidas);
+    const [unidades] = await pool.query(
+      "SELECT id, placa, sede FROM unidades WHERE COALESCE(activa, 1) = 1 AND sede IN (?) ORDER BY sede, placa",
+      [sedesPermitidas]
+    );
+    const unidadesRelleno = unidades.map(unidad => ({
+      ...unidad,
+      sede_inventario: sedeInventarioAceite(unidad.sede)
+    }));
     await sincronizarCambiosPendientesAceite(sedesPermitidas, req.session.user.id || null);
 
     const [cambios] = await pool.query(
@@ -774,6 +782,7 @@ router.get("/", async (req, res) => {
       ordenesAceite,
       resumen,
       sedesGestion,
+      unidadesRelleno,
       capacidadEstandar: CAPACIDAD_ESTANON_LITROS,
       capacidadEstandarGalones: CAPACIDAD_ESTANON_GALONES,
       galonALitros: GALON_A_LITROS,
