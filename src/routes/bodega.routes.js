@@ -3,7 +3,7 @@ const router = express.Router();
 const pool = require("../db");
 const { ensureGastosOperativosTables, registrarAuditoriaSistema, registrarGastoOperativo } = require("../utils/gastosOperativos");
 const { enviarNotificacionAdmins } = require("../utils/notificacionesPush");
-const { defaultPeriod, reportPeriod, consumption, inventoryXlsx, consignmentXlsx, ownInventoryPdf } = require("../utils/bodegaReportes");
+const { defaultPeriod, reportPeriod, consumption, consumptionOrderLines, inventoryXlsx, consignmentXlsx, ownInventoryPdf } = require("../utils/bodegaReportes");
 const { TODAS_SEDES } = require("../utils/sedes");
 
 const ROLES_BODEGA = ["ADMIN", "TALLER", "PROVEEDURIA_TALLER", "BODEGA", "BODEGUERO"];
@@ -850,7 +850,7 @@ router.get("/inventario", (req, res) => renderBodega(req, res, "inventario"));
 router.get("/herramientas", (req, res) => renderBodega(req, res, "herramientas"));
 router.get("/movimientos", (req, res) => renderBodega(req, res, "movimientos"));
 
-async function movimientosConsumo(origen, period, proveedor = "", sede = "") {
+async function movimientosConsumo(origen, period, proveedor = "", sede = "", soloPendientes = false) {
   const params = [origen, period.desde, period.hasta];
   let proveedorSql = "";
   if (proveedor) {
@@ -871,13 +871,58 @@ async function movimientosConsumo(origen, period, proveedor = "", sede = "") {
                     NULLIF(TRIM(ba.proveedor_consignacion), ''), NULLIF(TRIM(ba.proveedor_nombre), ''), ?) AS proveedor
     FROM bodega_movimientos bm
     JOIN bodega_articulos ba ON ba.id = bm.articulo_id
+    ${soloPendientes ? "LEFT JOIN bodega_ordenes_consumo_movimientos bom ON bom.movimiento_id = bm.id" : ""}
     WHERE bm.origen_inventario = ?
       AND bm.tipo_movimiento IN ('SALIDA', 'DEVOLUCION')
-      AND DATE(bm.creado_en) BETWEEN ? AND ?${proveedorSql}${sedeSql}
+      AND DATE(bm.creado_en) BETWEEN ? AND ?${proveedorSql}${sedeSql}${soloPendientes ? " AND bom.movimiento_id IS NULL" : ""}
     ORDER BY bm.creado_en, bm.id
   `, [PROVEEDOR_CONSIGNACION_DEFAULT, ...params]);
   return consumption(rows);
 }
+
+router.get("/consignacion/orden/revisar", async (req, res) => {
+  try {
+    const period = reportPeriod(req.query, fechaCostaRica());
+    const proveedor = limpiar(req.query.proveedor);
+    const sedes = await sedesBodega();
+    const sedeSolicitada = limpiar(req.query.sede);
+    const sede = sedeSolicitada && sedes.includes(sedeSolicitada) ? sedeSolicitada : "";
+    if (!proveedor) throw new Error("Seleccione el proveedor de consignación.");
+
+    const [proveedores] = await pool.query(`
+      SELECT COALESCE(NULLIF(TRIM(proveedor_consignacion), ''), NULLIF(TRIM(proveedor_nombre), ''), ?) AS proveedor
+      FROM bodega_articulos
+      WHERE activo = 1 AND origen_inventario = 'CONSIGNACION'
+      GROUP BY proveedor
+      ORDER BY proveedor
+    `, [PROVEEDOR_CONSIGNACION_DEFAULT]);
+    if (!proveedores.some(item => item.proveedor === proveedor)) {
+      throw new Error("El proveedor seleccionado no tiene artículos de consignación activos.");
+    }
+
+    const data = await movimientosConsumo("CONSIGNACION", period, proveedor, sede, true);
+    const lineas = consumptionOrderLines(data.details);
+    const consumosSinPlaca = data.details.filter(item => !limpiar(item.placa));
+    if (!lineas.length) throw new Error("No hay consumos pendientes con cantidad neta positiva para ese proveedor y período.");
+
+    res.render("bodega_consignacion_confirmar", {
+      user: req.session.user,
+      proveedor,
+      sede,
+      period,
+      lineas,
+      consumosSinPlaca: consumosSinPlaca.length,
+      total: lineas.reduce((sum, item) => sum + Number(item.costo_neto || 0), 0),
+      movimientos: data.details.length
+    });
+  } catch (error) {
+    req.session.error = error.message || "No se pudo revisar el consumo de consignación.";
+    const params = new URLSearchParams();
+    if (req.query.proveedor) params.set("proveedor", limpiar(req.query.proveedor));
+    if (req.query.sede) params.set("sede", limpiar(req.query.sede));
+    res.redirect(`/bodega/consignacion${params.size ? `?${params}` : ""}`);
+  }
+});
 
 router.get("/inventario/exportar.xlsx", async (req, res) => {
   try {

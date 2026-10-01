@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Confirmar consumo de consignación</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="/css/compras.css">
+  <style>
+    body { background: #f3f6fa; color: #14243a; }
+    .shell { max-width: 1180px; }
+    .panel { background: #fff; border: 1px solid #dce4ee; border-radius: 8px; }
+    .eyebrow { color: #62748a; font-size: .75rem; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
+    .table thead th { background: #f5f8fc; color: #52657a; font-size: .76rem; text-transform: uppercase; }
+    .money { font-variant-numeric: tabular-nums; white-space: nowrap; }
+  </style>
+</head>
+<body>
+  <nav class="navbar navbar-dark bg-dark px-3 py-2">
+    <span class="navbar-brand mb-0 fw-semibold">Revisión de consumo de consignación</span>
+    <a class="btn btn-sm btn-outline-light" href="/bodega/consignacion?proveedor=<%= encodeURIComponent(proveedor) %><%= sede ? `&sede=${encodeURIComponent(sede)}` : '' %>">Volver a consignación</a>
+  </nav>
+
+  <main class="container shell py-4">
+    <header class="mb-3">
+      <div class="eyebrow">Confirmación previa a la compra</div>
+      <h1 class="h3 fw-bold mt-1 mb-1"><%= proveedor %></h1>
+      <p class="text-secondary mb-0"><%= period.desde %> al <%= period.hasta %><%= sede ? ` · ${sede}` : ' · Todas las sedes' %></p>
+    </header>
+
+    <section class="row g-3 mb-3">
+      <div class="col-sm-4"><div class="panel p-3 h-100"><div class="eyebrow">Líneas por placa y producto</div><div class="h4 mb-0 mt-1"><%= lineas.length %></div></div></div>
+      <div class="col-sm-4"><div class="panel p-3 h-100"><div class="eyebrow">Movimientos revisados</div><div class="h4 mb-0 mt-1"><%= movimientos %></div></div></div>
+      <div class="col-sm-4"><div class="panel p-3 h-100"><div class="eyebrow">Estimado neto</div><div class="h4 mb-0 mt-1">₡<%= Number(total).toLocaleString('es-CR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %></div></div></div>
+    </section>
+
+    <% if (consumosSinPlaca > 0) { %>
+      <div class="alert alert-danger" role="alert">
+        Hay <strong><%= consumosSinPlaca %></strong> movimiento(s) sin placa. No se puede generar la orden porque cada consumo debe quedar asignado a una unidad. Corrija esos movimientos antes de continuar.
+      </div>
+    <% } %>
+
+    <section class="panel mb-3 overflow-hidden">
+      <div class="p-3 border-bottom">
+        <h2 class="h5 fw-bold mb-1">Detalle que se presentará al proveedor</h2>
+        <p class="text-secondary small mb-0">Cada línea corresponde a un producto consumido por una placa. Las devoluciones ya se rebajaron de la cantidad neta.</p>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+          <thead><tr><th>Placa</th><th>Código proveedor</th><th>Producto</th><th>Unidad</th><th class="text-end">Cantidad neta</th><th class="text-end">Precio unitario</th><th class="text-end">Subtotal</th></tr></thead>
+          <tbody>
+            <% lineas.forEach(linea => { %>
+              <tr>
+                <td><strong><%= linea.placa %></strong></td>
+                <td><%= linea.codigo_producto || '-' %></td>
+                <td><%= linea.descripcion %></td>
+                <td><%= linea.unidad_medida %></td>
+                <td class="text-end"><%= Number(linea.cantidad_neta).toLocaleString('es-CR') %></td>
+                <td class="text-end money">₡<%= Number(linea.precio_unitario).toLocaleString('es-CR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %></td>
+                <td class="text-end money">₡<%= Number(linea.costo_neto).toLocaleString('es-CR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %></td>
+              </tr>
+            <% }) %>
+          </tbody>
+          <tfoot><tr class="fw-bold"><td colspan="6" class="text-end">Total neto estimado</td><td class="text-end money">₡<%= Number(total).toLocaleString('es-CR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %></td></tr></tfoot>
+        </table>
+      </div>
+    </section>
+
+    <form method="POST" action="/compras/ordenes/consignacion-consumo" class="panel p-3">
+      <input type="hidden" name="proveedor" value="<%= proveedor %>">
+      <input type="hidden" name="fecha_desde" value="<%= period.desde %>">
+      <input type="hidden" name="fecha_hasta" value="<%= period.hasta %>">
+      <input type="hidden" name="sede" value="<%= sede %>">
+      <h2 class="h5 fw-bold">Confirmación del proveedor</h2>
+      <p class="text-secondary">Después de revisar cantidades y precios con el proveedor, registre quién confirmó. La orden quedará como borrador en Compras para completar el proceso normal.</p>
+      <div class="row g-3">
+        <div class="col-md-6">
+          <label class="form-label" for="contacto-confirmacion">Persona que confirmó <span class="text-danger">*</span></label>
+          <input class="form-control" id="contacto-confirmacion" name="contacto_confirmacion" maxlength="180" required placeholder="Nombre del contacto del proveedor">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label" for="referencia-confirmacion">Referencia de confirmación</label>
+          <input class="form-control" id="referencia-confirmacion" name="referencia_confirmacion" maxlength="180" placeholder="Teléfono, correo o número de conversación">
+        </div>
+        <div class="col-12">
+          <label class="form-check-label">
+            <input class="form-check-input me-2" type="checkbox" name="proveedor_confirmado" value="1" required>
+            Confirmo que revisé con el proveedor todos los productos, cantidades por placa y precios de esta lista.
+          </label>
+        </div>
+      </div>
+      <div class="d-flex justify-content-between flex-wrap gap-2 mt-4">
+        <a class="btn btn-outline-secondary" href="/bodega/consignacion?proveedor=<%= encodeURIComponent(proveedor) %><%= sede ? `&sede=${encodeURIComponent(sede)}` : '' %>">Cancelar</a>
+        <button class="btn btn-success fw-semibold" type="submit" <%= consumosSinPlaca > 0 ? 'disabled' : '' %>>Confirmar y crear orden borrador</button>
+      </div>
+    </form>
+  </main>
+</body>
+</html>

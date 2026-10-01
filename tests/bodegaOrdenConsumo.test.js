@@ -65,7 +65,8 @@ test("consumption creates a regular draft PO with net per-plate lines and locks 
   };
 
   const response = await request({
-    proveedor: "MAXI REPUESTOS", fecha_desde: "2026-09-21", fecha_hasta: "2026-09-27", sede: "Cartago"
+    proveedor: "MAXI REPUESTOS", fecha_desde: "2026-09-21", fecha_hasta: "2026-09-27", sede: "Cartago",
+    proveedor_confirmado: "1", contacto_confirmacion: "María Proveedor", referencia_confirmacion: "WhatsApp 123"
   });
   assert.equal(committed, true);
   assert.equal(rolledBack, false);
@@ -78,7 +79,28 @@ test("consumption creates a regular draft PO with net per-plate lines and locks 
   assert.equal(order.params[6], 113);
   const line = statements.find(item => /INSERT INTO ordenes_compra_detalle/.test(item.sql));
   assert.deepEqual(line.params, [30, "C164528", "LF1", "Filtro", 1, 100, 100]);
+  const confirmed = statements.find(item => /INSERT INTO bodega_ordenes_consumo\s/.test(item.sql));
+  assert.deepEqual(confirmed.params, [30, 5, "2026-09-21", "2026-09-27", "Cartago", "María Proveedor", "WhatsApp 123", 7, 7]);
   assert.deepEqual(statements.filter(item => /INSERT INTO bodega_ordenes_consumo_movimientos/.test(item.sql)).map(item => item.params[0]), [101, 102]);
+});
+
+test("consumption without a plate cannot be converted into a purchase order", async () => {
+  query = async sql => {
+    if (/SELECT id, nombre FROM proveedores/.test(sql)) return [[{ id: 5, nombre: "MAXI REPUESTOS SRL" }]];
+    if (/SELECT orden_compra_id FROM bodega_ordenes_consumo/.test(sql)) return [[]];
+    if (/SELECT bm\.id, bm\.articulo_id/.test(sql)) return [[
+      { id: 101, articulo_id: 9, tipo_movimiento: "SALIDA", cantidad: 2, placa: null, precio_unitario: 100, codigo_taller: "0009", codigo: "LF1", nombre: "Filtro", unidad_medida: "UND", precio_actual: 120, articulo_proveedor_id: 5 }
+    ]];
+    throw new Error(sql);
+  };
+  const response = await request({
+    proveedor: "MAXI REPUESTOS", fecha_desde: "2026-09-21", fecha_hasta: "2026-09-27",
+    proveedor_confirmado: "1", contacto_confirmacion: "María Proveedor"
+  });
+  assert.equal(committed, false);
+  assert.equal(rolledBack, true);
+  assert.equal(statements.some(item => /INSERT INTO ordenes_compra\s/.test(item.sql)), false);
+  assert.match(response.session.error, /sin placa/);
 });
 
 test("repeating the same provider, site and period does not create a duplicate order", async () => {
@@ -87,7 +109,7 @@ test("repeating the same provider, site and period does not create a duplicate o
     if (/SELECT orden_compra_id FROM bodega_ordenes_consumo/.test(sql)) return [[{ orden_compra_id: 30 }]];
     throw new Error(sql);
   };
-  const response = await request({ proveedor: "MAXI REPUESTOS", fecha_desde: "2026-09-21", fecha_hasta: "2026-09-27", sede: "Cartago" });
+  const response = await request({ proveedor: "MAXI REPUESTOS", fecha_desde: "2026-09-21", fecha_hasta: "2026-09-27", sede: "Cartago", proveedor_confirmado: "1", contacto_confirmacion: "María" });
   assert.equal(committed, false);
   assert.equal(rolledBack, true);
   assert.equal(response.redirect, "/compras/ordenes/30/pdf");

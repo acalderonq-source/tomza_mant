@@ -4180,9 +4180,17 @@ router.post("/ordenes/consignacion-consumo", requireAuth, allowRoles("ADMIN", "T
 
   const proveedorSolicitado = String(req.body.proveedor || "").trim();
   const sede = String(req.body.sede || "").trim();
+  const contactoConfirmacion = String(req.body.contacto_confirmacion || "").trim().slice(0, 180);
+  const referenciaConfirmacion = String(req.body.referencia_confirmacion || "").trim().slice(0, 180);
   if (!proveedorSolicitado) {
     req.session.error = "Seleccione un proveedor de consignación antes de generar la orden.";
     return res.redirect("/bodega/consignacion");
+  }
+  if (req.body.proveedor_confirmado !== "1" || !contactoConfirmacion) {
+    req.session.error = "Confirme con el proveedor los productos, cantidades por placa y precios antes de crear la orden.";
+    const params = new URLSearchParams({ proveedor: proveedorSolicitado, fecha_desde: period.desde, fecha_hasta: period.hasta });
+    if (sede) params.set("sede", sede);
+    return res.redirect(`/bodega/consignacion/orden/revisar?${params}`);
   }
 
   const connection = await pool.getConnection();
@@ -4243,6 +4251,10 @@ router.post("/ordenes/consignacion-consumo", requireAuth, allowRoles("ADMIN", "T
     `, [period.desde, period.hasta, "MAXI REPUESTOS", proveedorSolicitado, sede, sede]);
 
     if (!movimientos.length) throw new Error("No hay consumos de consignación pendientes de ordenar para ese proveedor, sede y período.");
+    const movimientosSinPlaca = movimientos.filter(row => !String(row.placa || "").trim());
+    if (movimientosSinPlaca.length) {
+      throw new Error(`Hay ${movimientosSinPlaca.length} consumo(s) sin placa. Corrija la trazabilidad antes de generar la orden.`);
+    }
     const idsProveedorArticulo = [...new Set(movimientos.map(row => Number(row.articulo_proveedor_id)).filter(Boolean))];
     if (idsProveedorArticulo.some(id => id !== Number(proveedor.id))) {
       throw new Error("Los artículos consumidos tienen un proveedor de Compras distinto al proveedor de consignación seleccionado.");
@@ -4258,7 +4270,7 @@ router.post("/ordenes/consignacion-consumo", requireAuth, allowRoles("ADMIN", "T
     const total = subtotal + montoIva;
     const placas = [...new Set(lineas.map(linea => linea.placa).filter(placa => placa !== "GENERAL"))];
     const placaOrden = placas.length === 1 && lineas.every(linea => linea.placa === placas[0]) ? placas[0] : null;
-    const observaciones = `Orden generada desde consumo de consignación · Período ${period.desde} al ${period.hasta}${sede ? ` · Sede ${sede}` : " · Todas las sedes"}. Cada línea conserva la placa del consumo.`;
+    const observaciones = `Orden de consignación confirmada con ${contactoConfirmacion}${referenciaConfirmacion ? ` (${referenciaConfirmacion})` : ""} · Período ${period.desde} al ${period.hasta}${sede ? ` · Sede ${sede}` : " · Todas las sedes"}. Cada línea conserva la placa del consumo.`;
     const [ordenResult] = await connection.query(`
       INSERT INTO ordenes_compra
         (po_numero, fecha, proveedor_id, forma_pago, moneda, placa_unidad, tipo_mantenimiento,
@@ -4269,9 +4281,11 @@ router.post("/ordenes/consignacion-consumo", requireAuth, allowRoles("ADMIN", "T
 
     await connection.query(`
       INSERT INTO bodega_ordenes_consumo
-        (orden_compra_id, proveedor_id, fecha_desde, fecha_hasta, sede, creado_por)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `, [ordenId, proveedor.id, period.desde, period.hasta, sede, req.session.user.id]);
+        (orden_compra_id, proveedor_id, fecha_desde, fecha_hasta, sede,
+         contacto_confirmacion, referencia_confirmacion, confirmado_por, confirmado_en, creado_por)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?)
+    `, [ordenId, proveedor.id, period.desde, period.hasta, sede, contactoConfirmacion,
+      referenciaConfirmacion || null, req.session.user.id, req.session.user.id]);
 
     for (const linea of lineas) {
       await connection.query(`

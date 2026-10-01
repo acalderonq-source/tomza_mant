@@ -635,13 +635,13 @@
       <button class="btn btn-outline-primary btn-sm fw-bold"><i class="bi bi-download"></i> Consumo consignación Excel</button>
     </form>
     <% if (proveedorConsignacionSeleccionado && ['ADMIN', 'TALLER', 'PROVEEDURIA_TALLER'].includes(user.rol)) { %>
-      <form id="form-orden-consumo" method="POST" action="/compras/ordenes/consignacion-consumo" class="panel-body border-bottom d-flex align-items-end gap-2 flex-wrap" onsubmit="return confirm('Se creará una orden borrador en Órdenes de Compra solo con los consumos netos del período y proveedor seleccionados. ¿Continuar?')">
+      <form method="GET" action="/bodega/consignacion/orden/revisar" class="panel-body border-bottom d-flex align-items-end gap-2 flex-wrap">
         <input type="hidden" name="proveedor" value="<%= proveedorConsignacionSeleccionado %>">
-        <input id="orden-consumo-desde" type="hidden" name="fecha_desde" value="<%= periodoReporte.desde %>">
-        <input id="orden-consumo-hasta" type="hidden" name="fecha_hasta" value="<%= periodoReporte.hasta %>">
+        <div><label class="form-label" for="orden-consumo-desde">Consumo desde</label><input id="orden-consumo-desde" class="form-control form-control-sm" type="date" name="fecha_desde" value="<%= periodoReporte.desde %>" required></div>
+        <div><label class="form-label" for="orden-consumo-hasta">Hasta</label><input id="orden-consumo-hasta" class="form-control form-control-sm" type="date" name="fecha_hasta" value="<%= periodoReporte.hasta %>" required></div>
         <% if (sedeBodega) { %><input type="hidden" name="sede" value="<%= sedeBodega %>"><% } %>
-        <div class="small muted flex-grow-1">La orden incluirá artículo, código, cantidad neta y placa por consumo. Los movimientos no se volverán a incluir en otra orden.</div>
-        <button class="btn btn-success btn-sm fw-bold"><i class="bi bi-receipt"></i> Crear y descargar orden</button>
+        <div class="small muted flex-grow-1">Primero revise con el proveedor todos los artículos consumidos y sus cantidades; la orden conservará una línea por producto y placa.</div>
+        <button class="btn btn-success btn-sm fw-bold"><i class="bi bi-search"></i> Revisar consumo y confirmar proveedor</button>
       </form>
     <% } %>
     <div class="table-responsive">
@@ -1476,10 +1476,6 @@
   servicioCompatible?.addEventListener('change', renderCompatibilidad);
 
   const salidaOrigen = document.getElementById('salida-origen');
-  document.getElementById('form-orden-consumo')?.addEventListener('submit', () => {
-    document.getElementById('orden-consumo-desde').value = document.getElementById('consumo-desde')?.value || '';
-    document.getElementById('orden-consumo-hasta').value = document.getElementById('consumo-hasta')?.value || '';
-  });
   const pendienteDevolucion = document.getElementById('pendiente-devolucion');
   const cantidadDevolucion = document.getElementById('cantidad-devolucion');
   const cargarSalidasPendientes = async () => {
