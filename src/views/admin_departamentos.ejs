@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Asignación de departamentos | Gas Tomza</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body { background: #f3f6f8; color: #182230; font-family: "Segoe UI", Arial, sans-serif; }
+    .page { max-width: 1200px; margin: 0 auto; padding: 30px 20px 56px; }
+    .user-row { background: #fff; border: 1px solid #dce3e8; border-radius: 8px; padding: 18px; }
+    .departments { display: flex; flex-wrap: wrap; gap: 8px 14px; }
+    .dept-option { font-size: 13px; white-space: nowrap; }
+    .dept-label { color: #667085; font-size: 13px; }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <a class="btn btn-sm btn-outline-secondary mb-3" href="/dashboard">← Volver al sistema</a>
+    <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-4">
+      <div><h1 class="h3 mb-1">Accesos por departamento</h1><p class="text-secondary mb-0">Asigne una o varias áreas por usuario. Los permisos internos de cada módulo siguen aplicando.</p></div>
+      <span class="badge text-bg-dark">Solo ADMIN</span>
+    </div>
+    <% if (guardado) { %><div class="alert alert-success">Asignaciones guardadas.</div><% } %>
+    <div class="d-grid gap-3">
+      <% usuarios.forEach(usuario => { const asignados = String(usuario.departamentos || '').split(',').filter(Boolean); %>
+        <form class="user-row" method="post" action="/admin/departamentos/<%= usuario.id %>">
+          <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-3">
+            <div><strong><%= usuario.nombre || usuario.usuario %></strong> <span class="dept-label">· <%= usuario.usuario %> · <%= usuario.rol %></span></div>
+            <button class="btn btn-sm btn-primary">Guardar accesos</button>
+          </div>
+          <div class="departments">
+            <% departamentos.forEach(departamento => { %>
+              <label class="form-check form-check-inline dept-option">
+                <input class="form-check-input" type="checkbox" name="departamentos" value="<%= departamento.key %>" <%= asignados.includes(departamento.key) ? 'checked' : '' %> <%= usuario.rol === 'ADMIN' ? 'disabled' : '' %>>
+                <span class="form-check-label"><%= departamento.nombre %></span>
+              </label>
+            <% }) %>
+            <% if (usuario.rol === 'ADMIN') { departamentos.forEach(departamento => { %><input type="hidden" name="departamentos" value="<%= departamento.key %>"><% }) } %>
+          </div>
+        </form>
+      <% }) %>
+    </div>
+  </main>
+</body>
+</html>

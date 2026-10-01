@@ -1,7 +1,7 @@
 {
-  "name": "Tomza Taller",
-  "short_name": "Tomza",
-  "description": "Sistema de mantenimiento, agenda y compras de Gas Tomza.",
+  "name": "Sistema Empresarial Gas Tomza",
+  "short_name": "Gas Tomza",
+  "description": "Portal interno de departamentos y procesos de Gas Tomza.",
   "start_url": "/dashboard",
   "scope": "/",
   "display": "standalone",

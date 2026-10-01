@@ -299,30 +299,36 @@
   const esBodegaDashboard = ['BODEGA', 'BODEGUERO'].includes(user.rol);
   const sedeActualVista = esBodegaDashboard ? 'TODAS' : sedeActual;
   const usuarioDashboardLower = String(user.usuario || '').trim().toLowerCase();
+  const departamentoActivo = user.departamentoActivo || 'TALLER';
+  const esAdminDashboard = user.rol === 'ADMIN';
+  const areaTaller = esAdminDashboard || departamentoActivo === 'TALLER';
+  const areaOperaciones = esAdminDashboard || departamentoActivo === 'OPERACIONES';
+  const areaContabilidad = esAdminDashboard || departamentoActivo === 'CONTABILIDAD';
+  const areaProveeduria = esAdminDashboard || departamentoActivo === 'PROVEEDURIA';
   const esMecanicoLimitado = user.rol === 'MECANICO'
     || usuarioDashboardLower.startsWith('mecanico')
     || usuarioDashboardLower.startsWith('mecanicos');
-  const puedeVerCompras = !esMecanicoLimitado && ['ADMIN', 'TALLER', 'PROVEEDURIA_TALLER', 'CONTABILIDAD'].includes(user.rol);
-  const puedeVerOrdenesCompra = puedeVerCompras || user.rol === 'BODEGUERO';
-  const puedeVerOperaciones = user.rol !== 'CONTABILIDAD' && !esMensajeroDashboard && !esBodegaDashboard;
-  const puedeVerReportesSupervisores = !esMecanicoLimitado && ['ADMIN', 'TALLER', 'MECANICO', 'SUPERVISOR', 'SUPERVISOR_PESADO'].includes(user.rol);
-  const puedeVerAceite = esMecanicoLimitado || ['ADMIN', 'MECANICO', 'BODEGA', 'BODEGUERO'].includes(user.rol)
-    || usuarioDashboardLower === 'supervisor_rio_claro';
-  const puedeVerAires = !esMecanicoLimitado && ['ADMIN', 'TALLER', 'MECANICO'].includes(user.rol);
-  const puedeVerRevisionRuta = esMecanicoLimitado || ['ADMIN', 'TALLER', 'MECANICO', 'SUPERVISOR', 'SUPERVISOR_PESADO'].includes(user.rol);
-  const puedeVerGiras = !esMecanicoLimitado && ['ADMIN', 'TALLER', 'MECANICO', 'SUPERVISOR', 'SUPERVISOR_PESADO'].includes(user.rol);
-  const puedeVerDashboardTaller = esMecanicoLimitado || ['ADMIN', 'TALLER', 'MECANICO', 'SUPERVISOR', 'SUPERVISOR_PESADO'].includes(user.rol);
-  const puedeVerLogisticaTaller = !esMecanicoLimitado && ['ADMIN', 'TALLER', 'MECANICO', 'PROVEEDURIA_TALLER'].includes(user.rol);
-  const puedeVerLavadoUnidades = esMecanicoLimitado || ['ADMIN', 'TALLER', 'MECANICO', 'SUPERVISOR', 'SUPERVISOR_PESADO'].includes(user.rol);
-  const puedeVerKpisMecanicos = !esMecanicoLimitado && ['ADMIN', 'TALLER', 'PROVEEDURIA_TALLER'].includes(user.rol);
-  const puedeVerOrdenesMotor = !esMecanicoLimitado && ['ADMIN', 'TALLER', 'PROVEEDURIA_TALLER'].includes(user.rol);
+  const puedeVerCompras = !esMecanicoLimitado && ['ADMIN', 'TALLER', 'PROVEEDURIA_TALLER', 'CONTABILIDAD'].includes(user.rol) && (areaContabilidad || areaProveeduria);
+  const puedeVerOrdenesCompra = (puedeVerCompras || user.rol === 'BODEGUERO') && (areaContabilidad || areaProveeduria);
+  const puedeVerOperaciones = user.rol !== 'CONTABILIDAD' && !esMensajeroDashboard && !esBodegaDashboard && (areaTaller || areaOperaciones);
+  const puedeVerReportesSupervisores = !esMecanicoLimitado && ['ADMIN', 'TALLER', 'MECANICO', 'SUPERVISOR', 'SUPERVISOR_PESADO'].includes(user.rol) && (areaTaller || areaOperaciones);
+  const puedeVerAceite = (esMecanicoLimitado || ['ADMIN', 'MECANICO', 'BODEGA', 'BODEGUERO'].includes(user.rol)
+    || usuarioDashboardLower === 'supervisor_rio_claro') && (areaTaller || areaProveeduria);
+  const puedeVerAires = !esMecanicoLimitado && ['ADMIN', 'TALLER', 'MECANICO'].includes(user.rol) && areaTaller;
+  const puedeVerRevisionRuta = (esMecanicoLimitado || ['ADMIN', 'TALLER', 'MECANICO', 'SUPERVISOR', 'SUPERVISOR_PESADO'].includes(user.rol)) && (areaTaller || areaOperaciones);
+  const puedeVerGiras = !esMecanicoLimitado && ['ADMIN', 'TALLER', 'MECANICO', 'SUPERVISOR', 'SUPERVISOR_PESADO'].includes(user.rol) && (areaTaller || areaOperaciones);
+  const puedeVerDashboardTaller = (esMecanicoLimitado || ['ADMIN', 'TALLER', 'MECANICO', 'SUPERVISOR', 'SUPERVISOR_PESADO'].includes(user.rol)) && areaTaller;
+  const puedeVerLogisticaTaller = !esMecanicoLimitado && ['ADMIN', 'TALLER', 'MECANICO', 'PROVEEDURIA_TALLER'].includes(user.rol) && areaTaller;
+  const puedeVerLavadoUnidades = (esMecanicoLimitado || ['ADMIN', 'TALLER', 'MECANICO', 'SUPERVISOR', 'SUPERVISOR_PESADO'].includes(user.rol)) && (areaTaller || areaOperaciones);
+  const puedeVerKpisMecanicos = !esMecanicoLimitado && ['ADMIN', 'TALLER', 'PROVEEDURIA_TALLER'].includes(user.rol) && areaTaller;
+  const puedeVerOrdenesMotor = !esMecanicoLimitado && ['ADMIN', 'TALLER', 'PROVEEDURIA_TALLER'].includes(user.rol) && areaTaller;
   const puedeVerResumenEjecutivo = esMecanicoLimitado || ['ADMIN', 'TALLER', 'PROVEEDURIA', 'PROVEEDURIA_TALLER', 'TRAMITES'].includes(user.rol);
   const puedeVerRepuestos = !esMecanicoLimitado && (
     ['ADMIN', 'TALLER', 'PROVEEDURIA_TALLER', 'PROVEEDURIA', 'SUPERVISOR_PESADO', 'MENSAJERO', 'MENSAJERIA', 'MENSAJERO_FACTURAS'].includes(user.rol)
     || usuarioDashboardLower === 'pesados'
-  );
+  ) && (areaTaller || areaProveeduria || areaOperaciones);
   const puedeVerRepuestosSemanales = puedeVerRepuestos || user.rol === 'BODEGUERO';
-  const puedeVerBodega = !esMecanicoLimitado && ['ADMIN', 'TALLER', 'PROVEEDURIA_TALLER', 'BODEGA', 'BODEGUERO'].includes(user.rol);
+  const puedeVerBodega = !esMecanicoLimitado && ['ADMIN', 'TALLER', 'PROVEEDURIA_TALLER', 'BODEGA', 'BODEGUERO'].includes(user.rol) && (areaTaller || areaProveeduria);
   const prioridadesLista = Array.isArray(prioridadesTaller) ? prioridadesTaller : [];
   const llantasEnProceso = Number(exec.llantasSolicitadas || 0) + Number(exec.llantasCotizadas || 0) + Number(exec.llantasCompradas || 0);
   const unidadesActivas = Number(exec.unidadesActivas ?? exec.unidades ?? 0);
@@ -359,7 +365,18 @@
 <nav class="navbar navbar-dark topbar px-3 py-2">
   <span class="navbar-brand fw-semibold"><span class="brand-box"><i class="bi bi-house"></i></span>Gas Tomza</span>
   <div class="text-white d-flex align-items-center gap-2 flex-wrap">
+    <% if (Array.isArray(user.departamentos) && user.departamentos.length > 1) { %>
+      <form method="POST" action="/departamento/activo" class="d-flex align-items-center gap-2">
+        <label for="departamento-activo" class="small">Área</label>
+        <select id="departamento-activo" name="departamento" class="form-select form-select-sm" onchange="this.form.submit()">
+          <% user.departamentos.forEach(key => { const area = ['TALLER','OPERACIONES','CONTABILIDAD','SEGURIDAD_OCUPACIONAL','LOGISTICA','PROVEEDURIA','RECURSOS_HUMANOS'].find(item => item === key); const nombres = { TALLER: 'Taller', OPERACIONES: 'Operaciones', CONTABILIDAD: 'Contabilidad', SEGURIDAD_OCUPACIONAL: 'Seguridad Ocupacional', LOGISTICA: 'Logística', PROVEEDURIA: 'Proveeduría', RECURSOS_HUMANOS: 'Recursos Humanos' }; %>
+            <option value="<%= area %>" <%= area === departamentoActivo ? 'selected' : '' %>><%= nombres[area] || area %></option>
+          <% }) %>
+        </select>
+      </form>
+    <% } %>
     <span class="small"><%= user.usuario %> · <%= user.rol %></span>
+    <% if (user.rol === 'ADMIN') { %><a href="/admin/departamentos" class="btn btn-outline-light btn-sm">Accesos por área</a><% } %>
     <a href="/logout" class="btn btn-warning btn-sm rounded-pill px-3">Salir</a>
   </div>
 </nav>
@@ -369,9 +386,9 @@
     <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
       <div>
         <h1 class="page-title">Inicio</h1>
-        <div class="page-subtitle">Sede actual: <strong><%= sedeActualVista %></strong> · <%= new Date().toLocaleDateString('es-CR') %></div>
+        <div class="page-subtitle">Departamento: <strong><%= { TALLER: 'Taller', OPERACIONES: 'Operaciones', CONTABILIDAD: 'Contabilidad', SEGURIDAD_OCUPACIONAL: 'Seguridad Ocupacional', LOGISTICA: 'Logística', PROVEEDURIA: 'Proveeduría', RECURSOS_HUMANOS: 'Recursos Humanos' }[departamentoActivo] || departamentoActivo %></strong> · Sede: <strong><%= sedeActualVista %></strong> · <%= new Date().toLocaleDateString('es-CR') %></div>
       </div>
-      <% if (!esMecanicoLimitado) { %>
+      <% if (!esMecanicoLimitado && (areaContabilidad || areaProveeduria)) { %>
         <a href="/ia" class="btn btn-dark btn-sm rounded-pill px-3"><i class="bi bi-stars"></i> IA Tomza</a>
       <% } %>
     </div>
@@ -395,18 +412,21 @@
     </section>
   <% } %>
 
+  <% if (areaTaller || areaOperaciones || areaContabilidad || areaProveeduria) { %>
   <section class="summary-grid mb-2">
-    <div class="summary-card">
-      <div class="summary-label">Mantenimientos</div>
-      <div class="summary-value"><%= mantenimientosPendientes %></div>
-      <div class="summary-foot"><%= mantenimientosAtrasados %> atrasados · <%= mantenimientosHoy.length %> hoy</div>
-    </div>
-    <div class="summary-card">
-      <div class="summary-label">Unidades</div>
-      <div class="summary-value"><%= exec.unidades || 0 %></div>
-      <div class="summary-foot"><%= unidadesActivas %> activas · <%= unidadesVaradas %> varadas</div>
-    </div>
-    <% if (!esMecanicoLimitado) { %>
+    <% if (areaTaller || areaOperaciones) { %>
+      <div class="summary-card">
+        <div class="summary-label">Mantenimientos</div>
+        <div class="summary-value"><%= mantenimientosPendientes %></div>
+        <div class="summary-foot"><%= mantenimientosAtrasados %> atrasados · <%= mantenimientosHoy.length %> hoy</div>
+      </div>
+      <div class="summary-card">
+        <div class="summary-label">Unidades</div>
+        <div class="summary-value"><%= exec.unidades || 0 %></div>
+        <div class="summary-foot"><%= unidadesActivas %> activas · <%= unidadesVaradas %> varadas</div>
+      </div>
+    <% } %>
+    <% if (!esMecanicoLimitado && (areaContabilidad || areaProveeduria)) { %>
       <div class="summary-card">
         <div class="summary-label">Facturas</div>
         <div class="summary-value"><%= facturasPendientes %></div>
@@ -419,6 +439,7 @@
       </div>
     <% } %>
   </section>
+  <% } %>
 
   <% if (puedeVerOperaciones) { %>
     <section class="top-info-grid mb-2">
@@ -452,7 +473,7 @@
   <section class="mb-2">
     <h2 class="section-title">Módulos</h2>
     <div class="module-grid">
-      <% if (puedeVerResumenEjecutivo) { %>
+      <% if (puedeVerResumenEjecutivo && (areaTaller || areaOperaciones || areaProveeduria)) { %>
         <a href="/dashboard/resumen-ejecutivo" class="module-card">
           <span class="module-icon icon-blue"><i class="bi bi-graph-up-arrow"></i></span>
           <div><div class="module-title">Resumen ejecutivo</div><p class="module-copy">Gastos, proveedores, placas y mantenimientos.</p></div>
@@ -553,17 +574,17 @@
             <div><div class="module-title">Órdenes Motor</div><p class="module-copy">Presupuesto separado de compras.</p></div>
           </a>
         <% } %>
-        <% if (mostrarOficinaDiaDia) { %>
+        <% if (mostrarOficinaDiaDia && (areaTaller || areaOperaciones)) { %>
           <a href="/oficina-dia-dia" class="module-card">
             <span class="module-icon icon-blue"><i class="bi bi-person-workspace"></i></span>
             <div><div class="module-title">Oficina día a día</div><p class="module-copy">Registro diario de tareas de oficina.</p></div>
           </a>
         <% } %>
-        <a href="/dekra" class="module-card">
+        <% if (areaOperaciones || areaTaller) { %><a href="/dekra" class="module-card">
           <span class="module-icon icon-blue"><i class="bi bi-clipboard-check"></i></span>
           <div><div class="module-title">DEKRA</div><p class="module-copy">Revisión técnica y vencimientos.</p></div>
-        </a>
-        <% if (!esMecanicoLimitado) { %>
+        </a><% } %>
+        <% if (!esMecanicoLimitado && areaOperaciones) { %>
           <a href="/minae" class="module-card">
             <span class="module-icon icon-blue"><i class="bi bi-bank"></i></span>
             <div><div class="module-title">MINAE</div><p class="module-copy">Trámites y permisos.</p></div>
@@ -582,7 +603,7 @@
           </a>
         <% } %>
       <% } %>
-      <% if (!esMecanicoLimitado && ['ADMIN', 'CONTABILIDAD', 'TRAMITES'].includes(user.rol)) { %>
+      <% if (!esMecanicoLimitado && ['ADMIN', 'CONTABILIDAD', 'TRAMITES'].includes(user.rol) && areaContabilidad) { %>
         <a href="/aresep" class="module-card">
           <span class="module-icon icon-green"><i class="bi bi-clipboard-data"></i></span>
           <div><div class="module-title">ARESEP</div><p class="module-copy">Unidades A7, costos, planillas y control mensual.</p></div>
@@ -635,6 +656,12 @@
             <div><div class="module-title">Compras</div><p class="module-copy">Resumen del área.</p></div>
           </a>
         <% } %>
+      <% } %>
+      <% if (['SEGURIDAD_OCUPACIONAL', 'LOGISTICA', 'RECURSOS_HUMANOS'].includes(departamentoActivo)) { %>
+        <div class="module-card">
+          <span class="module-icon icon-blue"><i class="bi bi-cone-striped"></i></span>
+          <div><div class="module-title">Área en preparación</div><p class="module-copy">El acceso ya está organizado. Los módulos de este departamento se habilitarán conforme se incorporen sus procesos y permisos.</p></div>
+        </div>
       <% } %>
     </div>
   </section>

@@ -171,6 +171,25 @@ app.use(express.static(path.join(__dirname, "..", "public")));
 
 app.use(ensureCsrfToken);
 
+app.use(async (req, _res, next) => {
+  const user = req.session.user;
+  if (!user || Array.isArray(user.departamentos)) return next();
+  try {
+    const [rows] = await pool.query(
+      "SELECT departamento FROM usuario_departamentos WHERE usuario_id = ? ORDER BY es_principal DESC, departamento",
+      [user.id]
+    );
+    user.departamentos = rows.map(row => row.departamento);
+    user.departamentoActivo = user.departamentos.includes(user.departamentoActivo)
+      ? user.departamentoActivo
+      : user.departamentos[0] || "TALLER";
+    return next();
+  } catch (error) {
+    console.error("Error cargando departamentos de sesión:", error.code || error.message);
+    return next(error);
+  }
+});
+
 function esUsuarioMecanicoLimitado(user) {
   const usuario = String(user?.usuario || "").trim().toLowerCase();
   return user?.rol === "MECANICO" ||
@@ -226,7 +245,7 @@ function injectPageAssets(html, csrfToken) {
   <meta name="theme-color" content="#111827">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-title" content="Tomza Taller">
+  <meta name="apple-mobile-web-app-title" content="Gas Tomza">
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" href="/img/app-icon.svg" type="image/svg+xml">`;
   const pwaScript = `\n<script src="/js/pwa.js?v=20260915-1" defer></script>`;
@@ -363,13 +382,16 @@ cron.schedule("0 8 * * *", async () => {
 
 // ===================== ROOT =====================
 app.get("/", (req, res) => {
-  if (!req.session.user) return res.redirect("/login");
+  if (!req.session.user) return res.render("portal_departamentos", {
+    departamentos: require("./utils/departamentos").DEPARTAMENTOS,
+    next: ""
+  });
   res.redirect("/dashboard");
 });
 
 app.get("/logout", (req, res) => {
   req.session.destroy(() => {
-    res.redirect("/login");
+    res.redirect("/");
   });
 });
 

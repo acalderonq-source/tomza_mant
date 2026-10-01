@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const pool = require("../db");
 const { ensureNumeroMantenimientoColumn, asignarNumeroMantenimiento } = require("../utils/mantenimientosNumero");
+const { DEPARTAMENTOS, esDepartamentoValido } = require("../utils/departamentos");
 
 const CUPOS_PREVENTIVOS_POR_DIA = {
   CARTAGO: 5,
@@ -11,6 +12,68 @@ const CUPOS_PREVENTIVOS_POR_DIA = {
   RIO_CLARO: 2,
   NICOYA: 2
 };
+
+router.get("/admin/departamentos", async (req, res) => {
+  if (!req.session.user || req.session.user.rol !== "ADMIN") return res.status(403).send("No autorizado");
+  try {
+    const [usuarios] = await pool.query(`
+      SELECT u.id, u.usuario, u.nombre, u.rol,
+        COALESCE(GROUP_CONCAT(ud.departamento ORDER BY ud.departamento SEPARATOR ','), '') AS departamentos
+      FROM usuarios u
+      LEFT JOIN usuario_departamentos ud ON ud.usuario_id = u.id
+      GROUP BY u.id, u.usuario, u.nombre, u.rol
+      ORDER BY u.nombre, u.usuario
+    `);
+    res.render("admin_departamentos", {
+      departamentos: DEPARTAMENTOS,
+      usuarios,
+      guardado: req.query.guardado === "1",
+    });
+  } catch (error) {
+    console.error("Error cargando asignaciones por departamento:", error.code || error.message);
+    res.status(500).send("No se pudieron cargar las asignaciones por departamento.");
+  }
+});
+
+router.post("/admin/departamentos/:id", async (req, res) => {
+  if (!req.session.user || req.session.user.rol !== "ADMIN") return res.status(403).send("No autorizado");
+  const usuarioId = Number(req.params.id);
+  const seleccionados = [...new Set((Array.isArray(req.body.departamentos)
+    ? req.body.departamentos
+    : req.body.departamentos ? [req.body.departamentos] : [])
+    .map(value => String(value).toUpperCase()))];
+  if (!Number.isInteger(usuarioId) || usuarioId < 1 || !seleccionados.length || seleccionados.some(key => !esDepartamentoValido(key))) {
+    return res.status(400).send("Seleccione al menos un departamento válido.");
+  }
+
+  let connection;
+  try {
+    connection = await pool.getConnection();
+    await connection.beginTransaction();
+    const [users] = await connection.query("SELECT id, rol FROM usuarios WHERE id = ? LIMIT 1 FOR UPDATE", [usuarioId]);
+    if (!users.length) {
+      await connection.rollback();
+      return res.status(404).send("Usuario no encontrado.");
+    }
+
+    const claves = users[0].rol === "ADMIN" ? DEPARTAMENTOS.map(dept => dept.key) : seleccionados;
+    await connection.query("DELETE FROM usuario_departamentos WHERE usuario_id = ?", [usuarioId]);
+    for (const departamento of claves) {
+      await connection.query(
+        "INSERT INTO usuario_departamentos (usuario_id, departamento, es_principal) VALUES (?, ?, ?)",
+        [usuarioId, departamento, departamento === claves[0] ? 1 : 0]
+      );
+    }
+    await connection.commit();
+    res.redirect("/admin/departamentos?guardado=1");
+  } catch (error) {
+    if (connection) await connection.rollback().catch(() => {});
+    console.error("Error guardando asignaciones por departamento:", error.code || error.message);
+    res.status(500).send("No se pudieron guardar las asignaciones.");
+  } finally {
+    connection?.release();
+  }
+});
 
 // devuelve siguiente día hábil (sin sábado ni domingo)
 function siguienteDiaHabil(fecha) {
