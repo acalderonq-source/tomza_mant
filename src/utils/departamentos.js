@@ -47,6 +47,25 @@ async function ensurePortalDepartmentSchema(pool) {
     )
   `);
 
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS portal_departamento_config (
+      id TINYINT NOT NULL PRIMARY KEY,
+      asignacion_inicial_completa TINYINT(1) NOT NULL DEFAULT 0
+    )
+  `);
+  await pool.query("INSERT IGNORE INTO portal_departamento_config (id, asignacion_inicial_completa) VALUES (1, 0)");
+  const [config] = await pool.query("SELECT asignacion_inicial_completa FROM portal_departamento_config WHERE id = 1 LIMIT 1");
+
+  if (!Number(config[0]?.asignacion_inicial_completa)) {
+    await pool.query("DELETE FROM usuario_departamentos WHERE departamento <> 'TALLER'");
+    await pool.query(`
+      INSERT IGNORE INTO usuario_departamentos (usuario_id, departamento, es_principal)
+      SELECT id, 'TALLER', 1 FROM usuarios
+    `);
+    await pool.query("UPDATE usuario_departamentos SET es_principal = 1 WHERE departamento = 'TALLER'");
+    await pool.query("UPDATE portal_departamento_config SET asignacion_inicial_completa = 1 WHERE id = 1");
+  }
+
   const [users] = await pool.query(`
     SELECT u.id, u.rol, u.usuario
     FROM usuarios u

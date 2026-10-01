@@ -27,13 +27,16 @@ test("la validación de clave de área no acepta valores arbitrarios", () => {
   assert.equal(esDepartamentoValido("../../admin"), false);
 });
 
-test("el arranque crea la tabla y asigna solo usuarios que aún no tienen áreas", async () => {
+test("el primer arranque deja todos los usuarios actuales en Taller y no repite la normalización", async () => {
   const executed = [];
+  let initialized = 0;
   const pool = {
     async query(sql, params = []) {
       executed.push({ sql, params });
+      if (sql.includes("SELECT asignacion_inicial_completa")) return [[{ asignacion_inicial_completa: initialized }]];
+      if (sql.includes("UPDATE portal_departamento_config SET")) initialized = 1;
       if (sql.includes("SELECT u.id, u.rol, u.usuario")) {
-        return [[{ id: 1, rol: "ADMIN", usuario: "admin" }, { id: 2, rol: "MECANICO", usuario: "mecanico_pz" }]];
+        return [[]];
       }
       return [{ affectedRows: 1 }];
     }
@@ -41,5 +44,9 @@ test("el arranque crea la tabla y asigna solo usuarios que aún no tienen áreas
 
   await ensurePortalDepartmentSchema(pool);
   assert.match(executed[0].sql, /CREATE TABLE IF NOT EXISTS usuario_departamentos/);
-  assert.deepEqual(executed.slice(2).map(item => item.params[1]), [...DEPARTAMENTOS.map(item => item.key), "TALLER"]);
+  assert.ok(executed.some(item => item.sql.includes("DELETE FROM usuario_departamentos WHERE departamento <> 'TALLER'")));
+  assert.ok(executed.some(item => item.sql.includes("SELECT id, 'TALLER', 1 FROM usuarios")));
+  assert.equal(initialized, 1);
+  await ensurePortalDepartmentSchema(pool);
+  assert.equal(executed.filter(item => item.sql.includes("DELETE FROM usuario_departamentos WHERE departamento <> 'TALLER'")).length, 1);
 });

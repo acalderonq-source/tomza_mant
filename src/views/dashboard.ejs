@@ -302,9 +302,9 @@
   const departamentoActivo = user.departamentoActivo || 'TALLER';
   const esAdminDashboard = user.rol === 'ADMIN';
   const areaTaller = esAdminDashboard || departamentoActivo === 'TALLER';
-  const areaOperaciones = esAdminDashboard || departamentoActivo === 'OPERACIONES';
-  const areaContabilidad = esAdminDashboard || departamentoActivo === 'CONTABILIDAD';
-  const areaProveeduria = esAdminDashboard || departamentoActivo === 'PROVEEDURIA';
+  const areaOperaciones = esAdminDashboard || departamentoActivo === 'OPERACIONES' || ['SUPERVISOR', 'SUPERVISOR_PESADO', 'TRAMITES'].includes(user.rol);
+  const areaContabilidad = esAdminDashboard || departamentoActivo === 'CONTABILIDAD' || user.rol === 'CONTABILIDAD';
+  const areaProveeduria = esAdminDashboard || departamentoActivo === 'PROVEEDURIA' || ['TALLER', 'PROVEEDURIA', 'PROVEEDURIA_TALLER', 'BODEGA', 'BODEGUERO'].includes(user.rol);
   const esMecanicoLimitado = user.rol === 'MECANICO'
     || usuarioDashboardLower.startsWith('mecanico')
     || usuarioDashboardLower.startsWith('mecanicos');
