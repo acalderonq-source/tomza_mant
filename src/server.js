@@ -10,6 +10,7 @@ const enviarAlertasDekra = require("./utils/dekraMail");
 const { enviarRecordatoriosMantenimientos, ensurePushTables } = require("./utils/notificacionesPush");
 const { ensureCsrfToken, injectSecurityAssets } = require("./middleware/security");
 const { UPLOAD_ROOT, seedBundledUploads } = require("./utils/uploadStorage");
+const { ensurePortalDepartmentSchema } = require("./utils/departamentos");
 
 // Inicializar app
 const app = express();
@@ -396,8 +397,16 @@ app.get("/logout", (req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`🚀 Servidor corriendo en puerto ${PORT}`);
-  console.log("ENTORNO:", process.env.NODE_ENV || "development");
-  console.log("DB:", process.env.DB_NAME || "no definida");
+async function startServer() {
+  await ensurePortalDepartmentSchema(pool);
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log(`🚀 Servidor corriendo en puerto ${PORT}`);
+    console.log("ENTORNO:", process.env.NODE_ENV || "development");
+    console.log("DB:", process.env.DB_NAME || "no definida");
+  });
+}
+
+startServer().catch(error => {
+  console.error("No se pudo preparar el portal de departamentos:", error.code || error.message);
+  process.exit(1);
 });

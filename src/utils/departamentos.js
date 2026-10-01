@@ -10,7 +10,8 @@ const DEPARTAMENTOS = [
 
 const DEPARTAMENTO_POR_CLAVE = new Map(DEPARTAMENTOS.map(departamento => [departamento.key, departamento]));
 
-function departamentosInicialesPorRol(rol) {
+function departamentosInicialesPorRol(rol, usuario = "") {
+  if (/^mecanicos?/i.test(String(usuario || "").trim())) return ["TALLER"];
   const asignaciones = {
     ADMIN: DEPARTAMENTOS.map(({ key }) => key),
     TALLER: ["TALLER", "OPERACIONES", "PROVEEDURIA"],
@@ -23,13 +24,44 @@ function departamentosInicialesPorRol(rol) {
     BODEGA: ["PROVEEDURIA", "TALLER"],
     BODEGUERO: ["PROVEEDURIA", "TALLER"],
     TRAMITES: ["OPERACIONES", "LOGISTICA"],
-    MENSAJERO: ["LOGISTICA"]
+    MENSAJERO: ["LOGISTICA"],
+    MENSAJERIA: ["LOGISTICA"],
+    MENSAJERO_FACTURAS: ["LOGISTICA"]
   };
-  return asignaciones[String(rol || "").toUpperCase()] || ["TALLER"];
+  return asignaciones[String(rol || "").toUpperCase()] || [];
 }
 
 function esDepartamentoValido(departamento) {
   return DEPARTAMENTO_POR_CLAVE.has(String(departamento || "").toUpperCase());
 }
 
-module.exports = { DEPARTAMENTOS, departamentosInicialesPorRol, esDepartamentoValido };
+async function ensurePortalDepartmentSchema(pool) {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS usuario_departamentos (
+      usuario_id INT NOT NULL,
+      departamento VARCHAR(40) NOT NULL,
+      es_principal TINYINT(1) NOT NULL DEFAULT 0,
+      asignado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (usuario_id, departamento),
+      INDEX idx_usuario_departamentos_departamento (departamento)
+    )
+  `);
+
+  const [users] = await pool.query(`
+    SELECT u.id, u.rol, u.usuario
+    FROM usuarios u
+    LEFT JOIN usuario_departamentos ud ON ud.usuario_id = u.id
+    WHERE ud.usuario_id IS NULL
+  `);
+  for (const user of users) {
+    const departamentos = departamentosInicialesPorRol(user.rol, user.usuario);
+    for (const [index, departamento] of departamentos.entries()) {
+      await pool.query(
+        "INSERT IGNORE INTO usuario_departamentos (usuario_id, departamento, es_principal) VALUES (?, ?, ?)",
+        [user.id, departamento, index === 0 ? 1 : 0]
+      );
+    }
+  }
+}
+
+module.exports = { DEPARTAMENTOS, departamentosInicialesPorRol, esDepartamentoValido, ensurePortalDepartmentSchema };
