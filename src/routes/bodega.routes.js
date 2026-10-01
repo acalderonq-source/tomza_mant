@@ -933,7 +933,7 @@ router.get("/consignacion/orden/revisar", async (req, res) => {
 
     const data = await movimientosConsumo("CONSIGNACION", period, proveedor, sede, true, proveedorInfo.variantes);
     const lineas = consumptionOrderLines(data.details);
-    const consumosSinPlaca = data.details.filter(item => !limpiar(item.placa));
+    const consumosGenerales = data.details.filter(item => !limpiar(item.placa) || ["GENERAL", "GENERALES", "GENERAL TALLER", "GENERALES TALLER"].includes(upper(item.placa)));
     if (!lineas.length) throw new Error("No hay consumos pendientes con cantidad neta positiva para ese proveedor y período.");
 
     res.render("bodega_consignacion_confirmar", {
@@ -942,7 +942,7 @@ router.get("/consignacion/orden/revisar", async (req, res) => {
       sede,
       period,
       lineas,
-      consumosSinPlaca: consumosSinPlaca.length,
+      consumosGenerales: consumosGenerales.length,
       total: lineas.reduce((sum, item) => sum + Number(item.costo_neto || 0), 0),
       movimientos: data.details.length
     });

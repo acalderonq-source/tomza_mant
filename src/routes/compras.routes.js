@@ -4271,10 +4271,6 @@ router.post("/ordenes/consignacion-consumo", requireAuth, allowRoles("ADMIN", "T
     `, [period.desde, period.hasta, "MAXI REPUESTOS", ...variantesProveedor, sede, sede]);
 
     if (!movimientos.length) throw new Error("No hay consumos de consignación pendientes de ordenar para ese proveedor, sede y período.");
-    const movimientosSinPlaca = movimientos.filter(row => !String(row.placa || "").trim());
-    if (movimientosSinPlaca.length) {
-      throw new Error(`Hay ${movimientosSinPlaca.length} consumo(s) sin placa. Corrija la trazabilidad antes de generar la orden.`);
-    }
     const idsProveedorArticulo = [...new Set(movimientos.map(row => Number(row.articulo_proveedor_id)).filter(Boolean))];
     if (idsProveedorArticulo.some(id => id !== Number(proveedor.id))) {
       throw new Error("Los artículos consumidos tienen un proveedor de Compras distinto al proveedor de consignación seleccionado.");

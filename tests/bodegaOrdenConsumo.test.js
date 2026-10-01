@@ -85,7 +85,7 @@ test("consumption creates a regular draft PO with net per-plate lines and locks 
   assert.deepEqual(statements.filter(item => /INSERT INTO bodega_ordenes_consumo_movimientos/.test(item.sql)).map(item => item.params[0]), [101, 102]);
 });
 
-test("consumption without a plate cannot be converted into a purchase order", async () => {
+test("general and blank-plate consumption is ordered under General Taller", async () => {
   query = async sql => {
     if (/SELECT id, nombre FROM proveedores/.test(sql)) return [[{ id: 5, nombre: "MAXI REPUESTOS SRL" }]];
     if (/SELECT DISTINCT COALESCE\(NULLIF\(TRIM\(proveedor_consignacion/.test(sql)) return [[{ proveedor: "MAXI REPUESTOS" }, { proveedor: "Maxi Repuestos SRL" }]];
@@ -93,16 +93,20 @@ test("consumption without a plate cannot be converted into a purchase order", as
     if (/SELECT bm\.id, bm\.articulo_id/.test(sql)) return [[
       { id: 101, articulo_id: 9, tipo_movimiento: "SALIDA", cantidad: 2, placa: null, precio_unitario: 100, codigo_taller: "0009", codigo: "LF1", nombre: "Filtro", unidad_medida: "UND", precio_actual: 120, articulo_proveedor_id: 5 }
     ]];
+    if (/INSERT INTO ordenes_compra\s/.test(sql)) return [{ insertId: 31 }];
+    if (/INSERT INTO/.test(sql)) return [{ affectedRows: 1 }];
     throw new Error(sql);
   };
   const response = await request({
     proveedor: "MAXI REPUESTOS", fecha_desde: "2026-09-21", fecha_hasta: "2026-09-27",
     proveedor_confirmado: "1", contacto_confirmacion: "María Proveedor"
   });
-  assert.equal(committed, false);
-  assert.equal(rolledBack, true);
-  assert.equal(statements.some(item => /INSERT INTO ordenes_compra\s/.test(item.sql)), false);
-  assert.match(response.session.error, /sin placa/);
+  assert.equal(committed, true);
+  assert.equal(rolledBack, false);
+  const order = statements.find(item => /INSERT INTO ordenes_compra\s/.test(item.sql));
+  assert.equal(order.params[3], "GENERALES TALLER");
+  const line = statements.find(item => /INSERT INTO ordenes_compra_detalle/.test(item.sql));
+  assert.equal(line.params[1], "GENERALES TALLER");
 });
 
 test("repeating the same provider, site and period does not create a duplicate order", async () => {

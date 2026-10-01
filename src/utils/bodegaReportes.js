@@ -98,7 +98,10 @@ function consumption(rows) {
 function consumptionOrderLines(rows) {
   const grouped = new Map();
   for (const row of rows) {
-    const plate = row.placa || "GENERAL";
+    const rawPlate = String(row.placa || "").trim().toUpperCase().replace(/[\s_-]+/g, "");
+    const plate = !rawPlate || ["GENERAL", "GENERALES", "GENERALTALLER", "GENERALESTALLER"].includes(rawPlate)
+      ? "GENERALES TALLER"
+      : row.placa;
     const key = `${row.articulo_id}:${plate}`;
     if (!grouped.has(key)) grouped.set(key, {
       articulo_id: row.articulo_id,

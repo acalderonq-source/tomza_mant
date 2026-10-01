@@ -20,6 +20,15 @@ test("report dates default to Monday-Sunday and reject invalid ranges", () => {
   assert.throws(() => reportPeriod({ fecha_desde: "2026-09-27", fecha_hasta: "2026-09-21" }, "2026-09-23"));
 });
 
+test("blank or GENERAL consignment plates become General Taller in purchase order lines", () => {
+  const lines = consumptionOrderLines([
+    { id: 81, articulo_id: 7, tipo_movimiento: "SALIDA", cantidad: 1, placa: null, precio_unitario: 100, nombre: "Filtro" },
+    { id: 82, articulo_id: 8, tipo_movimiento: "SALIDA", cantidad: 2, placa: "GENERAL", precio_unitario: 50, nombre: "Cinta" },
+    { id: 83, articulo_id: 9, tipo_movimiento: "SALIDA", cantidad: 1, placa: "C164528", precio_unitario: 75, nombre: "Buje" }
+  ]);
+  assert.deepEqual(lines.map(line => line.placa), ["C164528", "GENERALES TALLER", "GENERALES TALLER"]);
+});
+
 test("consignment consumption uses dispatch prices and subtracts returns", async () => {
   const movements = [
     { id: 1, articulo_id: 7, codigo_taller: "0007", codigo: "PR-007", nombre: "Filtro de aceite", proveedor: "MAXI", unidad_medida: "UND", tipo_movimiento: "SALIDA", cantidad: 2, precio_unitario: 100, precio_actual: 110, placa: "C164528" },
