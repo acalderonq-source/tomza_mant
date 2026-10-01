@@ -149,6 +149,41 @@ router.use((req, res, next) => {
   next();
 });
 
+router.get("/foto/:tipo/:id", async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isSafeInteger(id) || id <= 0) return res.sendStatus(404);
+
+    const sedesPermitidas = getSedesPermitidas(req);
+    let sql;
+    if (req.params.tipo === "revision") {
+      sql = `SELECT rr.foto_base64, rr.foto_tipo
+             FROM revisiones_ruta rr
+             WHERE rr.id = ? AND rr.sede IN (?)`;
+    } else if (req.params.tipo === "detalle") {
+      sql = `SELECT d.foto_base64, d.foto_tipo
+             FROM revisiones_ruta_detalle d
+             JOIN revisiones_ruta rr ON rr.id = d.revision_id
+             WHERE d.id = ? AND rr.sede IN (?)`;
+    } else {
+      return res.sendStatus(404);
+    }
+
+    const [rows] = await pool.query(sql, [id, sedesPermitidas]);
+    const foto = rows[0];
+    if (!foto?.foto_base64) return res.sendStatus(404);
+
+    const dataUrl = String(foto.foto_base64);
+    const match = dataUrl.match(/^data:(image\/[\w.+-]+);base64,([\s\S]+)$/i);
+    const contenido = match ? match[2] : dataUrl;
+    const tipo = match ? match[1] : (foto.foto_tipo || "image/jpeg");
+    res.type(tipo).set("Cache-Control", "private, max-age=300").send(Buffer.from(contenido, "base64"));
+  } catch (error) {
+    console.error("ERROR cargando foto de revision ruta:", error.code || error.message);
+    res.status(500).send("No se pudo cargar la foto");
+  }
+});
+
 // ===================== LISTADO =====================
 router.get("/", async (req, res) => {
   try {
@@ -171,7 +206,7 @@ router.get("/", async (req, res) => {
         rr.observaciones_generales,
         rr.foto_nombre,
         rr.foto_tipo,
-        rr.foto_base64,
+        (rr.foto_base64 IS NOT NULL AND rr.foto_base64 <> '') AS tiene_foto,
         DATE_FORMAT(rr.creado_en, '%d/%m/%Y %H:%i') AS creado_formato,
         u.placa,
         us.nombre AS creado_por_nombre,
@@ -220,7 +255,8 @@ router.get("/", async (req, res) => {
       const ids = revisiones.map(r => r.id);
       const [detalles] = await pool.query(
         `
-        SELECT revision_id, item_nombre, estado, observacion, foto_base64
+        SELECT id, revision_id, item_nombre, estado, observacion,
+               (foto_base64 IS NOT NULL AND foto_base64 <> '') AS tiene_foto
         FROM revisiones_ruta_detalle
         WHERE revision_id IN (?)
         ORDER BY id ASC

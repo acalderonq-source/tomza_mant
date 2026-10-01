@@ -342,9 +342,9 @@
           <div class="work-summary-text"><%= r.observaciones_resumen || '—' %></div>
         </div>
 
-        <% if (r.foto_base64) { %>
+        <% if (r.tiene_foto) { %>
           <div>
-            <img class="revision-photo" src="<%= r.foto_base64 %>" alt="Foto de la revisión <%= r.placa %>">
+            <img class="revision-photo" src="/revision-ruta/foto/revision/<%= r.id %>" loading="lazy" alt="Foto de la revisión <%= r.placa %>">
           </div>
         <% } %>
 
@@ -361,8 +361,8 @@
               <div><span class="badge badge-<%= d.estado %>"><%= etiquetaEstado(d.estado) %></span></div>
               <div class="small-muted">
                 <%= d.observacion || '-' %>
-                <% if (d.foto_base64) { %>
-                  <img class="detail-photo" src="<%= d.foto_base64 %>" alt="Foto de <%= d.item_nombre %>">
+                <% if (d.tiene_foto) { %>
+                  <img class="detail-photo" src="/revision-ruta/foto/detalle/<%= d.id %>" loading="lazy" alt="Foto de <%= d.item_nombre %>">
                 <% } %>
               </div>
             </div>

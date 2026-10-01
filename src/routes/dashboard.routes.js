@@ -24,6 +24,7 @@ const DB_CONNECTION_ERRORS = new Set(["ECONNRESET", "PROTOCOL_CONNECTION_LOST", 
 const RESUMEN_EJECUTIVO_CACHE_MS = Number(process.env.RESUMEN_EJECUTIVO_CACHE_MS || 1000 * 60);
 const RESUMEN_EJECUTIVO_STALE_MS = Number(process.env.RESUMEN_EJECUTIVO_STALE_MS || 1000 * 60 * 5);
 const resumenEjecutivoCache = new Map();
+const RESUMEN_EJECUTIVO_CACHE_MAX = 5;
 
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
@@ -1916,6 +1917,9 @@ function claveResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro, periodoCie
 async function obtenerResumenEjecutivoCached(params) {
   const key = claveResumenEjecutivo(params);
   const now = Date.now();
+  for (const [cacheKey, entry] of resumenEjecutivoCache) {
+    if (now - entry.createdAt > RESUMEN_EJECUTIVO_STALE_MS) resumenEjecutivoCache.delete(cacheKey);
+  }
   const cached = resumenEjecutivoCache.get(key);
 
   if (cached && now - cached.createdAt <= RESUMEN_EJECUTIVO_CACHE_MS) {
@@ -1926,9 +1930,9 @@ async function obtenerResumenEjecutivoCached(params) {
     const data = await obtenerResumenEjecutivo(params);
     resumenEjecutivoCache.set(key, { data, createdAt: now });
 
-    if (resumenEjecutivoCache.size > 30) {
+    if (resumenEjecutivoCache.size > RESUMEN_EJECUTIVO_CACHE_MAX) {
       const entradas = [...resumenEjecutivoCache.entries()].sort((a, b) => a[1].createdAt - b[1].createdAt);
-      entradas.slice(0, resumenEjecutivoCache.size - 30).forEach(([cacheKey]) => resumenEjecutivoCache.delete(cacheKey));
+      entradas.slice(0, resumenEjecutivoCache.size - RESUMEN_EJECUTIVO_CACHE_MAX).forEach(([cacheKey]) => resumenEjecutivoCache.delete(cacheKey));
     }
 
     return data;

@@ -18,6 +18,19 @@ const sessionSecret = process.env.SESSION_SECRET || "tomza_dev_secret_change_me"
 const sessionMaxAge = Number(process.env.SESSION_MAX_AGE_MS || 1000 * 60 * 60 * 24 * 7);
 const transientDbErrors = new Set(["ECONNRESET", "PROTOCOL_CONNECTION_LOST", "ETIMEDOUT", "ENOTFOUND", "ECONNREFUSED"]);
 
+if (isProduction) {
+  const memoryLogInterval = setInterval(() => {
+    const { rss, heapUsed, heapTotal, external } = process.memoryUsage();
+    console.info("Memoria proceso (MB):", {
+      rss: Math.round(rss / 1024 / 1024),
+      heapUsed: Math.round(heapUsed / 1024 / 1024),
+      heapTotal: Math.round(heapTotal / 1024 / 1024),
+      external: Math.round(external / 1024 / 1024)
+    });
+  }, 1000 * 60 * 5);
+  memoryLogInterval.unref();
+}
+
 function isTransientDbError(error) {
   return error && transientDbErrors.has(error.code);
 }
