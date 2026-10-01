@@ -4215,6 +4215,26 @@ router.post("/ordenes/consignacion-consumo", requireAuth, allowRoles("ADMIN", "T
     }
     const proveedor = candidatos[0];
 
+    const [proveedoresConsignacion] = await connection.query(`
+      SELECT DISTINCT COALESCE(NULLIF(TRIM(proveedor_consignacion), ''), NULLIF(TRIM(proveedor_nombre), ''), ?) AS proveedor
+      FROM bodega_articulos
+      WHERE origen_inventario = 'CONSIGNACION'
+    `, ["MAXI REPUESTOS"]);
+    const variantesProveedor = [...new Set([
+      proveedor.nombre,
+      ...proveedoresConsignacion.map(row => String(row.proveedor || "").trim()).filter(nombre => {
+        const clave = normalizarProveedor(nombre);
+        if (!clave) return false;
+        const exacto = proveedores.find(item => normalizarProveedor(item.nombre) === clave);
+        if (exacto) return Number(exacto.id) === Number(proveedor.id);
+        const posibles = proveedores.filter(item => {
+          const registrada = normalizarProveedor(item.nombre);
+          return registrada.startsWith(clave) || clave.startsWith(registrada);
+        });
+        return posibles.length === 1 && Number(posibles[0].id) === Number(proveedor.id);
+      })
+    ])];
+
     await connection.beginTransaction();
     transaction = true;
     const [[existente]] = await connection.query(`
@@ -4243,12 +4263,12 @@ router.post("/ordenes/consignacion-consumo", requireAuth, allowRoles("ADMIN", "T
         AND bm.tipo_movimiento IN ('SALIDA', 'DEVOLUCION')
         AND DATE(bm.creado_en) BETWEEN ? AND ?
         AND COALESCE(NULLIF(TRIM(bm.proveedor_snapshot), ''), NULLIF(TRIM(bm.proveedor_nombre), ''),
-                     NULLIF(TRIM(ba.proveedor_consignacion), ''), NULLIF(TRIM(ba.proveedor_nombre), ''), ?) = ?
+                     NULLIF(TRIM(ba.proveedor_consignacion), ''), NULLIF(TRIM(ba.proveedor_nombre), ''), ?) IN (${variantesProveedor.map(() => "?").join(", ")})
         AND (? = '' OR bm.sede = ?)
         AND bom.movimiento_id IS NULL
       ORDER BY bm.id
       FOR UPDATE
-    `, [period.desde, period.hasta, "MAXI REPUESTOS", proveedorSolicitado, sede, sede]);
+    `, [period.desde, period.hasta, "MAXI REPUESTOS", ...variantesProveedor, sede, sede]);
 
     if (!movimientos.length) throw new Error("No hay consumos de consignación pendientes de ordenar para ese proveedor, sede y período.");
     const movimientosSinPlaca = movimientos.filter(row => !String(row.placa || "").trim());
@@ -4268,8 +4288,7 @@ router.post("/ordenes/consignacion-consumo", requireAuth, allowRoles("ADMIN", "T
     const iva = 13;
     const montoIva = subtotal * iva / 100;
     const total = subtotal + montoIva;
-    const placas = [...new Set(lineas.map(linea => linea.placa).filter(placa => placa !== "GENERAL"))];
-    const placaOrden = placas.length === 1 && lineas.every(linea => linea.placa === placas[0]) ? placas[0] : null;
+    const placaOrden = "GENERALES TALLER";
     const observaciones = `Orden de consignación confirmada con ${contactoConfirmacion}${referenciaConfirmacion ? ` (${referenciaConfirmacion})` : ""} · Período ${period.desde} al ${period.hasta}${sede ? ` · Sede ${sede}` : " · Todas las sedes"}. Cada línea conserva la placa del consumo.`;
     const [ordenResult] = await connection.query(`
       INSERT INTO ordenes_compra

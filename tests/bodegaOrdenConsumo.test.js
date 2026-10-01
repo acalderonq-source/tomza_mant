@@ -52,9 +52,10 @@ beforeEach(() => {
 test("consumption creates a regular draft PO with net per-plate lines and locks movements against reuse", async () => {
   query = async (sql, params = []) => {
     if (/SELECT id, nombre FROM proveedores/.test(sql)) return [[{ id: 5, nombre: "MAXI REPUESTOS SRL" }]];
+    if (/SELECT DISTINCT COALESCE\(NULLIF\(TRIM\(proveedor_consignacion/.test(sql)) return [[{ proveedor: "MAXI REPUESTOS" }, { proveedor: "Maxi Repuestos SRL" }]];
     if (/SELECT orden_compra_id FROM bodega_ordenes_consumo/.test(sql)) return [[]];
     if (/SELECT bm\.id, bm\.articulo_id/.test(sql)) {
-      assert.deepEqual(params, ["2026-09-21", "2026-09-27", "MAXI REPUESTOS", "MAXI REPUESTOS", "Cartago", "Cartago"]);
+      assert.deepEqual(params, ["2026-09-21", "2026-09-27", "MAXI REPUESTOS", "MAXI REPUESTOS SRL", "MAXI REPUESTOS", "Maxi Repuestos SRL", "Cartago", "Cartago"]);
       return [[
         { id: 101, articulo_id: 9, tipo_movimiento: "SALIDA", cantidad: 2, placa: "C164528", precio_unitario: 100, codigo_taller: "0009", codigo: "LF1", nombre: "Filtro", unidad_medida: "UND", precio_actual: 120, articulo_proveedor_id: 5 },
         { id: 102, articulo_id: 9, tipo_movimiento: "DEVOLUCION", cantidad: 1, placa: "C164528", precio_unitario: 100, codigo_taller: "0009", codigo: "LF1", nombre: "Filtro", unidad_medida: "UND", precio_actual: 120, articulo_proveedor_id: 5 }
@@ -73,7 +74,7 @@ test("consumption creates a regular draft PO with net per-plate lines and locks 
   assert.equal(response.redirect, "/compras/ordenes/30/pdf");
   assert.match(response.session.success, /2026-001/);
   const order = statements.find(item => /INSERT INTO ordenes_compra\s/.test(item.sql));
-  assert.equal(order.params[3], "C164528");
+  assert.equal(order.params[3], "GENERALES TALLER");
   assert.equal(order.params[4], 100);
   assert.equal(order.params[5], 13);
   assert.equal(order.params[6], 113);
@@ -87,6 +88,7 @@ test("consumption creates a regular draft PO with net per-plate lines and locks 
 test("consumption without a plate cannot be converted into a purchase order", async () => {
   query = async sql => {
     if (/SELECT id, nombre FROM proveedores/.test(sql)) return [[{ id: 5, nombre: "MAXI REPUESTOS SRL" }]];
+    if (/SELECT DISTINCT COALESCE\(NULLIF\(TRIM\(proveedor_consignacion/.test(sql)) return [[{ proveedor: "MAXI REPUESTOS" }, { proveedor: "Maxi Repuestos SRL" }]];
     if (/SELECT orden_compra_id FROM bodega_ordenes_consumo/.test(sql)) return [[]];
     if (/SELECT bm\.id, bm\.articulo_id/.test(sql)) return [[
       { id: 101, articulo_id: 9, tipo_movimiento: "SALIDA", cantidad: 2, placa: null, precio_unitario: 100, codigo_taller: "0009", codigo: "LF1", nombre: "Filtro", unidad_medida: "UND", precio_actual: 120, articulo_proveedor_id: 5 }
@@ -106,6 +108,7 @@ test("consumption without a plate cannot be converted into a purchase order", as
 test("repeating the same provider, site and period does not create a duplicate order", async () => {
   query = async sql => {
     if (/SELECT id, nombre FROM proveedores/.test(sql)) return [[{ id: 5, nombre: "MAXI REPUESTOS SRL" }]];
+    if (/SELECT DISTINCT COALESCE\(NULLIF\(TRIM\(proveedor_consignacion/.test(sql)) return [[{ proveedor: "MAXI REPUESTOS" }, { proveedor: "Maxi Repuestos SRL" }]];
     if (/SELECT orden_compra_id FROM bodega_ordenes_consumo/.test(sql)) return [[{ orden_compra_id: 30 }]];
     throw new Error(sql);
   };

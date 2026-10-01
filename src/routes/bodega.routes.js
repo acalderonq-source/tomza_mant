@@ -51,6 +51,45 @@ function upper(value) {
   return limpiar(value).toUpperCase();
 }
 
+function claveProveedor(value) {
+  return upper(value).normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^A-Z0-9]/g, "");
+}
+
+function proveedorCanonico(nombre, proveedoresCompras) {
+  const clave = claveProveedor(nombre);
+  const exacto = proveedoresCompras.find(item => claveProveedor(item.nombre) === clave);
+  if (exacto) return exacto.nombre;
+  const candidatos = proveedoresCompras.filter(item => {
+    const registrada = claveProveedor(item.nombre);
+    return registrada.startsWith(clave) || clave.startsWith(registrada);
+  });
+  return candidatos.length === 1 ? candidatos[0].nombre : limpiar(nombre);
+}
+
+async function catalogoProveedoresConsignacion() {
+  const [filas] = await pool.query(`
+    SELECT COALESCE(NULLIF(TRIM(proveedor_consignacion), ''), NULLIF(TRIM(proveedor_nombre), ''), ?) AS proveedor,
+           COUNT(*) AS total_articulos
+    FROM bodega_articulos
+    WHERE activo = 1 AND origen_inventario = 'CONSIGNACION'
+    GROUP BY proveedor
+    ORDER BY proveedor
+  `, [PROVEEDOR_CONSIGNACION_DEFAULT]);
+  const [proveedoresCompras] = await pool.query("SELECT id, nombre FROM proveedores ORDER BY nombre");
+  const agrupados = new Map();
+  for (const fila of filas) {
+    const proveedor = proveedorCanonico(fila.proveedor, proveedoresCompras);
+    if (!agrupados.has(proveedor)) agrupados.set(proveedor, { proveedor, total_articulos: 0, variantes: new Set() });
+    const grupo = agrupados.get(proveedor);
+    grupo.total_articulos += Number(fila.total_articulos || 0);
+    grupo.variantes.add(fila.proveedor);
+  }
+  return [...agrupados.values()].map(item => ({
+    ...item,
+    variantes: [...new Set([...item.variantes, item.proveedor])]
+  }));
+}
+
 function origenInventario(value, fallback = "PROPIO") {
   const origen = upper(value);
   return ORIGENES_INVENTARIO.includes(origen) ? origen : fallback;
@@ -628,24 +667,19 @@ async function renderBodega(req, res, pagina = "inicio") {
     let proveedoresConsignacion = [];
     let articulosConsignacion = [];
     let proveedorConsignacionSeleccionado = "";
+    let proveedorConsignacionVariantes = [];
     if (pagina === "consignacion") {
-      const [proveedoresRows] = await pool.query(`
-        SELECT COALESCE(NULLIF(TRIM(proveedor_consignacion), ''), NULLIF(TRIM(proveedor_nombre), ''), ?) AS proveedor,
-               COUNT(*) AS total_articulos
-        FROM bodega_articulos
-        WHERE activo = 1 AND origen_inventario = 'CONSIGNACION'
-        GROUP BY proveedor
-        ORDER BY proveedor
-      `, [PROVEEDOR_CONSIGNACION_DEFAULT]);
-      proveedoresConsignacion = proveedoresRows;
+      proveedoresConsignacion = await catalogoProveedoresConsignacion();
       const proveedorSolicitado = limpiar(req.query.proveedor);
-      proveedorConsignacionSeleccionado = proveedoresRows.find(row => row.proveedor === proveedorSolicitado)?.proveedor || "";
+      const grupoProveedor = proveedoresConsignacion.find(row => row.proveedor === proveedorSolicitado);
+      proveedorConsignacionSeleccionado = grupoProveedor?.proveedor || "";
+      proveedorConsignacionVariantes = grupoProveedor?.variantes || [];
 
       const condicionesConsignacion = ["activo = 1", "origen_inventario = 'CONSIGNACION'"];
       const paramsConsignacion = [];
       if (proveedorConsignacionSeleccionado) {
-        condicionesConsignacion.push("COALESCE(NULLIF(TRIM(proveedor_consignacion), ''), NULLIF(TRIM(proveedor_nombre), ''), ?) = ?");
-        paramsConsignacion.push(PROVEEDOR_CONSIGNACION_DEFAULT, proveedorConsignacionSeleccionado);
+        condicionesConsignacion.push(`COALESCE(NULLIF(TRIM(proveedor_consignacion), ''), NULLIF(TRIM(proveedor_nombre), ''), ?) IN (${proveedorConsignacionVariantes.map(() => "?").join(", ")})`);
+        paramsConsignacion.push(PROVEEDOR_CONSIGNACION_DEFAULT, ...proveedorConsignacionVariantes);
       }
       if (q) {
         condicionesConsignacion.push("(nombre LIKE ? OR codigo LIKE ? OR codigo_taller LIKE ? OR numero_parte LIKE ? OR categoria LIKE ? OR proveedor_consignacion LIKE ?)");
@@ -809,6 +843,7 @@ async function renderBodega(req, res, pagina = "inicio") {
       articulosConsignacion,
       proveedoresConsignacion,
       proveedorConsignacionSeleccionado,
+      proveedorConsignacionVariantes,
       movimientos,
       prestamos,
       stats: {
@@ -850,12 +885,13 @@ router.get("/inventario", (req, res) => renderBodega(req, res, "inventario"));
 router.get("/herramientas", (req, res) => renderBodega(req, res, "herramientas"));
 router.get("/movimientos", (req, res) => renderBodega(req, res, "movimientos"));
 
-async function movimientosConsumo(origen, period, proveedor = "", sede = "", soloPendientes = false) {
+async function movimientosConsumo(origen, period, proveedor = "", sede = "", soloPendientes = false, variantesProveedor = []) {
   const params = [origen, period.desde, period.hasta];
   let proveedorSql = "";
   if (proveedor) {
-    proveedorSql = " AND COALESCE(NULLIF(TRIM(bm.proveedor_snapshot), ''), NULLIF(TRIM(bm.proveedor_nombre), ''), NULLIF(TRIM(ba.proveedor_consignacion), ''), NULLIF(TRIM(ba.proveedor_nombre), ''), ?) = ?";
-    params.push(PROVEEDOR_CONSIGNACION_DEFAULT, proveedor);
+    const variantes = variantesProveedor.length ? variantesProveedor : [proveedor];
+    proveedorSql = ` AND COALESCE(NULLIF(TRIM(bm.proveedor_snapshot), ''), NULLIF(TRIM(bm.proveedor_nombre), ''), NULLIF(TRIM(ba.proveedor_consignacion), ''), NULLIF(TRIM(ba.proveedor_nombre), ''), ?) IN (${variantes.map(() => "?").join(", ")})`;
+    params.push(PROVEEDOR_CONSIGNACION_DEFAULT, ...variantes);
   }
   const sedeSql = sede ? " AND bm.sede = ?" : "";
   if (sede) params.push(sede);
@@ -889,18 +925,13 @@ router.get("/consignacion/orden/revisar", async (req, res) => {
     const sede = sedeSolicitada && sedes.includes(sedeSolicitada) ? sedeSolicitada : "";
     if (!proveedor) throw new Error("Seleccione el proveedor de consignación.");
 
-    const [proveedores] = await pool.query(`
-      SELECT COALESCE(NULLIF(TRIM(proveedor_consignacion), ''), NULLIF(TRIM(proveedor_nombre), ''), ?) AS proveedor
-      FROM bodega_articulos
-      WHERE activo = 1 AND origen_inventario = 'CONSIGNACION'
-      GROUP BY proveedor
-      ORDER BY proveedor
-    `, [PROVEEDOR_CONSIGNACION_DEFAULT]);
-    if (!proveedores.some(item => item.proveedor === proveedor)) {
+    const proveedores = await catalogoProveedoresConsignacion();
+    const proveedorInfo = proveedores.find(item => item.proveedor === proveedor);
+    if (!proveedorInfo) {
       throw new Error("El proveedor seleccionado no tiene artículos de consignación activos.");
     }
 
-    const data = await movimientosConsumo("CONSIGNACION", period, proveedor, sede, true);
+    const data = await movimientosConsumo("CONSIGNACION", period, proveedor, sede, true, proveedorInfo.variantes);
     const lineas = consumptionOrderLines(data.details);
     const consumosSinPlaca = data.details.filter(item => !limpiar(item.placa));
     if (!lineas.length) throw new Error("No hay consumos pendientes con cantidad neta positiva para ese proveedor y período.");
@@ -973,7 +1004,8 @@ router.get("/consignacion/consumos.xlsx", async (req, res) => {
     const proveedor = limpiar(req.query.proveedor);
     const sedes = await sedesBodega();
     const sede = sedes.includes(limpiar(req.query.sede)) ? limpiar(req.query.sede) : "";
-    const data = await movimientosConsumo("CONSIGNACION", period, proveedor, sede);
+    const proveedorInfo = proveedor ? (await catalogoProveedoresConsignacion()).find(item => item.proveedor === proveedor) : null;
+    const data = await movimientosConsumo("CONSIGNACION", period, proveedor, sede, false, proveedorInfo?.variantes || []);
     const buffer = await consignmentXlsx(data, period, [proveedor, sede].filter(Boolean).join(" · "));
     res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
     res.setHeader("Content-Disposition", `attachment; filename="consumo_consignacion_${period.desde}_${period.hasta}.xlsx"`);
