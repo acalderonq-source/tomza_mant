@@ -12,6 +12,7 @@ async function withServer(departamento, run) {
   app.use(controlarAccesoPorDepartamento);
   app.all("/mantenimientos/:id/plan", (_req, res) => res.send("handler ejecutado"));
   app.get("/dashboard", (_req, res) => res.send("dashboard disponible"));
+  app.get("/api/unidades/buscar", (_req, res) => res.json({ unidades: ["C123"] }));
   app.get("/compras/facturas/asientos", (_req, res) => res.send("asientos disponibles"));
   app.get("/compras/ordenes", (_req, res) => res.send("órdenes disponibles"));
   app.get("/bodega/inventario", (_req, res) => res.send("bodega disponible"));
@@ -55,6 +56,22 @@ test("las llamadas JSON reciben un 403 estructurado si intentan abrir una ruta d
     assert.equal(response.status, 403);
     assert.equal(response.headers.get("content-type")?.includes("application/json"), true);
     assert.match((await response.json()).error, /pertenece a Taller/);
+  });
+});
+
+test("el buscador API de placas queda aislado en Taller", async () => {
+  await withServer("OPERACIONES", async base => {
+    const response = await fetch(`${base}/api/unidades/buscar?q=C1`, {
+      headers: { Accept: "application/json" }
+    });
+    assert.equal(response.status, 403);
+    assert.match((await response.json()).error, /pertenece a Taller/);
+  });
+
+  await withServer("TALLER", async base => {
+    const response = await fetch(`${base}/api/unidades/buscar?q=C1`);
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), { unidades: ["C123"] });
   });
 });
 

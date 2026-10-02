@@ -45,9 +45,10 @@ El numero `1.0.0` que aparece en `package.json` identifica la version del paquet
 ## Estado de auditoria al 2026-10-02
 
 - El sistema usa Node.js, Express, EJS y MySQL; las rutas se organizan por modulo.
-- `npm test` pasa 117 pruebas automatizadas (0 fallidas) en el estado local revisado.
+- `npm test` pasa 118 pruebas automatizadas (0 fallidas) en el estado local revisado.
 - La vista del dashboard se prueba renderizada: ADMIN ve los modulos historicos de Taller al seleccionar Taller y no ve modulos ni indicadores de Taller al seleccionar Operaciones.
 - El tablero se prueba para ADMIN, TALLER, Contabilidad, Proveeduría y BODEGUERO; se cruza cada enlace de Taller visible con el middleware para evitar tarjetas que terminen en 403.
+- La API del buscador de placas devuelve 403 fuera de Taller y funciona al seleccionar Taller.
 - Las rutas de Taller tienen pruebas HTTP de bloqueo por departamento; los flujos de aceites, lavado, bodega, unidades, ARESEP y otros procesos tienen pruebas automatizadas parciales.
 - El ejecutor procesa por separado las acciones de `ALTER TABLE`: una columna o indice ya existente no omite las acciones siguientes y los errores reales detienen la migracion.
 - `/ready` comprueba conexion y columnas esenciales de unidades y confirmacion de consignaciones; Render no marca listo un esquema incompleto.
