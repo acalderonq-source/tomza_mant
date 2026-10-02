@@ -1416,6 +1416,9 @@ router.post("/articulos/:id/editar", async (req, res) => {
       precio_unitario: precioUnitario,
       proveedor_id: proveedor.id,
       proveedor_nombre: proveedor.nombre,
+      proveedor_consignacion: anterior.origen_inventario === "CONSIGNACION"
+        ? (limpiar(req.body.proveedor_consignacion).slice(0, 180) || proveedor.nombre || anterior.proveedor_consignacion || PROVEEDOR_CONSIGNACION_DEFAULT)
+        : anterior.proveedor_consignacion,
       observacion: limpiar(req.body.observacion) || null
     };
 
@@ -1423,13 +1426,13 @@ router.post("/articulos/:id/editar", async (req, res) => {
       `UPDATE bodega_articulos
        SET codigo = ?, nombre = ?, tipo_articulo = ?, grupo_bodega = ?, categoria = ?, marca = ?,
            numero_parte = ?, tipo_unidad = ?, unidad_medida = ?, stock_minimo = ?, stock_maximo = ?,
-           ubicacion = ?, precio_unitario = ?, proveedor_id = ?, proveedor_nombre = ?, observacion = ?
+           ubicacion = ?, precio_unitario = ?, proveedor_id = ?, proveedor_nombre = ?, proveedor_consignacion = ?, observacion = ?
        WHERE id = ?`,
       [
         despues.codigo, despues.nombre, despues.tipo_articulo, despues.grupo_bodega, despues.categoria,
         despues.marca, despues.numero_parte, despues.tipo_unidad, despues.unidad_medida, despues.stock_minimo,
         despues.stock_maximo, despues.ubicacion, despues.precio_unitario, despues.proveedor_id,
-        despues.proveedor_nombre, despues.observacion, articuloId
+        despues.proveedor_nombre, despues.proveedor_consignacion, despues.observacion, articuloId
       ]
     );
     await registrarAuditoriaSistema({
@@ -1454,6 +1457,7 @@ router.post("/articulos/:id/editar", async (req, res) => {
         precio_unitario: anterior.precio_unitario,
         proveedor_id: anterior.proveedor_id,
         proveedor_nombre: anterior.proveedor_nombre,
+        proveedor_consignacion: anterior.proveedor_consignacion,
         observacion: anterior.observacion
       },
       despues,

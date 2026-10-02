@@ -9,6 +9,7 @@ test("Bodega suggests active plates and rejects invented plates before changing 
   const originalConnection = pool.getConnection;
   const writes = [];
   const session = { user: { id: 1, usuario: "taller", rol: "TALLER" } };
+  let origenArticulo = "PROPIO";
   pool.query = async (sql, params = []) => {
     if (sql.includes("INFORMATION_SCHEMA.COLUMNS") || sql.includes("INFORMATION_SCHEMA.STATISTICS") && sql.includes("COUNT(*)")) {
       return [[{ total: 1 }]];
@@ -25,7 +26,7 @@ test("Bodega suggests active plates and rejects invented plates before changing 
         : []];
     }
     if (sql.includes("FROM bodega_articulos WHERE id = ?")) {
-      return [[{ id: 1, stock_actual: 5, origen_inventario: "PROPIO", ubicacion: "A-02", precio_unitario: 100, nombre: "Filtro", codigo_taller: "0001", codigo: "F-1", tipo_articulo: "REPUESTO" }]];
+      return [[{ id: 1, stock_actual: 5, origen_inventario: origenArticulo, proveedor_consignacion: origenArticulo === "CONSIGNACION" ? "MAXI" : null, ubicacion: "A-02", precio_unitario: 100, nombre: "Filtro", codigo_taller: "0001", codigo: "F-1", tipo_articulo: "REPUESTO" }]];
     }
     if (sql.includes("SELECT id, cantidad FROM bodega_existencias")) return [[{ id: 1, cantidad: 5 }]];
     if (sql.includes("SELECT COALESCE(SUM(cantidad), 0) AS total FROM bodega_existencias")) return [[{ total: 5 }]];
@@ -133,17 +134,20 @@ test("Bodega suggests active plates and rejects invented plates before changing 
     assert.equal(writes.length, writesBeforeBodeguero + 1);
     assert.match(session.success, /Artículo creado/);
 
+    origenArticulo = "CONSIGNACION";
     const writesBeforeEdicion = writes.length;
     assert.equal((await post("/bodega/articulos/1/editar", {
       nombre: "Filtro actualizado", codigo: "PROV-2", tipo_articulo: "REPUESTO", grupo_bodega: "INVENTARIO",
       categoria: "Filtros", marca: "Hino", numero_parte: "LF-2", tipo_unidad: "Hino 500", unidad_medida: "UND",
       stock_minimo: "1", stock_maximo: "10", ubicacion: "A-03", precio_unitario: "125,50",
-      proveedor_id: "", proveedor_nombre: "Proveedor nuevo", observacion: "Ficha revisada"
+      proveedor_id: "", proveedor_nombre: "Proveedor nuevo", proveedor_consignacion: "MAXI REPUESTOS", observacion: "Ficha revisada"
     })).status, 302);
     assert.match(session.success, /existencias no se modificaron/);
     const actualizacionFicha = writes.find((call, index) => index >= writesBeforeEdicion && call.sql.includes("UPDATE bodega_articulos"));
     assert.ok(actualizacionFicha);
     assert.doesNotMatch(actualizacionFicha.sql, /stock_actual|origen_inventario|codigo_taller/);
+    assert.match(actualizacionFicha.sql, /proveedor_consignacion/);
+    assert.equal(actualizacionFicha.params[15], "MAXI REPUESTOS");
     assert.ok(writes.some((call, index) => index >= writesBeforeEdicion && call.sql.includes("INSERT INTO auditoria_sistema")));
 
     session.user.rol = "BODEGA";
