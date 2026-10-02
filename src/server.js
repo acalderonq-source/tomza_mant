@@ -79,7 +79,8 @@ app.get("/health", (_req, res) => {
 app.get("/ready", async (_req, res) => {
   try {
     await pool.query("SELECT 1");
-    res.status(200).json({ status: "ready", database: "connected" });
+    const release = process.env.RENDER_GIT_COMMIT || process.env.GIT_COMMIT || "local";
+    res.status(200).json({ status: "ready", database: "connected", release });
   } catch (error) {
     console.error("Readiness check fallo:", error.code || error.message);
     res.status(503).json({ status: "not_ready", database: "unavailable" });
