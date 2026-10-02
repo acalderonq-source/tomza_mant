@@ -2,7 +2,7 @@ const { test } = require("node:test");
 const assert = require("node:assert/strict");
 const { verificarColumnasRequeridas, COLUMNAS_ESENCIALES_TALLER } = require("../src/utils/schemaReadiness");
 
-test("readiness accepts the required Taller and Bodega schema", async () => {
+test("readiness accepts the required schemas for Taller workflows and Bodega", async () => {
   const result = await verificarColumnasRequeridas(async (sql, params) => {
     assert.match(sql, /INFORMATION_SCHEMA\.COLUMNS/);
     assert.deepEqual(params, Object.keys(COLUMNAS_ESENCIALES_TALLER));
@@ -23,6 +23,17 @@ test("readiness identifies absent inventory columns rather than trusting databas
 
   assert.equal(result.listo, false);
   assert.deepEqual(result.faltantes, columnas.slice(2).map(columna => ({ tabla: "bodega_existencias", columna })));
+});
+
+test("readiness identifies missing maintenance columns", async () => {
+  const required = { mantenimientos: COLUMNAS_ESENCIALES_TALLER.mantenimientos };
+  const result = await verificarColumnasRequeridas(async () => [[
+    { tabla: "mantenimientos", columna: "id" },
+    { tabla: "mantenimientos", columna: "unidad_id" }
+  ]], required);
+
+  assert.equal(result.listo, false);
+  assert.deepEqual(result.faltantes, required.mantenimientos.slice(2).map(columna => ({ tabla: "mantenimientos", columna })));
 });
 
 test("readiness handles an empty requirements set", async () => {
