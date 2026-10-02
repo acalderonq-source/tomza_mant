@@ -4,13 +4,9 @@ const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
 const pool = require("../db");
+const { executeMigrationStatement } = require("../utils/sqlMigrationStatements");
 
 const migrationsDir = path.join(__dirname, "..", "..", "migrations");
-const IGNORABLE_CODES = new Set([
-  "ER_DUP_FIELDNAME",
-  "ER_DUP_KEYNAME",
-  "ER_TABLE_EXISTS_ERROR"
-]);
 
 function checksum(content) {
   return crypto.createHash("sha256").update(content).digest("hex");
@@ -56,12 +52,8 @@ async function runMigration(filename) {
 
   for (const statement of statements) {
     try {
-      await pool.query(statement);
+      await executeMigrationStatement(sql => pool.query(sql), statement);
     } catch (error) {
-      if (IGNORABLE_CODES.has(error.code)) {
-        console.warn(`Omitido por existir (${error.code}) en ${filename}`);
-        continue;
-      }
       error.message = `Error en ${filename}: ${error.message}`;
       throw error;
     }
