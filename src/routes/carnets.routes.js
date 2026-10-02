@@ -1,4 +1,6 @@
 const express = require("express");
+const fs = require("node:fs");
+const path = require("node:path");
 const QRCode = require("qrcode");
 const PdfPrinter = require("pdfmake");
 const pool = require("../db");
@@ -34,30 +36,32 @@ function safeFilename(value) {
 }
 
 async function crearPdfCarnet(worker, qr, photoBuffer) {
+  const logoPath = path.join(__dirname, "../../public/img/logo_tomza_carnet.jpg");
+  const logo = `data:image/jpeg;base64,${fs.readFileSync(logoPath).toString("base64")}`;
   const photo = photoBuffer ? `data:image/jpeg;base64,${photoBuffer.toString("base64")}` : null;
   const document = {
     pageSize: { width: 255, height: 165 },
-    pageMargins: [12, 12, 12, 12],
+    pageMargins: [10, 10, 10, 10],
     defaultStyle: { font: "Helvetica", fontSize: 8, color: "#17243A" },
     content: [
       { columns: [
-        { text: "GAS TOMZA", bold: true, fontSize: 12, color: "#12396A" },
-        { text: "IDENTIFICACION", bold: true, fontSize: 8, color: "#64748B", alignment: "right", margin: [0, 3, 0, 0] }
-      ], margin: [0, 0, 0, 8] },
-      { canvas: [{ type: "line", x1: 0, y1: 0, x2: 231, y2: 0, lineWidth: 1, lineColor: "#CBD5E1" }], margin: [0, 0, 0, 8] },
+        { image: logo, fit: [112, 36] },
+        { text: "CARNET DE\nIDENTIFICACION", bold: true, fontSize: 7, color: "#64748B", alignment: "right", margin: [0, 10, 0, 0] }
+      ], margin: [0, 0, 0, 4] },
+      { canvas: [{ type: "line", x1: 0, y1: 0, x2: 235, y2: 0, lineWidth: 1, lineColor: "#CBD5E1" }], margin: [0, 0, 0, 5] },
       { columns: [
         photo
-          ? { image: photo, fit: [62, 88], alignment: "center", margin: [0, 1, 0, 0] }
-          : { text: "FOTO\nNO CARGADA", width: 62, height: 88, alignment: "center", color: "#64748B", margin: [0, 34, 0, 0] },
+          ? { image: photo, fit: [55, 74], alignment: "center" }
+          : { text: "FOTO\nNO CARGADA", width: 55, alignment: "center", color: "#64748B", margin: [0, 28, 0, 0] },
         { width: "*", stack: [
-          { text: worker.nombre || "Trabajador", bold: true, fontSize: 11, color: "#152238", margin: [0, 6, 0, 4] },
+          { text: worker.nombre || "Trabajador", bold: true, fontSize: 10, color: "#152238", margin: [0, 8, 0, 4] },
           { text: worker.perfil || "Trabajador", fontSize: 7, color: "#64748B", margin: [0, 0, 0, 7] },
           { text: "PIN / CODIGO DE TRABAJADOR", fontSize: 6, color: "#475569" },
-          { text: String(worker.codigo_trabajador || "Pendiente"), bold: true, fontSize: 15, color: "#12396A", margin: [0, 2, 0, 0] }
+          { text: String(worker.codigo_trabajador || "Pendiente"), bold: true, fontSize: 14, color: "#12396A", margin: [0, 2, 0, 0] }
         ] },
-        { image: qr, fit: [76, 76], alignment: "center", margin: [0, 7, 0, 0] }
-      ], columnGap: 8 },
-      { text: "El código de trabajador es el PIN de acceso al sistema.", fontSize: 6, color: "#64748B", margin: [0, 8, 0, 0], alignment: "center" }
+        { image: qr, fit: [65, 65], alignment: "center", margin: [0, 4, 0, 0] }
+      ], columnGap: 6 },
+      { text: "El código de trabajador es el PIN de acceso al sistema.", fontSize: 6, color: "#64748B", margin: [0, 5, 0, 0], alignment: "center" }
     ]
   };
   return pdfBuffer(document);
