@@ -43,6 +43,13 @@ function numero(value) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+function numeroNoNegativo(value) {
+  const texto = String(value ?? "").trim().replace(/\s/g, "");
+  if (!/^\d+(?:[.,]\d{1,2})?$/.test(texto)) return null;
+  const parsed = Number(texto.replace(",", "."));
+  return Number.isFinite(parsed) && parsed <= 9999999999.99 ? parsed : null;
+}
+
 function limpiar(value) {
   return String(value || "").trim();
 }
@@ -1790,9 +1797,9 @@ router.post("/ajustar", async (req, res) => {
   try {
     await ensureBodegaTables();
     const articuloId = Number(req.body.articulo_id);
-    const conteo = numero(req.body.conteo_fisico);
+    const conteo = numeroNoNegativo(req.body.conteo_fisico);
     const motivo = limpiar(req.body.motivo);
-    if (!articuloId || conteo < 0 || !motivo) {
+    if (!Number.isSafeInteger(articuloId) || articuloId <= 0 || conteo === null || !motivo) {
       req.session.error = "Debe indicar artículo, conteo físico y motivo del ajuste.";
       return redirectBodega(req, res);
     }

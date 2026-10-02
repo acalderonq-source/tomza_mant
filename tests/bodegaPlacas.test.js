@@ -80,6 +80,12 @@ test("Bodega suggests active plates and rejects invented plates before changing 
     assert.match(session.error, /cada línea debe tener un producto y una cantidad mayor que cero/);
     assert.equal(writes.length, 0);
 
+    assert.equal((await post("/bodega/ajustar", {
+      articulo_id: "1", conteo_fisico: "texto", sede: "Cartago", motivo: "Conteo físico"
+    })).status, 302);
+    assert.match(session.error, /conteo físico y motivo/);
+    assert.equal(writes.length, 0);
+
     assert.equal((await post("/bodega/articulos", { nombre: "Filtro", stock_actual: "5" })).status, 302);
     assert.match(session.error, /sin existencia/);
     assert.equal(writes.length, 0);
