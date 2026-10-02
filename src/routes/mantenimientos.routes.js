@@ -57,7 +57,8 @@ function esUnidadTecnicosPesados(user, placa) {
 }
 
 function puedeAccederUnidadMantenimiento(user, unidad, sedesPermitidas) {
-  return tieneSedePermitida(unidad?.sede, sedesPermitidas) || esUnidadTecnicosPesados(user, unidad?.placa);
+  return puedeAccederSedeMantenimiento(user, unidad?.sede, sedesPermitidas) ||
+    esUnidadTecnicosPesados(user, unidad?.placa);
 }
 
 function esUsuarioMecanicosCentrales(user) {
@@ -109,9 +110,15 @@ function aplicarFiltroSedesPermitidas(req, condiciones, params, columna, sedeFil
 }
 
 function tieneSedePermitida(sede, sedesPermitidas) {
-  if (!Array.isArray(sedesPermitidas) || !sedesPermitidas.length) return true;
+  if (!Array.isArray(sedesPermitidas) || !sedesPermitidas.length) return false;
   const sedeNormalizada = String(sede || "").trim().toUpperCase();
   return sedesPermitidas.some(item => String(item || "").trim().toUpperCase() === sedeNormalizada);
+}
+
+function puedeAccederSedeMantenimiento(user, sede, sedesPermitidas) {
+  const sedesDefinidas = Array.isArray(sedesPermitidas) && sedesPermitidas.length > 0;
+  if (!sedesDefinidas && ["ADMIN", "TALLER"].includes(user?.rol)) return true;
+  return tieneSedePermitida(sede, sedesPermitidas);
 }
 
 function puedeReprogramarMantenimientos(user) {
@@ -1126,7 +1133,7 @@ router.post("/correctivos", requireAuth, async (req, res) => {
         req.body.sede_sin_placa || sedeFiltro || req.session.user.sede || "Taller"
       ).trim();
       if (!sedeSinPlaca) return res.status(400).send("Debe indicar la sede del trabajo.");
-      if (!tieneSedePermitida(sedeSinPlaca, sedesPermitidasCorrectivo)) {
+      if (!puedeAccederSedeMantenimiento(req.session.user, sedeSinPlaca, sedesPermitidasCorrectivo)) {
         return res.status(403).send("Sede no autorizada para este usuario.");
       }
 

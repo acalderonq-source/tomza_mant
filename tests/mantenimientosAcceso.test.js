@@ -148,6 +148,71 @@ test("el cierre autorizado actualiza y asigna mecánicos en una sola transacció
   assert.equal(tx.released, true);
 });
 
+test("un mecanico sin sede asignada no puede cerrar mantenimientos de otras sedes", async () => {
+  const tx = { writes: [], committed: false, rolledBack: false, released: false };
+  const connection = {
+    async beginTransaction() {},
+    async query(sql) {
+      tx.writes.push(sql);
+      if (sql.includes("SELECT m.id, m.estado, u.placa, u.sede")) {
+        return [[{ id: 20, estado: "PROGRAMADO", placa: "C1", sede: "Cartago" }]];
+      }
+      return [[]];
+    },
+    async commit() { tx.committed = true; },
+    async rollback() { tx.rolledBack = true; },
+    release() { tx.released = true; }
+  };
+
+  await withServer({ id: 9, usuario: "mecanico_sin_sede", rol: "MECANICO", sede: "" }, {
+    getConnection: async () => connection
+  }, async base => {
+    const response = await post(base, "/mantenimientos/20/ejecucion", {
+      ejecucion: "Trabajo no autorizado",
+      mecanicos: ["7"]
+    });
+    assert.equal(response.status, 403);
+    assert.equal(tx.committed, false);
+    assert.equal(tx.rolledBack, true);
+    assert.equal(tx.writes.length, 1);
+  });
+  assert.equal(tx.released, true);
+});
+
+test("un mecanico de sede puede cerrar el mantenimiento de su sede", async () => {
+  const tx = { writes: [], committed: false, rolledBack: false, released: false };
+  const connection = {
+    async beginTransaction() {},
+    async query(sql, params = []) {
+      tx.writes.push({ sql, params });
+      if (sql.includes("SELECT m.id, m.estado, u.placa, u.sede")) {
+        return [[{ id: 20, estado: "PROGRAMADO", placa: "A1", sede: "Alajuela" }]];
+      }
+      if (sql.includes("SELECT id FROM mecanicos")) return [[{ id: 7 }]];
+      if (sql.includes("UPDATE mantenimientos m")) return [{ affectedRows: 1 }];
+      return [{ affectedRows: 1 }];
+    },
+    async commit() { tx.committed = true; },
+    async rollback() { tx.rolledBack = true; },
+    release() { tx.released = true; }
+  };
+
+  await withServer({ id: 10, usuario: "mecanico_alajuela", rol: "MECANICO", sede: "" }, {
+    getConnection: async () => connection
+  }, async base => {
+    const response = await post(base, "/mantenimientos/20/ejecucion", {
+      ejecucion: "Mantenimiento preventivo",
+      mecanicos: ["7"]
+    });
+    assert.equal(response.status, 302);
+    assert.equal(tx.committed, true);
+    assert.equal(tx.rolledBack, false);
+    const mecanicosQuery = tx.writes.find(item => item.sql.includes("SELECT id FROM mecanicos"));
+    assert.ok(mecanicosQuery.params.flat().includes("Alajuela"));
+  });
+  assert.equal(tx.released, true);
+});
+
 test("si falla la asignación de un mecánico, el cierre revierte todos los cambios", async () => {
   const tx = { committed: false, rolledBack: false, released: false };
   const connection = {
