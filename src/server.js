@@ -72,7 +72,10 @@ if (isProduction) {
 // ===================== MIDDLEWARES =====================
 app.use(express.urlencoded({ extended: true, limit: "10mb", parameterLimit: 5000 }));
 app.use(express.json({ limit: "10mb" }));
-seedBundledUploads();
+const estadoCargaAdjuntos = seedBundledUploads();
+if (!estadoCargaAdjuntos.listo) {
+  console.error("No se pudo preparar el almacenamiento de adjuntos:", estadoCargaAdjuntos.motivo);
+}
 
 app.get("/health", (_req, res) => {
   res.status(200).json({ status: "ok" });
@@ -88,13 +91,14 @@ app.get("/ready", async (_req, res) => {
       return res.status(503).json({ status: "not_ready", database: "connected", schema: "incomplete", release });
     }
     const almacenamiento = verificarAlmacenamientoUploads();
-    if (!almacenamiento.listo) {
-      console.error("Readiness check: almacenamiento de adjuntos no disponible:", almacenamiento.motivo);
+    if (!almacenamiento.listo || !estadoCargaAdjuntos.listo) {
+      const motivo = almacenamiento.motivo || estadoCargaAdjuntos.motivo;
+      console.error("Readiness check: almacenamiento de adjuntos no disponible:", motivo);
       return res.status(503).json({
         status: "not_ready",
         database: "connected",
         schema: "ready",
-        uploads: { status: "unavailable", reason: almacenamiento.motivo },
+        uploads: { status: "unavailable", reason: motivo },
         release
       });
     }

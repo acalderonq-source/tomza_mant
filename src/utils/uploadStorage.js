@@ -24,14 +24,19 @@ function ensureUploadDirectory(...segments) {
 }
 
 function seedBundledUploads() {
-  ensureUploadDirectory();
-  if (UPLOAD_ROOT === BUNDLED_UPLOAD_ROOT || !fs.existsSync(BUNDLED_UPLOAD_ROOT)) return;
-
-  fs.cpSync(BUNDLED_UPLOAD_ROOT, UPLOAD_ROOT, {
-    recursive: true,
-    force: false,
-    errorOnExist: false
-  });
+  try {
+    ensureUploadDirectory();
+    if (UPLOAD_ROOT !== BUNDLED_UPLOAD_ROOT && fs.existsSync(BUNDLED_UPLOAD_ROOT)) {
+      fs.cpSync(BUNDLED_UPLOAD_ROOT, UPLOAD_ROOT, {
+        recursive: true,
+        force: false,
+        errorOnExist: false
+      });
+    }
+    return { listo: true, motivo: null };
+  } catch (error) {
+    return { listo: false, motivo: error.code || "unavailable" };
+  }
 }
 
 function rutaEnDiscoPersistente(root, mountInfo) {

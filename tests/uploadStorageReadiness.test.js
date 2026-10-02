@@ -3,7 +3,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
-const { BUNDLED_UPLOAD_ROOT, RENDER_UPLOAD_ROOT, resolverRaizUploads, rutaEnDiscoPersistente, verificarAlmacenamientoUploads } = require("../src/utils/uploadStorage");
+const { BUNDLED_UPLOAD_ROOT, RENDER_UPLOAD_ROOT, resolverRaizUploads, rutaEnDiscoPersistente, seedBundledUploads, verificarAlmacenamientoUploads } = require("../src/utils/uploadStorage");
 
 const testRoot = fs.mkdtempSync(path.join(os.tmpdir(), "tomza-upload-readiness-"));
 const writableDirectory = path.join(testRoot, "persistent");
@@ -71,4 +71,19 @@ test("readiness rejects missing or non-directory uploads paths", () => {
   assert.deepEqual(verificarAlmacenamientoUploads({
     root: regularFile, production: false
   }), { listo: false, motivo: "not_a_directory" });
+});
+
+test("seeding reports a permission error instead of throwing during startup", () => {
+  const originalMkdirSync = fs.mkdirSync;
+  fs.mkdirSync = () => {
+    const error = new Error("permission denied");
+    error.code = "EACCES";
+    throw error;
+  };
+
+  try {
+    assert.deepEqual(seedBundledUploads(), { listo: false, motivo: "EACCES" });
+  } finally {
+    fs.mkdirSync = originalMkdirSync;
+  }
 });
