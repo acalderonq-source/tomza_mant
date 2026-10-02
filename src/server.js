@@ -11,6 +11,7 @@ const { enviarRecordatoriosMantenimientos, ensurePushTables } = require("./utils
 const { ensureCsrfToken, injectSecurityAssets } = require("./middleware/security");
 const { UPLOAD_ROOT, seedBundledUploads } = require("./utils/uploadStorage");
 const { DEPARTAMENTOS, departamentosPermitidosPorRol, controlarAccesoPorDepartamento, ensurePortalDepartmentSchema } = require("./utils/departamentos");
+const { preventAuthenticatedHtmlCaching } = require("./utils/httpCache");
 const { verificarColumnasRequeridas, COLUMNAS_ESENCIALES_TALLER } = require("./utils/schemaReadiness");
 
 // Inicializar app
@@ -299,6 +300,8 @@ app.use((req, res, next) => {
       callback = options;
       options = {};
     }
+
+    preventAuthenticatedHtmlCaching(req, res);
 
     originalRender(view, options, (err, html) => {
       if (callback) return callback(err, err ? html : injectPageAssets(html, res.locals.csrfToken));
