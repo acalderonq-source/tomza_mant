@@ -45,7 +45,7 @@ El numero `1.0.0` que aparece en `package.json` identifica la version del paquet
 ## Estado de auditoria al 2026-10-02
 
 - El sistema usa Node.js, Express, EJS y MySQL; las rutas se organizan por modulo.
-- `npm test` pasa 131 pruebas automatizadas (0 fallidas) en el estado local revisado.
+- `npm test` pasa 132 pruebas automatizadas (0 fallidas) en el estado local revisado.
 - En Render, con perfil ADMIN, se verifico en pantalla que Taller muestra sus accesos historicos; al cambiar a Operaciones desaparecen los modulos de Taller y `/mantenimientos` deniega el acceso directo. La sesion se dejo nuevamente en Taller.
 - Una prueba HTTP recorre todos los prefijos Taller y sus subrutas: Operaciones recibe 403, Taller conserva acceso y los modulos compartidos de Contabilidad/Proveeduria mantienen sus permisos.
 - El tablero se prueba para ADMIN, TALLER, Contabilidad, Proveeduría y BODEGUERO; se cruza cada enlace de Taller visible con el middleware para evitar tarjetas que terminen en 403.
@@ -60,11 +60,13 @@ El numero `1.0.0` que aparece en `package.json` identifica la version del paquet
 - Se documento el procedimiento de respaldo y restauracion para la base MySQL en Railway y los archivos del disco persistente de Render; falta configurarlo y probarlo desde las cuentas.
 - El catalogo de Bodega permite editar fichas con auditoria antes/despues sin cambiar existencias; se prueban permisos de BODEGUERO y denegacion de BODEGA.
 - Las paginas HTML renderizadas para usuarios autenticados usan `Cache-Control: private, no-store`, para que el navegador no reutilice informacion de un departamento o sesion anterior; se prueban respuestas autenticadas y publicas.
+- Los adjuntos privados de facturas y cotizaciones siguen los mismos departamentos y roles autorizados para Facturas y Órdenes; se valida acceso permitido y denegado por carpeta.
 - Las entregas rechazan lineas invalidas y una prueba verifica rollback total si una linea no tiene saldo; los ajustes no aceptan conteos no numericos y los precios de catalogo/recepcion se validan en el servidor.
 - La publicacion `6f8a745b97d8947cd1bbe02b019a6f2c6b77e72a` se verifico en Render con `/ready`: `status=ready`, `database=connected` y `schema=ready`; posteriormente, el commit `4c99d4f` se comprobo en la interfaz de Render para la separacion Taller/Operaciones.
-- La instalacion limpia con `npm ci` conserva 131 pruebas aprobadas y `npm audit` reporta cero vulnerabilidades; el bloqueo de dependencias alinea `mysql2` transitivo con la version corregida.
+- La instalacion limpia con `npm ci` conserva 132 pruebas aprobadas y `npm audit` reporta cero vulnerabilidades; el bloqueo de dependencias alinea `mysql2` transitivo con la version corregida.
 - Mantenimientos falla cerrado cuando un mecanico de sede no tiene sede autorizada, sin impedir el cierre dentro de su sede; ADMIN/TALLER conservan el acceso global solo cuando no hay filtro de sede. Render responde `ready` con el commit `07292c39327814f306201dec4f45b0b3ec0eaa43`.
 - El commit `1b4512e` evita almacenar paginas HTML privadas en caché. `npm test` pasa 131 pruebas, `npm audit --omit=dev` reporta cero vulnerabilidades y Render responde `ready` con la base y el esquema conectados.
+- Los adjuntos de facturas y cotizaciones ahora respetan el departamento activo autorizado por sus respectivas pantallas, en vez de quedar limitados a Taller; Operaciones sigue denegado. `npm test` pasa 132 pruebas y `npm audit --omit=dev` no reporta vulnerabilidades.
 - La migracion `202610020001_bodega_consumo_confirmacion_completar.sql` recupera esquemas parciales agregando cada columna por separado. Render responde `ready` con las nuevas columnas esenciales de Bodega en el commit `4117c75aae1cbb88b4221523680fff89840c1df7`.
 - El resumen ejecutivo ahora inicia en el mes actual de Costa Rica cuando no se indica un rango, limita las subconsultas de ordenes a ese periodo y comparte calculos concurrentes identicos para reducir picos de memoria; se conservan los filtros de periodos anteriores.
 - Aun falta validar la interfaz real con perfiles de supervisor, mecanico, Pesados y bodeguero; completar cobertura de flujos criticos, probar respaldo/restauracion y obtener aceptacion funcional antes de declarar liberada la V1.
