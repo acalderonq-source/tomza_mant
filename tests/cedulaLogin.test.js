@@ -46,15 +46,14 @@ async function withLoginServer(queryHandler, run) {
   }
 }
 
-test("permite ingresar con cédula normalizada y conserva la cuenta y sus departamentos", async () => {
-  const password = await bcrypt.hash("Clave-segura-2026", 4);
+test("permite ingresar con cédula normalizada y PIN del código de trabajador", async () => {
+  const pinHash = await bcrypt.hash("123", 4);
   const consultas = [];
-  const user = { id: 31, usuario: "ana.mora", nombre: "Ana Mora", rol: "TALLER", sede: "Cartago", cedula: "123456789", password };
+  const user = { id: 31, usuario: "ana.mora", nombre: "Perfil Taller", rol: "TALLER", sede: "Cartago", persona_nombre: "Ana Mora", pin_hash: pinHash };
 
   await withLoginServer(async (sql, params = []) => {
     consultas.push({ sql, params });
-    if (sql.includes("WHERE usuario = ?")) return [[]];
-    if (sql.includes("WHERE cedula = ?")) return [[user]];
+    if (sql.includes("FROM usuario_cedulas")) return [[user]];
     if (sql.includes("FROM usuario_departamentos")) return [[{ departamento: "TALLER", es_principal: 1 }]];
     return [[]];
   }, async base => {
@@ -63,27 +62,25 @@ test("permite ingresar con cédula normalizada y conserva la cuenta y sus depart
       redirect: "manual",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({
-        usuario: "1-2345-6789",
-        password: "Clave-segura-2026",
+        cedula: "1-2345-6789",
+        pin: "123",
         departamento: "TALLER"
       })
     });
 
     assert.equal(response.status, 302);
     assert.equal(response.headers.get("location"), "/dashboard");
-    assert.equal(consultas[0].params[0], "1-2345-6789");
-    assert.equal(consultas[1].params[0], "123456789");
+    assert.equal(consultas[0].params[0], "123456789");
   });
 });
 
 test("permite ingresar por una cédula asociada a un perfil del Excel", async () => {
-  const password = await bcrypt.hash("Clave-segura-2026", 4);
+  const pinHash = await bcrypt.hash("456", 4);
   const consultas = [];
-  const user = { id: 34, usuario: "mecanico_guapiles", nombre: "Mecánico Guápiles", rol: "MECANICO", sede: "Guapiles", password };
+  const user = { id: 34, usuario: "mecanico_guapiles", nombre: "Mecánico Guápiles", rol: "MECANICO", sede: "Guapiles", pin_hash: pinHash };
 
   await withLoginServer(async (sql, params = []) => {
     consultas.push({ sql, params });
-    if (sql.includes("WHERE usuario = ?")) return [[]];
     if (sql.includes("FROM usuario_cedulas")) return [[{ ...user, persona_nombre: "Persona Excel", perfil_excel: "MECANICO_GUAPILES" }]];
     if (sql.includes("FROM usuario_departamentos")) return [[{ departamento: "TALLER", es_principal: 1 }]];
     return [[]];
@@ -92,7 +89,7 @@ test("permite ingresar por una cédula asociada a un perfil del Excel", async ()
       method: "POST",
       redirect: "manual",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({ usuario: "1-2345-6789", password: "Clave-segura-2026", departamento: "TALLER" })
+      body: new URLSearchParams({ cedula: "1-2345-6789", pin: "456", departamento: "TALLER" })
     });
     assert.equal(response.status, 302);
     assert.equal(response.headers.get("location"), "/dashboard");
@@ -100,13 +97,13 @@ test("permite ingresar por una cédula asociada a un perfil del Excel", async ()
   });
 });
 
-test("si la cédula y contraseña coinciden con dos perfiles, pide seleccionar el perfil", async () => {
-  const password = await bcrypt.hash("Clave-compartida-2026", 4);
+test("si la cédula tiene dos perfiles, el PIN válido permite seleccionar el perfil", async () => {
+  const pinHash = await bcrypt.hash("789", 4);
   await withLoginServer(async sql => {
     if (sql.includes("WHERE usuario = ?")) return [[]];
     if (sql.includes("FROM usuario_cedulas")) return [[
-      { id: 4, usuario: "mecanico", nombre: "Mecánico", rol: "MECANICO", password },
-      { id: 21, usuario: "pesados", nombre: "Mecánico Pesados", rol: "MECANICO", password }
+      { id: 4, usuario: "mecanico", nombre: "Mecánico", rol: "MECANICO", pin_hash: pinHash },
+      { id: 21, usuario: "pesados", nombre: "Mecánico Pesados", rol: "MECANICO", pin_hash: pinHash }
     ]];
     return [[]];
   }, async base => {
@@ -114,7 +111,7 @@ test("si la cédula y contraseña coinciden con dos perfiles, pide seleccionar e
       method: "POST",
       redirect: "manual",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({ usuario: "123456789", password: "Clave-compartida-2026", departamento: "TALLER" })
+      body: new URLSearchParams({ cedula: "123456789", pin: "789", departamento: "TALLER" })
     });
     const html = await response.text();
     assert.equal(response.status, 200);

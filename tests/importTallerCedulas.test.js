@@ -26,7 +26,20 @@ test("importación lee solo personas activas y admite cédulas con formato", asy
     const people = await leerPersonal(temp.file);
     assert.equal(people.length, 1);
     assert.equal(people[0].cedula, "123456789");
+    assert.equal(people[0].codigo, "123");
     assert.deepEqual(people[0].targets, ["mecanico"]);
+  } finally {
+    await fs.rm(temp.directory, { recursive: true, force: true });
+  }
+});
+
+test("importación conserva el cero inicial del código de trabajador mostrado en Excel", async () => {
+  const temp = await archivoTemporal([
+    ["001", "Persona Uno", "SI", "1-2345-6789", "MECANICO"]
+  ]);
+  try {
+    const people = await leerPersonal(temp.file);
+    assert.equal(people[0].codigo, "001");
   } finally {
     await fs.rm(temp.directory, { recursive: true, force: true });
   }

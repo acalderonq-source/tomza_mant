@@ -49,8 +49,10 @@ router.get("/login", (req, res) => {
  */
 router.post("/login", loginLimiter, async (req, res) => {
   try {
-    const identificador = String(req.body.usuario || "").trim();
-    const password = req.body.password;
+    const identificador = String(req.body.cedula || req.body.usuario || "").trim();
+    const cedula = normalizarCedula(identificador);
+    const esCedula = /^\d{9,12}$/.test(cedula);
+    const password = String(esCedula ? req.body.pin || "" : req.body.password || req.body.pin || "");
     const departamento = String(req.body.departamento || "").toUpperCase();
     const nextUrl = getSafeNextUrl(req.body.next);
 
@@ -61,7 +63,7 @@ router.post("/login", loginLimiter, async (req, res) => {
     // Validación básica
     if (!identificador || !password) {
       return res.render("login", {
-        error: "Debe ingresar usuario y contraseña",
+        error: esCedula ? "Ingrese la cédula y el PIN del código de trabajador." : "Debe ingresar usuario y contraseña",
         next: nextUrl,
         departamento,
         departamentoNombre: DEPARTAMENTOS.find(item => item.key === departamento)?.nombre
@@ -69,31 +71,23 @@ router.post("/login", loginLimiter, async (req, res) => {
     }
 
     // Acepta el nombre de usuario o una cédula asociada a uno o más perfiles.
-    let [rows] = await pool.query(
-      "SELECT * FROM usuarios WHERE usuario = ? LIMIT 1",
-      [identificador]
-    );
-
-    if (!rows.length) {
-      const cedula = normalizarCedula(identificador);
-      if (/^\d{9,12}$/.test(cedula)) {
-        [rows] = await pool.query(`
-          SELECT u.*, uc.persona_nombre, uc.perfil_excel
-          FROM usuario_cedulas uc
-          JOIN usuarios u ON u.id = uc.usuario_id
-          WHERE uc.cedula = ?
-          ORDER BY u.usuario
-        `, [cedula]);
-        if (!rows.length) {
-          [rows] = await pool.query("SELECT * FROM usuarios WHERE cedula = ? LIMIT 1", [cedula]);
-        }
-      }
+    let rows;
+    if (esCedula) {
+      [rows] = await pool.query(`
+        SELECT u.*, uc.persona_nombre, uc.perfil_excel, uc.pin_hash
+        FROM usuario_cedulas uc
+        JOIN usuarios u ON u.id = uc.usuario_id
+        WHERE uc.cedula = ?
+        ORDER BY u.usuario
+      `, [cedula]);
+    } else {
+      [rows] = await pool.query("SELECT * FROM usuarios WHERE usuario = ? LIMIT 1", [identificador]);
     }
 
     // Usuario no existe
     if (rows.length === 0) {
       return res.render("login", {
-        error: "Usuario o contraseña incorrecta",
+        error: esCedula ? "Cédula o PIN incorrecto. Verifique sus datos o consulte al administrador." : "Usuario o contraseña incorrecta",
         next: nextUrl,
         departamento,
         departamentoNombre: DEPARTAMENTOS.find(item => item.key === departamento)?.nombre
@@ -102,12 +96,13 @@ router.post("/login", loginLimiter, async (req, res) => {
 
     const usersWithValidPassword = [];
     for (const candidate of rows) {
-      if (await bcrypt.compare(password, candidate.password)) usersWithValidPassword.push(candidate);
+      const hash = esCedula ? candidate.pin_hash : candidate.password;
+      if (hash && await bcrypt.compare(password, hash)) usersWithValidPassword.push(candidate);
     }
 
     if (!usersWithValidPassword.length) {
       return res.render("login", {
-        error: "Usuario o contraseña incorrecta",
+        error: esCedula ? "Cédula o PIN incorrecto. Verifique sus datos o consulte al administrador." : "Usuario o contraseña incorrecta",
         next: nextUrl,
         departamento,
         departamentoNombre: DEPARTAMENTOS.find(item => item.key === departamento)?.nombre
@@ -118,6 +113,7 @@ router.post("/login", loginLimiter, async (req, res) => {
     if (uniqueCandidates.length > 1) {
       req.session.pendingCedulaLogin = {
         usuarioIds: uniqueCandidates.map(user => user.id),
+        cedula,
         departamento,
         next: nextUrl
       };
@@ -143,7 +139,13 @@ router.post("/login/perfil", async (req, res) => {
   if (!pending || !pending.usuarioIds.includes(usuarioId)) return res.status(401).redirect("/login?departamento=TALLER");
 
   try {
-    const [[user]] = await pool.query("SELECT * FROM usuarios WHERE id = ? LIMIT 1", [usuarioId]);
+    const [[user]] = await pool.query(`
+      SELECT u.*, uc.persona_nombre
+      FROM usuarios u
+      LEFT JOIN usuario_cedulas uc ON uc.usuario_id = u.id AND uc.cedula = ?
+      WHERE u.id = ?
+      LIMIT 1
+    `, [pending.cedula, usuarioId]);
     if (!user) {
       delete req.session.pendingCedulaLogin;
       return res.status(401).redirect("/login?departamento=TALLER");
@@ -202,7 +204,7 @@ async function iniciarSesion(req, res, user, departamento, nextUrl) {
     // Login correcto -> guardar sesión
     const sessionUser = {
       id: user.id,
-      nombre: user.nombre || user.usuario,
+      nombre: user.persona_nombre || user.nombre || user.usuario,
       usuario: user.usuario,
       rol: user.rol,
       sede: user.sede,

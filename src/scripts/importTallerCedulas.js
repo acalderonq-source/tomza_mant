@@ -63,9 +63,10 @@ async function leerPersonal(pathArchivo) {
     if (activo !== "SI") continue;
     const cedula = normalizarCedula(row.getCell(cedulaColumn).value);
     const nombre = String(row.getCell(nombreColumn).value || "").trim();
-    const codigo = String(row.getCell(codigoColumn).value || "").trim();
+    const codigoCell = row.getCell(codigoColumn);
+    const codigo = String(codigoCell.text || codigoCell.value || "").trim();
     const perfil = normalizarPerfil(row.getCell(profileColumn).value);
-    if (!/^\d{9,12}$/.test(cedula) || !nombre || !perfil || !PERFILES[perfil]) {
+    if (!/^\d{9,12}$/.test(cedula) || !nombre || !/^\d{1,30}$/.test(codigo) || !perfil || !PERFILES[perfil]) {
       throw new Error(`La fila ${rowNumber} tiene datos incompletos o un perfil no reconocido.`);
     }
     if (seenIds.has(cedula)) throw new Error(`Hay una cédula repetida en la fila ${rowNumber}.`);
@@ -80,7 +81,6 @@ async function importar(pathArchivo, aplicar) {
   const people = await leerPersonal(pathArchivo);
   const usernames = [...new Set(people.flatMap(person => person.targets))];
   const connection = await pool.getConnection();
-  let passwordTemporal = null;
   let creoNicoya = false;
 
   try {
@@ -106,10 +106,9 @@ async function importar(pathArchivo, aplicar) {
     if (cedulasLegacy.length) throw new Error("El Excel contiene cédulas que ya están asignadas fuera de la importación de Taller.");
 
     if (missing.includes("mecanico_nicoya")) {
-      passwordTemporal = crypto.randomBytes(18).toString("base64url");
-      const passwordHash = await bcrypt.hash(passwordTemporal, 12);
+      const passwordHash = await bcrypt.hash(crypto.randomBytes(32).toString("base64url"), 12);
       const [result] = await connection.query(
-        "INSERT INTO usuarios (nombre, usuario, password, rol, sede, requiere_cambio_password) VALUES (?, ?, ?, 'MECANICO', 'Nicoya', 1)",
+        "INSERT INTO usuarios (nombre, usuario, password, rol, sede, requiere_cambio_password) VALUES (?, ?, ?, 'MECANICO', 'Nicoya', 0)",
         ["Mecánico Nicoya", "mecanico_nicoya", passwordHash]
       );
       const account = { id: result.insertId, usuario: "mecanico_nicoya", rol: "MECANICO" };
@@ -123,6 +122,7 @@ async function importar(pathArchivo, aplicar) {
 
     let associations = 0;
     for (const person of people) {
+      const pinHash = await bcrypt.hash(person.codigo, 12);
       const accountIds = person.targets.map(username => accounts.get(username)?.id).filter(Boolean);
       await connection.query(
         "DELETE FROM usuario_cedulas WHERE cedula = ? AND usuario_id NOT IN (?)",
@@ -132,17 +132,17 @@ async function importar(pathArchivo, aplicar) {
         const account = accounts.get(username);
         if (!account) throw new Error(`No se pudo resolver el perfil ${username}.`);
         await connection.query(`
-          INSERT INTO usuario_cedulas (cedula, usuario_id, persona_nombre, codigo_trabajador, perfil_excel)
-          VALUES (?, ?, ?, ?, ?)
+          INSERT INTO usuario_cedulas (cedula, usuario_id, persona_nombre, codigo_trabajador, pin_hash, perfil_excel)
+          VALUES (?, ?, ?, NULL, ?, ?)
           ON DUPLICATE KEY UPDATE persona_nombre = VALUES(persona_nombre),
-            codigo_trabajador = VALUES(codigo_trabajador), perfil_excel = VALUES(perfil_excel)
-        `, [person.cedula, account.id, person.nombre, person.codigo || null, person.perfil]);
+            codigo_trabajador = NULL, pin_hash = VALUES(pin_hash), perfil_excel = VALUES(perfil_excel)
+        `, [person.cedula, account.id, person.nombre, pinHash, person.perfil]);
         associations += 1;
       }
     }
 
     await connection.commit();
-    console.log(JSON.stringify({ modo: "aplicado", personasActivas: people.length, asociaciones, creoNicoya, ...(passwordTemporal ? { usuarioNuevo: "mecanico_nicoya", contraseñaTemporal: passwordTemporal } : {}) }));
+    console.log(JSON.stringify({ modo: "aplicado", personasActivas: people.length, asociaciones, creoNicoya }));
   } catch (error) {
     await connection.rollback().catch(() => {});
     throw error;

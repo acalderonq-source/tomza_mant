@@ -26,7 +26,7 @@
 
     <div class="feature-row">
       <span class="feature-pill"><%= departamentoNombre %></span>
-      <span class="feature-pill">Acceso por usuario o cédula</span>
+      <span class="feature-pill">Acceso personal con cédula y PIN</span>
       <span class="feature-pill">Gas Tomza</span>
     </div>
   </section>
@@ -47,12 +47,12 @@
         <input type="hidden" name="next" value="<%= typeof next !== 'undefined' ? next : '' %>">
         <input type="hidden" name="departamento" value="<%= departamento %>">
         <div>
-          <label class="form-label">Usuario o cédula</label>
-          <input class="form-control" name="usuario" placeholder="Ingrese su usuario o cédula" autocomplete="username" required>
+          <label class="form-label">Cédula</label>
+          <input class="form-control" name="cedula" placeholder="Ingrese su cédula" inputmode="numeric" autocomplete="username" required>
         </div>
         <div>
-          <label class="form-label">Contraseña</label>
-          <input class="form-control" type="password" name="password" placeholder="Ingrese su contraseña" autocomplete="current-password" required>
+          <label class="form-label">PIN (código de trabajador)</label>
+          <input class="form-control" type="password" name="pin" placeholder="Ingrese su código de trabajador" inputmode="numeric" autocomplete="current-password" required>
         </div>
         <button class="btn btn-login">Entrar</button>
       </form>
