@@ -75,7 +75,7 @@ router.post("/login", loginLimiter, async (req, res) => {
     if (esCedula) {
       [rows] = await pool.query(`
         SELECT u.*, uc.cedula AS cedula_persona, uc.persona_nombre,
-          uc.perfil_excel, uc.pin_hash, uc.requiere_cambio_pin
+          uc.perfil_excel, uc.pin_hash
         FROM usuario_cedulas uc
         JOIN usuarios u ON u.id = uc.usuario_id
         WHERE uc.cedula = ?
@@ -146,7 +146,7 @@ router.post("/login/perfil", async (req, res) => {
 
   try {
     const [[user]] = await pool.query(`
-      SELECT u.*, uc.cedula AS cedula_persona, uc.persona_nombre, uc.requiere_cambio_pin
+      SELECT u.*, uc.cedula AS cedula_persona, uc.persona_nombre
       FROM usuarios u
       LEFT JOIN usuario_cedulas uc ON uc.usuario_id = u.id AND uc.cedula = ?
       WHERE u.id = ?
@@ -189,47 +189,6 @@ router.post("/cambiar-clave", async (req, res) => {
   }
 });
 
-router.get("/cambiar-pin", (req, res) => {
-  if (!req.session.user) return res.redirect("/login?departamento=TALLER");
-  if (!req.session.user.requiereCambioPin) return res.redirect("/dashboard");
-  res.render("cambiar_pin", { error: null });
-});
-
-router.post("/cambiar-pin", async (req, res) => {
-  const user = req.session.user;
-  if (!user?.requiereCambioPin || !user.cedula) return res.redirect("/dashboard");
-  const pin = String(req.body.pin || "");
-  const confirmar = String(req.body.confirmar || "");
-  if (!/^\d{6,12}$/.test(pin)) {
-    return res.status(400).render("cambiar_pin", { error: "El PIN privado debe tener entre 6 y 12 dígitos." });
-  }
-  if (pin !== confirmar) {
-    return res.status(400).render("cambiar_pin", { error: "Los PIN no coinciden." });
-  }
-
-  try {
-    const [[person]] = await pool.query(
-      "SELECT codigo_trabajador FROM usuario_cedulas WHERE cedula = ? LIMIT 1",
-      [user.cedula]
-    );
-    if (!person) return res.status(400).render("cambiar_pin", { error: "No se encontró su registro de trabajador." });
-    if (pin === String(person.codigo_trabajador || "")) {
-      return res.status(400).render("cambiar_pin", { error: "El PIN debe ser distinto del código visible en su carnet." });
-    }
-
-    const hash = await bcrypt.hash(pin, 12);
-    await pool.query(
-      "UPDATE usuario_cedulas SET pin_hash = ?, requiere_cambio_pin = 0 WHERE cedula = ?",
-      [hash, user.cedula]
-    );
-    user.requiereCambioPin = false;
-    return res.redirect("/dashboard");
-  } catch (error) {
-    console.error("Error cambiando PIN de trabajador:", error.code || error.message);
-    return res.status(500).render("cambiar_pin", { error: "No se pudo guardar el PIN. Inténtelo de nuevo." });
-  }
-});
-
 async function iniciarSesion(req, res, user, departamento, nextUrl) {
     const [departmentRows] = await pool.query(
       "SELECT departamento, es_principal FROM usuario_departamentos WHERE usuario_id = ? ORDER BY es_principal DESC, departamento",
@@ -257,7 +216,6 @@ async function iniciarSesion(req, res, user, departamento, nextUrl) {
       rol: user.rol,
       sede: user.sede,
       requiereCambioPassword: Boolean(user.requiere_cambio_password),
-      requiereCambioPin: Boolean(user.requiere_cambio_pin),
       departamentos: departamentosPermitidos,
       departamentoActivo: departamento
     };
@@ -269,9 +227,7 @@ async function iniciarSesion(req, res, user, departamento, nextUrl) {
       }
 
       req.session.user = sessionUser;
-      const destino = user.requiere_cambio_pin
-        ? "/cambiar-pin"
-        : user.requiere_cambio_password ? "/cambiar-clave" : nextUrl || "/dashboard";
+      const destino = user.requiere_cambio_password ? "/cambiar-clave" : nextUrl || "/dashboard";
       res.redirect(destino);
     });
 }

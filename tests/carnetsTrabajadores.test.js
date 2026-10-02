@@ -38,7 +38,7 @@ test("administra carnets y el QR no expone cédula ni PIN", async () => {
     const html = await response.text();
     assert.equal(response.status, 200);
     assert.match(html, /Trabajador Prueba/);
-    assert.match(html, /PIN inicial \/ código de trabajador/);
+    assert.match(html, /PIN \/ código de trabajador/);
     assert.match(html, /data:image\/png;base64,/);
     assert.match(html, new RegExp(`data-token="${token}"`));
     assert.doesNotMatch(html, /cedula|pin_hash/i);

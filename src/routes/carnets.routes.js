@@ -52,12 +52,12 @@ async function crearPdfCarnet(worker, qr, photoBuffer) {
         { width: "*", stack: [
           { text: worker.nombre || "Trabajador", bold: true, fontSize: 11, color: "#152238", margin: [0, 6, 0, 4] },
           { text: worker.perfil || "Trabajador", fontSize: 7, color: "#64748B", margin: [0, 0, 0, 7] },
-          { text: "PIN INICIAL / CODIGO DE TRABAJADOR", fontSize: 6, color: "#475569" },
+          { text: "PIN / CODIGO DE TRABAJADOR", fontSize: 6, color: "#475569" },
           { text: String(worker.codigo_trabajador || "Pendiente"), bold: true, fontSize: 15, color: "#12396A", margin: [0, 2, 0, 0] }
         ] },
         { image: qr, fit: [76, 76], alignment: "center", margin: [0, 7, 0, 0] }
       ], columnGap: 8 },
-      { text: "El PIN privado se establece por separado y no aparece en este carnet.", fontSize: 6, color: "#64748B", margin: [0, 8, 0, 0], alignment: "center" }
+      { text: "El código de trabajador es el PIN de acceso al sistema.", fontSize: 6, color: "#64748B", margin: [0, 8, 0, 0], alignment: "center" }
     ]
   };
   return pdfBuffer(document);
@@ -91,7 +91,6 @@ router.get("/admin/carnets-trabajadores", requireAdmin, async (_req, res) => {
         MAX(uc.persona_nombre) AS nombre,
         MAX(uc.codigo_trabajador) AS codigo_trabajador,
         MAX(uc.perfil_excel) AS perfil,
-        MAX(uc.requiere_cambio_pin) AS requiere_cambio_pin,
         (c.foto_data IS NOT NULL) AS tiene_foto
       FROM carnets_trabajador c
       JOIN usuario_cedulas uc ON uc.cedula = c.cedula

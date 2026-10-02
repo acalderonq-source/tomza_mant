@@ -74,12 +74,11 @@ test("permite ingresar con cédula normalizada y PIN del código de trabajador",
   });
 });
 
-test("obliga a establecer PIN privado cuando el perfil requiere cambio", async () => {
+test("el PIN del código de trabajador da acceso directo sin pedir un cambio", async () => {
   const pinHash = await bcrypt.hash("123", 4);
   const user = {
     id: 33, usuario: "ana.mora", nombre: "Perfil Taller", rol: "TALLER", sede: "Cartago",
-    persona_nombre: "Ana Mora", cedula_persona: "123456789", pin_hash: pinHash,
-    requiere_cambio_pin: 1
+    persona_nombre: "Ana Mora", cedula_persona: "123456789", pin_hash: pinHash
   };
   await withLoginServer(async sql => {
     if (sql.includes("FROM usuario_cedulas")) return [[user]];
@@ -93,7 +92,7 @@ test("obliga a establecer PIN privado cuando el perfil requiere cambio", async (
       body: new URLSearchParams({ cedula: "123456789", pin: "123", departamento: "TALLER" })
     });
     assert.equal(response.status, 302);
-    assert.equal(response.headers.get("location"), "/cambiar-pin");
+    assert.equal(response.headers.get("location"), "/dashboard");
   });
 });
 

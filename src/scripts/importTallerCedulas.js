@@ -133,10 +133,11 @@ async function importar(pathArchivo, aplicar) {
         const account = accounts.get(username);
         if (!account) throw new Error(`No se pudo resolver el perfil ${username}.`);
         await connection.query(`
-          INSERT INTO usuario_cedulas (cedula, usuario_id, persona_nombre, codigo_trabajador, pin_hash, requiere_cambio_pin, perfil_excel)
-          VALUES (?, ?, ?, ?, ?, 1, ?)
+          INSERT INTO usuario_cedulas (cedula, usuario_id, persona_nombre, codigo_trabajador, pin_hash, perfil_excel)
+          VALUES (?, ?, ?, ?, ?, ?)
           ON DUPLICATE KEY UPDATE persona_nombre = VALUES(persona_nombre),
-            codigo_trabajador = VALUES(codigo_trabajador), perfil_excel = VALUES(perfil_excel)
+            codigo_trabajador = VALUES(codigo_trabajador), pin_hash = VALUES(pin_hash),
+            perfil_excel = VALUES(perfil_excel)
         `, [person.cedula, account.id, person.nombre, person.codigo, pinHash, person.perfil]);
         associations += 1;
       }

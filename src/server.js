@@ -365,9 +365,9 @@ const carnetsRoutes = require("./routes/carnets.routes");
 app.use("/", authRoutes);
 app.use((req, res, next) => {
   const user = req.session.user;
-  if (!user?.requiereCambioPin && !user?.requiereCambioPassword) return next();
-  if (["/cambiar-pin", "/cambiar-clave", "/logout"].includes(req.path)) return next();
-  return res.redirect(user.requiereCambioPin ? "/cambiar-pin" : "/cambiar-clave");
+  if (!user?.requiereCambioPassword) return next();
+  if (["/cambiar-clave", "/logout"].includes(req.path)) return next();
+  return res.redirect("/cambiar-clave");
 });
 app.use("/", sedeRoutes);
 app.use("/", adminRoutes);
