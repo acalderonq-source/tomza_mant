@@ -3,7 +3,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
-const { BUNDLED_UPLOAD_ROOT, RENDER_UPLOAD_ROOT, resolverRaizUploads, verificarAlmacenamientoUploads } = require("../src/utils/uploadStorage");
+const { BUNDLED_UPLOAD_ROOT, RENDER_UPLOAD_ROOT, resolverRaizUploads, rutaEnDiscoPersistente, verificarAlmacenamientoUploads } = require("../src/utils/uploadStorage");
 
 const testRoot = fs.mkdtempSync(path.join(os.tmpdir(), "tomza-upload-readiness-"));
 const writableDirectory = path.join(testRoot, "persistent");
@@ -35,6 +35,32 @@ test("readiness rejects production when uploads fall back to bundled ephemeral s
 test("Render defaults uploads to the persistent mount declared in its service config", () => {
   assert.equal(resolverRaizUploads({ RENDER: "true" }), RENDER_UPLOAD_ROOT);
   assert.equal(resolverRaizUploads({ UPLOAD_ROOT: writableDirectory, RENDER: "true" }), writableDirectory);
+});
+
+test("Render readiness requires uploads to live inside an attached disk mount", () => {
+  const mountInfo = `36 25 0:32 / ${testRoot} rw - ext4 /dev/disk rw`;
+  assert.equal(rutaEnDiscoPersistente(writableDirectory, mountInfo), true);
+  assert.equal(rutaEnDiscoPersistente(`${testRoot}-otro/uploads`, mountInfo), false);
+  assert.deepEqual(verificarAlmacenamientoUploads({
+    root: writableDirectory,
+    configuredRoot: writableDirectory,
+    production: true,
+    render: true,
+    mountInfo
+  }), { listo: true, motivo: null });
+});
+
+test("Render readiness rejects a writable directory when the persistent disk is not mounted", () => {
+  const result = verificarAlmacenamientoUploads({
+    root: writableDirectory,
+    configuredRoot: writableDirectory,
+    production: true,
+    render: true,
+    mountInfo: ""
+  });
+
+  assert.equal(result.listo, false);
+  assert.equal(result.motivo, "persistent_mount_not_attached");
 });
 
 test("readiness rejects missing or non-directory uploads paths", () => {

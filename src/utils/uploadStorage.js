@@ -29,13 +29,39 @@ function seedBundledUploads() {
   });
 }
 
+function rutaEnDiscoPersistente(root, mountInfo) {
+  let contenido = mountInfo;
+  try {
+    if (contenido == null) contenido = fs.readFileSync("/proc/self/mountinfo", "utf8");
+  } catch (_error) {
+    return false;
+  }
+
+  const ruta = path.resolve(root);
+  return String(contenido).split("\n").some(linea => {
+    const campos = linea.split(" ");
+    const puntoMontaje = (campos[4] || "").replace(/\\([0-7]{3})/g, (_match, octal) =>
+      String.fromCharCode(parseInt(octal, 8))
+    );
+    if (!puntoMontaje) return false;
+
+    const relativo = path.relative(path.resolve(puntoMontaje), ruta);
+    return relativo === "" || (!relativo.startsWith(`..${path.sep}`) && relativo !== ".." && !path.isAbsolute(relativo));
+  });
+}
+
 function verificarAlmacenamientoUploads({
   root = UPLOAD_ROOT,
   production = process.env.NODE_ENV === "production",
-  configuredRoot = resolverRaizUploads()
+  configuredRoot = resolverRaizUploads(),
+  render = process.env.RENDER === "true",
+  mountInfo
 } = {}) {
   if (production && (!configuredRoot || path.resolve(configuredRoot) === BUNDLED_UPLOAD_ROOT)) {
     return { listo: false, motivo: "persistent_root_not_configured" };
+  }
+  if (production && render && !rutaEnDiscoPersistente(root, mountInfo)) {
+    return { listo: false, motivo: "persistent_mount_not_attached" };
   }
 
   try {
@@ -52,6 +78,7 @@ module.exports = {
   BUNDLED_UPLOAD_ROOT,
   RENDER_UPLOAD_ROOT,
   resolverRaizUploads,
+  rutaEnDiscoPersistente,
   ensureUploadDirectory,
   seedBundledUploads,
   verificarAlmacenamientoUploads
