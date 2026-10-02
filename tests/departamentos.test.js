@@ -16,9 +16,27 @@ test("el portal ofrece los siete departamentos previstos", () => {
 
 test("la matriz inicial mantiene separados los accesos principales", () => {
   assert.deepEqual(departamentosInicialesPorRol("MECANICO"), ["TALLER"]);
+  assert.deepEqual(departamentosInicialesPorRol("TALLER"), ["TALLER"]);
   assert.ok(departamentosInicialesPorRol("SUPERVISOR").includes("OPERACIONES"));
   assert.deepEqual(departamentosInicialesPorRol("CONTABILIDAD"), ["CONTABILIDAD"]);
   assert.deepEqual(departamentosInicialesPorRol("ADMIN"), DEPARTAMENTOS.map(item => item.key));
+});
+
+test("un nuevo usuario TALLER sin asignaciones recibe solamente Taller", async () => {
+  const asignaciones = [];
+  const pool = {
+    async query(sql, params = []) {
+      if (sql.includes("SELECT asignacion_inicial_completa")) return [[{ asignacion_inicial_completa: 1 }]];
+      if (sql.includes("SELECT u.id, u.rol, u.usuario")) {
+        return [[{ id: 55, rol: "TALLER", usuario: "taller_nuevo" }]];
+      }
+      if (sql.includes("INSERT IGNORE INTO usuario_departamentos")) asignaciones.push(params);
+      return [{ affectedRows: 1 }];
+    }
+  };
+
+  await ensurePortalDepartmentSchema(pool);
+  assert.deepEqual(asignaciones, [[55, "TALLER", 1]]);
 });
 
 test("ADMIN conserva acceso a todos los departamentos aunque su asignación guardada esté incompleta", () => {

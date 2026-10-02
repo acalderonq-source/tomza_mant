@@ -83,7 +83,7 @@ function departamentosInicialesPorRol(rol, usuario = "") {
   if (/^mecanicos?/i.test(String(usuario || "").trim())) return ["TALLER"];
   const asignaciones = {
     ADMIN: DEPARTAMENTOS.map(({ key }) => key),
-    TALLER: ["TALLER", "OPERACIONES", "PROVEEDURIA"],
+    TALLER: ["TALLER"],
     MECANICO: ["TALLER"],
     SUPERVISOR: ["OPERACIONES", "TALLER"],
     SUPERVISOR_PESADO: ["OPERACIONES"],
