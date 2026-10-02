@@ -1,7 +1,7 @@
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
 const express = require("express");
-const { controlarAccesoPorDepartamento } = require("../src/utils/departamentos");
+const { controlarAccesoPorDepartamento, RUTAS_TALLER } = require("../src/utils/departamentos");
 
 async function withServer(departamento, run) {
   const app = express();
@@ -16,6 +16,7 @@ async function withServer(departamento, run) {
   app.get("/compras/facturas/asientos", (_req, res) => res.send("asientos disponibles"));
   app.get("/compras/ordenes", (_req, res) => res.send("órdenes disponibles"));
   app.get("/bodega/inventario", (_req, res) => res.send("bodega disponible"));
+  app.all("*", (_req, res) => res.send("handler ejecutado"));
   const server = await new Promise(resolve => {
     const listening = app.listen(0, "127.0.0.1", () => resolve(listening));
   });
@@ -31,6 +32,24 @@ test("Express bloquea URLs directas de Taller cuando el departamento activo es O
     const response = await fetch(`${base}/mantenimientos/25/plan`, { method: "POST" });
     assert.equal(response.status, 403);
     assert.match(await response.text(), /pertenece a Taller/);
+  });
+});
+
+test("cada prefijo y subruta registrada como Taller se bloquea fuera del departamento", async () => {
+  await withServer("OPERACIONES", async base => {
+    for (const prefix of RUTAS_TALLER) {
+      for (const pathname of [prefix, `${prefix}/auditoria`]) {
+        const response = await fetch(`${base}${pathname}`);
+        assert.equal(response.status, 403, `${pathname} debe pertenecer solo a Taller`);
+      }
+    }
+  });
+
+  await withServer("TALLER", async base => {
+    for (const prefix of RUTAS_TALLER) {
+      const response = await fetch(`${base}${prefix}`);
+      assert.equal(response.status, 200, `${prefix} debe estar disponible en Taller`);
+    }
   });
 });
 

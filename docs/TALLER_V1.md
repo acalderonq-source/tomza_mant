@@ -45,8 +45,9 @@ El numero `1.0.0` que aparece en `package.json` identifica la version del paquet
 ## Estado de auditoria al 2026-10-02
 
 - El sistema usa Node.js, Express, EJS y MySQL; las rutas se organizan por modulo.
-- `npm test` pasa 128 pruebas automatizadas (0 fallidas) en el estado local revisado.
+- `npm test` pasa 129 pruebas automatizadas (0 fallidas) en el estado local revisado.
 - En Render, con perfil ADMIN, se verifico en pantalla que Taller muestra sus accesos historicos; al cambiar a Operaciones desaparecen los modulos de Taller y `/mantenimientos` deniega el acceso directo. La sesion se dejo nuevamente en Taller.
+- Una prueba HTTP recorre todos los prefijos Taller y sus subrutas: Operaciones recibe 403, Taller conserva acceso y los modulos compartidos de Contabilidad/Proveeduria mantienen sus permisos.
 - El tablero se prueba para ADMIN, TALLER, Contabilidad, Proveeduría y BODEGUERO; se cruza cada enlace de Taller visible con el middleware para evitar tarjetas que terminen en 403.
 - Los usuarios nuevos con rol `TALLER` reciben solo el departamento Taller por defecto; otros accesos se conceden expresamente desde administración.
 - La asignación de departamentos se prueba por HTTP: solo ADMIN puede cambiarla, los valores invalidos se rechazan y un error de escritura revierte toda la transacción.
@@ -60,7 +61,7 @@ El numero `1.0.0` que aparece en `package.json` identifica la version del paquet
 - El catalogo de Bodega permite editar fichas con auditoria antes/despues sin cambiar existencias; se prueban permisos de BODEGUERO y denegacion de BODEGA.
 - Las entregas rechazan lineas invalidas y una prueba verifica rollback total si una linea no tiene saldo; los ajustes no aceptan conteos no numericos y los precios de catalogo/recepcion se validan en el servidor.
 - La publicacion `6f8a745b97d8947cd1bbe02b019a6f2c6b77e72a` se verifico en Render con `/ready`: `status=ready`, `database=connected` y `schema=ready`; posteriormente, el commit `4c99d4f` se comprobo en la interfaz de Render para la separacion Taller/Operaciones.
-- La instalacion limpia con `npm ci` conserva 128 pruebas aprobadas y `npm audit` reporta cero vulnerabilidades; el bloqueo de dependencias alinea `mysql2` transitivo con la version corregida.
+- La instalacion limpia con `npm ci` conserva 129 pruebas aprobadas y `npm audit` reporta cero vulnerabilidades; el bloqueo de dependencias alinea `mysql2` transitivo con la version corregida.
 - Mantenimientos falla cerrado cuando un mecanico de sede no tiene sede autorizada, sin impedir el cierre dentro de su sede; ADMIN/TALLER conservan el acceso global solo cuando no hay filtro de sede. Render responde `ready` con el commit `07292c39327814f306201dec4f45b0b3ec0eaa43`.
 - La migracion `202610020001_bodega_consumo_confirmacion_completar.sql` recupera esquemas parciales agregando cada columna por separado. Render responde `ready` con las nuevas columnas esenciales de Bodega en el commit `4117c75aae1cbb88b4221523680fff89840c1df7`.
 - El resumen ejecutivo ahora inicia en el mes actual de Costa Rica cuando no se indica un rango, limita las subconsultas de ordenes a ese periodo y comparte calculos concurrentes identicos para reducir picos de memoria; se conservan los filtros de periodos anteriores.

@@ -161,6 +161,7 @@ async function ensurePortalDepartmentSchema(pool) {
 
 module.exports = {
   DEPARTAMENTOS,
+  RUTAS_TALLER,
   departamentosInicialesPorRol,
   departamentosPermitidosPorRol,
   esDepartamentoValido,
