@@ -4,7 +4,7 @@ const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
 const pool = require("../db");
-const { executeMigrationStatement } = require("../utils/sqlMigrationStatements");
+const { executeMigrationStatement, parseSingleColumnForeignKey } = require("../utils/sqlMigrationStatements");
 
 const migrationsDir = path.join(__dirname, "..", "..", "migrations");
 
@@ -22,6 +22,23 @@ function splitStatements(sql) {
       .join("\n")
       .trim())
     .filter(Boolean);
+}
+
+async function foreignKeyAlreadyApplied(statement) {
+  const foreignKey = parseSingleColumnForeignKey(statement);
+  if (!foreignKey) return false;
+  const { table, constraint, column, referencedTable, referencedColumn } = foreignKey;
+  const [[existing]] = await pool.query(`
+    SELECT COUNT(*) AS total
+    FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE
+    WHERE CONSTRAINT_SCHEMA = DATABASE()
+      AND TABLE_NAME = ?
+      AND CONSTRAINT_NAME = ?
+      AND COLUMN_NAME = ?
+      AND REFERENCED_TABLE_NAME = ?
+      AND REFERENCED_COLUMN_NAME = ?
+  `, [table, constraint, column, referencedTable, referencedColumn]);
+  return Number(existing?.total || 0) === 1;
 }
 
 async function ensureMigrationsTable() {
@@ -52,7 +69,9 @@ async function runMigration(filename) {
 
   for (const statement of statements) {
     try {
-      await executeMigrationStatement(sql => pool.query(sql), statement);
+      await executeMigrationStatement(sql => pool.query(sql), statement, {
+        isDuplicateForeignKeyAlreadyApplied: foreignKeyAlreadyApplied
+      });
     } catch (error) {
       error.message = `Error en ${filename}: ${error.message}`;
       throw error;

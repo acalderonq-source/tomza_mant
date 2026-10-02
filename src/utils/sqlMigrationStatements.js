@@ -53,14 +53,25 @@ function splitAlterTableStatement(statement) {
   return actions.map(action => `${match[1]} ${action}`);
 }
 
-async function executeMigrationStatement(query, statement) {
+function parseSingleColumnForeignKey(statement) {
+  const match = statement.match(
+    /^ALTER\s+TABLE\s+`?([a-z0-9_$]+)`?\s+ADD\s+CONSTRAINT\s+`?([a-z0-9_$]+)`?\s+FOREIGN\s+KEY\s*\(\s*`?([a-z0-9_$]+)`?\s*\)\s+REFERENCES\s+`?([a-z0-9_$]+)`?\s*\(\s*`?([a-z0-9_$]+)`?\s*\)\s*$/i
+  );
+  if (!match) return null;
+  const [, table, constraint, column, referencedTable, referencedColumn] = match;
+  return { table, constraint, column, referencedTable, referencedColumn };
+}
+
+async function executeMigrationStatement(query, statement, { isDuplicateForeignKeyAlreadyApplied } = {}) {
   for (const action of splitAlterTableStatement(statement)) {
     try {
       await query(action);
     } catch (error) {
-      if (!IGNORABLE_CODES.has(error.code)) throw error;
+      if (IGNORABLE_CODES.has(error.code)) continue;
+      if (error.code === "ER_FK_DUP_NAME" && await isDuplicateForeignKeyAlreadyApplied?.(action, error)) continue;
+      throw error;
     }
   }
 }
 
-module.exports = { splitAlterTableStatement, executeMigrationStatement };
+module.exports = { splitAlterTableStatement, parseSingleColumnForeignKey, executeMigrationStatement };
