@@ -38,7 +38,7 @@ test("administra carnets y el QR no expone cédula ni PIN", async () => {
     const html = await response.text();
     assert.equal(response.status, 200);
     assert.match(html, /Trabajador Prueba/);
-    assert.match(html, /Código de trabajador/);
+    assert.match(html, /PIN inicial \/ código de trabajador/);
     assert.match(html, /data:image\/png;base64,/);
     assert.match(html, new RegExp(`data-token="${token}"`));
     assert.doesNotMatch(html, /cedula|pin_hash/i);
@@ -49,6 +49,24 @@ test("rechaza el panel de carnets para perfiles que no son admin", async () => {
   await withServer(async () => { throw new Error("No debe consultar datos."); }, "MECANICO", async base => {
     const response = await fetch(`${base}/admin/carnets-trabajadores`);
     assert.equal(response.status, 403);
+  });
+});
+
+test("descarga un carnet individual como PDF y adjunto", async () => {
+  const token = "c".repeat(64);
+  await withServer(async sql => {
+    if (sql.includes("MAX(uc.persona_nombre)")) {
+      return [[{ cedula: "no-expuesta", qr_token: token, nombre: "Nombre de Prueba", codigo_trabajador: "2790", perfil: "TALLER" }]];
+    }
+    if (sql.includes("SELECT foto_data")) return [[{ foto_data: null }]];
+    throw new Error("Consulta no esperada");
+  }, "ADMIN", async base => {
+    const response = await fetch(`${base}/admin/carnets-trabajadores/${token}.pdf`);
+    const pdf = Buffer.from(await response.arrayBuffer());
+    assert.equal(response.status, 200);
+    assert.match(response.headers.get("content-type"), /application\/pdf/);
+    assert.match(response.headers.get("content-disposition"), /attachment; filename="carnet_2790_Nombre_de_Prueba\.pdf"/);
+    assert.equal(pdf.subarray(0, 5).toString(), "%PDF-");
   });
 });
 

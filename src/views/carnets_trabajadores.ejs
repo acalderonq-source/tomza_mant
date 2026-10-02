@@ -45,14 +45,17 @@
               <% } else { %>
                 <div class="worker-photo d-flex align-items-center justify-content-center text-secondary fs-1"><i class="bi bi-person-bounding-box"></i></div>
               <% } %>
-              <div><div class="worker-name"><%= worker.nombre %></div><div class="worker-profile mt-1"><%= worker.perfil || 'Trabajador' %></div><div class="small mt-2">Código de trabajador</div><div class="worker-code"><%= worker.codigo_trabajador || 'Pendiente' %></div></div>
+              <div><div class="worker-name"><%= worker.nombre %></div><div class="worker-profile mt-1"><%= worker.perfil || 'Trabajador' %></div><div class="small mt-2">PIN inicial / código de trabajador</div><div class="worker-code"><%= worker.codigo_trabajador || 'Pendiente' %></div></div>
               <img class="worker-qr" src="<%= worker.qr %>" alt="Código QR del carnet de <%= worker.nombre %>">
             </div>
             <div class="px-3 pb-2 small text-secondary">Escanee para verificar el carnet en el sistema</div>
           </div>
           <div class="card-actions no-print d-flex align-items-center justify-content-between gap-2">
             <span class="small photo-status" aria-live="polite"><%= worker.tiene_foto ? 'Foto cargada' : 'Falta fotografía' %></span>
-            <label class="btn btn-sm btn-outline-primary mb-0"><i class="bi bi-camera"></i> <%= worker.tiene_foto ? 'Cambiar foto' : 'Cargar foto' %><input class="photo-input d-none" type="file" accept="image/jpeg,image/png,image/webp" data-token="<%= worker.qr_token %>"></label>
+            <div class="d-flex gap-1">
+              <a class="btn btn-sm btn-outline-secondary" href="/admin/carnets-trabajadores/<%= worker.qr_token %>.pdf"><i class="bi bi-file-earmark-pdf"></i> PDF</a>
+              <label class="btn btn-sm btn-outline-primary mb-0"><i class="bi bi-camera"></i> <%= worker.tiene_foto ? 'Cambiar foto' : 'Cargar foto' %><input class="photo-input d-none" type="file" accept="image/jpeg,image/png,image/webp" data-token="<%= worker.qr_token %>"></label>
+            </div>
           </div>
         </article>
       <% }) %>

@@ -1,8 +1,67 @@
 const express = require("express");
 const QRCode = require("qrcode");
+const PdfPrinter = require("pdfmake");
 const pool = require("../db");
 
 const router = express.Router();
+const pdfPrinter = new PdfPrinter({
+  Helvetica: {
+    normal: "Helvetica",
+    bold: "Helvetica-Bold",
+    italics: "Helvetica-Oblique",
+    bolditalics: "Helvetica-BoldOblique"
+  }
+});
+
+function pdfBuffer(document) {
+  return new Promise((resolve, reject) => {
+    const stream = pdfPrinter.createPdfKitDocument(document);
+    const chunks = [];
+    stream.on("data", chunk => chunks.push(chunk));
+    stream.on("end", () => resolve(Buffer.concat(chunks)));
+    stream.on("error", reject);
+    stream.end();
+  });
+}
+
+function safeFilename(value) {
+  return String(value || "trabajador")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-zA-Z0-9_-]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .slice(0, 60) || "trabajador";
+}
+
+async function crearPdfCarnet(worker, qr, photoBuffer) {
+  const photo = photoBuffer ? `data:image/jpeg;base64,${photoBuffer.toString("base64")}` : null;
+  const document = {
+    pageSize: { width: 255, height: 165 },
+    pageMargins: [12, 12, 12, 12],
+    defaultStyle: { font: "Helvetica", fontSize: 8, color: "#17243A" },
+    content: [
+      { columns: [
+        { text: "GAS TOMZA", bold: true, fontSize: 12, color: "#12396A" },
+        { text: "IDENTIFICACION", bold: true, fontSize: 8, color: "#64748B", alignment: "right", margin: [0, 3, 0, 0] }
+      ], margin: [0, 0, 0, 8] },
+      { canvas: [{ type: "line", x1: 0, y1: 0, x2: 231, y2: 0, lineWidth: 1, lineColor: "#CBD5E1" }], margin: [0, 0, 0, 8] },
+      { columns: [
+        photo
+          ? { image: photo, fit: [62, 88], alignment: "center", margin: [0, 1, 0, 0] }
+          : { text: "FOTO\nNO CARGADA", width: 62, height: 88, alignment: "center", color: "#64748B", margin: [0, 34, 0, 0] },
+        { width: "*", stack: [
+          { text: worker.nombre || "Trabajador", bold: true, fontSize: 11, color: "#152238", margin: [0, 6, 0, 4] },
+          { text: worker.perfil || "Trabajador", fontSize: 7, color: "#64748B", margin: [0, 0, 0, 7] },
+          { text: "PIN INICIAL / CODIGO DE TRABAJADOR", fontSize: 6, color: "#475569" },
+          { text: String(worker.codigo_trabajador || "Pendiente"), bold: true, fontSize: 15, color: "#12396A", margin: [0, 2, 0, 0] }
+        ] },
+        { image: qr, fit: [76, 76], alignment: "center", margin: [0, 7, 0, 0] }
+      ], columnGap: 8 },
+      { text: "El PIN privado se establece por separado y no aparece en este carnet.", fontSize: 6, color: "#64748B", margin: [0, 8, 0, 0], alignment: "center" }
+    ]
+  };
+  return pdfBuffer(document);
+}
 
 function requireAdmin(req, res, next) {
   if (!req.session?.user || req.session.user.rol !== "ADMIN") {
@@ -52,6 +111,43 @@ router.get("/admin/carnets-trabajadores", requireAdmin, async (_req, res) => {
   } catch (error) {
     console.error("Error cargando carnets de trabajadores:", error.code || error.message);
     res.status(500).send("No se pudieron cargar los carnets.");
+  }
+});
+
+router.get("/admin/carnets-trabajadores/:token.pdf", requireAdmin, async (req, res) => {
+  const token = String(req.params.token || "");
+  if (!/^[a-f0-9]{64}$/.test(token)) return res.sendStatus(404);
+  try {
+    const [[worker]] = await pool.query(`
+      SELECT MAX(uc.persona_nombre) AS nombre,
+        MAX(uc.codigo_trabajador) AS codigo_trabajador,
+        MAX(uc.perfil_excel) AS perfil,
+        c.cedula, c.qr_token
+      FROM carnets_trabajador c
+      JOIN usuario_cedulas uc ON uc.cedula = c.cedula
+      WHERE c.qr_token = ?
+      GROUP BY c.cedula, c.qr_token
+    `, [token]);
+    if (!worker) return res.sendStatus(404);
+
+    const [[photoRow]] = await pool.query(
+      "SELECT foto_data FROM carnets_trabajador WHERE qr_token = ? LIMIT 1",
+      [token]
+    );
+    const qr = await QRCode.toDataURL(`${basePublicUrl(req)}/personal/carnet/${token}`, {
+      errorCorrectionLevel: "M", margin: 1, width: 220
+    });
+    const output = await crearPdfCarnet(worker, qr, photoRow?.foto_data);
+    res.set({
+      "Content-Type": "application/pdf",
+      "Content-Disposition": `attachment; filename="carnet_${safeFilename(worker.codigo_trabajador)}_${safeFilename(worker.nombre)}.pdf"`,
+      "Cache-Control": "private, no-store",
+      "X-Content-Type-Options": "nosniff"
+    });
+    res.send(output);
+  } catch (error) {
+    console.error("Error generando PDF de carnet:", error.code || error.message);
+    res.status(500).send("No se pudo descargar el carnet.");
   }
 });
 
@@ -128,3 +224,5 @@ router.get("/personal/carnet/:token", requireLogin, async (req, res) => {
 });
 
 module.exports = router;
+module.exports.crearPdfCarnet = crearPdfCarnet;
+module.exports.safeFilename = safeFilename;

@@ -24,7 +24,7 @@
     <div class="badge-head">GAS TOMZA · IDENTIFICACIÓN</div>
     <div class="badge-main">
       <% if (worker.tiene_foto) { %><img class="photo" src="/personal/carnet/<%= worker.qr_token %>/foto" alt="Fotografía de <%= worker.nombre %>"><% } else { %><div class="photo d-grid text-secondary fs-1" style="place-items:center"><i class="bi bi-person-bounding-box"></i></div><% } %>
-      <div><div class="name"><%= worker.nombre %></div><div class="text-secondary small mt-1"><%= worker.perfil || 'Trabajador' %></div><div class="small mt-3">Código de trabajador</div><div class="code"><%= worker.codigo_trabajador || 'Pendiente' %></div></div>
+      <div><div class="name"><%= worker.nombre %></div><div class="text-secondary small mt-1"><%= worker.perfil || 'Trabajador' %></div><div class="small mt-3">PIN inicial / código de trabajador</div><div class="code"><%= worker.codigo_trabajador || 'Pendiente' %></div></div>
     </div>
     <div class="qr-wrap"><img class="qr" src="<%= worker.qr %>" alt="Código QR"><span>Carnet verificado por el sistema interno de Gas Tomza.</span></div>
   </article>
