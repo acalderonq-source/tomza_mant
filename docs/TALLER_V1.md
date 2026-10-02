@@ -38,7 +38,7 @@ El numero `1.0.0` que aparece en `package.json` identifica la version del paquet
 - [ ] Se concilian existencias antes y despues de recibir, entregar, devolver y ajustar productos.
 - [ ] Se verifica en pantalla el recorrido de administrador, supervisor, mecanico, Pesados y bodeguero.
 - [ ] Exportaciones y reportes coinciden con los registros filtrados por sede, fecha y placa.
-- [ ] Se confirma respaldo y restauracion de base de datos y archivos adjuntos.
+- [ ] Se configura y prueba respaldo/restauracion en Railway y Render siguiendo [el runbook](RESPALDO_Y_RESTAURACION.md).
 - [ ] Se ejecutan pruebas automatizadas y una prueba de humo en Render; se identifica el commit activo.
 - [ ] El responsable funcional valida los flujos y se publica una nota de version con cambios y limitaciones.
 
@@ -52,9 +52,10 @@ El numero `1.0.0` que aparece en `package.json` identifica la version del paquet
 - El ejecutor procesa por separado las acciones de `ALTER TABLE`: una columna o indice ya existente no omite las acciones siguientes y los errores reales detienen la migracion.
 - `/ready` comprueba conexion y columnas esenciales de unidades y confirmacion de consignaciones; Render no marca listo un esquema incompleto.
 - El borrado de unidad usa un formulario separado del guardado masivo; una prueba verifica que no envie los campos de todas las unidades.
+- Se documento el procedimiento de respaldo y restauracion para la base MySQL en Railway y los archivos del disco persistente de Render; falta configurarlo y probarlo desde las cuentas.
 - El catalogo de Bodega permite editar fichas con auditoria antes/despues sin cambiar existencias; se prueban permisos de BODEGUERO y denegacion de BODEGA.
 - Las entregas rechazan lineas invalidas sin guardar parcialmente, los ajustes no aceptan conteos no numericos y los precios de catalogo/recepcion se validan en el servidor.
-- La publicacion `8c84bc52f9fd7b98adf988fe9e854aa0fe53d843` se verifico en Render con `/ready`: `status=ready`, `database=connected` y `schema=ready`.
+- La publicacion `6f8a745b97d8947cd1bbe02b019a6f2c6b77e72a` se verifico en Render con `/ready`: `status=ready`, `database=connected` y `schema=ready`.
 - La migracion `202610020001_bodega_consumo_confirmacion_completar.sql` recupera esquemas parciales agregando cada columna por separado. No se consulto la base productiva directamente; la verificacion cubre las columnas esenciales declaradas en `/ready`.
 - Aun falta validar la interfaz real con perfiles de usuario, completar cobertura de flujos criticos, probar respaldo/restauracion y obtener aceptacion funcional antes de declarar liberada la V1.
 
