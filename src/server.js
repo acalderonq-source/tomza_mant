@@ -9,7 +9,7 @@ const pool = require("./db");
 const enviarAlertasDekra = require("./utils/dekraMail");
 const { enviarRecordatoriosMantenimientos, ensurePushTables } = require("./utils/notificacionesPush");
 const { ensureCsrfToken, injectSecurityAssets } = require("./middleware/security");
-const { UPLOAD_ROOT, seedBundledUploads } = require("./utils/uploadStorage");
+const { seedBundledUploads, verificarAlmacenamientoUploads } = require("./utils/uploadStorage");
 const { DEPARTAMENTOS, departamentosPermitidosPorRol, controlarAccesoPorDepartamento, ensurePortalDepartmentSchema } = require("./utils/departamentos");
 const { preventAuthenticatedHtmlCaching } = require("./utils/httpCache");
 const { verificarColumnasRequeridas, COLUMNAS_ESENCIALES_TALLER } = require("./utils/schemaReadiness");
@@ -86,8 +86,13 @@ app.get("/ready", async (_req, res) => {
       console.error("Readiness check: faltan columnas esenciales:", esquema.faltantes);
       return res.status(503).json({ status: "not_ready", database: "connected", schema: "incomplete" });
     }
+    const almacenamiento = verificarAlmacenamientoUploads();
+    if (!almacenamiento.listo) {
+      console.error("Readiness check: almacenamiento de adjuntos no disponible:", almacenamiento.motivo);
+      return res.status(503).json({ status: "not_ready", database: "connected", schema: "ready", uploads: "unavailable" });
+    }
     const release = process.env.RENDER_GIT_COMMIT || process.env.GIT_COMMIT || "local";
-    res.status(200).json({ status: "ready", database: "connected", schema: "ready", release });
+    res.status(200).json({ status: "ready", database: "connected", schema: "ready", uploads: "ready", release });
   } catch (error) {
     console.error("Readiness check fallo:", error.code || error.message);
     res.status(503).json({ status: "not_ready", database: "unavailable" });

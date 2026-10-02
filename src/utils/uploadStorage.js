@@ -23,8 +23,28 @@ function seedBundledUploads() {
   });
 }
 
+function verificarAlmacenamientoUploads({
+  root = UPLOAD_ROOT,
+  production = process.env.NODE_ENV === "production",
+  configuredRoot = process.env.UPLOAD_ROOT
+} = {}) {
+  if (production && (!configuredRoot || path.resolve(configuredRoot) === BUNDLED_UPLOAD_ROOT)) {
+    return { listo: false, motivo: "persistent_root_not_configured" };
+  }
+
+  try {
+    if (!fs.statSync(root).isDirectory()) return { listo: false, motivo: "not_a_directory" };
+    fs.accessSync(root, fs.constants.R_OK | fs.constants.W_OK);
+    return { listo: true, motivo: null };
+  } catch (error) {
+    return { listo: false, motivo: error.code || "unavailable" };
+  }
+}
+
 module.exports = {
   UPLOAD_ROOT,
+  BUNDLED_UPLOAD_ROOT,
   ensureUploadDirectory,
-  seedBundledUploads
+  seedBundledUploads,
+  verificarAlmacenamientoUploads
 };
