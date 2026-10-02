@@ -611,6 +611,7 @@ router.get("/exportar", async (req, res) => {
 
 router.post("/", async (req, res) => {
   let connection;
+  let transaccionAbierta = false;
   const fecha = String(req.body.fecha || "").trim();
 
   try {
@@ -637,21 +638,6 @@ router.post("/", async (req, res) => {
 
     const semana = semanaDesdeFecha(fecha);
     const limites = limitesSemana(semana);
-    const [[lavadoExistente]] = await pool.query(
-      `SELECT numero_lavado
-       FROM lavado_unidades
-       WHERE unidad_id = ? AND fecha BETWEEN ? AND ?
-       LIMIT 1`,
-      [unidadId, limites.inicio, limites.fin]
-    );
-    if (lavadoExistente) {
-      return redirectNuevoConError(
-        res,
-        fecha,
-        `${unidad.placa} ya fue registrada esta semana en ${lavadoExistente.numero_lavado}.`
-      );
-    }
-
     const fotosBase64 = req.body.fotos_base64 || {};
     const fotosNombre = req.body.fotos_nombre || {};
     const fotosTipo = req.body.fotos_tipo || {};
@@ -704,13 +690,46 @@ router.post("/", async (req, res) => {
 
     connection = await pool.getConnection();
     await connection.beginTransaction();
+    transaccionAbierta = true;
+
+    const [[unidadBloqueada]] = await connection.query(
+      `SELECT id, placa, sede
+       FROM unidades
+       WHERE id = ? AND COALESCE(activa, 1) = 1
+       LIMIT 1
+       FOR UPDATE`,
+      [unidadId]
+    );
+    if (!unidadBloqueada || !sedesLavadoPermitidas(req).includes(unidadBloqueada.sede)) {
+      await connection.rollback();
+      transaccionAbierta = false;
+      return redirectNuevoConError(res, fecha, "No está autorizado para registrar esa unidad.");
+    }
+
+    const [[lavadoExistente]] = await connection.query(
+      `SELECT numero_lavado
+       FROM lavado_unidades
+       WHERE unidad_id = ? AND fecha BETWEEN ? AND ?
+       LIMIT 1
+       FOR UPDATE`,
+      [unidadId, limites.inicio, limites.fin]
+    );
+    if (lavadoExistente) {
+      await connection.rollback();
+      transaccionAbierta = false;
+      return redirectNuevoConError(
+        res,
+        fecha,
+        `${unidadBloqueada.placa} ya fue registrada esta semana en ${lavadoExistente.numero_lavado}.`
+      );
+    }
 
     const numeroLavado = await siguienteNumeroLavado(connection, fecha);
     const [result] = await connection.query(
       `INSERT INTO lavado_unidades
        (numero_lavado, unidad_id, placa, sede, fecha, observaciones, creado_por)
        VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [numeroLavado, unidad.id, unidad.placa, unidad.sede, fecha, observaciones, req.session.user.id || null]
+      [numeroLavado, unidadBloqueada.id, unidadBloqueada.placa, unidadBloqueada.sede, fecha, observaciones, req.session.user.id || null]
     );
 
     for (const foto of fotos) {
@@ -731,6 +750,7 @@ router.post("/", async (req, res) => {
     }
 
     await connection.commit();
+    transaccionAbierta = false;
     const params = new URLSearchParams({
       semana,
       sede: String(req.body.sede_retorno || "TODAS"),
@@ -739,7 +759,7 @@ router.post("/", async (req, res) => {
     });
     res.redirect(`/lavado-unidades?${params.toString()}`);
   } catch (error) {
-    if (connection) await connection.rollback();
+    if (connection && transaccionAbierta) await connection.rollback().catch(() => {});
     if (error.code === "ER_DUP_ENTRY") {
       const mensaje = String(error.message || "").includes("uq_lavado_unidad_semana")
         ? "Esa unidad ya tiene un lavado registrado en la semana seleccionada."
