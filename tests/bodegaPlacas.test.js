@@ -132,6 +132,25 @@ test("Bodega suggests active plates and rejects invented plates before changing 
     assert.equal((await post("/bodega/articulos", { nombre: "Nuevo filtro", stock_actual: "0" })).status, 302);
     assert.equal(writes.length, writesBeforeBodeguero + 1);
     assert.match(session.success, /Artículo creado/);
+
+    const writesBeforeEdicion = writes.length;
+    assert.equal((await post("/bodega/articulos/1/editar", {
+      nombre: "Filtro actualizado", codigo: "PROV-2", tipo_articulo: "REPUESTO", grupo_bodega: "INVENTARIO",
+      categoria: "Filtros", marca: "Hino", numero_parte: "LF-2", tipo_unidad: "Hino 500", unidad_medida: "UND",
+      stock_minimo: "1", stock_maximo: "10", ubicacion: "A-03", precio_unitario: "125,50",
+      proveedor_id: "", proveedor_nombre: "Proveedor nuevo", observacion: "Ficha revisada"
+    })).status, 302);
+    assert.match(session.success, /existencias no se modificaron/);
+    const actualizacionFicha = writes.find((call, index) => index >= writesBeforeEdicion && call.sql.includes("UPDATE bodega_articulos"));
+    assert.ok(actualizacionFicha);
+    assert.doesNotMatch(actualizacionFicha.sql, /stock_actual|origen_inventario|codigo_taller/);
+    assert.ok(writes.some((call, index) => index >= writesBeforeEdicion && call.sql.includes("INSERT INTO auditoria_sistema")));
+
+    session.user.rol = "BODEGA";
+    assert.equal((await post("/bodega/articulos/1/editar", {
+      nombre: "No autorizado", tipo_articulo: "REPUESTO", grupo_bodega: "INVENTARIO",
+      stock_minimo: "0", stock_maximo: "0", precio_unitario: "0"
+    })).status, 403);
   } finally {
     pool.query = originalQuery;
     pool.getConnection = originalConnection;

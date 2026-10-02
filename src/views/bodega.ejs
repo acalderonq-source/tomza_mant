@@ -1007,9 +1007,9 @@
     </div>
     <div class="table-responsive">
       <table class="table table-hover table-sm table-modern align-middle">
-        <thead><tr><th>Cód. taller</th><th>Cód. proveedor</th><th>Artículo</th><th>Tipo</th><th>Grupo</th><th>Origen</th><th>Existencia</th><th>Estado</th><th>Ubicación</th><th>Min/Max</th><th>Proveedor</th><th>Precio</th><% if (puedeAjustar) { %><th>Ajuste</th><% } %></tr></thead>
+        <thead><tr><th>Cód. taller</th><th>Cód. proveedor</th><th>Artículo</th><th>Tipo</th><th>Grupo</th><th>Origen</th><th>Existencia</th><th>Estado</th><th>Ubicación</th><th>Min/Max</th><th>Proveedor</th><th>Precio</th><% if (puedeAjustar) { %><th>Ajuste</th><% } %><% if (puedeEditarCatalogo) { %><th>Ficha</th><% } %></tr></thead>
         <tbody>
-          <% if (!articulos.length) { %><tr><td colspan="<%= puedeAjustar ? 13 : 12 %>" class="empty-row">No hay artículos con ese filtro.</td></tr><% } %>
+          <% if (!articulos.length) { %><tr><td colspan="<%= 12 + (puedeAjustar ? 1 : 0) + (puedeEditarCatalogo ? 1 : 0) %>" class="empty-row">No hay artículos con ese filtro.</td></tr><% } %>
           <% articulos.forEach(a => { const estado = estadoStock(a); %>
             <tr>
               <td><span class="code-badge"><%= a.codigo_taller || '-' %></span></td>
@@ -1036,6 +1036,18 @@
                   </form>
                 </td>
               <% } %>
+              <% if (puedeEditarCatalogo) { %>
+                <td><button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editarArticuloModal"
+                  data-id="<%= a.id %>" data-codigo-taller="<%= a.codigo_taller || '' %>" data-codigo="<%= a.codigo || '' %>"
+                  data-nombre="<%= a.nombre || '' %>" data-tipo="<%= a.tipo_articulo || 'REPUESTO' %>"
+                  data-grupo="<%= a.grupo_bodega || 'INVENTARIO' %>" data-categoria="<%= a.categoria || '' %>"
+                  data-marca="<%= a.marca || '' %>" data-numero-parte="<%= a.numero_parte || '' %>"
+                  data-tipo-unidad="<%= a.tipo_unidad || '' %>" data-unidad="<%= a.unidad_medida || 'UND' %>"
+                  data-minimo="<%= a.stock_minimo || 0 %>" data-maximo="<%= a.stock_maximo || 0 %>"
+                  data-ubicacion="<%= a.ubicacion || '' %>" data-precio="<%= a.precio_unitario || 0 %>"
+                  data-proveedor-id="<%= a.proveedor_id || '' %>" data-proveedor-nombre="<%= a.proveedor_nombre || '' %>"
+                  data-observacion="<%= a.observacion || '' %>"><i class="bi bi-pencil-square me-1"></i>Editar</button></td>
+              <% } %>
             </tr>
           <% }) %>
         </tbody>
@@ -1051,6 +1063,41 @@
       </div>
     <% } %>
   </section>
+
+  <% if (pagina === 'inventario' && puedeEditarCatalogo) { %>
+    <div class="modal fade" id="editarArticuloModal" tabindex="-1" aria-labelledby="editarArticuloTitulo" aria-hidden="true">
+      <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+          <form method="POST" id="editarArticuloForm">
+            <input type="hidden" name="redirect_to" value="inventario">
+            <div class="modal-header">
+              <div><h2 class="modal-title fs-5" id="editarArticuloTitulo">Editar ficha de artículo</h2><div class="small muted">El código interno y las existencias se conservan; use movimientos para cambiar stock.</div></div>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body row g-3">
+              <div class="col-md-3"><label class="form-label">Código taller</label><input class="form-control" id="editar-codigo-taller" readonly></div>
+              <div class="col-md-3"><label class="form-label">Código proveedor</label><input class="form-control" name="codigo" id="editar-codigo" maxlength="80"></div>
+              <div class="col-md-6"><label class="form-label">Descripción</label><input class="form-control" name="nombre" id="editar-nombre" maxlength="180" required></div>
+              <div class="col-md-3"><label class="form-label">Tipo</label><select class="form-select" name="tipo_articulo" id="editar-tipo"><% tiposArticulo.forEach(t => { %><option value="<%= t %>"><%= t %></option><% }) %></select></div>
+              <div class="col-md-3"><label class="form-label">Grupo</label><select class="form-select" name="grupo_bodega" id="editar-grupo"><option value="INVENTARIO">Inventario</option><option value="SUMINISTRO">Suministro</option></select></div>
+              <div class="col-md-3"><label class="form-label">Categoría</label><input class="form-control" name="categoria" id="editar-categoria" maxlength="100"></div>
+              <div class="col-md-3"><label class="form-label">Marca</label><input class="form-control" name="marca" id="editar-marca" maxlength="100"></div>
+              <div class="col-md-3"><label class="form-label">Número de parte</label><input class="form-control" name="numero_parte" id="editar-numero-parte" maxlength="120"></div>
+              <div class="col-md-3"><label class="form-label">Tipo de unidad</label><input class="form-control" name="tipo_unidad" id="editar-tipo-unidad" maxlength="120"></div>
+              <div class="col-md-2"><label class="form-label">Unidad</label><input class="form-control" name="unidad_medida" id="editar-unidad" maxlength="30" required></div>
+              <div class="col-md-2"><label class="form-label">Mínimo</label><input class="form-control" type="number" min="0" step="0.01" name="stock_minimo" id="editar-minimo" required></div>
+              <div class="col-md-2"><label class="form-label">Máximo</label><input class="form-control" type="number" min="0" step="0.01" name="stock_maximo" id="editar-maximo" required></div>
+              <div class="col-md-3"><label class="form-label">Ubicación</label><input class="form-control" name="ubicacion" id="editar-ubicacion" maxlength="120"></div>
+              <div class="col-md-3"><label class="form-label">Precio unitario</label><input class="form-control" type="number" min="0" step="0.01" name="precio_unitario" id="editar-precio" required></div>
+              <div class="col-md-6"><label class="form-label">Proveedor del catálogo</label><select class="form-select mb-2" name="proveedor_id" id="editar-proveedor-id"><option value="">Sin proveedor vinculado</option><% proveedores.forEach(p => { %><option value="<%= p.id %>"><%= p.nombre %></option><% }) %></select><input class="form-control" name="proveedor_nombre" id="editar-proveedor-nombre" maxlength="180" placeholder="Nombre libre del proveedor"></div>
+              <div class="col-12"><label class="form-label">Observaciones / uso</label><textarea class="form-control" name="observacion" id="editar-observacion" rows="2"></textarea></div>
+            </div>
+            <div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button><button class="btn btn-primary"><i class="bi bi-check2-circle me-1"></i>Guardar ficha</button></div>
+          </form>
+        </div>
+      </div>
+    </div>
+  <% } %>
 
   <div class="row g-3 mt-1 <%= mostrar('movimientos') ? '' : 'd-none' %>">
     <div class="col-xl-5">
@@ -1536,6 +1583,38 @@
 
     seleccionarPlaca(document.getElementById('placa-entrega'), consultaCompatibilidad.unidad.placa);
     document.getElementById('form-entrega')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+
+  const editarArticuloModal = document.getElementById('editarArticuloModal');
+  editarArticuloModal?.addEventListener('show.bs.modal', event => {
+    const trigger = event.relatedTarget;
+    if (!trigger) return;
+    const data = trigger.dataset;
+    const form = document.getElementById('editarArticuloForm');
+    form.action = `/bodega/articulos/${encodeURIComponent(data.id)}/editar`;
+    const fields = {
+      'editar-codigo-taller': 'codigoTaller',
+      'editar-codigo': 'codigo',
+      'editar-nombre': 'nombre',
+      'editar-tipo': 'tipo',
+      'editar-grupo': 'grupo',
+      'editar-categoria': 'categoria',
+      'editar-marca': 'marca',
+      'editar-numero-parte': 'numeroParte',
+      'editar-tipo-unidad': 'tipoUnidad',
+      'editar-unidad': 'unidad',
+      'editar-minimo': 'minimo',
+      'editar-maximo': 'maximo',
+      'editar-ubicacion': 'ubicacion',
+      'editar-precio': 'precio',
+      'editar-proveedor-id': 'proveedorId',
+      'editar-proveedor-nombre': 'proveedorNombre',
+      'editar-observacion': 'observacion'
+    };
+    Object.entries(fields).forEach(([id, key]) => {
+      const field = document.getElementById(id);
+      if (field) field.value = data[key] || '';
+    });
   });
 </script>
 </body>

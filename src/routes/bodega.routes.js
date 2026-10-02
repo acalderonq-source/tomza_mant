@@ -875,6 +875,7 @@ async function renderBodega(req, res, pagina = "inicio") {
       proximoCodigoTaller,
       pagina,
       puedeAjustar: puedeAjustar(req.session.user),
+      puedeEditarCatalogo: ROLES_CATALOGO.includes(req.session.user.rol),
       success: req.session.success || "",
       error: req.session.error || ""
     });
@@ -1351,6 +1352,125 @@ router.post("/suministros", async (req, res) => {
     req.session.error = error.code === "ER_DUP_ENTRY" ? "Ya existe un artículo con ese código." : (error.message || "No se pudo agregar el suministro.");
   }
   res.redirect("/bodega/inventario?grupo=SUMINISTRO");
+});
+
+router.post("/articulos/:id/editar", async (req, res) => {
+  if (!requiereRol(ROLES_CATALOGO, req, res)) return;
+  const conn = await pool.getConnection();
+  try {
+    await ensureBodegaTables();
+    const articuloId = Number(req.params.id);
+    const nombre = limpiar(req.body.nombre).slice(0, 180);
+    const tipo = upper(req.body.tipo_articulo);
+    const grupo = upper(req.body.grupo_bodega);
+    const stockMinimo = numeroFormularioNoNegativo(req.body.stock_minimo);
+    const stockMaximo = numeroFormularioNoNegativo(req.body.stock_maximo);
+    const precioUnitario = numeroFormularioNoNegativo(req.body.precio_unitario);
+    const proveedorIdIngresado = limpiar(req.body.proveedor_id);
+    const proveedorId = proveedorIdIngresado ? Number(proveedorIdIngresado) : null;
+    const proveedorNombre = limpiar(req.body.proveedor_nombre).slice(0, 180) || null;
+
+    if (!Number.isSafeInteger(articuloId) || articuloId <= 0 || !nombre) {
+      throw new Error("Seleccione un artículo y escriba una descripción válida.");
+    }
+    if (!TIPOS_ARTICULO.includes(tipo) || !["INVENTARIO", "SUMINISTRO"].includes(grupo)) {
+      throw new Error("Seleccione un tipo de artículo y grupo válidos.");
+    }
+    if (stockMinimo === null || stockMaximo === null || precioUnitario === null || stockMinimo > stockMaximo) {
+      throw new Error("Revise los mínimos, máximos y precio: deben ser números no negativos y el máximo no puede ser menor que el mínimo.");
+    }
+    if (proveedorIdIngresado && (!Number.isSafeInteger(proveedorId) || proveedorId <= 0)) {
+      throw new Error("Seleccione un proveedor válido.");
+    }
+
+    await conn.beginTransaction();
+    const [[anterior]] = await conn.query(
+      "SELECT * FROM bodega_articulos WHERE id = ? FOR UPDATE",
+      [articuloId]
+    );
+    if (!anterior) throw new Error("El artículo seleccionado no existe.");
+
+    let proveedor = { id: null, nombre: proveedorNombre };
+    if (proveedorId) {
+      const [[filaProveedor]] = await conn.query(
+        "SELECT id, nombre FROM proveedores WHERE id = ? LIMIT 1",
+        [proveedorId]
+      );
+      if (!filaProveedor) throw new Error("El proveedor seleccionado no existe.");
+      proveedor = filaProveedor;
+    }
+
+    const despues = {
+      codigo: limpiar(req.body.codigo).slice(0, 80) || null,
+      nombre,
+      tipo_articulo: tipo,
+      grupo_bodega: grupo,
+      categoria: limpiar(req.body.categoria).slice(0, 100) || null,
+      marca: limpiar(req.body.marca).slice(0, 100) || null,
+      numero_parte: limpiar(req.body.numero_parte).slice(0, 120) || null,
+      tipo_unidad: limpiar(req.body.tipo_unidad).slice(0, 120) || null,
+      unidad_medida: (limpiar(req.body.unidad_medida) || "UND").slice(0, 30),
+      stock_minimo: stockMinimo,
+      stock_maximo: stockMaximo,
+      ubicacion: limpiar(req.body.ubicacion).slice(0, 120) || null,
+      precio_unitario: precioUnitario,
+      proveedor_id: proveedor.id,
+      proveedor_nombre: proveedor.nombre,
+      observacion: limpiar(req.body.observacion) || null
+    };
+
+    await conn.query(
+      `UPDATE bodega_articulos
+       SET codigo = ?, nombre = ?, tipo_articulo = ?, grupo_bodega = ?, categoria = ?, marca = ?,
+           numero_parte = ?, tipo_unidad = ?, unidad_medida = ?, stock_minimo = ?, stock_maximo = ?,
+           ubicacion = ?, precio_unitario = ?, proveedor_id = ?, proveedor_nombre = ?, observacion = ?
+       WHERE id = ?`,
+      [
+        despues.codigo, despues.nombre, despues.tipo_articulo, despues.grupo_bodega, despues.categoria,
+        despues.marca, despues.numero_parte, despues.tipo_unidad, despues.unidad_medida, despues.stock_minimo,
+        despues.stock_maximo, despues.ubicacion, despues.precio_unitario, despues.proveedor_id,
+        despues.proveedor_nombre, despues.observacion, articuloId
+      ]
+    );
+    await registrarAuditoriaSistema({
+      modulo: "Bodega",
+      tabla: "bodega_articulos",
+      registro_id: articuloId,
+      accion: "EDITAR",
+      resumen: `Ficha de artículo actualizada: ${anterior.codigo_taller || articuloId} · ${nombre}`,
+      antes: {
+        codigo: anterior.codigo,
+        nombre: anterior.nombre,
+        tipo_articulo: anterior.tipo_articulo,
+        grupo_bodega: anterior.grupo_bodega,
+        categoria: anterior.categoria,
+        marca: anterior.marca,
+        numero_parte: anterior.numero_parte,
+        tipo_unidad: anterior.tipo_unidad,
+        unidad_medida: anterior.unidad_medida,
+        stock_minimo: anterior.stock_minimo,
+        stock_maximo: anterior.stock_maximo,
+        ubicacion: anterior.ubicacion,
+        precio_unitario: anterior.precio_unitario,
+        proveedor_id: anterior.proveedor_id,
+        proveedor_nombre: anterior.proveedor_nombre,
+        observacion: anterior.observacion
+      },
+      despues,
+      usuario_id: req.session.user.id,
+      usuario_nombre: req.session.user.usuario
+    }, conn, { ensure: false });
+
+    await conn.commit();
+    req.session.success = "Ficha actualizada. Las existencias no se modificaron.";
+  } catch (error) {
+    await conn.rollback();
+    console.error("ERROR editar artículo bodega:", error);
+    req.session.error = error.message || "No se pudo actualizar el artículo.";
+  } finally {
+    conn.release();
+  }
+  redirectBodega(req, res);
 });
 
 router.post("/entregar", async (req, res) => {

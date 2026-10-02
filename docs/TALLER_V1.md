@@ -48,7 +48,9 @@ El numero `1.0.0` que aparece en `package.json` identifica la version del paquet
 - `npm test` pasa 104 pruebas automatizadas (0 fallidas) en el estado local revisado.
 - La vista del dashboard se prueba renderizada: ADMIN ve los modulos historicos de Taller al seleccionar Taller y no ve modulos ni indicadores de Taller al seleccionar Operaciones.
 - Las rutas de Taller tienen pruebas HTTP de bloqueo por departamento; los flujos de aceites, lavado, bodega, unidades, ARESEP y otros procesos tienen pruebas automatizadas parciales.
-- Render responde `/ready` con base de datos conectada y el commit `3ba4fdb310d8f85844e313b7b76322702bcaf9a0`.
+- El catalogo de Bodega permite editar fichas con auditoria antes/despues sin cambiar existencias; se prueban permisos de BODEGUERO y denegacion de BODEGA.
+- Las entregas rechazan lineas invalidas sin guardar parcialmente, los ajustes no aceptan conteos no numericos y los precios de catalogo/recepcion se validan en el servidor.
+- Cada publicacion se verifica con `/ready`, validando respuesta lista, base conectada y SHA del release activo.
 - La migracion `202610020001_bodega_consumo_confirmacion_completar.sql` recupera esquemas parciales agregando cada columna por separado. El entorno local usa una base distinta de Render; por eso la verificacion directa del esquema productivo queda pendiente.
 - Aun falta validar la interfaz real con perfiles de usuario, completar cobertura de flujos criticos, probar respaldo/restauracion y obtener aceptacion funcional antes de declarar liberada la V1.
 
