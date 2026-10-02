@@ -302,9 +302,10 @@
   const departamentoActivo = user.departamentoActivo || 'TALLER';
   const esAdminDashboard = user.rol === 'ADMIN';
   const areaTaller = departamentoActivo === 'TALLER';
-  const areaOperaciones = departamentoActivo === 'OPERACIONES' || (!esAdminDashboard && ['SUPERVISOR', 'SUPERVISOR_PESADO', 'TRAMITES'].includes(user.rol));
-  const areaContabilidad = departamentoActivo === 'CONTABILIDAD' || (!esAdminDashboard && user.rol === 'CONTABILIDAD');
-  const areaProveeduria = departamentoActivo === 'PROVEEDURIA' || (!esAdminDashboard && ['TALLER', 'PROVEEDURIA', 'PROVEEDURIA_TALLER', 'BODEGA', 'BODEGUERO'].includes(user.rol));
+  const adminEnTaller = esAdminDashboard && areaTaller;
+  const areaOperaciones = departamentoActivo === 'OPERACIONES' || adminEnTaller || (!esAdminDashboard && ['SUPERVISOR', 'SUPERVISOR_PESADO', 'TRAMITES'].includes(user.rol));
+  const areaContabilidad = departamentoActivo === 'CONTABILIDAD' || adminEnTaller || (!esAdminDashboard && user.rol === 'CONTABILIDAD');
+  const areaProveeduria = departamentoActivo === 'PROVEEDURIA' || adminEnTaller || (!esAdminDashboard && ['TALLER', 'PROVEEDURIA', 'PROVEEDURIA_TALLER', 'BODEGA', 'BODEGUERO'].includes(user.rol));
   const esMecanicoLimitado = user.rol === 'MECANICO'
     || usuarioDashboardLower.startsWith('mecanico')
     || usuarioDashboardLower.startsWith('mecanicos');
