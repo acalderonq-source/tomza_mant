@@ -3,6 +3,7 @@ const assert = require("node:assert/strict");
 const express = require("express");
 const pool = require("../src/db");
 const bodega = require("../src/routes/bodega.routes");
+const transactionEvents = [];
 
 test("Bodega suggests active plates and rejects invented plates before changing stock", async () => {
   const originalQuery = pool.query;
@@ -26,10 +27,10 @@ test("Bodega suggests active plates and rejects invented plates before changing 
         : []];
     }
     if (sql.includes("FROM bodega_articulos WHERE id = ?")) {
-      return [[{ id: 1, stock_actual: 5, origen_inventario: origenArticulo, proveedor_consignacion: origenArticulo === "CONSIGNACION" ? "MAXI" : null, ubicacion: "A-02", precio_unitario: 100, nombre: "Filtro", codigo_taller: "0001", codigo: "F-1", tipo_articulo: "REPUESTO" }]];
+      return [[{ id: Number(params[0]), stock_actual: 5, origen_inventario: origenArticulo, proveedor_consignacion: origenArticulo === "CONSIGNACION" ? "MAXI" : null, ubicacion: "A-02", precio_unitario: 100, nombre: "Filtro", codigo_taller: "0001", codigo: "F-1", tipo_articulo: "REPUESTO" }]];
     }
-    if (sql.includes("SELECT id, cantidad FROM bodega_existencias")) return [[{ id: 1, cantidad: 5 }]];
-    if (sql.includes("SELECT COALESCE(SUM(cantidad), 0) AS total FROM bodega_existencias")) return [[{ total: 5 }]];
+    if (sql.includes("SELECT id, cantidad FROM bodega_existencias")) return [[{ id: Number(params[0]), cantidad: Number(params[0]) === 2 ? 0 : 5 }]];
+    if (sql.includes("SELECT COALESCE(SUM(cantidad), 0) AS total FROM bodega_existencias")) return [[{ total: Number(params[0]) === 2 ? 0 : 5 }]];
     if (sql.includes("SELECT * FROM bodega_movimientos WHERE id = ? AND tipo_movimiento = 'SALIDA'")) {
       return [params[0] === 77 ? [{ id: 77, articulo_id: 1, tipo_movimiento: "SALIDA", cantidad: 2, sede: "Cartago", ubicacion: "A-02", origen_inventario: "PROPIO", precio_unitario: 100, placa: null, mecanico: "Taller" }] : []];
     }
@@ -41,9 +42,9 @@ test("Bodega suggests active plates and rejects invented plates before changing 
   };
   pool.getConnection = async () => ({
     query: (...args) => pool.query(...args),
-    beginTransaction: async () => {},
-    commit: async () => {},
-    rollback: async () => {},
+    beginTransaction: async () => { transactionEvents.push("begin"); },
+    commit: async () => { transactionEvents.push("commit"); },
+    rollback: async () => { transactionEvents.push("rollback"); },
     release: () => {}
   });
   const app = express();
@@ -58,12 +59,18 @@ test("Bodega suggests active plates and rejects invented plates before changing 
     const search = await fetch(base + "/bodega/api/placas?q=1645");
     assert.equal(search.status, 200);
     assert.deepEqual((await search.json()).map(unidad => unidad.placa), ["C164528"]);
-    const post = (path, data) => fetch(base + path, {
-      method: "POST",
-      redirect: "manual",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams(data)
-    });
+    const post = (path, data) => {
+      const form = new URLSearchParams();
+      for (const [key, value] of Object.entries(data)) {
+        for (const item of Array.isArray(value) ? value : [value]) form.append(key, item);
+      }
+      return fetch(base + path, {
+        method: "POST",
+        redirect: "manual",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: form
+      });
+    };
     assert.equal((await post("/bodega/entregar", {
       placa: "C16452X", sede: "Cartago", mecanico: "Prueba", articulo_id: "1", cantidad: "1"
     })).status, 302);
@@ -100,6 +107,13 @@ test("Bodega suggests active plates and rejects invented plates before changing 
     assert.equal((await post("/bodega/articulos", { nombre: "Filtro", stock_actual: "5" })).status, 302);
     assert.match(session.error, /sin existencia/);
     assert.equal(writes.length, 0);
+
+    const transaccionesAntes = transactionEvents.length;
+    assert.equal((await post("/bodega/entregar", {
+      sin_placa: "1", sede: "Cartago", mecanico: "Prueba", articulo_id: ["1", "2"], cantidad: ["1", "1"]
+    })).status, 302);
+    assert.match(session.error, /no tiene suficiente existencia/i);
+    assert.deepEqual(transactionEvents.slice(transaccionesAntes), ["begin", "rollback"]);
 
     assert.equal((await post("/bodega/entregar", {
       sin_placa: "1", sede: "Cartago", mecanico: "Prueba", articulo_id: "1", cantidad: "1"
