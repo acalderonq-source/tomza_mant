@@ -11,6 +11,21 @@ const { enviarRecordatoriosMantenimientos, ensurePushTables } = require("./utils
 const { ensureCsrfToken, injectSecurityAssets } = require("./middleware/security");
 const { UPLOAD_ROOT, seedBundledUploads } = require("./utils/uploadStorage");
 const { DEPARTAMENTOS, departamentosPermitidosPorRol, controlarAccesoPorDepartamento, ensurePortalDepartmentSchema } = require("./utils/departamentos");
+const { verificarColumnasRequeridas } = require("./utils/schemaReadiness");
+
+const COLUMNAS_ESENCIALES = {
+  unidades: ["id", "placa", "sede", "activa", "varada", "comodin"],
+  bodega_ordenes_consumo: [
+    "orden_compra_id",
+    "proveedor_id",
+    "fecha_desde",
+    "fecha_hasta",
+    "contacto_confirmacion",
+    "referencia_confirmacion",
+    "confirmado_por",
+    "confirmado_en"
+  ]
+};
 
 // Inicializar app
 const app = express();
@@ -79,8 +94,13 @@ app.get("/health", (_req, res) => {
 app.get("/ready", async (_req, res) => {
   try {
     await pool.query("SELECT 1");
+    const esquema = await verificarColumnasRequeridas((sql, params) => pool.query(sql, params), COLUMNAS_ESENCIALES);
+    if (!esquema.listo) {
+      console.error("Readiness check: faltan columnas esenciales:", esquema.faltantes);
+      return res.status(503).json({ status: "not_ready", database: "connected", schema: "incomplete" });
+    }
     const release = process.env.RENDER_GIT_COMMIT || process.env.GIT_COMMIT || "local";
-    res.status(200).json({ status: "ready", database: "connected", release });
+    res.status(200).json({ status: "ready", database: "connected", schema: "ready", release });
   } catch (error) {
     console.error("Readiness check fallo:", error.code || error.message);
     res.status(503).json({ status: "not_ready", database: "unavailable" });
