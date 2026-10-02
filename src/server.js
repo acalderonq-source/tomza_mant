@@ -79,12 +79,13 @@ app.get("/health", (_req, res) => {
 });
 
 app.get("/ready", async (_req, res) => {
+  const release = process.env.RENDER_GIT_COMMIT || process.env.GIT_COMMIT || "local";
   try {
     await pool.query("SELECT 1");
     const esquema = await verificarColumnasRequeridas((sql, params) => pool.query(sql, params), COLUMNAS_ESENCIALES_TALLER);
     if (!esquema.listo) {
       console.error("Readiness check: faltan columnas esenciales:", esquema.faltantes);
-      return res.status(503).json({ status: "not_ready", database: "connected", schema: "incomplete" });
+      return res.status(503).json({ status: "not_ready", database: "connected", schema: "incomplete", release });
     }
     const almacenamiento = verificarAlmacenamientoUploads();
     if (!almacenamiento.listo) {
@@ -93,14 +94,14 @@ app.get("/ready", async (_req, res) => {
         status: "not_ready",
         database: "connected",
         schema: "ready",
-        uploads: { status: "unavailable", reason: almacenamiento.motivo }
+        uploads: { status: "unavailable", reason: almacenamiento.motivo },
+        release
       });
     }
-    const release = process.env.RENDER_GIT_COMMIT || process.env.GIT_COMMIT || "local";
     res.status(200).json({ status: "ready", database: "connected", schema: "ready", uploads: "ready", release });
   } catch (error) {
     console.error("Readiness check fallo:", error.code || error.message);
-    res.status(503).json({ status: "not_ready", database: "unavailable" });
+    res.status(503).json({ status: "not_ready", database: "unavailable", release });
   }
 });
 
