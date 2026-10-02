@@ -5,8 +5,13 @@ const BUNDLED_UPLOAD_ROOT = path.resolve(__dirname, "..", "..", "public", "uploa
 const RENDER_UPLOAD_ROOT = "/var/data/uploads";
 
 function resolverRaizUploads(env = process.env) {
-  if (env.UPLOAD_ROOT) return path.resolve(env.UPLOAD_ROOT);
-  if (env.RENDER === "true") return RENDER_UPLOAD_ROOT;
+  const render = env.RENDER === "true";
+  if (env.UPLOAD_ROOT) {
+    const configuredRoot = path.resolve(env.UPLOAD_ROOT);
+    if (render && configuredRoot === BUNDLED_UPLOAD_ROOT) return RENDER_UPLOAD_ROOT;
+    return configuredRoot;
+  }
+  if (render) return RENDER_UPLOAD_ROOT;
   return BUNDLED_UPLOAD_ROOT;
 }
 

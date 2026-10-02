@@ -35,6 +35,7 @@ test("readiness rejects production when uploads fall back to bundled ephemeral s
 test("Render defaults uploads to the persistent mount declared in its service config", () => {
   assert.equal(resolverRaizUploads({ RENDER: "true" }), RENDER_UPLOAD_ROOT);
   assert.equal(resolverRaizUploads({ UPLOAD_ROOT: writableDirectory, RENDER: "true" }), writableDirectory);
+  assert.equal(resolverRaizUploads({ UPLOAD_ROOT: BUNDLED_UPLOAD_ROOT, RENDER: "true" }), RENDER_UPLOAD_ROOT);
 });
 
 test("Render readiness requires uploads to live inside an attached disk mount", () => {
