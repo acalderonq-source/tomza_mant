@@ -104,9 +104,43 @@ test("Bodega suggests active plates and rejects invented plates before changing 
     assert.match(session.error, /precio recibido debe ser un monto no negativo/);
     assert.equal(writes.length, 0);
 
+    const writesAntesRecepcion = writes.length;
+    const transaccionesAntesRecepcion = transactionEvents.length;
+    assert.equal((await post("/bodega/recibir", {
+      articulo_id: "1", cantidad: "2", precio_unitario: "130,25", sede: "Cartago",
+      destino_recepcion: "PLACA", placa: "C164528", numero_factura: "F-100", origen_inventario: "PROPIO"
+    })).status, 302);
+    assert.match(session.success, /Entrada registrada/);
+    assert.deepEqual(transactionEvents.slice(transaccionesAntesRecepcion), ["begin", "commit"]);
+    const entradaPorPlaca = writes.slice(writesAntesRecepcion).find(call =>
+      call.sql.includes("INSERT INTO bodega_movimientos") && call.sql.includes("'ENTRADA'")
+    );
+    assert.ok(entradaPorPlaca);
+    assert.equal(entradaPorPlaca.params[4], 2);
+    assert.equal(entradaPorPlaca.params[7], "C164528");
+    assert.equal(entradaPorPlaca.params[8], "PLACA");
+    assert.equal(entradaPorPlaca.params[13], 130.25);
+
+    const writesAntesRecepcionGeneral = writes.length;
+    const transaccionesAntesRecepcionGeneral = transactionEvents.length;
+    assert.equal((await post("/bodega/recibir", {
+      articulo_id: "1", cantidad: "3", sede: "Cartago", destino_recepcion: "GENERALES",
+      placa: "C164528", origen_inventario: "PROPIO"
+    })).status, 302);
+    assert.match(session.success, /Entrada registrada/);
+    assert.deepEqual(transactionEvents.slice(transaccionesAntesRecepcionGeneral), ["begin", "commit"]);
+    const entradaGeneral = writes.slice(writesAntesRecepcionGeneral).find(call =>
+      call.sql.includes("INSERT INTO bodega_movimientos") && call.sql.includes("'ENTRADA'")
+    );
+    assert.ok(entradaGeneral);
+    assert.equal(entradaGeneral.params[4], 3);
+    assert.equal(entradaGeneral.params[7], null);
+    assert.equal(entradaGeneral.params[8], "GENERALES");
+
+    const writesAntesArticuloSinSaldo = writes.length;
     assert.equal((await post("/bodega/articulos", { nombre: "Filtro", stock_actual: "5" })).status, 302);
     assert.match(session.error, /sin existencia/);
-    assert.equal(writes.length, 0);
+    assert.equal(writes.length, writesAntesArticuloSinSaldo);
 
     const transaccionesAntes = transactionEvents.length;
     assert.equal((await post("/bodega/entregar", {
@@ -115,11 +149,13 @@ test("Bodega suggests active plates and rejects invented plates before changing 
     assert.match(session.error, /no tiene suficiente existencia/i);
     assert.deepEqual(transactionEvents.slice(transaccionesAntes), ["begin", "rollback"]);
 
+    const writesAntesEntregaCorrecta = writes.length;
     assert.equal((await post("/bodega/entregar", {
       sin_placa: "1", sede: "Cartago", mecanico: "Prueba", articulo_id: "1", cantidad: "1"
     })).status, 302);
-    const entrega = writes.find(call => call.sql.includes("INSERT INTO bodega_entregas"));
-    const salida = writes.find(call => call.sql.includes("INSERT INTO bodega_movimientos"));
+    const writesEntregaCorrecta = writes.slice(writesAntesEntregaCorrecta);
+    const entrega = writesEntregaCorrecta.find(call => call.sql.includes("INSERT INTO bodega_entregas"));
+    const salida = writesEntregaCorrecta.find(call => call.sql.includes("INSERT INTO bodega_movimientos") && call.params[3] === "SALIDA");
     assert.ok(entrega);
     assert.ok(salida);
     assert.equal(entrega.params[0], null);
