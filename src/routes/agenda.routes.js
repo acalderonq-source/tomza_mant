@@ -14,37 +14,47 @@ const { ensureNumeroMantenimientoColumn, asignarNumeroMantenimiento } = require(
 
 // ================= FUNCIONES AUXILIARES =================
 
-function hoy() {
-  const f = new Date();
-  f.setHours(0, 0, 0, 0);
-  return f.toISOString().slice(0, 10);
+function hoy(fecha = new Date()) {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Costa_Rica",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).format(fecha);
 }
 
 function siguienteDiaHabil(fechaBase) {
-  const f = new Date(fechaBase);
+  const f = new Date(`${fechaValida(fechaBase, hoy())}T00:00:00Z`);
   do {
-    f.setDate(f.getDate() + 1);
-  } while (f.getDay() === 0 || f.getDay() === 6);
+    f.setUTCDate(f.getUTCDate() + 1);
+  } while (f.getUTCDay() === 0 || f.getUTCDay() === 6);
   return f.toISOString().slice(0, 10);
 }
 
 function sumarDias(fechaBase, dias) {
-  const f = new Date(`${fechaBase}T00:00:00`);
-  f.setDate(f.getDate() + dias);
+  const f = new Date(`${fechaValida(fechaBase, hoy())}T00:00:00Z`);
+  f.setUTCDate(f.getUTCDate() + dias);
   return f.toISOString().slice(0, 10);
 }
 
 function lunesDeSemana(fechaBase = hoy()) {
-  const f = new Date(`${fechaBase}T00:00:00`);
-  const dia = f.getDay();
+  const f = new Date(`${fechaValida(fechaBase, hoy())}T00:00:00Z`);
+  const dia = f.getUTCDay();
   const diferencia = dia === 0 ? -6 : 1 - dia;
-  f.setDate(f.getDate() + diferencia);
+  f.setUTCDate(f.getUTCDate() + diferencia);
   return f.toISOString().slice(0, 10);
 }
 
-function fechaValida(value, fallback = hoy()) {
+function fechaISOValida(value) {
   const fecha = String(value || "").trim();
-  return /^\d{4}-\d{2}-\d{2}$/.test(fecha) ? fecha : fallback;
+  const match = fecha.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return "";
+  const parsed = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3])));
+  return parsed.toISOString().slice(0, 10) === fecha ? fecha : "";
+}
+
+function fechaValida(value, fallback = hoy()) {
+  return fechaISOValida(value) || fallback;
 }
 
 // ================= SEDES =================
@@ -181,7 +191,7 @@ router.get("/manana", async (req, res) => {
   try {
     if (!req.session.user) return res.redirect("/login");
 
-    const manana = siguienteDiaHabil(new Date());
+    const manana = siguienteDiaHabil(hoy());
     const sedesPermitidas = await obtenerSedesPermitidas(req);
     const sedeFiltro = obtenerSedeFiltro(req, sedesPermitidas);
 
@@ -360,13 +370,19 @@ router.post("/nuevo", async (req, res) => {
       return res.status(403).send("No autorizado");
     }
 
-    const { unidad_id, tipo, plan, fecha } = req.body;
+    const unidad_id = Number.parseInt(req.body.unidad_id, 10);
+    const tipo = String(req.body.tipo || "").trim().toUpperCase();
+    const plan = String(req.body.plan || "").trim();
+    const fecha = fechaISOValida(req.body.fecha);
 
-    if (!unidad_id || !tipo || !fecha) {
+    if (!Number.isInteger(unidad_id) || unidad_id <= 0 || !["PREVENTIVO", "CORRECTIVO"].includes(tipo) || !fecha) {
       return res.status(400).send("Datos incompletos");
     }
 
-    const [[unidad]] = await pool.query("SELECT sede FROM unidades WHERE id = ?", [unidad_id]);
+    const [[unidad]] = await pool.query(
+      "SELECT sede FROM unidades WHERE id = ? AND COALESCE(activa, 1) = 1 LIMIT 1",
+      [unidad_id]
+    );
     if (!unidad) return res.status(404).send("Unidad no encontrada");
     const sedesPermitidas = await obtenerSedesPermitidas(req);
     const sedeFiltro = obtenerSedeFiltro(req, sedesPermitidas);
@@ -392,3 +408,8 @@ router.post("/nuevo", async (req, res) => {
 });
 
 module.exports = router;
+module.exports.fechaCostaRica = hoy;
+module.exports.fechaISOValida = fechaISOValida;
+module.exports.lunesDeSemana = lunesDeSemana;
+module.exports.siguienteDiaHabil = siguienteDiaHabil;
+module.exports.sumarDias = sumarDias;
