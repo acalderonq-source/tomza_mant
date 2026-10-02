@@ -420,6 +420,8 @@
         <div class="summary-value"><%= mantenimientosPendientes %></div>
         <div class="summary-foot"><%= mantenimientosAtrasados %> atrasados · <%= mantenimientosHoy.length %> hoy</div>
       </div>
+    <% } %>
+    <% if ((areaTaller || areaOperaciones) && (!esAdminDashboard || areaOperaciones || areaTaller)) { %>
       <div class="summary-card">
         <div class="summary-label">Unidades</div>
         <div class="summary-value"><%= exec.unidades || 0 %></div>
@@ -432,6 +434,8 @@
         <div class="summary-value"><%= facturasPendientes %></div>
         <div class="summary-foot"><%= facturasVencidas %> vencidas · CRC <%= money(exec.montoPendiente) %></div>
       </div>
+    <% } %>
+    <% if (!esMecanicoLimitado && areaTaller && (!esAdminDashboard || areaTaller)) { %>
       <div class="summary-card">
         <div class="summary-label">Llantas</div>
         <div class="summary-value"><%= llantasEnProceso %></div>
@@ -473,6 +477,51 @@
   <section class="mb-2">
     <h2 class="section-title">Módulos</h2>
     <div class="module-grid">
+      <% if (esAdminDashboard && departamentoActivo !== 'TALLER') { %>
+        <% if (departamentoActivo === 'OPERACIONES') { %>
+          <% [
+            ['/reportes-supervisores', 'Reportes de unidades', 'Fallas reportadas por unidad.', 'bi-clipboard-pulse', 'icon-blue'],
+            ['/reportes-supervisores/rutas', 'Rutas y choferes', 'Asignación semanal e historial de cambios.', 'bi-signpost-split', 'icon-green'],
+            ['/unidades', 'Unidades', 'Consulta de unidades y su estado operativo.', 'bi-truck-front', 'icon-green'],
+            ['/lavado-unidades', 'Lavado semanal', 'Evidencia fotográfica, cumplimiento y unidades pendientes.', 'bi-droplet', 'icon-blue'],
+            ['/revision-ruta', 'Salida a ruta', 'Revisión diaria de camiones.', 'bi-clipboard-check', 'icon-green'],
+            ['/dekra', 'DEKRA', 'Revisión técnica y vencimientos.', 'bi-clipboard-check', 'icon-blue'],
+            ['/minae', 'MINAE', 'Trámites y permisos de transporte.', 'bi-bank', 'icon-blue']
+          ].forEach(([href, title, copy, icon, color]) => { %>
+            <a href="<%= href %>" class="module-card">
+              <span class="module-icon <%= color %>"><i class="bi <%= icon %>"></i></span>
+              <div><div class="module-title"><%= title %></div><p class="module-copy"><%= copy %></p></div>
+            </a>
+          <% }) %>
+        <% } else if (departamentoActivo === 'CONTABILIDAD') { %>
+          <% [
+            ['/compras/facturas', 'Facturas', 'Facturas recibidas, pagos y reportes.', 'bi-receipt', 'icon-red'],
+            ['/compras/facturas/asientos', 'Asientos de pasivos', 'Generar Excel y consultar el historial de asientos.', 'bi-journal-check', 'icon-blue'],
+            ['/aresep', 'ARESEP', 'Unidades A7, costos, planillas y control mensual.', 'bi-clipboard-data', 'icon-green']
+          ].forEach(([href, title, copy, icon, color]) => { %>
+            <a href="<%= href %>" class="module-card">
+              <span class="module-icon <%= color %>"><i class="bi <%= icon %>"></i></span>
+              <div><div class="module-title"><%= title %></div><p class="module-copy"><%= copy %></p></div>
+            </a>
+          <% }) %>
+        <% } else if (departamentoActivo === 'PROVEEDURIA') { %>
+          <% [
+            ['/compras/ordenes', 'Órdenes de compra', 'Crear y consultar órdenes de compra.', 'bi-cart-check', 'icon-dark'],
+            ['/bodega', 'Bodega', 'Inventario, entregas, entradas y herramientas.', 'bi-boxes', 'icon-green'],
+            ['/repuestos-semanales', 'Repuestos semanales', 'Consultar solicitudes y registrar recepciones.', 'bi-calendar-week', 'icon-red']
+          ].forEach(([href, title, copy, icon, color]) => { %>
+            <a href="<%= href %>" class="module-card">
+              <span class="module-icon <%= color %>"><i class="bi <%= icon %>"></i></span>
+              <div><div class="module-title"><%= title %></div><p class="module-copy"><%= copy %></p></div>
+            </a>
+          <% }) %>
+        <% } else { %>
+          <div class="module-card">
+            <span class="module-icon icon-blue"><i class="bi bi-cone-striped"></i></span>
+            <div><div class="module-title">Área en preparación</div><p class="module-copy">Este departamento no muestra módulos de Taller. Sus herramientas se habilitarán conforme se incorporen sus procesos y permisos.</p></div>
+          </div>
+        <% } %>
+      <% } else { %>
       <% if (puedeVerResumenEjecutivo && (areaTaller || areaOperaciones || areaProveeduria)) { %>
         <a href="/dashboard/resumen-ejecutivo" class="module-card">
           <span class="module-icon icon-blue"><i class="bi bi-graph-up-arrow"></i></span>
@@ -662,6 +711,7 @@
           <span class="module-icon icon-blue"><i class="bi bi-cone-striped"></i></span>
           <div><div class="module-title">Área en preparación</div><p class="module-copy">El acceso ya está organizado. Los módulos de este departamento se habilitarán conforme se incorporen sus procesos y permisos.</p></div>
         </div>
+      <% } %>
       <% } %>
     </div>
   </section>
