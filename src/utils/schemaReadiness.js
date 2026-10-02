@@ -21,4 +21,14 @@ async function verificarColumnasRequeridas(query, columnasRequeridas) {
   return { listo: faltantes.length === 0, faltantes };
 }
 
-module.exports = { verificarColumnasRequeridas };
+const COLUMNAS_ESENCIALES_TALLER = {
+  unidades: ["id", "placa", "sede", "activa", "varada", "comodin"],
+  bodega_articulos: ["id", "nombre", "tipo_articulo", "grupo_bodega", "origen_inventario", "stock_actual", "precio_unitario", "activo"],
+  bodega_existencias: ["id", "articulo_id", "sede", "ubicacion", "cantidad"],
+  bodega_entregas: ["id", "placa", "mecanico", "creado_por", "creado_en"],
+  bodega_movimientos: ["id", "articulo_id", "tipo_movimiento", "origen_inventario", "sede", "cantidad", "existencia_anterior", "existencia_nueva", "movimiento_origen_id"],
+  bodega_ordenes_consumo: ["orden_compra_id", "proveedor_id", "fecha_desde", "fecha_hasta", "contacto_confirmacion", "referencia_confirmacion", "confirmado_por", "confirmado_en"],
+  bodega_ordenes_consumo_movimientos: ["movimiento_id", "orden_compra_id"]
+};
+
+module.exports = { verificarColumnasRequeridas, COLUMNAS_ESENCIALES_TALLER };
