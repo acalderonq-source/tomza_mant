@@ -184,4 +184,8 @@ test("la pantalla de unidades ofrece Comodin y enlaza los dos listados", async (
   assert.match(html, /href="\/unidades\/comodines"/);
   assert.match(html, /name="unidades\[7\]\[condicion\]"/);
   assert.match(html, /value="comodin" selected/);
+  assert.match(html, /form="deleteUnitForm"[\s\S]*?formaction="\/unidades\/7\/eliminar"/);
+  const deleteForm = html.match(/<form id="deleteUnitForm" method="POST">([\s\S]*?)<\/form>/);
+  assert.ok(deleteForm, "eliminar usa un formulario independiente y pequeño");
+  assert.doesNotMatch(deleteForm[1], /unidades\[/);
 });
