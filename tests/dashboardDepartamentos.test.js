@@ -5,11 +5,11 @@ const path = require("node:path");
 
 const dashboardPath = path.join(__dirname, "..", "src", "views", "dashboard.ejs");
 
-async function renderDashboard(departamentoActivo) {
+async function renderDashboard(departamentoActivo, rol = "ADMIN", usuario = "admin") {
   return ejs.renderFile(dashboardPath, {
     user: {
-      usuario: "admin",
-      rol: "ADMIN",
+      usuario,
+      rol,
       sede: "TODAS",
       departamentos: ["TALLER", "OPERACIONES"],
       departamentoActivo
@@ -42,6 +42,27 @@ test("el dashboard de Taller conserva los accesos operativos historicos para ADM
     "/compras/facturas"
   ]) {
     assert.ok(html.includes(`href="${href}"`), `Falta el acceso ${href} en Taller`);
+  }
+});
+
+test("el rol TALLER conserva sus accesos de trabajo al seleccionar Taller", async () => {
+  const html = await renderDashboard("TALLER", "TALLER", "taller");
+  for (const href of [
+    "/mantenimientos",
+    "/unidades",
+    "/reportes-supervisores",
+    "/reportes-supervisores/rutas",
+    "/taller/dashboard",
+    "/lavado-unidades",
+    "/revision-ruta",
+    "/dekra",
+    "/minae",
+    "/bodega",
+    "/repuestos-semanales",
+    "/compras/ordenes",
+    "/compras/facturas"
+  ]) {
+    assert.ok(html.includes(`href="${href}"`), `Falta el acceso ${href} para el rol TALLER`);
   }
 });
 
