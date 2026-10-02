@@ -44,6 +44,7 @@ test("los módulos de Taller se identifican por ruta sin confundir rutas similar
   assert.equal(puedeAbrirRutaPorDepartamento("OPERACIONES", "/bodega"), false);
   assert.equal(puedeAbrirRutaPorDepartamento("CONTABILIDAD", "/compras/facturas/asientos"), true);
   assert.equal(puedeAbrirRutaPorDepartamento("CONTABILIDAD", "/compras/ordenes"), true);
+  assert.equal(puedeAbrirRutaPorDepartamento("CONTABILIDAD", "/aresep"), true);
   assert.equal(puedeAbrirRutaPorDepartamento("CONTABILIDAD", "/mantenimientos"), false);
   assert.equal(puedeAbrirRutaPorDepartamento("PROVEEDURIA", "/compras/facturas"), true);
   assert.equal(puedeAbrirRutaPorDepartamento("PROVEEDURIA", "/compras/ordenes/42"), true);

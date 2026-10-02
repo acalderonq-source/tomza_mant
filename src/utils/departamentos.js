@@ -38,7 +38,7 @@ const RUTAS_TALLER = [
 ];
 
 const RUTAS_COMPARTIDAS_POR_DEPARTAMENTO = {
-  CONTABILIDAD: ["/compras/facturas", "/compras/ordenes"],
+  CONTABILIDAD: ["/compras/facturas", "/compras/ordenes", "/aresep"],
   PROVEEDURIA: [
     "/compras/facturas",
     "/compras/ordenes",

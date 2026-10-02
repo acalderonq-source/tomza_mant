@@ -2,6 +2,7 @@ const { test } = require("node:test");
 const assert = require("node:assert/strict");
 const ejs = require("ejs");
 const path = require("node:path");
+const { puedeAbrirRutaPorDepartamento, rutaPerteneceATaller } = require("../src/utils/departamentos");
 
 const dashboardPath = path.join(__dirname, "..", "src", "views", "dashboard.ejs");
 
@@ -100,4 +101,30 @@ test("Proveeduría ve compras y bodega con sus módulos visibles", async () => {
   }
   assert.ok(!html.includes('href="/mantenimientos"'));
   assert.ok(!html.includes('href="/unidades"'));
+  assert.ok(!html.includes('href="/dashboard/resumen-ejecutivo"'));
+});
+
+test("cada módulo visible que pertenece a Taller es accesible desde el área activa", async () => {
+  const casos = [
+    { departamento: "TALLER", rol: "ADMIN", usuario: "admin" },
+    { departamento: "OPERACIONES", rol: "ADMIN", usuario: "admin" },
+    { departamento: "CONTABILIDAD", rol: "CONTABILIDAD", usuario: "contabilidad" },
+    { departamento: "PROVEEDURIA", rol: "PROVEEDURIA_TALLER", usuario: "proveeduria" },
+    { departamento: "PROVEEDURIA", rol: "PROVEEDURIA", usuario: "proveeduria" },
+    { departamento: "PROVEEDURIA", rol: "BODEGUERO", usuario: "bodeguero" }
+  ];
+
+  for (const caso of casos) {
+    const html = await renderDashboard(caso.departamento, caso.rol, caso.usuario);
+    const hrefs = [...html.matchAll(/href="([^"]+)"/g)].map(match => match[1]);
+    for (const href of hrefs) {
+      const pathname = new URL(href, "http://localhost").pathname;
+      if (!rutaPerteneceATaller(pathname)) continue;
+      assert.equal(
+        puedeAbrirRutaPorDepartamento(caso.departamento, pathname),
+        true,
+        `${caso.rol} ve ${pathname} en ${caso.departamento}, pero el middleware lo bloquea`
+      );
+    }
+  }
 });

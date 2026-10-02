@@ -323,7 +323,7 @@
   const puedeVerLavadoUnidades = (esMecanicoLimitado || ['ADMIN', 'TALLER', 'MECANICO', 'SUPERVISOR', 'SUPERVISOR_PESADO'].includes(user.rol)) && (esAdminDashboard ? areaOperaciones : (areaTaller || areaOperaciones));
   const puedeVerKpisMecanicos = !esMecanicoLimitado && ['ADMIN', 'TALLER', 'PROVEEDURIA_TALLER'].includes(user.rol) && areaTaller;
   const puedeVerOrdenesMotor = !esMecanicoLimitado && ['ADMIN', 'TALLER', 'PROVEEDURIA_TALLER'].includes(user.rol) && areaTaller;
-  const puedeVerResumenEjecutivo = esMecanicoLimitado || ['ADMIN', 'TALLER', 'PROVEEDURIA', 'PROVEEDURIA_TALLER', 'TRAMITES'].includes(user.rol);
+  const puedeVerResumenEjecutivo = areaTaller && (esMecanicoLimitado || ['ADMIN', 'TALLER', 'PROVEEDURIA_TALLER'].includes(user.rol));
   const puedeVerRepuestos = !esMecanicoLimitado && (
     ['ADMIN', 'TALLER', 'PROVEEDURIA_TALLER', 'PROVEEDURIA', 'SUPERVISOR_PESADO', 'MENSAJERO', 'MENSAJERIA', 'MENSAJERO_FACTURAS'].includes(user.rol)
     || usuarioDashboardLower === 'pesados'
