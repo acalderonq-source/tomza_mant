@@ -1840,7 +1840,13 @@ router.post("/prestamos/:id/devolver", async (req, res) => {
     const articulo = await articuloParaMovimiento(conn, prestamo.articulo_id);
     const cantidadDevueltaAntes = Number(prestamo.cantidad_devuelta || 0);
     const cantidadPrestamo = Number(prestamo.cantidad || 0);
-    const cantidadDevuelta = numero(req.body.cantidad) || (cantidadPrestamo - cantidadDevueltaAntes);
+    const cantidadTexto = limpiar(req.body.cantidad);
+    const cantidadDevuelta = cantidadTexto
+      ? numeroNoNegativo(cantidadTexto)
+      : cantidadPrestamo - cantidadDevueltaAntes;
+    if (cantidadDevuelta === null) {
+      throw new Error("Indique una cantidad válida con hasta dos decimales.");
+    }
     if (cantidadDevuelta <= 0 || cantidadDevuelta > cantidadPrestamo - cantidadDevueltaAntes) {
       throw new Error("La cantidad devuelta debe ser positiva y no puede superar el saldo prestado.");
     }

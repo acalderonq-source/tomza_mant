@@ -34,6 +34,9 @@ test("Bodega suggests active plates and rejects invented plates before changing 
     if (sql.includes("SELECT * FROM bodega_movimientos WHERE id = ? AND tipo_movimiento = 'SALIDA'")) {
       return [params[0] === 77 ? [{ id: 77, articulo_id: 1, tipo_movimiento: "SALIDA", cantidad: 2, sede: "Cartago", ubicacion: "A-02", origen_inventario: "PROPIO", precio_unitario: 100, placa: null, mecanico: "Taller" }] : []];
     }
+    if (sql.includes("SELECT * FROM bodega_prestamos_herramientas WHERE id = ? AND estado = 'PRESTADO'")) {
+      return [[{ id: 31, articulo_id: 1, cantidad: 2, cantidad_devuelta: 0, sede: "Cartago", ubicacion: "A-02", placa: null, mecanico: "Taller" }]];
+    }
     if (sql.includes("SELECT COALESCE(SUM(cantidad), 0) AS total FROM bodega_movimientos")) return [[{ total: 0 }]];
     if (/^\s*(?:INSERT|UPDATE|DELETE)\b/.test(sql)) writes.push({ sql, params });
     if (sql.includes("INSERT INTO bodega_entregas")) return [{ insertId: 501 }];
@@ -177,6 +180,30 @@ test("Bodega suggests active plates and rejects invented plates before changing 
     assert.ok(devolucion);
     assert.equal(devolucion.params[4], 77);
     assert.equal(devolucion.params[5], 1);
+
+    for (const cantidad of ["abc", "0", "-1", "1.234"]) {
+      const writesAntes = writes.length;
+      const eventosAntes = transactionEvents.length;
+      assert.equal((await post("/bodega/prestamos/31/devolver", { cantidad })).status, 302);
+      assert.match(session.error, /cantidad/i);
+      assert.equal(writes.length, writesAntes);
+      assert.deepEqual(transactionEvents.slice(eventosAntes), ["begin", "rollback"]);
+    }
+
+    const writesAntesDevolucionHerramienta = writes.length;
+    const eventosAntesDevolucionHerramienta = transactionEvents.length;
+    assert.equal((await post("/bodega/prestamos/31/devolver", { cantidad: "1" })).status, 302);
+    assert.match(session.success, /Herramienta devuelta/);
+    assert.deepEqual(transactionEvents.slice(eventosAntesDevolucionHerramienta), ["begin", "commit"]);
+    const actualizacionPrestamo = writes.slice(writesAntesDevolucionHerramienta).find(call =>
+      call.sql.includes("UPDATE bodega_prestamos_herramientas")
+    );
+    assert.equal(actualizacionPrestamo.params[0], 1, JSON.stringify(actualizacionPrestamo));
+    const devolucionHerramienta = writes.slice(writesAntesDevolucionHerramienta).find(call =>
+      call.sql.includes("DEVOLUCION_HERRAMIENTA")
+    );
+    assert.ok(devolucionHerramienta);
+    assert.equal(devolucionHerramienta.params[5], 1);
 
     session.user.rol = "BODEGUERO";
     const writesBeforeBodeguero = writes.length;
