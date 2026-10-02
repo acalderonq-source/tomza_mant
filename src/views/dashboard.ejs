@@ -389,7 +389,7 @@
         <h1 class="page-title">Inicio</h1>
         <div class="page-subtitle">Departamento: <strong><%= { TALLER: 'Taller', OPERACIONES: 'Operaciones', CONTABILIDAD: 'Contabilidad', SEGURIDAD_OCUPACIONAL: 'Seguridad Ocupacional', LOGISTICA: 'Logística', PROVEEDURIA: 'Proveeduría', RECURSOS_HUMANOS: 'Recursos Humanos' }[departamentoActivo] || departamentoActivo %></strong> · Sede: <strong><%= sedeActualVista %></strong> · <%= new Date().toLocaleDateString('es-CR') %></div>
       </div>
-      <% if (!esMecanicoLimitado && (areaContabilidad || areaProveeduria)) { %>
+      <% if (!esMecanicoLimitado && areaTaller && (areaContabilidad || areaProveeduria)) { %>
         <a href="/ia" class="btn btn-dark btn-sm rounded-pill px-3"><i class="bi bi-stars"></i> IA Tomza</a>
       <% } %>
     </div>
@@ -413,7 +413,7 @@
     </section>
   <% } %>
 
-  <% if ((!esAdminDashboard || areaTaller) && (areaTaller || areaOperaciones || areaContabilidad || areaProveeduria)) { %>
+  <% if (areaTaller) { %>
   <section class="summary-grid mb-2">
     <% if ((areaTaller || areaOperaciones) && (!esAdminDashboard || areaTaller)) { %>
       <div class="summary-card">
@@ -446,7 +446,7 @@
   </section>
   <% } %>
 
-  <% if (puedeVerOperaciones && (!esAdminDashboard || areaTaller)) { %>
+  <% if (puedeVerOperaciones && areaTaller) { %>
     <section class="top-info-grid mb-2">
       <div class="priority-panel">
         <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap mb-2">
@@ -475,7 +475,7 @@
     </section>
   <% } %>
 
-  <% if (!esAdminDashboard || areaTaller) { %>
+  <% if (areaTaller) { %>
   <section class="mb-2">
     <h2 class="section-title">Módulos</h2>
     <div class="module-grid">
@@ -673,7 +673,7 @@
   </section>
   <% } %>
 
-  <% if (puedeVerOperaciones && (!esAdminDashboard || areaTaller)) { %>
+  <% if (puedeVerOperaciones && areaTaller) { %>
     <section class="plain-card">
       <div class="p-3 border-bottom d-flex justify-content-between align-items-center gap-2 flex-wrap">
         <div>

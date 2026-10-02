@@ -1,6 +1,6 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { DEPARTAMENTOS, departamentosInicialesPorRol, departamentosPermitidosPorRol, esDepartamentoValido, ensurePortalDepartmentSchema } = require("../src/utils/departamentos");
+const { DEPARTAMENTOS, departamentosInicialesPorRol, departamentosPermitidosPorRol, esDepartamentoValido, rutaPerteneceATaller, puedeAbrirRutaPorDepartamento, ensurePortalDepartmentSchema } = require("../src/utils/departamentos");
 
 test("el portal ofrece los siete departamentos previstos", () => {
   assert.deepEqual(DEPARTAMENTOS.map(item => item.key), [
@@ -30,6 +30,18 @@ test("la validación de clave de área no acepta valores arbitrarios", () => {
   assert.equal(esDepartamentoValido("taller"), true);
   assert.equal(esDepartamentoValido("ADMIN"), false);
   assert.equal(esDepartamentoValido("../../admin"), false);
+});
+
+test("los módulos de Taller se identifican por ruta sin confundir rutas similares", () => {
+  assert.equal(rutaPerteneceATaller("/mantenimientos/25"), true);
+  assert.equal(rutaPerteneceATaller("/compras/facturas"), true);
+  assert.equal(rutaPerteneceATaller("/api/unidades/buscar"), true);
+  assert.equal(rutaPerteneceATaller("/dashboard"), false);
+  assert.equal(rutaPerteneceATaller("/talleres"), false);
+  assert.equal(rutaPerteneceATaller("/departamento/activo"), false);
+  assert.equal(puedeAbrirRutaPorDepartamento("OPERACIONES", "/mantenimientos"), false);
+  assert.equal(puedeAbrirRutaPorDepartamento("OPERACIONES", "/dashboard"), true);
+  assert.equal(puedeAbrirRutaPorDepartamento("TALLER", "/mantenimientos"), true);
 });
 
 test("el primer arranque deja todos los usuarios actuales en Taller y no repite la normalización", async () => {

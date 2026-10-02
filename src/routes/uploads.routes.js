@@ -17,7 +17,11 @@ const privateFiles = express.static(UPLOAD_ROOT, {
 });
 
 function canViewUploads(user) {
-  return Boolean(user && allowedRoles.has(String(user.rol || "").toUpperCase()));
+  return Boolean(
+    user &&
+    allowedRoles.has(String(user.rol || "").toUpperCase()) &&
+    String(user.departamentoActivo || "TALLER").toUpperCase() === "TALLER"
+  );
 }
 
 function isSafeUploadPath(urlPath) {

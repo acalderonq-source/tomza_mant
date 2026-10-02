@@ -1,14 +1,49 @@
 const DEPARTAMENTOS = [
   { key: "TALLER", nombre: "Taller", icono: "bi-tools", descripcion: "Mantenimientos, repuestos y bodega del taller." },
-  { key: "OPERACIONES", nombre: "Operaciones", icono: "bi-truck", descripcion: "Unidades, rutas, lavados y control operativo." },
-  { key: "CONTABILIDAD", nombre: "Contabilidad", icono: "bi-journal-check", descripcion: "Facturas, asientos y controles contables." },
+  { key: "OPERACIONES", nombre: "Operaciones", icono: "bi-truck", descripcion: "Área en preparación; sus procesos se habilitarán en una versión posterior." },
+  { key: "CONTABILIDAD", nombre: "Contabilidad", icono: "bi-journal-check", descripcion: "Área en preparación; sus procesos se habilitarán en una versión posterior." },
   { key: "SEGURIDAD_OCUPACIONAL", nombre: "Seguridad Ocupacional", icono: "bi-shield-check", descripcion: "Área lista para incorporar sus procesos." },
   { key: "LOGISTICA", nombre: "Logística", icono: "bi-diagram-3", descripcion: "Área lista para incorporar sus procesos." },
-  { key: "PROVEEDURIA", nombre: "Proveeduría", icono: "bi-box-seam", descripcion: "Compras, órdenes y suministros." },
+  { key: "PROVEEDURIA", nombre: "Proveeduría", icono: "bi-box-seam", descripcion: "Área en preparación; sus procesos se habilitarán en una versión posterior." },
   { key: "RECURSOS_HUMANOS", nombre: "Recursos Humanos", icono: "bi-people", descripcion: "Área lista para incorporar sus procesos." }
 ];
 
 const DEPARTAMENTO_POR_CLAVE = new Map(DEPARTAMENTOS.map(departamento => [departamento.key, departamento]));
+const RUTAS_TALLER = [
+  "/dashboard/resumen-ejecutivo",
+  "/agenda",
+  "/mantenimientos",
+  "/unidades",
+  "/kpis",
+  "/aceite",
+  "/aires",
+  "/dekra",
+  "/minae",
+  "/aresep",
+  "/compras",
+  "/llantas",
+  "/ia",
+  "/reportes-supervisores",
+  "/revision-ruta",
+  "/giras",
+  "/taller",
+  "/logistica-taller",
+  "/oficina-dia-dia",
+  "/ordenes-motor",
+  "/repuestos",
+  "/repuestos-semanales",
+  "/bodega",
+  "/lavado-unidades",
+  "/api/unidades"
+];
+
+function rutaPerteneceATaller(pathname) {
+  return RUTAS_TALLER.some(ruta => pathname === ruta || pathname.startsWith(`${ruta}/`));
+}
+
+function puedeAbrirRutaPorDepartamento(departamento, pathname) {
+  return !rutaPerteneceATaller(pathname) || String(departamento || "TALLER").toUpperCase() === "TALLER";
+}
 
 function departamentosInicialesPorRol(rol, usuario = "") {
   if (/^mecanicos?/i.test(String(usuario || "").trim())) return ["TALLER"];
@@ -95,5 +130,7 @@ module.exports = {
   departamentosInicialesPorRol,
   departamentosPermitidosPorRol,
   esDepartamentoValido,
+  rutaPerteneceATaller,
+  puedeAbrirRutaPorDepartamento,
   ensurePortalDepartmentSchema
 };

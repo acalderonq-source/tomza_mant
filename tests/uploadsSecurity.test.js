@@ -7,6 +7,8 @@ test("private uploads require a business role", () => {
   assert.equal(canViewUploads({ rol: "MECANICO" }), false);
   assert.equal(canViewUploads({ rol: "CONTABILIDAD" }), true);
   assert.equal(canViewUploads({ rol: "admin" }), true);
+  assert.equal(canViewUploads({ rol: "ADMIN", departamentoActivo: "OPERACIONES" }), false);
+  assert.equal(canViewUploads({ rol: "ADMIN", departamentoActivo: "TALLER" }), true);
 });
 
 test("private uploads accept only invoice and quotation filenames", () => {
