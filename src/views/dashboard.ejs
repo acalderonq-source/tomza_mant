@@ -590,7 +590,7 @@
           <span class="module-icon icon-blue"><i class="bi bi-clipboard-check"></i></span>
           <div><div class="module-title">DEKRA</div><p class="module-copy">Revisión técnica y vencimientos.</p></div>
         </a><% } %>
-        <% if (!esMecanicoLimitado && areaOperaciones) { %>
+        <% if (!esMecanicoLimitado && (areaTaller || areaOperaciones)) { %>
           <a href="/minae" class="module-card">
             <span class="module-icon icon-blue"><i class="bi bi-bank"></i></span>
             <div><div class="module-title">MINAE</div><p class="module-copy">Trámites y permisos.</p></div>

@@ -1715,9 +1715,41 @@ router.get("/:id", requireAuth, async (req, res) => {
 router.post("/:id/plan", requireAuth, async (req, res) => {
   try {
     if (!["ADMIN", "TALLER"].includes(req.session.user.rol)) return res.status(403).send("No autorizado");
+
+    const id = String(req.params.id || "");
+    if (!/^\d+$/.test(id)) return res.status(400).send("Mantenimiento inválido.");
+
+    const [[mantenimiento]] = await pool.query(
+      `SELECT m.id, u.placa, u.sede
+       FROM mantenimientos m
+       JOIN unidades u ON u.id = m.unidad_id
+       WHERE m.id = ?
+       LIMIT 1`,
+      [id]
+    );
+    if (!mantenimiento) return res.status(404).send("Mantenimiento no encontrado.");
+
+    const sedeFiltro = obtenerSedeFiltro(req);
+    const sedesPermitidas = obtenerSedesFiltroUsuario(req, sedeFiltro);
+    if (!puedeAccederUnidadMantenimiento(req.session.user, mantenimiento, sedesPermitidas)) {
+      return res.status(403).send("No autorizado para esta sede.");
+    }
+
     const plan = sanitizarPlanTaller(req.body.plan);
-    await pool.query("UPDATE mantenimientos SET plan = ? WHERE id = ?", [plan, req.params.id]);
-    res.redirect(`/mantenimientos/${req.params.id}`);
+    let sql = `UPDATE mantenimientos m
+               JOIN unidades u ON u.id = m.unidad_id
+               SET m.plan = ?
+               WHERE m.id = ?`;
+    const params = [plan, id];
+    if (sedesPermitidas.length) {
+      sql += " AND u.sede IN (?)";
+      params.push(sedesPermitidas);
+    } else if (sedeFiltro) {
+      sql += " AND u.sede = ?";
+      params.push(sedeFiltro);
+    }
+    await pool.query(sql, params);
+    res.redirect(`/mantenimientos/${id}`);
   } catch (error) {
     console.error("❌ ERROR guardando plan:", error);
     res.status(500).send("Error interno");
@@ -1725,23 +1757,98 @@ router.post("/:id/plan", requireAuth, async (req, res) => {
 });
 
 router.post("/:id/ejecucion", requireAuth, async (req, res) => {
+  let connection;
+  let transaccionAbierta = false;
   try {
     if (!["ADMIN"].includes(req.session.user.rol) && !esUsuarioMecanicoLimitado(req.session.user)) return res.status(403).send("No autorizado");
-    const { ejecucion, pendiente } = req.body;
+    const id = String(req.params.id || "");
+    if (!/^\d+$/.test(id)) return res.status(400).send("Mantenimiento inválido.");
+
+    const ejecucion = String(req.body.ejecucion || "").trim();
+    const pendiente = String(req.body.pendiente || "").trim();
+    if (!ejecucion) return res.status(400).send("Debe describir el trabajo realizado.");
+
     let mecanicos = [];
     if (req.body.mecanicos !== undefined) {
       mecanicos = Array.isArray(req.body.mecanicos) ? req.body.mecanicos.filter(Boolean) : [req.body.mecanicos];
     }
+    mecanicos = [...new Set(mecanicos.map(value => String(value).trim()).filter(Boolean))];
     if (mecanicos.length === 0) return res.status(400).send("Debe asignar al menos un mecánico antes de cerrar.");
-    await pool.query(`UPDATE mantenimientos SET ejecucion = ?, pendiente = ?, estado = 'CERRADO', fecha_cierre = NOW() WHERE id = ?`, [ejecucion, pendiente, req.params.id]);
-    await pool.query("DELETE FROM mantenimiento_mecanicos WHERE mantenimiento_id = ?", [req.params.id]);
-    for (const mecanicoId of mecanicos) {
-      await pool.query("INSERT INTO mantenimiento_mecanicos (mantenimiento_id, mecanico_id) VALUES (?, ?)", [req.params.id, mecanicoId]);
+
+    const sedeFiltro = obtenerSedeFiltro(req);
+    const sedesPermitidas = obtenerSedesFiltroUsuario(req, sedeFiltro);
+    const filtroMecanicos = obtenerFiltroMecanicosPorSede(sedeFiltro, true, req.session.user, sedesPermitidas);
+
+    connection = await pool.getConnection();
+    await connection.beginTransaction();
+    transaccionAbierta = true;
+
+    const [[mantenimiento]] = await connection.query(
+      `SELECT m.id, m.estado, u.placa, u.sede
+       FROM mantenimientos m
+       JOIN unidades u ON u.id = m.unidad_id
+       WHERE m.id = ?
+       LIMIT 1
+       FOR UPDATE`,
+      [id]
+    );
+    if (!mantenimiento) {
+      await connection.rollback();
+      transaccionAbierta = false;
+      return res.status(404).send("Mantenimiento no encontrado.");
     }
+    if (!puedeAccederUnidadMantenimiento(req.session.user, mantenimiento, sedesPermitidas)) {
+      await connection.rollback();
+      transaccionAbierta = false;
+      return res.status(403).send("No autorizado para esta sede.");
+    }
+    if (String(mantenimiento.estado || "").toUpperCase() === "CERRADO") {
+      await connection.rollback();
+      transaccionAbierta = false;
+      return res.status(409).send("Este mantenimiento ya está cerrado.");
+    }
+
+    const [mecanicosPermitidos] = await connection.query(filtroMecanicos.sql, filtroMecanicos.params);
+    const idsPermitidos = new Set(mecanicosPermitidos.map(mecanico => String(mecanico.id)));
+    if (mecanicos.some(mecanicoId => !idsPermitidos.has(mecanicoId))) {
+      await connection.rollback();
+      transaccionAbierta = false;
+      return res.status(403).send("Mecánico no autorizado para este usuario.");
+    }
+
+    let sql = `UPDATE mantenimientos m
+               JOIN unidades u ON u.id = m.unidad_id
+               SET m.ejecucion = ?, m.pendiente = ?, m.estado = 'CERRADO', m.fecha_cierre = NOW()
+               WHERE m.id = ? AND m.estado <> 'CERRADO'`;
+    const params = [ejecucion, pendiente || null, id];
+    if (sedesPermitidas.length) {
+      sql += " AND u.sede IN (?)";
+      params.push(sedesPermitidas);
+    } else if (sedeFiltro) {
+      sql += " AND u.sede = ?";
+      params.push(sedeFiltro);
+    }
+    const [actualizacion] = await connection.query(sql, params);
+    if (!actualizacion.affectedRows) {
+      await connection.rollback();
+      transaccionAbierta = false;
+      return res.status(409).send("No se pudo cerrar; el mantenimiento cambió o ya fue cerrado.");
+    }
+
+    await connection.query("DELETE FROM mantenimiento_mecanicos WHERE mantenimiento_id = ?", [id]);
+    for (const mecanicoId of mecanicos) {
+      await connection.query("INSERT INTO mantenimiento_mecanicos (mantenimiento_id, mecanico_id) VALUES (?, ?)", [id, mecanicoId]);
+    }
+
+    await connection.commit();
+    transaccionAbierta = false;
     res.redirect("/mantenimientos");
   } catch (error) {
+    if (transaccionAbierta) await connection.rollback().catch(() => {});
     console.error("❌ ERROR cerrar mantenimiento:", error);
     res.status(500).send("Error interno");
+  } finally {
+    connection?.release();
   }
 });
 
