@@ -65,6 +65,17 @@ function permisosLlantas(user) {
   };
 }
 
+function puedeTransicionarEstado(estadoActual, estadoNuevo) {
+  if (estadoActual === estadoNuevo) return true;
+  const transiciones = {
+    SOLICITADA: ["COTIZADA", "COMPRADA"],
+    COTIZADA: ["COMPRADA"],
+    COMPRADA: ["RECIBIDA"],
+    RECIBIDA: []
+  };
+  return (transiciones[estadoActual] || []).includes(estadoNuevo);
+}
+
 async function ensureTables() {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS solicitudes_llantas (
@@ -587,7 +598,7 @@ router.post("/cotizar-multiple", allowRoles(...ROLES_COTIZAR), async (req, res) 
 
     for (const id of ids) {
       const { solicitud, error } = await cargarSolicitudAutorizada(req, id);
-      if (error || solicitud.estado !== "SOLICITADA") continue;
+      if (error || !puedeTransicionarEstado(solicitud.estado, "COTIZADA")) continue;
 
       await pool.query(
         `UPDATE solicitudes_llantas
@@ -616,7 +627,7 @@ router.post("/comprar-multiple", allowRoles(...ROLES_COMPRAR), async (req, res) 
 
     for (const id of ids) {
       const { solicitud, error } = await cargarSolicitudAutorizada(req, id);
-      if (error || !["SOLICITADA", "COTIZADA"].includes(solicitud.estado)) continue;
+      if (error || !puedeTransicionarEstado(solicitud.estado, "COMPRADA")) continue;
 
       await pool.query(
         `UPDATE solicitudes_llantas
@@ -705,14 +716,19 @@ router.post("/:id/editar", allowRoles(...ROLES_EDITAR), async (req, res) => {
     const estadoNormalizado = puedeGestionar(req.session.user) && ESTADOS.includes(estado)
       ? estado
       : solicitud.estado;
-    const cantidadNormalizada = parseInt(cantidad, 10) || 1;
+    const cantidadNormalizada = Number(cantidad);
     const medidaNormalizada = String(medida || "").trim();
+    const unidadId = Number(unidad_id || solicitud.unidad_id);
 
-    if (!medidaNormalizada || cantidadNormalizada < 1) {
-      return res.status(400).send("Debe indicar medida y cantidad.");
+    if (!Number.isSafeInteger(unidadId) || unidadId < 1 || !medidaNormalizada ||
+        !Number.isSafeInteger(cantidadNormalizada) || cantidadNormalizada < 1) {
+      return res.status(400).send("Debe indicar unidad, medida y cantidad entera mayor que cero.");
+    }
+    if (!puedeTransicionarEstado(solicitud.estado, estadoNormalizado)) {
+      return res.status(409).send("El estado solicitado no es válido para esta etapa del proceso.");
     }
 
-    await pool.query(
+    const [actualizacion] = await pool.query(
       `UPDATE solicitudes_llantas
        SET unidad_id = ?,
            placa = ?,
@@ -724,7 +740,7 @@ router.post("/:id/editar", allowRoles(...ROLES_EDITAR), async (req, res) => {
            motivo = ?,
            observaciones = ?,
            estado = ?
-       WHERE id = ?`,
+       WHERE id = ? AND estado = ?`,
       [
         unidad.id,
         unidad.placa,
@@ -736,9 +752,11 @@ router.post("/:id/editar", allowRoles(...ROLES_EDITAR), async (req, res) => {
         motivo || null,
         observaciones || null,
         estadoNormalizado,
-        id
+        id,
+        solicitud.estado
       ]
     );
+    if (!actualizacion.affectedRows) return res.status(409).send("La solicitud cambió mientras la editaba. Actualice la página.");
 
     if (estadoNormalizado !== solicitud.estado) {
       await registrarHistorial(id, solicitud.estado, estadoNormalizado, req.session.user.id, "Solicitud editada");
@@ -758,7 +776,7 @@ router.post("/:id/cotizar", allowRoles(...ROLES_COTIZAR), async (req, res) => {
     const { solicitud, error } = await cargarSolicitudAutorizada(req, id);
     if (error === "not_found") return res.status(404).send("Solicitud no encontrada");
     if (error === "forbidden") return res.status(403).send("No autorizado para esta sede");
-    if (solicitud.estado !== "SOLICITADA") {
+    if (!puedeTransicionarEstado(solicitud.estado, "COTIZADA")) {
       return res.status(409).send("Solo se pueden cotizar solicitudes pendientes.");
     }
 
@@ -787,7 +805,7 @@ router.post("/:id/comprar", allowRoles(...ROLES_COMPRAR), async (req, res) => {
     const { solicitud, error } = await cargarSolicitudAutorizada(req, id);
     if (error === "not_found") return res.status(404).send("Solicitud no encontrada");
     if (error === "forbidden") return res.status(403).send("No autorizado para esta sede");
-    if (!["SOLICITADA", "COTIZADA"].includes(solicitud.estado)) {
+    if (!puedeTransicionarEstado(solicitud.estado, "COMPRADA")) {
       return res.status(409).send("Solo se pueden comprar solicitudes pendientes o cotizadas.");
     }
 
@@ -814,7 +832,7 @@ router.post("/:id/recibir", allowRoles(...ROLES_RECIBIR), async (req, res) => {
     const { solicitud, error } = await cargarSolicitudAutorizada(req, id);
     if (error === "not_found") return res.status(404).send("Solicitud no encontrada");
     if (error === "forbidden") return res.status(403).send("No autorizado para esta sede");
-    if (solicitud.estado !== "COMPRADA") {
+    if (!puedeTransicionarEstado(solicitud.estado, "RECIBIDA")) {
       return res.status(409).send("Solo se pueden recibir solicitudes marcadas como compradas.");
     }
 

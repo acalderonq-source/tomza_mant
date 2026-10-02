@@ -72,6 +72,9 @@ test("llantas solo permiten avanzar por estados válidos y registran cada cambio
     if (/^\s*CREATE TABLE/i.test(sql)) return [[]];
     if (sql.includes("SELECT * FROM solicitudes_llantas WHERE id = ?")) return [[{ ...solicitud }]];
     if (sql.includes("SELECT DISTINCT sede") && sql.includes("FROM unidades")) return [[{ sede: "Cartago" }]];
+    if (sql.includes("SELECT id, placa, sede FROM unidades WHERE id = ?")) {
+      return [[{ id: 24, placa: "C164528", sede: "Cartago" }]];
+    }
     if (sql.includes("UPDATE solicitudes_llantas")) {
       if (simularCambioConcurrente) {
         simularCambioConcurrente = false;
@@ -108,14 +111,17 @@ test("llantas solo permiten avanzar por estados válidos y registran cada cambio
 
   try {
     const base = `http://127.0.0.1:${server.address().port}/llantas/5`;
-    const post = action => fetch(`${base}/${action}`, {
+    const post = (action, data = {}) => fetch(`${base}/${action}`, {
       method: "POST",
       redirect: "manual",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: ""
+      body: new URLSearchParams(data)
     });
 
     assert.equal((await post("recibir")).status, 409);
+    assert.equal((await post("editar", {
+      unidad_id: "24", medida: "11R22.5", cantidad: "1", estado: "RECIBIDA"
+    })).status, 409);
     simularCambioConcurrente = true;
     assert.equal((await post("cotizar")).status, 409);
     assert.equal(historial.length, 0);
