@@ -24,7 +24,8 @@ const DB_CONNECTION_ERRORS = new Set(["ECONNRESET", "PROTOCOL_CONNECTION_LOST", 
 const RESUMEN_EJECUTIVO_CACHE_MS = Number(process.env.RESUMEN_EJECUTIVO_CACHE_MS || 1000 * 60);
 const RESUMEN_EJECUTIVO_STALE_MS = Number(process.env.RESUMEN_EJECUTIVO_STALE_MS || 1000 * 60 * 5);
 const resumenEjecutivoCache = new Map();
-const RESUMEN_EJECUTIVO_CACHE_MAX = 5;
+const resumenEjecutivoEnCurso = new Map();
+const RESUMEN_EJECUTIVO_CACHE_MAX = 3;
 
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
@@ -832,6 +833,16 @@ function rangoFechasDesdePeriodo(periodo) {
   };
 }
 
+function periodoActualCostaRica(fecha = new Date()) {
+  const partes = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Costa_Rica",
+    year: "numeric",
+    month: "2-digit"
+  }).formatToParts(fecha);
+  const valores = Object.fromEntries(partes.map(parte => [parte.type, parte.value]));
+  return `${valores.year}-${valores.month}`;
+}
+
 function armarFiltrosFechaConPeriodoCierre(aliasFecha, aliasPeriodo, fechaDesde, fechaHasta, params, periodoCierre) {
   const periodo = normalizarPeriodoCierre(periodoCierre) || periodoCierreDesdeRango(fechaDesde, fechaHasta);
 
@@ -955,6 +966,11 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro, pe
   const whereOrdenes = condicionesOrdenes.length ? `WHERE ${condicionesOrdenes.join(" AND ")}` : "";
 
   const ordenesLineas = await safeQuery(`
+    WITH ordenes_periodo AS (
+      SELECT o.*
+      FROM ordenes_compra o
+      ${whereOrdenes}
+    )
     SELECT
       'ORDEN' AS fuente,
       o.id,
@@ -990,7 +1006,7 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro, pe
           THEN COALESCE(d.subtotal, d.cantidad * d.precio_unitario, 0) * (COALESCE(o.total, 0) / detalle_totales.total_detalle)
         ELSE COALESCE(d.subtotal, d.cantidad * d.precio_unitario, 0)
       END AS monto
-    FROM ordenes_compra o
+    FROM ordenes_periodo o
     LEFT JOIN proveedores p ON p.id = o.proveedor_id
     LEFT JOIN (
       SELECT
@@ -1002,14 +1018,16 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro, pe
         SELECT
           orden_compra_id,
           REPLACE(REPLACE(REPLACE(REGEXP_SUBSTR(UPPER(CONCAT_WS(' ', codigo, descripcion)), 'CL[[:space:].-]*[0-9]{5,6}|EE[[:space:].-]*[0-9]{5,6}|C[[:space:].-]*[0-9]{5,6}|S[[:space:].-]*[0-9]{5,6}'), ' ', ''), '-', ''), '.', '') AS placa_detectada
-        FROM ordenes_compra_detalle
+        FROM ordenes_compra_detalle d
+        JOIN ordenes_periodo op ON op.id = d.orden_compra_id
       ) placas_detectadas
       WHERE placa_detectada IS NOT NULL
       GROUP BY orden_compra_id
     ) placas_detalle ON placas_detalle.orden_compra_id = o.id
     LEFT JOIN (
       SELECT orden_compra_id, SUM(COALESCE(subtotal, cantidad * precio_unitario, 0)) AS total_detalle
-      FROM ordenes_compra_detalle
+      FROM ordenes_compra_detalle d
+      JOIN ordenes_periodo op ON op.id = d.orden_compra_id
       GROUP BY orden_compra_id
     ) detalle_totales ON detalle_totales.orden_compra_id = o.id
     LEFT JOIN ordenes_compra_detalle d ON d.orden_compra_id = o.id
@@ -1027,7 +1045,6 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro, pe
       ) THEN 'ACEITES' END,
       CASE WHEN UPPER(TRIM(COALESCE(d.codigo, ''))) IN ('ACEITE', 'ACEITES') THEN 'ACEITES' END
     )))
-    ${whereOrdenes}
   `, paramsOrdenes, []);
 
   const paramsOrdenesMotor = [];
@@ -1926,9 +1943,15 @@ async function obtenerResumenEjecutivoCached(params) {
     return { ...cached.data, desdeCache: true, cacheEdadSegundos: Math.round((now - cached.createdAt) / 1000) };
   }
 
+  const enCurso = resumenEjecutivoEnCurso.get(key);
+  if (enCurso) return enCurso;
+
+  const calculo = obtenerResumenEjecutivo(params);
+  resumenEjecutivoEnCurso.set(key, calculo);
+
   try {
-    const data = await obtenerResumenEjecutivo(params);
-    resumenEjecutivoCache.set(key, { data, createdAt: now });
+    const data = await calculo;
+    resumenEjecutivoCache.set(key, { data, createdAt: Date.now() });
 
     if (resumenEjecutivoCache.size > RESUMEN_EJECUTIVO_CACHE_MAX) {
       const entradas = [...resumenEjecutivoCache.entries()].sort((a, b) => a[1].createdAt - b[1].createdAt);
@@ -1948,6 +1971,8 @@ async function obtenerResumenEjecutivoCached(params) {
     }
 
     throw error;
+  } finally {
+    if (resumenEjecutivoEnCurso.get(key) === calculo) resumenEjecutivoEnCurso.delete(key);
   }
 }
 
@@ -1956,9 +1981,14 @@ async function obtenerResumenEjecutivoCached(params) {
 // =========================================================
 
 async function prepararResumenEjecutivoRequest(req) {
-  const fechaDesde = String(req.query.fecha_desde || "").trim();
-  const fechaHasta = String(req.query.fecha_hasta || "").trim();
+  let fechaDesde = String(req.query.fecha_desde || "").trim();
+  let fechaHasta = String(req.query.fecha_hasta || "").trim();
   const periodoCierre = normalizarPeriodoCierre(req.query.periodo_cierre);
+  if (!fechaDesde && !fechaHasta && !periodoCierre) {
+    const rangoActual = rangoFechasDesdePeriodo(periodoActualCostaRica());
+    fechaDesde = rangoActual.desde;
+    fechaHasta = rangoActual.hasta;
+  }
   const contextoSedes = await resolverSedesUsuario(req);
   const resumen = await obtenerResumenEjecutivoCached({
     fechaDesde,
