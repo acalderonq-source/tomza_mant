@@ -27,7 +27,11 @@
         <form class="user-row" method="post" action="/admin/departamentos/<%= usuario.id %>">
           <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-3">
             <div><strong><%= usuario.nombre || usuario.usuario %></strong> <span class="dept-label">· <%= usuario.usuario %> · <%= usuario.rol %></span></div>
-            <button class="btn btn-sm btn-primary">Guardar accesos</button>
+            <button class="btn btn-sm btn-primary">Guardar cambios</button>
+          </div>
+          <div class="mb-3" style="max-width: 360px">
+            <label class="form-label" for="cedula-<%= usuario.id %>">Cédula para ingresar (opcional)</label>
+            <input class="form-control" id="cedula-<%= usuario.id %>" name="cedula" value="<%= usuario.cedula || '' %>" inputmode="numeric" autocomplete="off" maxlength="15" placeholder="9 a 12 dígitos">
           </div>
           <div class="departments">
             <% departamentos.forEach(departamento => { %>

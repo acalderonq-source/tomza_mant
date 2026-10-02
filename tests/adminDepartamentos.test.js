@@ -88,6 +88,67 @@ test("ADMIN guarda asignaciones de departamento en una transaccion con Taller pr
   ]);
 });
 
+test("ADMIN guarda la cédula normalizada junto con los departamentos", async () => {
+  const writes = [];
+  const connection = {
+    async beginTransaction() {},
+    async query(sql, params = []) {
+      if (sql.includes("SELECT id, rol FROM usuarios")) return [[{ id: 42, rol: "TALLER" }]];
+      if (sql.includes("SELECT id FROM usuarios WHERE cedula")) return [[]];
+      writes.push({ sql, params });
+      return [{ affectedRows: 1 }];
+    },
+    async commit() {},
+    async rollback() {},
+    release() {}
+  };
+
+  await withServer({ id: 1, rol: "ADMIN" }, { getConnection: async () => connection }, async base => {
+    const response = await post(base, { cedula: "1-2345-6789", departamentos: "TALLER" });
+    assert.equal(response.status, 302);
+  });
+
+  assert.deepEqual(writes.find(item => item.sql.includes("UPDATE usuarios SET cedula"))?.params, ["123456789", 42]);
+});
+
+test("ADMIN rechaza una cédula duplicada sin modificar departamentos", async () => {
+  let rolledBack = false;
+  const writes = [];
+  const connection = {
+    async beginTransaction() {},
+    async query(sql, params = []) {
+      if (sql.includes("SELECT id, rol FROM usuarios")) return [[{ id: 42, rol: "TALLER" }]];
+      if (sql.includes("SELECT id FROM usuarios WHERE cedula")) return [[{ id: 99 }]];
+      writes.push({ sql, params });
+      return [{ affectedRows: 1 }];
+    },
+    async commit() {},
+    async rollback() { rolledBack = true; },
+    release() {}
+  };
+
+  await withServer({ id: 1, rol: "ADMIN" }, { getConnection: async () => connection }, async base => {
+    const response = await post(base, { cedula: "123456789", departamentos: "TALLER" });
+    assert.equal(response.status, 409);
+    assert.match(await response.text(), /ya está asignada/);
+  });
+
+  assert.equal(rolledBack, true);
+  assert.equal(writes.length, 0);
+});
+
+test("una cédula inválida se rechaza antes de abrir transacción", async () => {
+  let connections = 0;
+  await withServer({ id: 1, rol: "ADMIN" }, {
+    getConnection: async () => { connections += 1; throw new Error("No debe abrir conexion"); }
+  }, async base => {
+    const response = await post(base, { cedula: "12ABC6789", departamentos: "TALLER" });
+    assert.equal(response.status, 400);
+    assert.match(await response.text(), /cédula/);
+  });
+  assert.equal(connections, 0);
+});
+
 test("si falla una insercion la asignacion anterior se revierte", async () => {
   const state = { committed: false, rolledBack: false, released: false };
   let inserts = 0;

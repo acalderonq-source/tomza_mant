@@ -3,6 +3,7 @@ const bcrypt = require("bcryptjs");
 const { rateLimit } = require("express-rate-limit");
 const pool = require("../db");
 const { DEPARTAMENTOS, departamentosPermitidosPorRol, esDepartamentoValido } = require("../utils/departamentos");
+const { normalizarCedula } = require("../utils/cedula");
 
 const router = express.Router();
 const loginLimiter = rateLimit({
@@ -48,7 +49,8 @@ router.get("/login", (req, res) => {
  */
 router.post("/login", loginLimiter, async (req, res) => {
   try {
-    const { usuario, password } = req.body;
+    const identificador = String(req.body.usuario || "").trim();
+    const password = req.body.password;
     const departamento = String(req.body.departamento || "").toUpperCase();
     const nextUrl = getSafeNextUrl(req.body.next);
 
@@ -57,7 +59,7 @@ router.post("/login", loginLimiter, async (req, res) => {
     }
 
     // Validación básica
-    if (!usuario || !password) {
+    if (!identificador || !password) {
       return res.render("login", {
         error: "Debe ingresar usuario y contraseña",
         next: nextUrl,
@@ -67,10 +69,17 @@ router.post("/login", loginLimiter, async (req, res) => {
     }
 
     // Buscar usuario en la base de datos
-    const [rows] = await pool.query(
+    let [rows] = await pool.query(
       "SELECT * FROM usuarios WHERE usuario = ? LIMIT 1",
-      [usuario]
+      [identificador]
     );
+
+    if (!rows.length) {
+      const cedula = normalizarCedula(identificador);
+      if (/^\d{9,12}$/.test(cedula)) {
+        [rows] = await pool.query("SELECT * FROM usuarios WHERE cedula = ? LIMIT 1", [cedula]);
+      }
+    }
 
     // Usuario no existe
     if (rows.length === 0) {

@@ -3,6 +3,7 @@ const router = express.Router();
 const pool = require("../db");
 const { ensureNumeroMantenimientoColumn, asignarNumeroMantenimiento } = require("../utils/mantenimientosNumero");
 const { DEPARTAMENTOS, esDepartamentoValido } = require("../utils/departamentos");
+const { normalizarCedula, cedulaValida } = require("../utils/cedula");
 
 const CUPOS_PREVENTIVOS_POR_DIA = {
   CARTAGO: 5,
@@ -17,11 +18,11 @@ router.get("/admin/departamentos", async (req, res) => {
   if (!req.session.user || req.session.user.rol !== "ADMIN") return res.status(403).send("No autorizado");
   try {
     const [usuarios] = await pool.query(`
-      SELECT u.id, u.usuario, u.nombre, u.rol,
+      SELECT u.id, u.usuario, u.nombre, u.rol, u.cedula,
         COALESCE(GROUP_CONCAT(ud.departamento ORDER BY ud.departamento SEPARATOR ','), '') AS departamentos
       FROM usuarios u
       LEFT JOIN usuario_departamentos ud ON ud.usuario_id = u.id
-      GROUP BY u.id, u.usuario, u.nombre, u.rol
+      GROUP BY u.id, u.usuario, u.nombre, u.rol, u.cedula
       ORDER BY u.nombre, u.usuario
     `);
     res.render("admin_departamentos", {
@@ -42,9 +43,12 @@ router.post("/admin/departamentos/:id", async (req, res) => {
     ? req.body.departamentos
     : req.body.departamentos ? [req.body.departamentos] : [])
     .map(value => String(value).toUpperCase()))];
+  const cedulaRaw = String(req.body.cedula || "").trim();
+  const cedula = cedulaRaw ? normalizarCedula(cedulaRaw) : null;
   if (!Number.isInteger(usuarioId) || usuarioId < 1 || !seleccionados.length || seleccionados.some(key => !esDepartamentoValido(key))) {
     return res.status(400).send("Seleccione al menos un departamento válido.");
   }
+  if (!cedulaValida(cedulaRaw)) return res.status(400).send("La cédula debe contener entre 9 y 12 dígitos.");
 
   let connection;
   try {
@@ -56,7 +60,19 @@ router.post("/admin/departamentos/:id", async (req, res) => {
       return res.status(404).send("Usuario no encontrado.");
     }
 
+    if (cedula) {
+      const [duplicadas] = await connection.query(
+        "SELECT id FROM usuarios WHERE cedula = ? AND id <> ? LIMIT 1 FOR UPDATE",
+        [cedula, usuarioId]
+      );
+      if (duplicadas.length) {
+        await connection.rollback();
+        return res.status(409).send("Esa cédula ya está asignada a otro usuario.");
+      }
+    }
+
     const claves = users[0].rol === "ADMIN" ? DEPARTAMENTOS.map(dept => dept.key) : seleccionados;
+    await connection.query("UPDATE usuarios SET cedula = ? WHERE id = ?", [cedula, usuarioId]);
     await connection.query("DELETE FROM usuario_departamentos WHERE usuario_id = ?", [usuarioId]);
     for (const departamento of claves) {
       await connection.query(
@@ -69,6 +85,7 @@ router.post("/admin/departamentos/:id", async (req, res) => {
   } catch (error) {
     if (connection) await connection.rollback().catch(() => {});
     console.error("Error guardando asignaciones por departamento:", error.code || error.message);
+    if (error.code === "ER_DUP_ENTRY") return res.status(409).send("Esa cédula ya está asignada a otro usuario.");
     res.status(500).send("No se pudieron guardar las asignaciones.");
   } finally {
     connection?.release();
