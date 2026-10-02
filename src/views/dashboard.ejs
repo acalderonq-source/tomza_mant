@@ -311,7 +311,7 @@
     || usuarioDashboardLower.startsWith('mecanicos');
   const puedeVerCompras = !esMecanicoLimitado && ['ADMIN', 'TALLER', 'PROVEEDURIA_TALLER', 'CONTABILIDAD'].includes(user.rol) && (areaContabilidad || areaProveeduria);
   const puedeVerOrdenesCompra = (puedeVerCompras || user.rol === 'BODEGUERO') && (areaContabilidad || areaProveeduria);
-  const puedeVerOperaciones = user.rol !== 'CONTABILIDAD' && !esMensajeroDashboard && !esBodegaDashboard && (areaTaller || areaOperaciones);
+  const puedeVerOperaciones = user.rol !== 'CONTABILIDAD' && !esMensajeroDashboard && !esBodegaDashboard && areaTaller;
   const puedeVerReportesSupervisores = !esMecanicoLimitado && ['ADMIN', 'TALLER', 'MECANICO', 'SUPERVISOR', 'SUPERVISOR_PESADO'].includes(user.rol) && (esAdminDashboard ? areaOperaciones : (areaTaller || areaOperaciones));
   const puedeVerAceite = (esMecanicoLimitado || ['ADMIN', 'MECANICO', 'BODEGA', 'BODEGUERO'].includes(user.rol)
     || usuarioDashboardLower === 'supervisor_rio_claro') && (areaTaller || areaProveeduria);

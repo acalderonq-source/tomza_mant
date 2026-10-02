@@ -32,14 +32,30 @@ async function renderDashboard(departamentoActivo, rol = "ADMIN", usuario = "adm
 test("el dashboard de Taller conserva los accesos operativos historicos para ADMIN", async () => {
   const html = await renderDashboard("TALLER");
   for (const href of [
+    "/dashboard/resumen-ejecutivo",
     "/mantenimientos",
-    "/unidades",
+    "/kpis/mecanicos",
+    "/reportes-supervisores",
     "/reportes-supervisores/rutas",
+    "/unidades",
+    "/taller/dashboard",
+    "/taller/prioridades-historial",
+    "/logistica-taller",
     "/lavado-unidades",
     "/revision-ruta",
+    "/giras",
+    "/llantas",
+    "/repuestos",
+    "/repuestos-semanales",
+    "/bodega",
+    "/ordenes-motor",
+    "/oficina-dia-dia",
     "/dekra",
     "/minae",
-    "/bodega",
+    "/aceite",
+    "/aires",
+    "/aresep",
+    "/compras/ordenes",
     "/compras/facturas"
   ]) {
     assert.ok(html.includes(`href="${href}"`), `Falta el acceso ${href} en Taller`);
@@ -71,13 +87,29 @@ test("el dashboard de Operaciones no mezcla modulos ni indicadores de Taller", a
   const html = await renderDashboard("OPERACIONES");
   for (const href of [
     "/mantenimientos",
+    "/dashboard/resumen-ejecutivo",
+    "/kpis/mecanicos",
     "/unidades",
+    "/reportes-supervisores",
     "/reportes-supervisores/rutas",
+    "/taller/dashboard",
+    "/taller/prioridades-historial",
+    "/logistica-taller",
     "/lavado-unidades",
     "/revision-ruta",
+    "/giras",
+    "/llantas",
+    "/repuestos",
+    "/repuestos-semanales",
     "/dekra",
     "/minae",
     "/bodega",
+    "/ordenes-motor",
+    "/oficina-dia-dia",
+    "/aceite",
+    "/aires",
+    "/aresep",
+    "/compras/ordenes",
     "/compras/facturas"
   ]) {
     assert.ok(!html.includes(`href="${href}"`), `Operaciones muestra el acceso de Taller ${href}`);
