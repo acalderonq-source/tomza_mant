@@ -2,9 +2,15 @@ const fs = require("fs");
 const path = require("path");
 
 const BUNDLED_UPLOAD_ROOT = path.resolve(__dirname, "..", "..", "public", "uploads");
-const UPLOAD_ROOT = path.resolve(
-  process.env.UPLOAD_ROOT || BUNDLED_UPLOAD_ROOT
-);
+const RENDER_UPLOAD_ROOT = "/var/data/uploads";
+
+function resolverRaizUploads(env = process.env) {
+  if (env.UPLOAD_ROOT) return path.resolve(env.UPLOAD_ROOT);
+  if (env.RENDER === "true") return RENDER_UPLOAD_ROOT;
+  return BUNDLED_UPLOAD_ROOT;
+}
+
+const UPLOAD_ROOT = resolverRaizUploads();
 
 function ensureUploadDirectory(...segments) {
   const directory = path.join(UPLOAD_ROOT, ...segments);
@@ -26,7 +32,7 @@ function seedBundledUploads() {
 function verificarAlmacenamientoUploads({
   root = UPLOAD_ROOT,
   production = process.env.NODE_ENV === "production",
-  configuredRoot = process.env.UPLOAD_ROOT
+  configuredRoot = resolverRaizUploads()
 } = {}) {
   if (production && (!configuredRoot || path.resolve(configuredRoot) === BUNDLED_UPLOAD_ROOT)) {
     return { listo: false, motivo: "persistent_root_not_configured" };
@@ -44,6 +50,8 @@ function verificarAlmacenamientoUploads({
 module.exports = {
   UPLOAD_ROOT,
   BUNDLED_UPLOAD_ROOT,
+  RENDER_UPLOAD_ROOT,
+  resolverRaizUploads,
   ensureUploadDirectory,
   seedBundledUploads,
   verificarAlmacenamientoUploads

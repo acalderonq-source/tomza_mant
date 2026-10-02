@@ -45,7 +45,7 @@ El numero `1.0.0` que aparece en `package.json` identifica la version del paquet
 ## Estado de auditoria al 2026-10-02
 
 - El sistema usa Node.js, Express, EJS y MySQL; las rutas se organizan por modulo.
-- `npm test` pasa 136 pruebas automatizadas (0 fallidas) en el estado local revisado.
+- `npm test` pasa 137 pruebas automatizadas (0 fallidas) en el estado local revisado.
 - En Render, con perfil ADMIN, se verifico en pantalla que Taller muestra sus accesos historicos; al cambiar a Operaciones desaparecen los modulos de Taller y `/mantenimientos` deniega el acceso directo. La sesion se dejo nuevamente en Taller.
 - Una prueba HTTP recorre todos los prefijos Taller y sus subrutas: Operaciones recibe 403, Taller conserva acceso y los modulos compartidos de Contabilidad/Proveeduria mantienen sus permisos.
 - El tablero se prueba para ADMIN, TALLER, Contabilidad, Proveeduría y BODEGUERO; se cruza cada enlace de Taller visible con el middleware para evitar tarjetas que terminen en 403.
@@ -68,6 +68,7 @@ El numero `1.0.0` que aparece en `package.json` identifica la version del paquet
 - El commit `1b4512e` evita almacenar paginas HTML privadas en caché. `npm test` pasa 131 pruebas, `npm audit --omit=dev` reporta cero vulnerabilidades y Render responde `ready` con la base y el esquema conectados.
 - Los adjuntos de facturas y cotizaciones respetan el departamento activo autorizado por sus pantallas, en vez de quedar limitados a Taller; una prueba HTTP comprueba lectura autorizada, denegacion a Operaciones y rechazo sin sesion. `npm test` pasa 133 pruebas y `npm audit --omit=dev` no reporta vulnerabilidades.
 - La disponibilidad requiere almacenamiento de adjuntos configurado fuera del directorio incluido con el codigo y comprueba que la ruta exista como directorio legible y escribible. La verificacion tiene casos para almacenamiento configurado, fallback no persistente y rutas invalidas.
+- En Render, si `UPLOAD_ROOT` no se sincroniza como variable del servicio, se usa `/var/data/uploads`, el punto declarado para el disco persistente en `render.yaml`; una variable `UPLOAD_ROOT` explicita sigue teniendo prioridad.
 - La migracion `202610020001_bodega_consumo_confirmacion_completar.sql` recupera esquemas parciales agregando cada columna por separado. Render responde `ready` con las nuevas columnas esenciales de Bodega en el commit `4117c75aae1cbb88b4221523680fff89840c1df7`.
 - El resumen ejecutivo ahora inicia en el mes actual de Costa Rica cuando no se indica un rango, limita las subconsultas de ordenes a ese periodo y comparte calculos concurrentes identicos para reducir picos de memoria; se conservan los filtros de periodos anteriores.
 - Aun falta validar la interfaz real con perfiles de supervisor, mecanico, Pesados y bodeguero; completar cobertura de flujos criticos, probar respaldo/restauracion y obtener aceptacion funcional antes de declarar liberada la V1.
