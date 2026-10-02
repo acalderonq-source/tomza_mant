@@ -89,7 +89,12 @@ app.get("/ready", async (_req, res) => {
     const almacenamiento = verificarAlmacenamientoUploads();
     if (!almacenamiento.listo) {
       console.error("Readiness check: almacenamiento de adjuntos no disponible:", almacenamiento.motivo);
-      return res.status(503).json({ status: "not_ready", database: "connected", schema: "ready", uploads: "unavailable" });
+      return res.status(503).json({
+        status: "not_ready",
+        database: "connected",
+        schema: "ready",
+        uploads: { status: "unavailable", reason: almacenamiento.motivo }
+      });
     }
     const release = process.env.RENDER_GIT_COMMIT || process.env.GIT_COMMIT || "local";
     res.status(200).json({ status: "ready", database: "connected", schema: "ready", uploads: "ready", release });
