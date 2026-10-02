@@ -370,7 +370,6 @@ app.use("/dekra", dekraRoutes);
 app.use("/minae", minaeRoutes);
 app.use("/aresep", aresepRoutes);
 app.use("/compras/facturas/correo", facturasCorreoRoutes);
-app.use("/compras/facturas/correo", facturasCorreoRoutes);
 app.use("/compras", comprasRoutes);
 app.use("/llantas", llantasRoutes);
 app.use("/notificaciones", notificacionesRoutes);
