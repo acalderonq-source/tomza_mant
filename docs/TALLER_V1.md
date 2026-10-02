@@ -45,14 +45,17 @@ El numero `1.0.0` que aparece en `package.json` identifica la version del paquet
 ## Estado de auditoria al 2026-10-02
 
 - El sistema usa Node.js, Express, EJS y MySQL; las rutas se organizan por modulo.
-- `npm test` pasa 110 pruebas automatizadas (0 fallidas) en el estado local revisado.
+- `npm test` pasa 117 pruebas automatizadas (0 fallidas) en el estado local revisado.
 - La vista del dashboard se prueba renderizada: ADMIN ve los modulos historicos de Taller al seleccionar Taller y no ve modulos ni indicadores de Taller al seleccionar Operaciones.
 - El tablero se prueba para ADMIN, TALLER, Contabilidad, Proveeduría y BODEGUERO; se cruza cada enlace de Taller visible con el middleware para evitar tarjetas que terminen en 403.
 - Las rutas de Taller tienen pruebas HTTP de bloqueo por departamento; los flujos de aceites, lavado, bodega, unidades, ARESEP y otros procesos tienen pruebas automatizadas parciales.
+- El ejecutor procesa por separado las acciones de `ALTER TABLE`: una columna o indice ya existente no omite las acciones siguientes y los errores reales detienen la migracion.
+- `/ready` comprueba conexion y columnas esenciales de unidades y confirmacion de consignaciones; Render no marca listo un esquema incompleto.
+- El borrado de unidad usa un formulario separado del guardado masivo; una prueba verifica que no envie los campos de todas las unidades.
 - El catalogo de Bodega permite editar fichas con auditoria antes/despues sin cambiar existencias; se prueban permisos de BODEGUERO y denegacion de BODEGA.
 - Las entregas rechazan lineas invalidas sin guardar parcialmente, los ajustes no aceptan conteos no numericos y los precios de catalogo/recepcion se validan en el servidor.
-- Cada publicacion se verifica con `/ready`, validando respuesta lista, base conectada y SHA del release activo.
-- La migracion `202610020001_bodega_consumo_confirmacion_completar.sql` recupera esquemas parciales agregando cada columna por separado. El entorno local usa una base distinta de Render; por eso la verificacion directa del esquema productivo queda pendiente.
+- La publicacion `8c84bc52f9fd7b98adf988fe9e854aa0fe53d843` se verifico en Render con `/ready`: `status=ready`, `database=connected` y `schema=ready`.
+- La migracion `202610020001_bodega_consumo_confirmacion_completar.sql` recupera esquemas parciales agregando cada columna por separado. No se consulto la base productiva directamente; la verificacion cubre las columnas esenciales declaradas en `/ready`.
 - Aun falta validar la interfaz real con perfiles de usuario, completar cobertura de flujos criticos, probar respaldo/restauracion y obtener aceptacion funcional antes de declarar liberada la V1.
 
 Este documento es el alcance de trabajo de la V1, no una declaracion de que todos sus criterios ya estan cumplidos.
