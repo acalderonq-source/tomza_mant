@@ -95,6 +95,7 @@ test("ADMIN guarda la cédula normalizada junto con los departamentos", async ()
     async query(sql, params = []) {
       if (sql.includes("SELECT id, rol FROM usuarios")) return [[{ id: 42, rol: "TALLER" }]];
       if (sql.includes("SELECT id FROM usuarios WHERE cedula")) return [[]];
+      if (sql.includes("FROM usuario_cedulas")) return [[]];
       writes.push({ sql, params });
       return [{ affectedRows: 1 }];
     },
@@ -119,6 +120,7 @@ test("ADMIN rechaza una cédula duplicada sin modificar departamentos", async ()
     async query(sql, params = []) {
       if (sql.includes("SELECT id, rol FROM usuarios")) return [[{ id: 42, rol: "TALLER" }]];
       if (sql.includes("SELECT id FROM usuarios WHERE cedula")) return [[{ id: 99 }]];
+      if (sql.includes("FROM usuario_cedulas")) return [[]];
       writes.push({ sql, params });
       return [{ affectedRows: 1 }];
     },
@@ -156,6 +158,7 @@ test("si falla una insercion la asignacion anterior se revierte", async () => {
     async beginTransaction() {},
     async query(sql) {
       if (sql.includes("SELECT id, rol FROM usuarios")) return [[{ id: 42, rol: "TALLER" }]];
+      if (sql.includes("FROM usuario_cedulas")) return [[]];
       if (sql.includes("INSERT INTO usuario_departamentos") && ++inserts === 2) throw new Error("fallo simulado");
       return [{ affectedRows: 1 }];
     },

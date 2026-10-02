@@ -26,7 +26,7 @@
 
     <div class="feature-row">
       <span class="feature-pill"><%= departamentoNombre %></span>
-      <span class="feature-pill">Acceso por usuario</span>
+      <span class="feature-pill">Acceso por usuario o cédula</span>
       <span class="feature-pill">Gas Tomza</span>
     </div>
   </section>
@@ -56,6 +56,17 @@
         </div>
         <button class="btn btn-login">Entrar</button>
       </form>
+      <% if (typeof perfiles !== 'undefined' && perfiles.length) { %>
+        <div class="mt-4">
+          <p class="mb-2">La cédula tiene acceso a más de un perfil. Seleccione dónde desea ingresar:</p>
+          <% perfiles.forEach(perfil => { %>
+            <form method="POST" action="/login/perfil" class="mb-2">
+              <input type="hidden" name="usuarioId" value="<%= perfil.id %>">
+              <button class="btn btn-outline-primary w-100" type="submit"><%= perfil.nombre %></button>
+            </form>
+          <% }) %>
+        </div>
+      <% } %>
     </div>
 
     <div class="login-footer">

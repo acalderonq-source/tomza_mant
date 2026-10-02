@@ -68,7 +68,7 @@ router.post("/login", loginLimiter, async (req, res) => {
       });
     }
 
-    // Buscar usuario en la base de datos
+    // Acepta el nombre de usuario o una cédula asociada a uno o más perfiles.
     let [rows] = await pool.query(
       "SELECT * FROM usuarios WHERE usuario = ? LIMIT 1",
       [identificador]
@@ -77,7 +77,16 @@ router.post("/login", loginLimiter, async (req, res) => {
     if (!rows.length) {
       const cedula = normalizarCedula(identificador);
       if (/^\d{9,12}$/.test(cedula)) {
-        [rows] = await pool.query("SELECT * FROM usuarios WHERE cedula = ? LIMIT 1", [cedula]);
+        [rows] = await pool.query(`
+          SELECT u.*, uc.persona_nombre, uc.perfil_excel
+          FROM usuario_cedulas uc
+          JOIN usuarios u ON u.id = uc.usuario_id
+          WHERE uc.cedula = ?
+          ORDER BY u.usuario
+        `, [cedula]);
+        if (!rows.length) {
+          [rows] = await pool.query("SELECT * FROM usuarios WHERE cedula = ? LIMIT 1", [cedula]);
+        }
       }
     }
 
@@ -91,12 +100,12 @@ router.post("/login", loginLimiter, async (req, res) => {
       });
     }
 
-    const user = rows[0];
+    const usersWithValidPassword = [];
+    for (const candidate of rows) {
+      if (await bcrypt.compare(password, candidate.password)) usersWithValidPassword.push(candidate);
+    }
 
-    // Comparar contraseña
-    const match = await bcrypt.compare(password, user.password);
-
-    if (!match) {
+    if (!usersWithValidPassword.length) {
       return res.render("login", {
         error: "Usuario o contraseña incorrecta",
         next: nextUrl,
@@ -105,6 +114,74 @@ router.post("/login", loginLimiter, async (req, res) => {
       });
     }
 
+    const uniqueCandidates = [...new Map(usersWithValidPassword.map(user => [user.id, user])).values()];
+    if (uniqueCandidates.length > 1) {
+      req.session.pendingCedulaLogin = {
+        usuarioIds: uniqueCandidates.map(user => user.id),
+        departamento,
+        next: nextUrl
+      };
+      return res.render("login", {
+        error: null,
+        next: nextUrl,
+        departamento,
+        departamentoNombre: DEPARTAMENTOS.find(item => item.key === departamento)?.nombre,
+        perfiles: uniqueCandidates.map(user => ({ id: user.id, nombre: user.nombre || user.usuario }))
+      });
+    }
+
+    return await iniciarSesion(req, res, uniqueCandidates[0], departamento, nextUrl);
+  } catch (error) {
+    console.error("Error procesando login:", error.code || error.message);
+    return res.status(500).send("No se pudo iniciar sesión.");
+  }
+});
+
+router.post("/login/perfil", async (req, res) => {
+  const pending = req.session.pendingCedulaLogin;
+  const usuarioId = Number(req.body.usuarioId);
+  if (!pending || !pending.usuarioIds.includes(usuarioId)) return res.status(401).redirect("/login?departamento=TALLER");
+
+  try {
+    const [[user]] = await pool.query("SELECT * FROM usuarios WHERE id = ? LIMIT 1", [usuarioId]);
+    if (!user) {
+      delete req.session.pendingCedulaLogin;
+      return res.status(401).redirect("/login?departamento=TALLER");
+    }
+    delete req.session.pendingCedulaLogin;
+    return await iniciarSesion(req, res, user, pending.departamento, pending.next);
+  } catch (error) {
+    console.error("Error seleccionando perfil de cédula:", error.code || error.message);
+    return res.status(500).send("No se pudo iniciar sesión.");
+  }
+});
+
+router.get("/cambiar-clave", (req, res) => {
+  if (!req.session.user) return res.redirect("/login?departamento=TALLER");
+  if (!req.session.user.requiereCambioPassword) return res.redirect("/dashboard");
+  res.render("cambiar_clave", { error: null });
+});
+
+router.post("/cambiar-clave", async (req, res) => {
+  const user = req.session.user;
+  if (!user?.requiereCambioPassword) return res.redirect("/dashboard");
+  const password = String(req.body.password || "");
+  const confirmar = String(req.body.confirmar || "");
+  if (password.length < 12) return res.status(400).render("cambiar_clave", { error: "La contraseña debe tener al menos 12 caracteres." });
+  if (password !== confirmar) return res.status(400).render("cambiar_clave", { error: "Las contraseñas no coinciden." });
+
+  try {
+    const hash = await bcrypt.hash(password, 12);
+    await pool.query("UPDATE usuarios SET password = ?, requiere_cambio_password = 0 WHERE id = ?", [hash, user.id]);
+    user.requiereCambioPassword = false;
+    return res.redirect("/dashboard");
+  } catch (error) {
+    console.error("Error cambiando contraseña inicial:", error.code || error.message);
+    return res.status(500).render("cambiar_clave", { error: "No se pudo cambiar la contraseña. Inténtelo de nuevo." });
+  }
+});
+
+async function iniciarSesion(req, res, user, departamento, nextUrl) {
     const [departmentRows] = await pool.query(
       "SELECT departamento, es_principal FROM usuario_departamentos WHERE usuario_id = ? ORDER BY es_principal DESC, departamento",
       [user.id]
@@ -129,6 +206,7 @@ router.post("/login", loginLimiter, async (req, res) => {
       usuario: user.usuario,
       rol: user.rol,
       sede: user.sede,
+      requiereCambioPassword: Boolean(user.requiere_cambio_password),
       departamentos: departamentosPermitidos,
       departamentoActivo: departamento
     };
@@ -140,14 +218,9 @@ router.post("/login", loginLimiter, async (req, res) => {
       }
 
       req.session.user = sessionUser;
-      res.redirect(nextUrl || "/dashboard");
+      res.redirect(user.requiere_cambio_password ? "/cambiar-clave" : nextUrl || "/dashboard");
     });
-
-  } catch (error) {
-    console.error("Error procesando login:", error.code || error.message);
-    return res.status(500).send("No se pudo iniciar sesión.");
-  }
-});
+}
 
 router.post("/departamento/activo", (req, res) => {
   const departamento = String(req.body.departamento || "").toUpperCase();

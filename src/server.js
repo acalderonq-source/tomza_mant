@@ -358,6 +358,11 @@ const apiRoutes = require("./routes/api.routes");
 
 // ===================== USAR RUTAS =====================
 app.use("/", authRoutes);
+app.use((req, res, next) => {
+  if (!req.session.user?.requiereCambioPassword) return next();
+  if (["/cambiar-clave", "/logout"].includes(req.path)) return next();
+  return res.redirect("/cambiar-clave");
+});
 app.use("/", sedeRoutes);
 app.use("/", adminRoutes);
 app.use("/dashboard", dashboardRoutes);

@@ -69,6 +69,14 @@ router.post("/admin/departamentos/:id", async (req, res) => {
         await connection.rollback();
         return res.status(409).send("Esa cédula ya está asignada a otro usuario.");
       }
+      const [aliasDuplicados] = await connection.query(
+        "SELECT usuario_id FROM usuario_cedulas WHERE cedula = ? AND usuario_id <> ? LIMIT 1 FOR UPDATE",
+        [cedula, usuarioId]
+      );
+      if (aliasDuplicados.length) {
+        await connection.rollback();
+        return res.status(409).send("Esa cédula ya está asignada a otro usuario.");
+      }
     }
 
     const claves = users[0].rol === "ADMIN" ? DEPARTAMENTOS.map(dept => dept.key) : seleccionados;
