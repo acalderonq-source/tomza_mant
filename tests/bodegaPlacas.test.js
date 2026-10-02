@@ -86,6 +86,16 @@ test("Bodega suggests active plates and rejects invented plates before changing 
     assert.match(session.error, /conteo físico y motivo/);
     assert.equal(writes.length, 0);
 
+    assert.equal((await post("/bodega/articulos", {
+      nombre: "Precio inválido", stock_actual: "0", precio_unitario: "-1"
+    })).status, 302);
+    assert.match(session.error, /mínimos, máximos y precio/);
+    assert.equal((await post("/bodega/recibir", {
+      articulo_id: "1", cantidad: "1", precio_unitario: "texto", sede: "Cartago"
+    })).status, 302);
+    assert.match(session.error, /precio recibido debe ser un monto no negativo/);
+    assert.equal(writes.length, 0);
+
     assert.equal((await post("/bodega/articulos", { nombre: "Filtro", stock_actual: "5" })).status, 302);
     assert.match(session.error, /sin existencia/);
     assert.equal(writes.length, 0);

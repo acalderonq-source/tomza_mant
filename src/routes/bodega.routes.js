@@ -50,6 +50,10 @@ function numeroNoNegativo(value) {
   return Number.isFinite(parsed) && parsed <= 9999999999.99 ? parsed : null;
 }
 
+function numeroFormularioNoNegativo(value) {
+  return String(value ?? "").trim() === "" ? 0 : numeroNoNegativo(value);
+}
+
 function limpiar(value) {
   return String(value || "").trim();
 }
@@ -1242,7 +1246,13 @@ router.post("/articulos", async (req, res) => {
     const codigoInterno = codigoTaller(req.body.codigo_taller) || await siguienteCodigoTaller();
     const codigo = limpiar(req.body.codigo) || null;
     const nombre = limpiar(req.body.nombre);
+    const stockMinimo = numeroFormularioNoNegativo(req.body.stock_minimo);
+    const stockMaximo = numeroFormularioNoNegativo(req.body.stock_maximo);
+    const precioUnitario = numeroFormularioNoNegativo(req.body.precio_unitario);
     if (numero(req.body.stock_actual) !== 0) throw new Error("El artículo se crea sin existencia. Registre el saldo mediante una entrada para conservar trazabilidad.");
+    if (stockMinimo === null || stockMaximo === null || precioUnitario === null || stockMinimo > stockMaximo) {
+      throw new Error("Revise los mínimos, máximos y precio: deben ser números no negativos y el máximo no puede ser menor que el mínimo.");
+    }
     if (!nombre) {
       req.session.error = "Debe escribir el nombre del artículo.";
       return redirectBodega(req, res);
@@ -1267,10 +1277,10 @@ router.post("/articulos", async (req, res) => {
         limpiar(req.body.tipo_unidad) || null,
         limpiar(req.body.unidad_medida) || "UND",
         0,
-        numero(req.body.stock_minimo),
-        numero(req.body.stock_maximo),
+        stockMinimo,
+        stockMaximo,
         limpiar(req.body.ubicacion) || null,
-        numero(req.body.precio_unitario),
+        precioUnitario,
         proveedor.id,
         proveedor.nombre,
         origen === "CONSIGNACION" ? (limpiar(req.body.proveedor_consignacion) || PROVEEDOR_CONSIGNACION_DEFAULT) : null,
@@ -1295,7 +1305,13 @@ router.post("/suministros", async (req, res) => {
     const proveedor = await obtenerProveedor(req.body.proveedor_id, req.body.proveedor_nombre);
     const codigoInterno = codigoTaller(req.body.codigo_taller) || await siguienteCodigoTaller();
     const nombre = limpiar(req.body.nombre);
+    const stockMinimo = numeroFormularioNoNegativo(req.body.stock_minimo);
+    const stockMaximo = numeroFormularioNoNegativo(req.body.stock_maximo);
+    const precioUnitario = numeroFormularioNoNegativo(req.body.precio_unitario);
     if (numero(req.body.stock_actual) !== 0) throw new Error("El suministro se crea sin existencia. Registre el saldo mediante una entrada para conservar trazabilidad.");
+    if (stockMinimo === null || stockMaximo === null || precioUnitario === null || stockMinimo > stockMaximo) {
+      throw new Error("Revise los mínimos, máximos y precio: deben ser números no negativos y el máximo no puede ser menor que el mínimo.");
+    }
     if (!nombre) {
       req.session.error = "Debe escribir el nombre del suministro.";
       return redirectBodega(req, res);
@@ -1317,10 +1333,10 @@ router.post("/suministros", async (req, res) => {
         limpiar(req.body.tipo_unidad) || null,
         limpiar(req.body.unidad_medida) || "UND",
         0,
-        numero(req.body.stock_minimo),
-        numero(req.body.stock_maximo),
+        stockMinimo,
+        stockMaximo,
         limpiar(req.body.ubicacion) || null,
-        numero(req.body.precio_unitario),
+        precioUnitario,
         proveedor.id,
         proveedor.nombre,
         req.body.fecha_ultima_compra || fechaCostaRica(),
@@ -1538,9 +1554,14 @@ router.post("/recibir", async (req, res) => {
     await ensureBodegaTables();
     const articuloId = Number(req.body.articulo_id);
     const cantidad = numero(req.body.cantidad);
+    const precioIngresado = limpiar(req.body.precio_unitario);
+    const precioRecibido = precioIngresado ? numeroNoNegativo(precioIngresado) : null;
     if (!articuloId || cantidad <= 0) {
       req.session.error = "Debe seleccionar un artículo y una cantidad recibida.";
       return redirectBodega(req, res);
+    }
+    if (precioIngresado && precioRecibido === null) {
+      throw new Error("El precio recibido debe ser un monto no negativo con hasta dos decimales.");
     }
 
     const proveedor = await obtenerProveedor(req.body.proveedor_id, req.body.proveedor_nombre);
@@ -1559,8 +1580,7 @@ router.post("/recibir", async (req, res) => {
     const saldo = await aplicarCambioExistencia(conn, articulo, sede, articulo.ubicacion || "", cantidad);
     const anterior = saldo.anterior;
     const nueva = saldo.nueva;
-    const precioIngresado = limpiar(req.body.precio_unitario);
-    const precio = precioIngresado ? numero(precioIngresado) : Number(articulo.precio_unitario || 0);
+    const precio = precioRecibido ?? Number(articulo.precio_unitario || 0);
 
     await conn.query(
       `UPDATE bodega_articulos
