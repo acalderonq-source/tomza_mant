@@ -45,10 +45,11 @@ El numero `1.0.0` que aparece en `package.json` identifica la version del paquet
 ## Estado de auditoria al 2026-10-02
 
 - El sistema usa Node.js, Express, EJS y MySQL; las rutas se organizan por modulo.
-- `npm test` pasa 142 pruebas automatizadas (0 fallidas) en el estado local revisado.
+- `npm test` pasa 145 pruebas automatizadas (0 fallidas) en el estado local revisado.
 - El menu de ADMIN en Taller conserva los accesos historicos, y Operaciones queda sin modulos ni indicadores de Taller; `tests/dashboardDepartamentos.test.js` verifica ambas vistas y los accesos de los roles Taller, Contabilidad, Proveeduria y BODEGUERO. El commit `8676b38` contiene la restauracion del menu Taller.
 - Una prueba HTTP recorre todos los prefijos Taller y sus subrutas: Operaciones recibe 403, Taller conserva acceso y los modulos compartidos de Contabilidad/Proveeduria mantienen sus permisos.
 - El tablero se prueba para ADMIN, TALLER, Contabilidad, Proveeduría y BODEGUERO; se cruza cada enlace de Taller visible con el middleware para evitar tarjetas que terminen en 403.
+- Las rutas y choferes prueban alta semanal con historial atomico, cambio de chofer con motivo obligatorio y rechazo de asignaciones fuera de la sede del supervisor.
 - Los usuarios nuevos con rol `TALLER` reciben solo el departamento Taller por defecto; otros accesos se conceden expresamente desde administración.
 - La asignación de departamentos se prueba por HTTP: solo ADMIN puede cambiarla, los valores invalidos se rechazan y un error de escritura revierte toda la transacción.
 - La API del buscador de placas devuelve 403 fuera de Taller y funciona al seleccionar Taller.
