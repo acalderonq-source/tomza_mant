@@ -39,14 +39,14 @@ El numero `1.0.0` que aparece en `package.json` identifica la version del paquet
 - [ ] Se verifica en pantalla el recorrido de administrador, supervisor, mecanico, Pesados y bodeguero.
 - [ ] Exportaciones y reportes coinciden con los registros filtrados por sede, fecha y placa.
 - [ ] Se configura y prueba respaldo/restauracion en Railway y Render siguiendo [el runbook](RESPALDO_Y_RESTAURACION.md).
-- [x] Se ejecutan pruebas automatizadas y una prueba de humo en Render; se identifica el commit activo.
+- [ ] Se ejecutan pruebas automatizadas y una prueba de humo en Render sobre el release vigente; se identifica el commit activo.
 - [ ] El responsable funcional valida los flujos y se publica una nota de version con cambios y limitaciones.
 
 ## Estado de auditoria al 2026-10-02
 
 - El sistema usa Node.js, Express, EJS y MySQL; las rutas se organizan por modulo.
 - `npm test` pasa 142 pruebas automatizadas (0 fallidas) en el estado local revisado.
-- En Render, con perfil ADMIN, se verifico en pantalla que Taller muestra sus accesos historicos; al cambiar a Operaciones desaparecen los modulos de Taller y `/mantenimientos` deniega el acceso directo. La sesion se dejo nuevamente en Taller.
+- El menu de ADMIN en Taller conserva los accesos historicos, y Operaciones queda sin modulos ni indicadores de Taller; `tests/dashboardDepartamentos.test.js` verifica ambas vistas y los accesos de los roles Taller, Contabilidad, Proveeduria y BODEGUERO. El commit `8676b38` contiene la restauracion del menu Taller.
 - Una prueba HTTP recorre todos los prefijos Taller y sus subrutas: Operaciones recibe 403, Taller conserva acceso y los modulos compartidos de Contabilidad/Proveeduria mantienen sus permisos.
 - El tablero se prueba para ADMIN, TALLER, Contabilidad, Proveeduría y BODEGUERO; se cruza cada enlace de Taller visible con el middleware para evitar tarjetas que terminen en 403.
 - Los usuarios nuevos con rol `TALLER` reciben solo el departamento Taller por defecto; otros accesos se conceden expresamente desde administración.
@@ -75,6 +75,7 @@ El numero `1.0.0` que aparece en `package.json` identifica la version del paquet
 - En Render, si `UPLOAD_ROOT` no se sincroniza como variable del servicio, se usa `/var/data/uploads`, el punto declarado para el disco persistente en `render.yaml`; una variable `UPLOAD_ROOT` explicita sigue teniendo prioridad.
 - La migracion `202610020001_bodega_consumo_confirmacion_completar.sql` recupera esquemas parciales agregando cada columna por separado. Render responde `ready` con las nuevas columnas esenciales de Bodega en el commit `4117c75aae1cbb88b4221523680fff89840c1df7`.
 - El resumen ejecutivo ahora inicia en el mes actual de Costa Rica cuando no se indica un rango, limita las subconsultas de ordenes a ese periodo y comparte calculos concurrentes identicos para reducir picos de memoria; se conservan los filtros de periodos anteriores.
+- Verificacion mas reciente de produccion: `https://tomza-mant.onrender.com/ready` devuelve `503 not_ready`, con base y esquema conectados, pero adjuntos no disponibles (`persistent_root_not_configured`). El release activo no se pudo identificar y la separacion Taller/Operaciones aun requiere confirmacion visual en el release vigente; no se declara publicado ni saludable hasta resolverlo.
 - Aun falta validar la interfaz real con perfiles de supervisor, mecanico, Pesados y bodeguero; completar cobertura de flujos criticos, probar respaldo/restauracion y obtener aceptacion funcional antes de declarar liberada la V1.
 
 Este documento es el alcance de trabajo de la V1, no una declaracion de que todos sus criterios ya estan cumplidos.
