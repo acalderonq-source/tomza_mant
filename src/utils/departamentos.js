@@ -31,6 +31,13 @@ function departamentosInicialesPorRol(rol, usuario = "") {
   return asignaciones[String(rol || "").toUpperCase()] || [];
 }
 
+function departamentosPermitidosPorRol(rol, asignados = []) {
+  if (String(rol || "").toUpperCase() === "ADMIN") {
+    return DEPARTAMENTOS.map(({ key }) => key);
+  }
+  return asignados;
+}
+
 function esDepartamentoValido(departamento) {
   return DEPARTAMENTO_POR_CLAVE.has(String(departamento || "").toUpperCase());
 }
@@ -83,4 +90,10 @@ async function ensurePortalDepartmentSchema(pool) {
   }
 }
 
-module.exports = { DEPARTAMENTOS, departamentosInicialesPorRol, esDepartamentoValido, ensurePortalDepartmentSchema };
+module.exports = {
+  DEPARTAMENTOS,
+  departamentosInicialesPorRol,
+  departamentosPermitidosPorRol,
+  esDepartamentoValido,
+  ensurePortalDepartmentSchema
+};

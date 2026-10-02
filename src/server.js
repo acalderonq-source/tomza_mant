@@ -10,7 +10,7 @@ const enviarAlertasDekra = require("./utils/dekraMail");
 const { enviarRecordatoriosMantenimientos, ensurePushTables } = require("./utils/notificacionesPush");
 const { ensureCsrfToken, injectSecurityAssets } = require("./middleware/security");
 const { UPLOAD_ROOT, seedBundledUploads } = require("./utils/uploadStorage");
-const { ensurePortalDepartmentSchema } = require("./utils/departamentos");
+const { DEPARTAMENTOS, departamentosPermitidosPorRol, ensurePortalDepartmentSchema } = require("./utils/departamentos");
 
 // Inicializar app
 const app = express();
@@ -174,13 +174,21 @@ app.use(ensureCsrfToken);
 
 app.use(async (req, _res, next) => {
   const user = req.session.user;
-  if (!user || Array.isArray(user.departamentos)) return next();
+  if (!user) return next();
+  if (String(user.rol || "").toUpperCase() === "ADMIN") {
+    user.departamentos = departamentosPermitidosPorRol(user.rol);
+    user.departamentoActivo = user.departamentos.includes(user.departamentoActivo)
+      ? user.departamentoActivo
+      : "TALLER";
+    return next();
+  }
+  if (Array.isArray(user.departamentos)) return next();
   try {
     const [rows] = await pool.query(
       "SELECT departamento FROM usuario_departamentos WHERE usuario_id = ? ORDER BY es_principal DESC, departamento",
       [user.id]
     );
-    user.departamentos = rows.map(row => row.departamento);
+    user.departamentos = departamentosPermitidosPorRol(user.rol, rows.map(row => row.departamento));
     user.departamentoActivo = user.departamentos.includes(user.departamentoActivo)
       ? user.departamentoActivo
       : user.departamentos[0] || "TALLER";

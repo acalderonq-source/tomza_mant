@@ -1,6 +1,6 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { DEPARTAMENTOS, departamentosInicialesPorRol, esDepartamentoValido, ensurePortalDepartmentSchema } = require("../src/utils/departamentos");
+const { DEPARTAMENTOS, departamentosInicialesPorRol, departamentosPermitidosPorRol, esDepartamentoValido, ensurePortalDepartmentSchema } = require("../src/utils/departamentos");
 
 test("el portal ofrece los siete departamentos previstos", () => {
   assert.deepEqual(DEPARTAMENTOS.map(item => item.key), [
@@ -19,6 +19,11 @@ test("la matriz inicial mantiene separados los accesos principales", () => {
   assert.ok(departamentosInicialesPorRol("SUPERVISOR").includes("OPERACIONES"));
   assert.deepEqual(departamentosInicialesPorRol("CONTABILIDAD"), ["CONTABILIDAD"]);
   assert.deepEqual(departamentosInicialesPorRol("ADMIN"), DEPARTAMENTOS.map(item => item.key));
+});
+
+test("ADMIN conserva acceso a todos los departamentos aunque su asignación guardada esté incompleta", () => {
+  assert.deepEqual(departamentosPermitidosPorRol("ADMIN", ["TALLER"]), DEPARTAMENTOS.map(item => item.key));
+  assert.deepEqual(departamentosPermitidosPorRol("MECANICO", ["TALLER"]), ["TALLER"]);
 });
 
 test("la validación de clave de área no acepta valores arbitrarios", () => {

@@ -2,7 +2,7 @@ const express = require("express");
 const bcrypt = require("bcryptjs");
 const { rateLimit } = require("express-rate-limit");
 const pool = require("../db");
-const { DEPARTAMENTOS, esDepartamentoValido } = require("../utils/departamentos");
+const { DEPARTAMENTOS, departamentosPermitidosPorRol, esDepartamentoValido } = require("../utils/departamentos");
 
 const router = express.Router();
 const loginLimiter = rateLimit({
@@ -100,7 +100,10 @@ router.post("/login", loginLimiter, async (req, res) => {
       "SELECT departamento, es_principal FROM usuario_departamentos WHERE usuario_id = ? ORDER BY es_principal DESC, departamento",
       [user.id]
     );
-    const departamentosPermitidos = departmentRows.map(row => row.departamento);
+    const departamentosPermitidos = departamentosPermitidosPorRol(
+      user.rol,
+      departmentRows.map(row => row.departamento)
+    );
     if (!departamentosPermitidos.includes(departamento)) {
       return res.status(403).render("login", {
         error: "Su cuenta no tiene acceso a ese departamento. Solicite la asignación a un administrador.",

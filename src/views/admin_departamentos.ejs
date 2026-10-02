@@ -32,7 +32,7 @@
           <div class="departments">
             <% departamentos.forEach(departamento => { %>
               <label class="form-check form-check-inline dept-option">
-                <input class="form-check-input" type="checkbox" name="departamentos" value="<%= departamento.key %>" <%= asignados.includes(departamento.key) ? 'checked' : '' %> <%= usuario.rol === 'ADMIN' ? 'disabled' : '' %>>
+                <input class="form-check-input" type="checkbox" name="departamentos" value="<%= departamento.key %>" <%= usuario.rol === 'ADMIN' || asignados.includes(departamento.key) ? 'checked' : '' %> <%= usuario.rol === 'ADMIN' ? 'disabled' : '' %>>
                 <span class="form-check-label"><%= departamento.nombre %></span>
               </label>
             <% }) %>
