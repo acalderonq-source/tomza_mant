@@ -10,7 +10,7 @@ const enviarAlertasDekra = require("./utils/dekraMail");
 const { enviarRecordatoriosMantenimientos, ensurePushTables } = require("./utils/notificacionesPush");
 const { ensureCsrfToken, injectSecurityAssets } = require("./middleware/security");
 const { UPLOAD_ROOT, seedBundledUploads } = require("./utils/uploadStorage");
-const { DEPARTAMENTOS, departamentosPermitidosPorRol, puedeAbrirRutaPorDepartamento, ensurePortalDepartmentSchema } = require("./utils/departamentos");
+const { DEPARTAMENTOS, departamentosPermitidosPorRol, controlarAccesoPorDepartamento, ensurePortalDepartmentSchema } = require("./utils/departamentos");
 
 // Inicializar app
 const app = express();
@@ -200,16 +200,7 @@ app.use(async (req, _res, next) => {
   }
 });
 
-app.use((req, res, next) => {
-  const user = req.session.user;
-  if (!user || puedeAbrirRutaPorDepartamento(user.departamentoActivo, req.path)) return next();
-
-  const mensaje = "Este modulo pertenece a Taller. Cambie el area activa a Taller para continuar.";
-  if (req.xhr || req.headers.accept?.includes("application/json")) {
-    return res.status(403).json({ error: mensaje });
-  }
-  return res.status(403).send(mensaje);
-});
+app.use(controlarAccesoPorDepartamento);
 
 function esUsuarioMecanicoLimitado(user) {
   const usuario = String(user?.usuario || "").trim().toLowerCase();

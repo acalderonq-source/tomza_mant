@@ -45,6 +45,17 @@ function puedeAbrirRutaPorDepartamento(departamento, pathname) {
   return !rutaPerteneceATaller(pathname) || String(departamento || "TALLER").toUpperCase() === "TALLER";
 }
 
+function controlarAccesoPorDepartamento(req, res, next) {
+  const user = req.session?.user;
+  if (!user || puedeAbrirRutaPorDepartamento(user.departamentoActivo, req.path)) return next();
+
+  const mensaje = "Este modulo pertenece a Taller. Cambie el area activa a Taller para continuar.";
+  if (req.xhr || req.headers.accept?.includes("application/json")) {
+    return res.status(403).json({ error: mensaje });
+  }
+  return res.status(403).send(mensaje);
+}
+
 function departamentosInicialesPorRol(rol, usuario = "") {
   if (/^mecanicos?/i.test(String(usuario || "").trim())) return ["TALLER"];
   const asignaciones = {
@@ -132,5 +143,6 @@ module.exports = {
   esDepartamentoValido,
   rutaPerteneceATaller,
   puedeAbrirRutaPorDepartamento,
+  controlarAccesoPorDepartamento,
   ensurePortalDepartmentSchema
 };
