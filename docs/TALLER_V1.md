@@ -45,7 +45,7 @@ El numero `1.0.0` que aparece en `package.json` identifica la version del paquet
 ## Estado de auditoria al 2026-10-02
 
 - El sistema usa Node.js, Express, EJS y MySQL; las rutas se organizan por modulo.
-- `npm test` pasa 141 pruebas automatizadas (0 fallidas) en el estado local revisado.
+- `npm test` pasa 142 pruebas automatizadas (0 fallidas) en el estado local revisado.
 - En Render, con perfil ADMIN, se verifico en pantalla que Taller muestra sus accesos historicos; al cambiar a Operaciones desaparecen los modulos de Taller y `/mantenimientos` deniega el acceso directo. La sesion se dejo nuevamente en Taller.
 - Una prueba HTTP recorre todos los prefijos Taller y sus subrutas: Operaciones recibe 403, Taller conserva acceso y los modulos compartidos de Contabilidad/Proveeduria mantienen sus permisos.
 - El tablero se prueba para ADMIN, TALLER, Contabilidad, Proveeduría y BODEGUERO; se cruza cada enlace de Taller visible con el middleware para evitar tarjetas que terminen en 403.
@@ -64,6 +64,7 @@ El numero `1.0.0` que aparece en `package.json` identifica la version del paquet
 - Las entregas rechazan lineas invalidas y una prueba verifica rollback total si una linea no tiene saldo; las recepciones exitosas por placa y generales conservan destino, cantidad, precio y transaccion; los ajustes no aceptan conteos no numericos y los precios de catalogo/recepcion se validan en el servidor.
 - Las solicitudes de llantas validan unidad, medida y cantidad entera positiva en el servidor; una prueba HTTP confirma que cantidades vacias, cero, negativas, decimales o no numericas no crean movimientos y que una solicitud valida deja historial.
 - Las rutas individuales y el formulario de edicion de llantas exigen transiciones validas; las actualizaciones condicionales rechazan cambios concurrentes obsoletos. Se prueba el flujo SOLICITADA -> COTIZADA -> COMPRADA -> RECIBIDA, los rechazos y un intento de saltar directamente a RECIBIDA.
+- El registro de correctivos con placa actualiza la condicion de la unidad, el correctivo, sus trabajos y el reporte relacionado dentro de una transaccion; una prueba confirma el rollback de todos los cambios cuando falla el detalle.
 - La publicacion `6f8a745b97d8947cd1bbe02b019a6f2c6b77e72a` se verifico en Render con `/ready`: `status=ready`, `database=connected` y `schema=ready`; posteriormente, el commit `4c99d4f` se comprobo en la interfaz de Render para la separacion Taller/Operaciones.
 - `npm audit --omit=dev` reporta cero vulnerabilidades en el estado revisado; la suite completa pasa sobre las dependencias instaladas.
 - Mantenimientos falla cerrado cuando un mecanico de sede no tiene sede autorizada, sin impedir el cierre dentro de su sede; ADMIN/TALLER conservan el acceso global solo cuando no hay filtro de sede. Render responde `ready` con el commit `07292c39327814f306201dec4f45b0b3ec0eaa43`.

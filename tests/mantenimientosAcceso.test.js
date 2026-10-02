@@ -243,3 +243,59 @@ test("si falla la asignación de un mecánico, el cierre revierte todos los camb
   });
   assert.equal(tx.released, true);
 });
+
+test("guardar un correctivo mantiene unidad y trabajos en una transacción", async () => {
+  let fallarDetalle = true;
+  const tx = { writes: [], commits: 0, rollbacks: 0, releases: 0 };
+  const connection = {
+    async beginTransaction() {},
+    async query(sql, params = []) {
+      tx.writes.push({ sql, params });
+      if (sql.includes("INSERT INTO correctivo_trabajos") && fallarDetalle) {
+        throw new Error("fallo de prueba al guardar el detalle");
+      }
+      if (sql.includes("INSERT INTO correctivos")) return [{ insertId: 90 }];
+      return [{ affectedRows: 1 }];
+    },
+    async commit() { tx.commits += 1; },
+    async rollback() { tx.rollbacks += 1; },
+    release() { tx.releases += 1; }
+  };
+
+  await withServer({ id: 1, usuario: "admin", rol: "ADMIN", sede: "Cartago" }, {
+    query: async (sql) => {
+      if (sql.toLowerCase().includes("information_schema")) return [[{ count: 1, total: 1 }]];
+      if (sql.includes("UPDATE mantenimientos SET numero_mantenimiento")) return [{ affectedRows: 0 }];
+      if (sql.includes("SELECT id, placa, sede FROM unidades WHERE id = ?")) {
+        return [[{ id: 20, placa: "C164528", sede: "Cartago" }]];
+      }
+      if (sql.includes("SELECT id FROM mecanicos")) return [[{ id: 7 }]];
+      return [[]];
+    },
+    getConnection: async () => connection
+  }, async base => {
+    const values = {
+      unidad_id: "20",
+      tipo_mantenimiento: "CORRECTIVO",
+      pendiente: "Esperar repuesto",
+      mecanicos: "7",
+      "trabajos[7]": "Cambio de filtro",
+      "repuestos[7]": "Filtro de aceite"
+    };
+
+    const fallido = await post(base, "/mantenimientos/correctivos", values);
+    assert.equal(fallido.status, 500);
+    assert.equal(tx.commits, 0);
+    assert.equal(tx.rollbacks, 1);
+    assert.ok(tx.writes.some(write => write.sql.includes("UPDATE unidades")));
+    assert.ok(tx.writes.some(write => write.sql.includes("INSERT INTO correctivos")));
+    assert.ok(tx.writes.some(write => write.sql.includes("INSERT INTO correctivo_trabajos")));
+
+    fallarDetalle = false;
+    const guardado = await post(base, "/mantenimientos/correctivos", values);
+    assert.equal(guardado.status, 302);
+    assert.equal(tx.commits, 1);
+    assert.equal(tx.rollbacks, 1);
+  });
+  assert.equal(tx.releases, 2);
+});

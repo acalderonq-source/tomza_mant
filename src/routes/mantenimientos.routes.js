@@ -1214,128 +1214,145 @@ router.post("/correctivos", requireAuth, async (req, res) => {
     }
     if (!resumenGeneral.trim()) return res.status(400).send("Debe escribir al menos un trabajo.");
 
-    if (pendienteTexto) {
-      await pool.query(
-        `UPDATE unidades
-         SET varada = 1,
-             comodin = 0,
-             razon_varada = ?
-         WHERE id = ?`,
-        [`Pendiente de taller: ${pendienteTexto}`, unidad_id]
-      );
-    } else {
-      await pool.query(
-        `UPDATE unidades
-         SET varada = 0,
-             razon_varada = NULL
-         WHERE id = ?`,
-        [unidad_id]
-      );
-    }
+    const reporteAtendido = await obtenerReporteSupervisorAutorizado(reporte_id, sedeFiltro, sedesPermitidasCorrectivo);
+    const connection = await pool.getConnection();
+    let correctivoId;
+    try {
+      await connection.beginTransaction();
 
-    if (tipoMantenimiento === "PREVENTIVO") {
-      const [mantenimientoResult] = await pool.query(
-        `INSERT INTO mantenimientos
-         (unidad_id, sede, tipo, plan, ejecucion, pendiente, estado, prioridad, fecha_programada, fecha_cierre, creado_por)
-         VALUES (?, ?, 'PREVENTIVO', ?, ?, ?, 'CERRADO', 'MEDIA', CURDATE(), NOW(), ?)`,
-        [
-          unidad_id,
-          sedeCorrectivo,
-          "Preventivo registrado por mecánico",
-          resumenGeneral,
-          pendienteTexto || null,
-          req.session.user.id
-        ]
-      );
-      const mantenimientoId = mantenimientoResult.insertId;
-      await asignarNumeroMantenimiento(pool, mantenimientoId);
-
-      for (const idMec of mecanicosArray) {
-        await pool.query(
-          `INSERT IGNORE INTO mantenimiento_mecanicos (mantenimiento_id, mecanico_id)
-           VALUES (?, ?)`,
-          [mantenimientoId, idMec]
+      if (pendienteTexto) {
+        await connection.query(
+          `UPDATE unidades
+           SET varada = 1,
+               comodin = 0,
+               razon_varada = ?
+           WHERE id = ?`,
+          [`Pendiente de taller: ${pendienteTexto}`, unidad_id]
+        );
+      } else {
+        await connection.query(
+          `UPDATE unidades
+           SET varada = 0,
+               razon_varada = NULL
+           WHERE id = ?`,
+          [unidad_id]
         );
       }
 
-      const reporteAtendido = await obtenerReporteSupervisorAutorizado(reporte_id, sedeFiltro, sedesPermitidasCorrectivo);
+      if (tipoMantenimiento === "PREVENTIVO") {
+        const [mantenimientoResult] = await connection.query(
+          `INSERT INTO mantenimientos
+           (unidad_id, sede, tipo, plan, ejecucion, pendiente, estado, prioridad, fecha_programada, fecha_cierre, creado_por)
+           VALUES (?, ?, 'PREVENTIVO', ?, ?, ?, 'CERRADO', 'MEDIA', CURDATE(), NOW(), ?)`,
+          [
+            unidad_id,
+            sedeCorrectivo,
+            "Preventivo registrado por mecánico",
+            resumenGeneral,
+            pendienteTexto || null,
+            req.session.user.id
+          ]
+        );
+        const mantenimientoId = mantenimientoResult.insertId;
+        await asignarNumeroMantenimiento(connection, mantenimientoId);
+
+        for (const idMec of mecanicosArray) {
+          await connection.query(
+            `INSERT IGNORE INTO mantenimiento_mecanicos (mantenimiento_id, mecanico_id)
+             VALUES (?, ?)`,
+            [mantenimientoId, idMec]
+          );
+        }
+
+        if (reporteAtendido && String(reporteAtendido.unidad_id) === String(unidad_id)) {
+          await connection.query(
+            `UPDATE reportes_supervisores
+             SET estado = 'HISTORIAL',
+                 cerrado_por = ?,
+                 fecha_cierre = NOW(),
+                 correctivo_id = NULL,
+                 mantenimiento_id = ?,
+                 cierre_motivo = ?,
+                 cierre_confianza = 1,
+                 actualizado_en = NOW()
+             WHERE id = ? AND estado IN ('PENDIENTE','EN_REVISION')`,
+            [
+              req.session.user.id,
+              mantenimientoId,
+              "Cerrado por mecánico al completar preventivo desde el reporte.",
+              reporteAtendido.id
+            ]
+          );
+        }
+
+        await connection.commit();
+        return res.redirect(`/mantenimientos/${mantenimientoId}`);
+      }
+
+      const puntos = calcularPuntos(resumenGeneral);
+      const [result] = await connection.query(
+        `INSERT INTO correctivos (unidad_id, sede, tipo_mantenimiento, trabajo_realizado, pendiente, creado_por, puntos)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [unidad_id, sedeCorrectivo, tipoMantenimiento, resumenGeneral, pendienteTexto || null, req.session.user.id, puntos]
+      );
+      correctivoId = result.insertId;
+
+      for (const idMec of mecanicosArray) {
+        const idx = idsOrdenados.indexOf(idMec);
+        const trabajo = obtenerValorCampoMecanico(req.body, "trabajos", idMec, idx) || null;
+        const repuesto = obtenerValorCampoMecanico(req.body, "repuestos", idMec, idx) || null;
+        if (trabajo || repuesto) {
+          await connection.query(
+            `INSERT INTO correctivo_trabajos (correctivo_id, mecanico_id, trabajo, repuestos)
+             VALUES (?, ?, ?, ?)`,
+            [correctivoId, idMec, trabajo, repuesto]
+          );
+        }
+      }
+
       if (reporteAtendido && String(reporteAtendido.unidad_id) === String(unidad_id)) {
-        await pool.query(
+        await connection.query(
           `UPDATE reportes_supervisores
            SET estado = 'HISTORIAL',
                cerrado_por = ?,
                fecha_cierre = NOW(),
-               correctivo_id = NULL,
-               mantenimiento_id = ?,
+               correctivo_id = ?,
+               mantenimiento_id = NULL,
                cierre_motivo = ?,
                cierre_confianza = 1,
                actualizado_en = NOW()
-           WHERE id = ?`,
+           WHERE id = ? AND estado IN ('PENDIENTE','EN_REVISION')`,
           [
             req.session.user.id,
-            mantenimientoId,
-            "Cerrado por mecánico al completar preventivo desde el reporte.",
+            correctivoId,
+            "Cerrado por mecánico al completar correctivo desde el reporte.",
             reporteAtendido.id
           ]
         );
-      }
-
-      return res.redirect(`/mantenimientos/${mantenimientoId}`);
-    }
-
-    const puntos = calcularPuntos(resumenGeneral);
-    const [result] = await pool.query(
-      `INSERT INTO correctivos (unidad_id, sede, tipo_mantenimiento, trabajo_realizado, pendiente, creado_por, puntos)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [unidad_id, sedeCorrectivo, tipoMantenimiento, resumenGeneral, pendienteTexto || null, req.session.user.id, puntos]
-    );
-    const correctivoId = result.insertId;
-
-    for (const idMec of mecanicosArray) {
-      let trabajo = null, repuesto = null;
-      const idx = idsOrdenados.indexOf(idMec);
-      trabajo = obtenerValorCampoMecanico(req.body, "trabajos", idMec, idx) || null;
-      repuesto = obtenerValorCampoMecanico(req.body, "repuestos", idMec, idx) || null;
-      if (trabajo || repuesto) {
-        await pool.query(
-          `INSERT INTO correctivo_trabajos (correctivo_id, mecanico_id, trabajo, repuestos)
-           VALUES (?, ?, ?, ?)`,
-          [correctivoId, idMec, trabajo, repuesto]
+        await connection.query(
+          `UPDATE reportes_supervisores_sugerencias
+           SET estado = CASE WHEN estado = 'PENDIENTE' THEN 'CONFIRMADA' ELSE estado END,
+               resuelto_por = COALESCE(resuelto_por, ?),
+               resuelto_en = COALESCE(resuelto_en, NOW())
+           WHERE reporte_id = ?`,
+          [req.session.user.id, reporteAtendido.id]
         );
       }
+
+      await connection.commit();
+    } catch (error) {
+      await connection.rollback().catch(() => {});
+      throw error;
+    } finally {
+      connection.release();
     }
 
-    const reporteAtendido = await obtenerReporteSupervisorAutorizado(reporte_id, sedeFiltro, sedesPermitidasCorrectivo);
-    if (reporteAtendido && String(reporteAtendido.unidad_id) === String(unidad_id)) {
-      await pool.query(
-        `UPDATE reportes_supervisores
-         SET estado = 'HISTORIAL',
-             cerrado_por = ?,
-             fecha_cierre = NOW(),
-             correctivo_id = ?,
-             mantenimiento_id = NULL,
-             cierre_motivo = ?,
-             cierre_confianza = 1,
-             actualizado_en = NOW()
-         WHERE id = ?`,
-        [
-          req.session.user.id,
-          correctivoId,
-          "Cerrado por mecánico al completar correctivo desde el reporte.",
-          reporteAtendido.id
-        ]
-      );
-      await pool.query(
-        `UPDATE reportes_supervisores_sugerencias
-         SET estado = CASE WHEN estado = 'PENDIENTE' THEN 'CONFIRMADA' ELSE estado END,
-             resuelto_por = COALESCE(resuelto_por, ?),
-             resuelto_en = COALESCE(resuelto_en, NOW())
-         WHERE reporte_id = ?`,
-        [req.session.user.id, reporteAtendido.id]
-      );
+    let sugerencias = [];
+    try {
+      sugerencias = await registrarSugerenciasParaCorrectivo(pool, correctivoId);
+    } catch (error) {
+      console.error("Error generando sugerencias para el correctivo guardado:", error);
     }
-
-    const sugerencias = await registrarSugerenciasParaCorrectivo(pool, correctivoId);
     if (sugerencias.length && ["ADMIN", "TALLER"].includes(req.session.user.rol)) {
       return res.redirect(`/reportes-supervisores?correctivo_id=${correctivoId}`);
     }
