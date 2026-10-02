@@ -61,3 +61,78 @@ test("solicitudes de llantas rechazan cantidades invalidas y guardan unidad, can
     await new Promise(resolve => server.close(resolve));
   }
 });
+
+test("llantas solo permiten avanzar por estados válidos y registran cada cambio", async () => {
+  const originalQuery = pool.query;
+  const cambios = [];
+  const historial = [];
+  const solicitud = { id: 5, unidad_id: 24, placa: "C164528", sede: "Cartago", estado: "SOLICITADA" };
+  let simularCambioConcurrente = false;
+  pool.query = async (sql, params = []) => {
+    if (/^\s*CREATE TABLE/i.test(sql)) return [[]];
+    if (sql.includes("SELECT * FROM solicitudes_llantas WHERE id = ?")) return [[{ ...solicitud }]];
+    if (sql.includes("SELECT DISTINCT sede") && sql.includes("FROM unidades")) return [[{ sede: "Cartago" }]];
+    if (sql.includes("UPDATE solicitudes_llantas")) {
+      if (simularCambioConcurrente) {
+        simularCambioConcurrente = false;
+        solicitud.estado = "COTIZADA";
+      }
+      const nuevoEstado = sql.match(/SET estado = '([^']+)'/)?.[1];
+      const permitidos = nuevoEstado === "COTIZADA"
+        ? ["SOLICITADA"]
+        : nuevoEstado === "COMPRADA"
+          ? ["SOLICITADA", "COTIZADA"]
+          : ["COMPRADA"];
+      if (!permitidos.includes(solicitud.estado)) return [{ affectedRows: 0 }];
+      cambios.push({ anterior: solicitud.estado, nuevo: nuevoEstado });
+      solicitud.estado = nuevoEstado;
+      return [{ affectedRows: 1 }];
+    }
+    if (sql.includes("INSERT INTO solicitudes_llantas_historial")) {
+      historial.push(params);
+      return [{ insertId: historial.length }];
+    }
+    throw new Error(`Consulta inesperada: ${sql}`);
+  };
+
+  const app = express();
+  app.use(express.urlencoded({ extended: true }));
+  app.use((req, _res, next) => {
+    req.session = { user: { id: 1, usuario: "admin", rol: "ADMIN", sede: "TODAS" } };
+    next();
+  });
+  app.use("/llantas", llantas);
+  const server = await new Promise(resolve => {
+    const listening = app.listen(0, "127.0.0.1", () => resolve(listening));
+  });
+
+  try {
+    const base = `http://127.0.0.1:${server.address().port}/llantas/5`;
+    const post = action => fetch(`${base}/${action}`, {
+      method: "POST",
+      redirect: "manual",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: ""
+    });
+
+    assert.equal((await post("recibir")).status, 409);
+    simularCambioConcurrente = true;
+    assert.equal((await post("cotizar")).status, 409);
+    assert.equal(historial.length, 0);
+    solicitud.estado = "SOLICITADA";
+    assert.equal((await post("cotizar")).status, 302);
+    assert.equal((await post("cotizar")).status, 409);
+    assert.equal((await post("comprar")).status, 302);
+    assert.equal((await post("recibir")).status, 302);
+    assert.equal((await post("comprar")).status, 409);
+    assert.deepEqual(cambios.map(cambio => cambio.nuevo), ["COTIZADA", "COMPRADA", "RECIBIDA"]);
+    assert.deepEqual(historial.map(registro => registro.slice(1, 3)), [
+      ["SOLICITADA", "COTIZADA"],
+      ["COTIZADA", "COMPRADA"],
+      ["COMPRADA", "RECIBIDA"]
+    ]);
+  } finally {
+    pool.query = originalQuery;
+    await new Promise(resolve => server.close(resolve));
+  }
+});

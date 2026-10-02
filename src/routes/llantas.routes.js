@@ -758,15 +758,19 @@ router.post("/:id/cotizar", allowRoles(...ROLES_COTIZAR), async (req, res) => {
     const { solicitud, error } = await cargarSolicitudAutorizada(req, id);
     if (error === "not_found") return res.status(404).send("Solicitud no encontrada");
     if (error === "forbidden") return res.status(403).send("No autorizado para esta sede");
+    if (solicitud.estado !== "SOLICITADA") {
+      return res.status(409).send("Solo se pueden cotizar solicitudes pendientes.");
+    }
 
-    await pool.query(
+    const [actualizacion] = await pool.query(
       `UPDATE solicitudes_llantas
        SET estado = 'COTIZADA',
            cotizado_por = ?,
            fecha_cotizada = NOW()
-       WHERE id = ?`,
+       WHERE id = ? AND estado = 'SOLICITADA'`,
       [req.session.user.id, id]
     );
+    if (!actualizacion.affectedRows) return res.status(409).send("La solicitud cambió de estado. Actualice la página.");
 
     await registrarHistorial(id, solicitud.estado, "COTIZADA", req.session.user.id, "Cotización registrada");
     res.redirect(redirectConFiltros(req));
@@ -783,13 +787,17 @@ router.post("/:id/comprar", allowRoles(...ROLES_COMPRAR), async (req, res) => {
     const { solicitud, error } = await cargarSolicitudAutorizada(req, id);
     if (error === "not_found") return res.status(404).send("Solicitud no encontrada");
     if (error === "forbidden") return res.status(403).send("No autorizado para esta sede");
+    if (!["SOLICITADA", "COTIZADA"].includes(solicitud.estado)) {
+      return res.status(409).send("Solo se pueden comprar solicitudes pendientes o cotizadas.");
+    }
 
-    await pool.query(
+    const [actualizacion] = await pool.query(
       `UPDATE solicitudes_llantas
        SET estado = 'COMPRADA', comprado_por = ?, fecha_comprada = NOW()
-       WHERE id = ?`,
+       WHERE id = ? AND estado IN ('SOLICITADA', 'COTIZADA')`,
       [req.session.user.id, id]
     );
+    if (!actualizacion.affectedRows) return res.status(409).send("La solicitud cambió de estado. Actualice la página.");
 
     await registrarHistorial(id, solicitud.estado, "COMPRADA", req.session.user.id, "Marcada como comprada");
     res.redirect(redirectConFiltros(req));
@@ -806,13 +814,17 @@ router.post("/:id/recibir", allowRoles(...ROLES_RECIBIR), async (req, res) => {
     const { solicitud, error } = await cargarSolicitudAutorizada(req, id);
     if (error === "not_found") return res.status(404).send("Solicitud no encontrada");
     if (error === "forbidden") return res.status(403).send("No autorizado para esta sede");
+    if (solicitud.estado !== "COMPRADA") {
+      return res.status(409).send("Solo se pueden recibir solicitudes marcadas como compradas.");
+    }
 
-    await pool.query(
+    const [actualizacion] = await pool.query(
       `UPDATE solicitudes_llantas
        SET estado = 'RECIBIDA', recibido_por = ?, fecha_recibida = NOW()
-       WHERE id = ?`,
+       WHERE id = ? AND estado = 'COMPRADA'`,
       [req.session.user.id, id]
     );
+    if (!actualizacion.affectedRows) return res.status(409).send("La solicitud cambió de estado. Actualice la página.");
 
     await registrarHistorial(id, solicitud.estado, "RECIBIDA", req.session.user.id, "Llanta recibida en sede");
     res.redirect(redirectConFiltros(req));
