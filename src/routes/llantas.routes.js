@@ -639,10 +639,16 @@ router.post("/solicitar", allowRoles(...ROLES_SOLICITAR), async (req, res) => {
   try {
     await ensureTables();
     const { unidad_id, medida, cantidad, posicion, marca_sugerida, motivo, observaciones } = req.body;
-    if (!unidad_id || !medida || !cantidad) return res.status(400).send("Datos incompletos");
+    const unidadId = Number(unidad_id);
+    const cantidadNormalizada = Number(cantidad);
+    const medidaNormalizada = String(medida || "").trim();
+    if (!Number.isSafeInteger(unidadId) || unidadId < 1 || !medidaNormalizada ||
+        !Number.isSafeInteger(cantidadNormalizada) || cantidadNormalizada < 1) {
+      return res.status(400).send("Indique una unidad, medida y cantidad entera mayor que cero.");
+    }
 
     const sedesPermitidas = await obtenerSedesPermitidas(req);
-    const [[unidad]] = await pool.query("SELECT id, placa, sede FROM unidades WHERE id = ?", [unidad_id]);
+    const [[unidad]] = await pool.query("SELECT id, placa, sede FROM unidades WHERE id = ?", [unidadId]);
     if (!unidad) return res.status(404).send("Unidad no encontrada");
     if (!sedesPermitidas.includes(unidad.sede)) return res.status(403).send("No autorizado para esta sede");
 
@@ -654,8 +660,8 @@ router.post("/solicitar", allowRoles(...ROLES_SOLICITAR), async (req, res) => {
         unidad.id,
         unidad.placa,
         unidad.sede,
-        medida,
-        parseInt(cantidad, 10) || 1,
+        medidaNormalizada,
+        cantidadNormalizada,
         posicion || null,
         marca_sugerida || null,
         motivo || null,
