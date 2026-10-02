@@ -39,14 +39,14 @@ El numero `1.0.0` que aparece en `package.json` identifica la version del paquet
 - [ ] Se verifica en pantalla el recorrido de administrador, supervisor, mecanico, Pesados y bodeguero.
 - [ ] Exportaciones y reportes coinciden con los registros filtrados por sede, fecha y placa.
 - [ ] Se configura y prueba respaldo/restauracion en Railway y Render siguiendo [el runbook](RESPALDO_Y_RESTAURACION.md).
-- [ ] Se ejecutan pruebas automatizadas y una prueba de humo en Render; se identifica el commit activo.
+- [x] Se ejecutan pruebas automatizadas y una prueba de humo en Render; se identifica el commit activo.
 - [ ] El responsable funcional valida los flujos y se publica una nota de version con cambios y limitaciones.
 
 ## Estado de auditoria al 2026-10-02
 
 - El sistema usa Node.js, Express, EJS y MySQL; las rutas se organizan por modulo.
 - `npm test` pasa 122 pruebas automatizadas (0 fallidas) en el estado local revisado.
-- La vista del dashboard se prueba renderizada: ADMIN ve los modulos historicos de Taller al seleccionar Taller y no ve modulos ni indicadores de Taller al seleccionar Operaciones.
+- En Render, con perfil ADMIN, se verifico en pantalla que Taller muestra sus accesos historicos; al cambiar a Operaciones desaparecen los modulos de Taller y `/mantenimientos` deniega el acceso directo. La sesion se dejo nuevamente en Taller.
 - El tablero se prueba para ADMIN, TALLER, Contabilidad, Proveeduría y BODEGUERO; se cruza cada enlace de Taller visible con el middleware para evitar tarjetas que terminen en 403.
 - Los usuarios nuevos con rol `TALLER` reciben solo el departamento Taller por defecto; otros accesos se conceden expresamente desde administración.
 - La asignación de departamentos se prueba por HTTP: solo ADMIN puede cambiarla, los valores invalidos se rechazan y un error de escritura revierte toda la transacción.
@@ -58,9 +58,9 @@ El numero `1.0.0` que aparece en `package.json` identifica la version del paquet
 - Se documento el procedimiento de respaldo y restauracion para la base MySQL en Railway y los archivos del disco persistente de Render; falta configurarlo y probarlo desde las cuentas.
 - El catalogo de Bodega permite editar fichas con auditoria antes/despues sin cambiar existencias; se prueban permisos de BODEGUERO y denegacion de BODEGA.
 - Las entregas rechazan lineas invalidas y una prueba verifica rollback total si una linea no tiene saldo; los ajustes no aceptan conteos no numericos y los precios de catalogo/recepcion se validan en el servidor.
-- La publicacion `6f8a745b97d8947cd1bbe02b019a6f2c6b77e72a` se verifico en Render con `/ready`: `status=ready`, `database=connected` y `schema=ready`.
+- La publicacion `6f8a745b97d8947cd1bbe02b019a6f2c6b77e72a` se verifico en Render con `/ready`: `status=ready`, `database=connected` y `schema=ready`; posteriormente, el commit `4c99d4f` se comprobo en la interfaz de Render para la separacion Taller/Operaciones.
 - La migracion `202610020001_bodega_consumo_confirmacion_completar.sql` recupera esquemas parciales agregando cada columna por separado. Render responde `ready` con las nuevas columnas esenciales de Bodega en el commit `4117c75aae1cbb88b4221523680fff89840c1df7`.
 - El resumen ejecutivo ahora inicia en el mes actual de Costa Rica cuando no se indica un rango, limita las subconsultas de ordenes a ese periodo y comparte calculos concurrentes identicos para reducir picos de memoria; se conservan los filtros de periodos anteriores.
-- Aun falta validar la interfaz real con perfiles de usuario, completar cobertura de flujos criticos, probar respaldo/restauracion y obtener aceptacion funcional antes de declarar liberada la V1.
+- Aun falta validar la interfaz real con perfiles de supervisor, mecanico, Pesados y bodeguero; completar cobertura de flujos criticos, probar respaldo/restauracion y obtener aceptacion funcional antes de declarar liberada la V1.
 
 Este documento es el alcance de trabajo de la V1, no una declaracion de que todos sus criterios ya estan cumplidos.
