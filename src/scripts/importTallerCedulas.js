@@ -133,13 +133,17 @@ async function importar(pathArchivo, aplicar) {
         const account = accounts.get(username);
         if (!account) throw new Error(`No se pudo resolver el perfil ${username}.`);
         await connection.query(`
-          INSERT INTO usuario_cedulas (cedula, usuario_id, persona_nombre, codigo_trabajador, pin_hash, perfil_excel)
-          VALUES (?, ?, ?, NULL, ?, ?)
+          INSERT INTO usuario_cedulas (cedula, usuario_id, persona_nombre, codigo_trabajador, pin_hash, requiere_cambio_pin, perfil_excel)
+          VALUES (?, ?, ?, ?, ?, 1, ?)
           ON DUPLICATE KEY UPDATE persona_nombre = VALUES(persona_nombre),
-            codigo_trabajador = NULL, pin_hash = VALUES(pin_hash), perfil_excel = VALUES(perfil_excel)
-        `, [person.cedula, account.id, person.nombre, pinHash, person.perfil]);
+            codigo_trabajador = VALUES(codigo_trabajador), perfil_excel = VALUES(perfil_excel)
+        `, [person.cedula, account.id, person.nombre, person.codigo, pinHash, person.perfil]);
         associations += 1;
       }
+      await connection.query(
+        "INSERT IGNORE INTO carnets_trabajador (cedula, qr_token) VALUES (?, ?)",
+        [person.cedula, crypto.randomBytes(32).toString("hex")]
+      );
     }
 
     await connection.commit();

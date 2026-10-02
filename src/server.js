@@ -359,16 +359,19 @@ const repuestosSemanalesRoutes = require("./routes/repuestosSemanales.routes");
 const bodegaRoutes = require("./routes/bodega.routes");
 const lavadoUnidadesRoutes = require("./routes/lavadoUnidades.routes");
 const apiRoutes = require("./routes/api.routes");
+const carnetsRoutes = require("./routes/carnets.routes");
 
 // ===================== USAR RUTAS =====================
 app.use("/", authRoutes);
 app.use((req, res, next) => {
-  if (!req.session.user?.requiereCambioPassword) return next();
-  if (["/cambiar-clave", "/logout"].includes(req.path)) return next();
-  return res.redirect("/cambiar-clave");
+  const user = req.session.user;
+  if (!user?.requiereCambioPin && !user?.requiereCambioPassword) return next();
+  if (["/cambiar-pin", "/cambiar-clave", "/logout"].includes(req.path)) return next();
+  return res.redirect(user.requiereCambioPin ? "/cambiar-pin" : "/cambiar-clave");
 });
 app.use("/", sedeRoutes);
 app.use("/", adminRoutes);
+app.use("/", carnetsRoutes);
 app.use("/dashboard", dashboardRoutes);
 app.use("/agenda", agendaRoutes);
 app.use("/mantenimientos", mantenimientosRoutes);

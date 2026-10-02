@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Carnets de trabajadores | Gas Tomza</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    body { background: #f3f6f9; color: #152238; }
+    .page { max-width: 1200px; margin: 28px auto; padding: 0 18px; }
+    .badge-card { width: 340px; min-height: 205px; border: 1px solid #cbd5e1; border-radius: 12px; background: white; overflow: hidden; }
+    .badge-top { background: #12396a; color: white; padding: 9px 14px; font-weight: 700; letter-spacing: .04em; }
+    .badge-content { display: grid; grid-template-columns: 106px 1fr 88px; gap: 10px; align-items: center; padding: 13px; }
+    .worker-photo { width: 100px; height: 126px; object-fit: cover; border-radius: 6px; background: #e8edf3; }
+    .worker-qr { width: 84px; height: 84px; }
+    .worker-name { font-size: 16px; line-height: 1.2; font-weight: 700; overflow-wrap: anywhere; }
+    .worker-code { color: #12396a; font-size: 21px; font-weight: 800; }
+    .worker-profile { color: #64748b; font-size: 12px; }
+    .card-actions { border-top: 1px solid #e5eaf0; padding: 9px 12px; }
+    .worker-item { break-inside: avoid; }
+    @media print {
+      body { background: white; }
+      .page { max-width: none; margin: 0; padding: 0; }
+      .no-print { display: none !important; }
+      .cards { display: grid !important; grid-template-columns: repeat(2, 340px); gap: 10mm; }
+      .badge-card { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <div class="d-flex justify-content-between align-items-center gap-3 flex-wrap mb-4 no-print">
+      <div><h1 class="h3 mb-1">Carnets de trabajadores</h1><p class="text-secondary mb-0"><%= trabajadores.length %> perfiles registrados. Cargue las fotos y luego imprima los carnets.</p></div>
+      <div class="d-flex gap-2"><a href="/dashboard" class="btn btn-outline-secondary">Volver</a><button class="btn btn-primary" onclick="window.print()"><i class="bi bi-printer"></i> Imprimir carnets</button></div>
+    </div>
+    <div class="cards d-flex flex-wrap gap-3">
+      <% trabajadores.forEach(worker => { %>
+        <article class="worker-item">
+          <div class="badge-card">
+            <div class="badge-top">GAS TOMZA · IDENTIFICACIÓN</div>
+            <div class="badge-content">
+              <% if (worker.tiene_foto) { %>
+                <img class="worker-photo" src="/personal/carnet/<%= worker.qr_token %>/foto" alt="Fotografía de <%= worker.nombre %>">
+              <% } else { %>
+                <div class="worker-photo d-flex align-items-center justify-content-center text-secondary fs-1"><i class="bi bi-person-bounding-box"></i></div>
+              <% } %>
+              <div><div class="worker-name"><%= worker.nombre %></div><div class="worker-profile mt-1"><%= worker.perfil || 'Trabajador' %></div><div class="small mt-2">Código de trabajador</div><div class="worker-code"><%= worker.codigo_trabajador || 'Pendiente' %></div></div>
+              <img class="worker-qr" src="<%= worker.qr %>" alt="Código QR del carnet de <%= worker.nombre %>">
+            </div>
+            <div class="px-3 pb-2 small text-secondary">Escanee para verificar el carnet en el sistema</div>
+          </div>
+          <div class="card-actions no-print d-flex align-items-center justify-content-between gap-2">
+            <span class="small photo-status" aria-live="polite"><%= worker.tiene_foto ? 'Foto cargada' : 'Falta fotografía' %></span>
+            <label class="btn btn-sm btn-outline-primary mb-0"><i class="bi bi-camera"></i> <%= worker.tiene_foto ? 'Cambiar foto' : 'Cargar foto' %><input class="photo-input d-none" type="file" accept="image/jpeg,image/png,image/webp" data-token="<%= worker.qr_token %>"></label>
+          </div>
+        </article>
+      <% }) %>
+    </div>
+    <% if (!trabajadores.length) { %><div class="alert alert-info">No hay perfiles de trabajadores para generar.</div><% } %>
+  </main>
+  <script>
+    document.querySelectorAll('.photo-input').forEach(input => input.addEventListener('change', async () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      const item = input.closest('.worker-item');
+      const status = item.querySelector('.photo-status');
+      status.textContent = 'Procesando fotografía…';
+      try {
+        const image = await createBadgeImage(file);
+        const response = await fetch(`/admin/carnets-trabajadores/${input.dataset.token}/foto`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ foto: image })
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || 'No se pudo guardar la fotografía.');
+        status.textContent = 'Foto cargada';
+        window.location.reload();
+      } catch (error) {
+        status.textContent = error.message;
+      } finally {
+        input.value = '';
+      }
+    }));
+    async function createBadgeImage(file) {
+      const bitmap = await createImageBitmap(file);
+      const scale = Math.min(900 / bitmap.width, 1100 / bitmap.height, 1);
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(bitmap.width * scale);
+      canvas.height = Math.round(bitmap.height * scale);
+      canvas.getContext('2d').drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+      bitmap.close();
+      let quality = .86;
+      let data = canvas.toDataURL('image/jpeg', quality);
+      while (data.length > 650000 && quality > .45) {
+        quality -= .1;
+        data = canvas.toDataURL('image/jpeg', quality);
+      }
+      if (data.length > 650000) throw new Error('La imagen es demasiado grande. Elija otra foto.');
+      return data;
+    }
+  </script>
+</body>
+</html>
