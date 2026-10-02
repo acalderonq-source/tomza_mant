@@ -21,7 +21,8 @@ const PERFILES = {
   MECANICO_ALAJUELA: ["mecanico_alajuela"],
   MECANICO_LA_CRUZ: ["mecanico_lacruz"],
   MECANICO_RIO_CLARO: ["mecanico_rio_claro"],
-  MECANICO_PEREZ_ZELEDON: ["mecanico_pz"]
+  MECANICO_PEREZ_ZELEDON: ["mecanico_pz"],
+  PROVEEDURIA_TALLER: ["proveeduria", "taller"]
 };
 
 function normalizarPerfil(value) {

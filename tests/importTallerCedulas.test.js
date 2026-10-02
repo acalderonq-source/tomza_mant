@@ -49,6 +49,10 @@ test("importación reconoce el acceso de Enderezado en ambos perfiles sin duplic
   assert.deepEqual(PERFILES["ENDEREZADO Y PINTURA"], ["mecanico", "pesados"]);
 });
 
+test("Proveeduría Taller conserva su perfil y recibe acceso al perfil general de Taller", async () => {
+  assert.deepEqual(PERFILES.PROVEEDURIA_TALLER, ["proveeduria", "taller"]);
+});
+
 test("importación detiene una cédula duplicada en la planilla", async () => {
   const temp = await archivoTemporal([
     [123, "Persona Uno", "SI", "1-2345-6789", "MECANICO"],
