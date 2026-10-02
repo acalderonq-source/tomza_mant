@@ -142,7 +142,7 @@ async function importar(pathArchivo, aplicar) {
     }
 
     await connection.commit();
-    console.log(JSON.stringify({ modo: "aplicado", personasActivas: people.length, asociaciones, creoNicoya }));
+    console.log(JSON.stringify({ modo: "aplicado", personasActivas: people.length, asociaciones: associations, creoNicoya }));
   } catch (error) {
     await connection.rollback().catch(() => {});
     throw error;
