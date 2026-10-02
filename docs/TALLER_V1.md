@@ -23,7 +23,7 @@ El numero `1.0.0` que aparece en `package.json` identifica la version del paquet
 ## Reglas de negocio y acceso
 
 - Cambiar de departamento no cambia la sede, y cambiar la sede no cambia el departamento.
-- Las rutas del servidor que pertenecen a Taller se bloquean cuando el departamento activo no es Taller, incluso si se intenta entrar por URL directa.
+- Las rutas operativas de Taller se bloquean fuera de Taller, incluso por URL directa. Facturas/asientos y consulta de órdenes se comparten con Contabilidad; compras, bodega y solicitudes autorizadas se comparten con Proveeduría, siempre sujetos al rol del módulo.
 - El administrador conserva los accesos historicos completos de Taller cuando selecciona el area Taller.
 - En Operaciones y en departamentos aun no habilitados no aparecen indicadores ni modulos pertenecientes a Taller.
 - Las restricciones de placa, sede y rol se validan en el servidor; ocultar una tarjeta no constituye un permiso.
@@ -45,8 +45,9 @@ El numero `1.0.0` que aparece en `package.json` identifica la version del paquet
 ## Estado de auditoria al 2026-10-02
 
 - El sistema usa Node.js, Express, EJS y MySQL; las rutas se organizan por modulo.
-- `npm test` pasa 104 pruebas automatizadas (0 fallidas) en el estado local revisado.
+- `npm test` pasa 109 pruebas automatizadas (0 fallidas) en el estado local revisado.
 - La vista del dashboard se prueba renderizada: ADMIN ve los modulos historicos de Taller al seleccionar Taller y no ve modulos ni indicadores de Taller al seleccionar Operaciones.
+- El tablero se prueba para el rol TALLER, Contabilidad y Proveeduría; el middleware permite rutas compartidas autorizadas y bloquea mantenimientos fuera de Taller.
 - Las rutas de Taller tienen pruebas HTTP de bloqueo por departamento; los flujos de aceites, lavado, bodega, unidades, ARESEP y otros procesos tienen pruebas automatizadas parciales.
 - El catalogo de Bodega permite editar fichas con auditoria antes/despues sin cambiar existencias; se prueban permisos de BODEGUERO y denegacion de BODEGA.
 - Las entregas rechazan lineas invalidas sin guardar parcialmente, los ajustes no aceptan conteos no numericos y los precios de catalogo/recepcion se validan en el servidor.

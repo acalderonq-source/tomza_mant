@@ -12,6 +12,9 @@ async function withServer(departamento, run) {
   app.use(controlarAccesoPorDepartamento);
   app.all("/mantenimientos/:id/plan", (_req, res) => res.send("handler ejecutado"));
   app.get("/dashboard", (_req, res) => res.send("dashboard disponible"));
+  app.get("/compras/facturas/asientos", (_req, res) => res.send("asientos disponibles"));
+  app.get("/compras/ordenes", (_req, res) => res.send("órdenes disponibles"));
+  app.get("/bodega/inventario", (_req, res) => res.send("bodega disponible"));
   const server = await new Promise(resolve => {
     const listening = app.listen(0, "127.0.0.1", () => resolve(listening));
   });
@@ -52,5 +55,29 @@ test("las llamadas JSON reciben un 403 estructurado si intentan abrir una ruta d
     assert.equal(response.status, 403);
     assert.equal(response.headers.get("content-type")?.includes("application/json"), true);
     assert.match((await response.json()).error, /pertenece a Taller/);
+  });
+});
+
+test("Contabilidad puede abrir facturas y órdenes, pero no rutas operativas de Taller", async () => {
+  await withServer("CONTABILIDAD", async base => {
+    const asientos = await fetch(`${base}/compras/facturas/asientos`);
+    const ordenes = await fetch(`${base}/compras/ordenes`);
+    const taller = await fetch(`${base}/mantenimientos/25/plan`);
+    assert.equal(asientos.status, 200);
+    assert.equal(await asientos.text(), "asientos disponibles");
+    assert.equal(ordenes.status, 200);
+    assert.equal(taller.status, 403);
+  });
+});
+
+test("Proveeduría puede abrir bodega y compras sin recibir acceso a mantenimientos", async () => {
+  await withServer("PROVEEDURIA", async base => {
+    const bodega = await fetch(`${base}/bodega/inventario`);
+    const ordenes = await fetch(`${base}/compras/ordenes`);
+    const taller = await fetch(`${base}/mantenimientos/25/plan`);
+    assert.equal(bodega.status, 200);
+    assert.equal(await bodega.text(), "bodega disponible");
+    assert.equal(ordenes.status, 200);
+    assert.equal(taller.status, 403);
   });
 });

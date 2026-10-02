@@ -37,12 +37,35 @@ const RUTAS_TALLER = [
   "/api/unidades"
 ];
 
+const RUTAS_COMPARTIDAS_POR_DEPARTAMENTO = {
+  CONTABILIDAD: ["/compras/facturas", "/compras/ordenes"],
+  PROVEEDURIA: [
+    "/compras/facturas",
+    "/compras/ordenes",
+    "/compras/proveedores",
+    "/compras/dashboard",
+    "/compras/cotizacion",
+    "/bodega",
+    "/repuestos-semanales",
+    "/repuestos",
+    "/aceite"
+  ]
+};
+
+function coincideRuta(pathname, prefijos) {
+  return prefijos.some(ruta => pathname === ruta || pathname.startsWith(`${ruta}/`));
+}
+
 function rutaPerteneceATaller(pathname) {
-  return RUTAS_TALLER.some(ruta => pathname === ruta || pathname.startsWith(`${ruta}/`));
+  return coincideRuta(pathname, RUTAS_TALLER);
 }
 
 function puedeAbrirRutaPorDepartamento(departamento, pathname) {
-  return !rutaPerteneceATaller(pathname) || String(departamento || "TALLER").toUpperCase() === "TALLER";
+  if (!rutaPerteneceATaller(pathname)) return true;
+
+  const area = String(departamento || "TALLER").toUpperCase();
+  if (area === "TALLER") return true;
+  return coincideRuta(pathname, RUTAS_COMPARTIDAS_POR_DEPARTAMENTO[area] || []);
 }
 
 function controlarAccesoPorDepartamento(req, res, next) {

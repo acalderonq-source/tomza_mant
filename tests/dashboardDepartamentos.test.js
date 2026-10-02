@@ -84,3 +84,20 @@ test("el dashboard de Operaciones no mezcla modulos ni indicadores de Taller", a
   assert.ok(!html.includes("Módulos"));
   assert.ok(!html.includes("Mantenimientos de hoy"));
 });
+
+test("Contabilidad ve facturas y asientos sin ver módulos operativos de Taller", async () => {
+  const html = await renderDashboard("CONTABILIDAD", "CONTABILIDAD", "contabilidad");
+  assert.ok(html.includes('href="/compras/facturas"'));
+  assert.ok(html.includes('href="/compras/facturas/asientos"'));
+  assert.ok(!html.includes('href="/mantenimientos"'));
+  assert.ok(!html.includes('href="/unidades"'));
+});
+
+test("Proveeduría ve compras y bodega con sus módulos visibles", async () => {
+  const html = await renderDashboard("PROVEEDURIA", "PROVEEDURIA_TALLER", "proveeduria");
+  for (const href of ["/compras/ordenes", "/compras/facturas", "/bodega", "/repuestos-semanales", "/repuestos"]) {
+    assert.ok(html.includes(`href="${href}"`), `Falta el acceso autorizado ${href} en Proveeduría`);
+  }
+  assert.ok(!html.includes('href="/mantenimientos"'));
+  assert.ok(!html.includes('href="/unidades"'));
+});

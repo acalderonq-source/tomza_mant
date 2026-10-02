@@ -475,7 +475,7 @@
     </section>
   <% } %>
 
-  <% if (areaTaller) { %>
+  <% if (areaTaller || areaContabilidad || areaProveeduria) { %>
   <section class="mb-2">
     <h2 class="section-title">Módulos</h2>
     <div class="module-grid">
@@ -650,7 +650,7 @@
           <span class="module-icon icon-red"><i class="bi bi-receipt"></i></span>
           <div><div class="module-title">Facturas</div><p class="module-copy">Pendientes, pagos y reportes.</p></div>
         </a>
-        <% if (user.rol === 'CONTABILIDAD') { %>
+        <% if (['ADMIN', 'CONTABILIDAD'].includes(user.rol) && areaContabilidad) { %>
           <a href="/compras/facturas/asientos" class="module-card">
             <span class="module-icon icon-blue"><i class="bi bi-journal-check"></i></span>
             <div><div class="module-title">Asientos de pasivos</div><p class="module-copy">Seleccionar facturas, generar el Excel y consultar el historial.</p></div>
