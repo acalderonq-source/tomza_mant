@@ -42,12 +42,14 @@ El numero `1.0.0` que aparece en `package.json` identifica la version del paquet
 - [ ] Se ejecutan pruebas automatizadas y una prueba de humo en Render; se identifica el commit activo.
 - [ ] El responsable funcional valida los flujos y se publica una nota de version con cambios y limitaciones.
 
-## Estado inicial de auditoria
+## Estado de auditoria al 2026-10-02
 
 - El sistema usa Node.js, Express, EJS y MySQL; las rutas se organizan por modulo.
-- `npm test` pasa 90 pruebas automatizadas despues de agregar verificaciones de rutas por departamento.
-- Ya existe cobertura para varios procesos de bodega, aceites, llantas, unidades y departamentos.
-- Se identifico una brecha de cobertura: mantenimientos y correctivos no tienen una suite dedicada de pruebas de integracion para los flujos principales y sus permisos.
-- La separacion del dashboard y el bloqueo de rutas por departamento deben confirmarse con una prueba de humo en el commit que se despliegue para esta entrega.
+- `npm test` pasa 104 pruebas automatizadas (0 fallidas) en el estado local revisado.
+- La vista del dashboard se prueba renderizada: ADMIN ve los modulos historicos de Taller al seleccionar Taller y no ve modulos ni indicadores de Taller al seleccionar Operaciones.
+- Las rutas de Taller tienen pruebas HTTP de bloqueo por departamento; los flujos de aceites, lavado, bodega, unidades, ARESEP y otros procesos tienen pruebas automatizadas parciales.
+- Render responde `/ready` con base de datos conectada y el commit `3ba4fdb310d8f85844e313b7b76322702bcaf9a0`.
+- La migracion `202610020001_bodega_consumo_confirmacion_completar.sql` recupera esquemas parciales agregando cada columna por separado. El entorno local usa una base distinta de Render; por eso la verificacion directa del esquema productivo queda pendiente.
+- Aun falta validar la interfaz real con perfiles de usuario, completar cobertura de flujos criticos, probar respaldo/restauracion y obtener aceptacion funcional antes de declarar liberada la V1.
 
 Este documento es el alcance de trabajo de la V1, no una declaracion de que todos sus criterios ya estan cumplidos.
