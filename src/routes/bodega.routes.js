@@ -1349,12 +1349,20 @@ router.post("/entregar", async (req, res) => {
       .map((id, index) => ({
         id: Number(id),
         cantidad: numero(cantidades[index]),
-        origen_salida: origenInventario(origenes[index], "")
-      }))
-      .filter(linea => linea.id && linea.cantidad > 0);
+        origen_salida: limpiar(origenes[index]) ? origenInventario(origenes[index], "") : "",
+        origen_salida_invalido: Boolean(limpiar(origenes[index])) && !ORIGENES_INVENTARIO.includes(upper(origenes[index]))
+      }));
 
-    if ((!sinPlaca && !placaSolicitada) || !mecanico || !lineas.length) {
+    const lineasInvalidas = !lineas.length
+      || articuloIds.length !== cantidades.length
+      || (origenes.length > 0 && origenes.length !== articuloIds.length)
+      || lineas.some(linea => !Number.isSafeInteger(linea.id) || linea.id <= 0 || linea.cantidad <= 0 || linea.origen_salida_invalido);
+    if ((!sinPlaca && !placaSolicitada) || !mecanico) {
       req.session.error = "Indique una placa o marque Sin placa; también debe indicar mecánico y al menos un artículo.";
+      return redirectBodega(req, res);
+    }
+    if (lineasInvalidas) {
+      req.session.error = "Revise todos los artículos: cada línea debe tener un producto y una cantidad mayor que cero.";
       return redirectBodega(req, res);
     }
 
