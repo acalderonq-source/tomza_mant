@@ -108,7 +108,7 @@
   <div class="page-heading">
     <div>
       <h1 class="page-title">Registrar mantenimiento</h1>
-      <p class="page-subtitle">Formulario simple para mecánicos. Seleccione si es correctivo o preventivo, marque quién trabajó y escriba qué se hizo.</p>
+      <p class="page-subtitle">Formulario para registrar el trabajo realizado. Su identidad se toma de la sesión; agregue a otros mecánicos solo si también participaron.</p>
     </div>
   </div>
 
@@ -159,7 +159,7 @@
         <div class="col-lg-5">
           <div class="helper-box h-100">
             <div class="fw-bold text-uppercase small text-secondary">Instrucción</div>
-            <div>Marque el mecánico que participó y escriba el trabajo realizado. Puede marcar varios si trabajaron juntos.</div>
+            <div><strong><%= mecanicoSesionNombre %></strong> queda registrado automáticamente. Puede agregar a otros mecánicos si trabajaron juntos.</div>
           </div>
         </div>
         </div>
@@ -184,8 +184,8 @@
           <% mecanicos.forEach(m => { %>
             <article class="mechanic-card">
               <div class="mechanic-head">
-                <input class="form-check-input mec-check" type="checkbox" name="mecanicos[]" value="<%= m.id %>" id="mec_<%= m.id %>">
-                <label class="fw-bold" for="mec_<%= m.id %>"><%= m.nombre %></label>
+                <input class="form-check-input mec-check" type="checkbox" name="mecanicos[]" value="<%= m.id %>" id="mec_<%= m.id %>" <%= String(m.id) === String(mecanicoSesionId || '') ? 'checked' : '' %>>
+                <label class="fw-bold" for="mec_<%= m.id %>"><%= m.nombre %><%= String(m.id) === String(mecanicoSesionId || '') ? ' · usted' : '' %></label>
               </div>
               <div class="row g-3">
                 <div class="col-lg-7">

@@ -244,7 +244,7 @@ test("si falla la asignación de un mecánico, el cierre revierte todos los camb
   assert.equal(tx.released, true);
 });
 
-test("guardar un correctivo mantiene unidad y trabajos en una transacción", async () => {
+test("el correctivo identifica al trabajador de sesión sin pedir seleccionarlo y mantiene la transacción", async () => {
   let fallarDetalle = true;
   const tx = { writes: [], commits: 0, rollbacks: 0, releases: 0 };
   const connection = {
@@ -262,14 +262,14 @@ test("guardar un correctivo mantiene unidad y trabajos en una transacción", asy
     release() { tx.releases += 1; }
   };
 
-  await withServer({ id: 1, usuario: "admin", rol: "ADMIN", sede: "Cartago" }, {
+  await withServer({ id: 1, usuario: "admin", nombre: "Mecánico Uno", rol: "ADMIN", sede: "Cartago" }, {
     query: async (sql) => {
       if (sql.toLowerCase().includes("information_schema")) return [[{ count: 1, total: 1 }]];
       if (sql.includes("UPDATE mantenimientos SET numero_mantenimiento")) return [{ affectedRows: 0 }];
       if (sql.includes("SELECT id, placa, sede FROM unidades WHERE id = ?")) {
         return [[{ id: 20, placa: "C164528", sede: "Cartago" }]];
       }
-      if (sql.includes("SELECT id FROM mecanicos")) return [[{ id: 7 }]];
+      if (sql.includes("SELECT id, nombre FROM mecanicos")) return [[{ id: 7, nombre: "Mecanico Uno" }]];
       return [[]];
     },
     getConnection: async () => connection
@@ -278,13 +278,12 @@ test("guardar un correctivo mantiene unidad y trabajos en una transacción", asy
       unidad_id: "20",
       tipo_mantenimiento: "CORRECTIVO",
       pendiente: "Esperar repuesto",
-      mecanicos: "7",
       "trabajos[7]": "Cambio de filtro",
       "repuestos[7]": "Filtro de aceite"
     };
 
     const fallido = await post(base, "/mantenimientos/correctivos", values);
-    assert.equal(fallido.status, 500);
+    assert.equal(fallido.status, 500, await fallido.clone().text());
     assert.equal(tx.commits, 0);
     assert.equal(tx.rollbacks, 1);
     assert.ok(tx.writes.some(write => write.sql.includes("UPDATE unidades")));

@@ -140,14 +140,8 @@ router.get("/nuevo", async (req, res) => {
       [sedesPermitidas]
     );
 
-    const [mecanicos] = await pool.query(
-      "SELECT nombre FROM mecanicos WHERE activo = 1 AND sede IN (?) ORDER BY nombre",
-      [sedesPermitidas]
-    );
-
     res.render("aires_nuevo", {
       unidades,
-      mecanicos,
       hoy: fechaActualCostaRica(),
       user: req.session.user
     });
@@ -170,13 +164,12 @@ router.post("/", async (req, res) => {
       unidad_id,
       tipo_trabajo,
       fecha,
-      realizado_por,
       proximo_mantenimiento,
       observaciones
     } = req.body;
 
     const tipoNormalizado = normalizarTipoTrabajo(tipo_trabajo);
-    const responsable = String(realizado_por || "").trim();
+    const responsable = String(req.session.user.nombre || req.session.user.usuario || "").trim();
 
     if (!unidad_id) return res.status(400).send("Debe seleccionar una unidad.");
     if (!tipoNormalizado) return res.status(400).send("Debe seleccionar el tipo de trabajo.");

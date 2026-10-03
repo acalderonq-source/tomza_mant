@@ -60,9 +60,9 @@
             <% mecanicosDisponibles.forEach(m => { %>
               <tr>
                 <td class="text-center" data-label="Seleccionar">
-                  <input type="checkbox" class="form-check-input" name="mecanicos[]" value="<%= m.id %>">
+                  <input type="checkbox" class="form-check-input" name="mecanicos[]" value="<%= m.id %>" <%= String(m.id) === String(mecanicoSesionId || '') ? 'checked' : '' %>>
                 </td>
-                <td data-label="Mecánico"><strong><%= m.nombre %></strong></td>
+                <td data-label="Mecánico"><strong><%= m.nombre %><%= String(m.id) === String(mecanicoSesionId || '') ? ' · usted' : '' %></strong></td>
                 <td data-label="Trabajo adicional">
                   <textarea name="trabajos[<%= m.id %>]" class="form-control" rows="2" placeholder="Ej: Ajuste de frenos..."></textarea>
                 </td>

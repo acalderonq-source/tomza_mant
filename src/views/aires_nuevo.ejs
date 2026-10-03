@@ -155,13 +155,9 @@
 
       <div class="row g-3 mt-1">
         <div class="col-12 col-md-6">
-          <label class="form-label">Quién lo hizo</label>
-          <input list="mecanicosAire" name="realizado_por" class="form-control" placeholder="Nombre del mecánico o proveedor" required>
-          <datalist id="mecanicosAire">
-            <% mecanicos.forEach(m => { %>
-              <option value="<%= m.nombre %>"></option>
-            <% }) %>
-          </datalist>
+          <label class="form-label">Registrado por</label>
+          <input class="form-control" value="<%= user.nombre || user.usuario %>" readonly>
+          <div class="form-text">Se toma automáticamente del trabajador que inició sesión.</div>
         </div>
         <div class="col-12 col-md-6">
           <label class="form-label">Próximo mantenimiento</label>

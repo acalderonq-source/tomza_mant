@@ -673,6 +673,21 @@ function obtenerValoresSeleccionados(body) {
   return [String(seleccion)];
 }
 
+function normalizarNombreMecanico(nombre) {
+  return String(nombre || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+function encontrarMecanicoSesion(mecanicos, user) {
+  const nombreSesion = normalizarNombreMecanico(user?.nombre || user?.persona_nombre);
+  if (!nombreSesion) return null;
+  return mecanicos.find(m => normalizarNombreMecanico(m.nombre) === nombreSesion) || null;
+}
+
 function obtenerValorCampoMecanico(body, nombreCampo, idMecanico, indiceOrdenado = -1) {
   const id = String(idMecanico);
   const planoPorId = body[`${nombreCampo}[${id}]`];
@@ -1073,12 +1088,15 @@ router.get("/correctivos/nuevo", requireAuth, async (req, res) => {
     );
     const { sql: sqlMecanicos, params: paramsMecanicos } = obtenerFiltroMecanicosPorSede(sedeFiltro, false, req.session.user, sedesFormulario);
     const [mecanicos] = await pool.query(sqlMecanicos, paramsMecanicos);
+    const mecanicoSesion = encontrarMecanicoSesion(mecanicos, req.session.user);
     const sedeTrabajoSinPlaca = String(
       sedeFiltro || req.session.user.sede || sedesFormulario[0] || "Taller"
     ).trim();
     res.render("correctivos_nuevo", {
       unidades,
       mecanicos,
+      mecanicoSesionId: mecanicoSesion?.id || null,
+      mecanicoSesionNombre: mecanicoSesion?.nombre || req.session.user.nombre,
       reporteAtendido,
       tipoDefault: normalizarTipoMantenimiento(reporteAtendido?.tipo_mantenimiento),
       sedeTrabajoSinPlaca,
@@ -1113,7 +1131,6 @@ router.post("/correctivos", requireAuth, async (req, res) => {
     );
     const observacionSinPlaca = String(req.body.observacion_sin_placa || "").trim();
     const mecanicosArray = obtenerValoresSeleccionados(req.body);
-    if (mecanicosArray.length === 0) return res.status(400).send("Debe seleccionar al menos un mecánico.");
 
     const sedeFiltro = obtenerSedeFiltro(req);
     const sedesPermitidasCorrectivo = obtenerSedesFiltroUsuario(req, sedeFiltro);
@@ -1139,11 +1156,16 @@ router.post("/correctivos", requireAuth, async (req, res) => {
 
       const filtroMecanicos = obtenerFiltroMecanicosPorSede(
         sedeSinPlaca,
-        true,
+        false,
         req.session.user,
         sedesPermitidasCorrectivo
       );
       const [mecanicosPermitidos] = await pool.query(filtroMecanicos.sql, filtroMecanicos.params);
+      const mecanicoSesion = encontrarMecanicoSesion(mecanicosPermitidos, req.session.user);
+      if (mecanicoSesion && !mecanicosArray.includes(String(mecanicoSesion.id))) {
+        mecanicosArray.push(String(mecanicoSesion.id));
+      }
+      if (mecanicosArray.length === 0) return res.status(400).send("Debe seleccionar al menos un mecánico.");
       const idsPermitidos = mecanicosPermitidos.map(mecanico => String(mecanico.id));
       if (mecanicosArray.some(id => !idsPermitidos.includes(String(id)))) {
         return res.status(403).send("Mecánico no autorizado para este usuario.");
@@ -1195,8 +1217,13 @@ router.post("/correctivos", requireAuth, async (req, res) => {
       return res.status(403).send("Unidad no autorizada para este usuario.");
     }
     const sedeCorrectivo = sedeFiltro || unidadCorrectivo.sede;
-    const { sql: sqlMecanicos, params: paramsMecanicos } = obtenerFiltroMecanicosPorSede(sedeCorrectivo, true, req.session.user, sedesPermitidasCorrectivo);
+    const { sql: sqlMecanicos, params: paramsMecanicos } = obtenerFiltroMecanicosPorSede(sedeCorrectivo, false, req.session.user, sedesPermitidasCorrectivo);
     const [todosMecanicos] = await pool.query(sqlMecanicos, paramsMecanicos);
+    const mecanicoSesion = encontrarMecanicoSesion(todosMecanicos, req.session.user);
+    if (mecanicoSesion && !mecanicosArray.includes(String(mecanicoSesion.id))) {
+      mecanicosArray.push(String(mecanicoSesion.id));
+    }
+    if (mecanicosArray.length === 0) return res.status(400).send("Debe seleccionar al menos un mecánico.");
     const idsOrdenados = todosMecanicos.map(m => String(m.id));
     const mecanicoNoAutorizado = mecanicosArray.some(idMec => !idsOrdenados.includes(String(idMec)));
     if (mecanicoNoAutorizado) return res.status(403).send("Mecánico no autorizado para este usuario.");
@@ -1385,7 +1412,13 @@ router.get("/correctivos/:id/agregar", requireAuth, async (req, res) => {
     }
     const { sql: sqlMecanicos, params: paramsMecanicos } = obtenerFiltroMecanicosPorSede(sedeFiltro, false, req.session.user, sedesPermitidas);
     const [mecanicosDisponibles] = await pool.query(sqlMecanicos, paramsMecanicos);
-    res.render("correctivos_agregar", { correctivo, mecanicosDisponibles, user: req.session.user });
+    const mecanicoSesion = encontrarMecanicoSesion(mecanicosDisponibles, req.session.user);
+    res.render("correctivos_agregar", {
+      correctivo,
+      mecanicosDisponibles,
+      mecanicoSesionId: mecanicoSesion?.id || null,
+      user: req.session.user
+    });
   } catch (error) {
     console.error("❌ Error al cargar formulario de agregado:", error);
     res.status(500).send("Error interno");
@@ -1395,7 +1428,7 @@ router.get("/correctivos/:id/agregar", requireAuth, async (req, res) => {
 router.post("/correctivos/:id/agregar", requireAuth, async (req, res) => {
   try {
     const correctivoId = req.params.id;
-    const { mecanicos, trabajos, repuestos } = req.body;
+    const { trabajos, repuestos } = req.body;
     const [[correctivo]] = await pool.query(
       `SELECT c.id, u.placa, COALESCE(c.sede, u.sede) AS sede
        FROM correctivos c
@@ -1410,14 +1443,15 @@ router.post("/correctivos/:id/agregar", requireAuth, async (req, res) => {
       return res.status(403).send("No autorizado para esta sede.");
     }
 
-    let mecanicosArray = [];
-    if (mecanicos) {
-      mecanicosArray = Array.isArray(mecanicos) ? mecanicos.filter(Boolean) : [mecanicos];
+    const mecanicosArray = obtenerValoresSeleccionados(req.body);
+    const sedeFiltro = sedeSesion || correctivo.sede;
+    const { sql: sqlMecanicos, params: paramsMecanicos } = obtenerFiltroMecanicosPorSede(sedeFiltro, false, req.session.user, sedesPermitidas);
+    const [mecanicosPermitidos] = await pool.query(sqlMecanicos, paramsMecanicos);
+    const mecanicoSesion = encontrarMecanicoSesion(mecanicosPermitidos, req.session.user);
+    if (mecanicoSesion && !mecanicosArray.includes(String(mecanicoSesion.id))) {
+      mecanicosArray.push(String(mecanicoSesion.id));
     }
     if (mecanicosArray.length === 0) return res.status(400).send("Debe seleccionar al menos un mecánico.");
-    const sedeFiltro = sedeSesion || correctivo.sede;
-    const { sql: sqlMecanicos, params: paramsMecanicos } = obtenerFiltroMecanicosPorSede(sedeFiltro, true, req.session.user, sedesPermitidas);
-    const [mecanicosPermitidos] = await pool.query(sqlMecanicos, paramsMecanicos);
     const idsPermitidos = mecanicosPermitidos.map(m => String(m.id));
     const mecanicoNoAutorizado = mecanicosArray.some(idMec => !idsPermitidos.includes(String(idMec)));
     if (mecanicoNoAutorizado) return res.status(403).send("Mecánico no autorizado para este usuario.");
