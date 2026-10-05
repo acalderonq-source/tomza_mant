@@ -278,6 +278,7 @@
 <%
   const lista = Array.isArray(solicitudes) ? solicitudes : [];
   const puedeEditar = Boolean(puedeGestionar);
+  const puedeCrear = Boolean(puedeCrearSolicitud);
   const puedeMarcarEntrega = Boolean(puedeEntregar);
   const usuarioMensajero = Boolean(esMensajero);
   const unidadesLista = Array.isArray(unidades) ? unidades : [];
@@ -307,7 +308,7 @@
       </div>
       <div class="d-flex gap-2 align-items-center flex-wrap">
         <span class="badge text-bg-light text-dark"><%= lista.length %> registros visibles</span>
-        <% if (puedeEditar) { %>
+        <% if (puedeCrear) { %>
           <button type="button" class="btn btn-warning btn-sm rounded-pill fw-bold px-3" data-bs-toggle="modal" data-bs-target="#agregarRepuestoModal">
             <i class="bi bi-plus-circle"></i> Agregar solicitud
           </button>
@@ -332,6 +333,8 @@
 
   <% if (usuarioMensajero) { %>
     <div class="alert alert-info">Su usuario puede ver repuestos, marcar quién sale con el repuesto y luego confirmar cuando ya llegó.</div>
+  <% } else if (!puedeEditar && puedeCrear) { %>
+    <div class="alert alert-info">Puede ingresar solicitudes para su sede. Proveeduría o Administración gestionan proveedor, estado y cierre.</div>
   <% } else if (!puedeEditar) { %>
     <div class="alert alert-info">Su usuario puede ver las solicitudes de repuestos, pero solo ADMIN y PROVEEDURIA pueden agregar o actualizar.</div>
   <% } %>
@@ -496,7 +499,7 @@
   </section>
 </main>
 
-<% if (puedeEditar) { %>
+<% if (puedeCrear) { %>
   <div class="modal fade" id="agregarRepuestoModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
       <div class="modal-content">
@@ -529,7 +532,7 @@
               </div>
               <div>
                 <label class="form-label mb-1">Solicitado por</label>
-                <input type="text" name="solicitado_por" class="form-control" value="<%= user.usuario %>" required>
+                <input type="text" class="form-control" value="<%= user.nombre || user.usuario %>" readonly>
               </div>
               <div class="grid-span">
                 <label class="form-label mb-1">Repuesto solicitado</label>
@@ -547,6 +550,7 @@
                   <% }) %>
                 </select>
               </div>
+              <% if (puedeEditar) { %>
               <div>
                 <label class="form-label mb-1">Estado</label>
                 <select name="estado" class="form-select">
@@ -564,6 +568,7 @@
                   <% }) %>
                 </select>
               </div>
+              <% } %>
             </div>
           </div>
           <div class="modal-footer">

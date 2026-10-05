@@ -64,6 +64,32 @@ function requireGestionRepuestos(req, res, next) {
   next();
 }
 
+async function puedeCrearSolicitudRepuesto(user) {
+  if (ROLES_GESTION_REPUESTOS.includes(user?.rol)) return true;
+  if (user?.rol !== "TALLER") return false;
+
+  let perfilExcel = user.perfilExcel;
+  if (!perfilExcel && user.cedula) {
+    const [[mapping]] = await pool.query(
+      "SELECT perfil_excel FROM usuario_cedulas WHERE usuario_id = ? AND cedula = ? LIMIT 1",
+      [user.id, user.cedula]
+    );
+    perfilExcel = mapping?.perfil_excel;
+  }
+
+  return String(perfilExcel || "").trim().toUpperCase() === "ASISTENTE TALLER";
+}
+
+async function requireCrearSolicitudRepuesto(req, res, next) {
+  try {
+    if (!await puedeCrearSolicitudRepuesto(req.session.user)) return res.status(403).send("No autorizado");
+    next();
+  } catch (error) {
+    console.error("Error validando permiso para solicitar repuestos:", error.code || error.message);
+    res.status(500).send("No se pudo validar el permiso para crear la solicitud.");
+  }
+}
+
 function fechaCostaRica(date = new Date()) {
   return new Intl.DateTimeFormat("en-CA", {
     timeZone: "America/Costa_Rica",
@@ -207,6 +233,7 @@ router.get("/", async (req, res) => {
       prioridades: PRIORIDADES_REPUESTOS,
       mensajerosRepuestos: MENSAJEROS_REPUESTOS,
       puedeGestionar: ROLES_GESTION_REPUESTOS.includes(req.session.user.rol),
+      puedeCrearSolicitud: await puedeCrearSolicitudRepuesto(req.session.user),
       puedeEntregar: esMensajeroRepuestos(req.session.user) || ROLES_GESTION_REPUESTOS.includes(req.session.user.rol),
       esMensajero: esMensajeroRepuestos(req.session.user),
       fechaHoy: fechaCostaRica(),
@@ -310,19 +337,22 @@ router.post("/:id/salida", async (req, res) => {
   }
 });
 
-router.post("/", requireGestionRepuestos, async (req, res) => {
+router.post("/", requireCrearSolicitudRepuesto, async (req, res) => {
   try {
     await ensureRepuestosSolicitudesTable(pool);
 
     const sedes = await sedesDisponibles(req);
     const fecha = req.body.fecha_solicitud || fechaCostaRica();
     const placa = normalizarPlaca(req.body.placa);
-    const solicitadoPor = String(req.body.solicitado_por || req.session.user.usuario || "").trim();
+    const solicitadoPor = String(req.session.user.nombre || req.session.user.usuario || "").trim();
     const repuesto = String(req.body.repuesto_solicitado || "").trim();
     const cantidad = Number(req.body.cantidad || 1);
+    const puedeGestionar = ROLES_GESTION_REPUESTOS.includes(req.session.user.rol);
     const prioridad = normalizarPrioridad(req.body.prioridad);
-    const estado = normalizarEstado(req.body.estado);
-    const proveedorSeleccionado = await obtenerProveedorSeleccionado(req.body.proveedor_id);
+    const estado = puedeGestionar ? normalizarEstado(req.body.estado) : "PENDIENTE_COMPRAR";
+    const proveedorSeleccionado = puedeGestionar
+      ? await obtenerProveedorSeleccionado(req.body.proveedor_id)
+      : { id: null, nombre: null };
 
     if (!fecha || !placa || !solicitadoPor || !repuesto || !Number.isFinite(cantidad) || cantidad <= 0) {
       req.session.error = "Complete fecha, placa, solicitado por, repuesto y cantidad.";

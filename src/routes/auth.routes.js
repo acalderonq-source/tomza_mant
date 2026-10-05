@@ -146,7 +146,7 @@ router.post("/login/perfil", async (req, res) => {
 
   try {
     const [[user]] = await pool.query(`
-      SELECT u.*, uc.cedula AS cedula_persona, uc.persona_nombre
+      SELECT u.*, uc.cedula AS cedula_persona, uc.persona_nombre, uc.perfil_excel
       FROM usuarios u
       LEFT JOIN usuario_cedulas uc ON uc.usuario_id = u.id AND uc.cedula = ?
       WHERE u.id = ?
@@ -213,6 +213,7 @@ async function iniciarSesion(req, res, user, departamento, nextUrl) {
       nombre: user.persona_nombre || user.nombre || user.usuario,
       usuario: user.usuario,
       cedula: user.cedula_persona || user.cedula || null,
+      perfilExcel: user.perfil_excel || null,
       rol: user.rol,
       sede: user.sede,
       requiereCambioPassword: Boolean(user.requiere_cambio_password),
