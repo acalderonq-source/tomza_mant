@@ -56,6 +56,26 @@
         </div>
         <button class="btn btn-login">Entrar</button>
       </form>
+      <% if (departamento === 'TALLER') { %>
+        <div class="my-4 d-flex align-items-center gap-3 text-secondary" aria-hidden="true">
+          <hr class="flex-grow-1 my-0"><span class="small">o</span><hr class="flex-grow-1 my-0">
+        </div>
+        <form method="POST" action="/login" class="d-grid gap-3">
+          <input type="hidden" name="departamento" value="TALLER">
+          <div>
+            <label class="form-label" for="pantalla-usuario">Acceso de pantalla</label>
+            <select class="form-select" id="pantalla-usuario" name="usuario" required>
+              <option value="pantalla_mecanicos">Pantalla de Mecánicos</option>
+              <option value="pantalla_pesados">Pantalla de Pesados</option>
+            </select>
+          </div>
+          <div>
+            <label class="form-label" for="pantalla-clave">Clave de pantalla</label>
+            <input class="form-control" id="pantalla-clave" type="password" name="password" placeholder="Ingrese la clave numérica" inputmode="numeric" pattern="[0-9]*" autocomplete="current-password" required>
+          </div>
+          <button class="btn btn-outline-primary" type="submit">Ingresar a la pantalla</button>
+        </form>
+      <% } %>
       <% if (typeof perfiles !== 'undefined' && perfiles.length) { %>
         <div class="mt-4">
           <p class="mb-2">La cédula tiene acceso a más de un perfil. Seleccione dónde desea ingresar:</p>

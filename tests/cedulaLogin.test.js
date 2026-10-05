@@ -183,3 +183,29 @@ test("el usuario existente sigue ingresando con su nombre de usuario", async () 
     assert.equal(consultas.some(call => call.sql.includes("NOT EXISTS (SELECT 1 FROM usuario_cedulas")), true);
   });
 });
+
+test("las cuentas de pantalla del taller pueden ingresar con su nombre y clave numérica", async () => {
+  const password = await bcrypt.hash("1414", 4);
+  const user = { id: 90, usuario: "pantalla_mecanicos", nombre: "Pantalla Mecánicos", rol: "PANTALLA_MECANICOS", sede: "Todas", password };
+
+  await withLoginServer(async sql => {
+    if (sql.includes("FROM usuarios u")) return [[user]];
+    if (sql.includes("FROM usuario_departamentos")) return [[{ departamento: "TALLER", es_principal: 1 }]];
+    return [[]];
+  }, async base => {
+    const page = await fetch(`${base}/login?departamento=TALLER`);
+    const html = await page.text();
+    assert.match(html, /Acceso de pantalla/);
+    assert.match(html, /pantalla_mecanicos/);
+    assert.match(html, /pantalla_pesados/);
+
+    const response = await fetch(`${base}/login`, {
+      method: "POST",
+      redirect: "manual",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ usuario: "pantalla_mecanicos", password: "1414", departamento: "TALLER" })
+    });
+    assert.equal(response.status, 302);
+    assert.equal(response.headers.get("location"), "/taller/dashboard");
+  });
+});
