@@ -8,8 +8,12 @@ function restringirCuentaPantalla(req, res, next) {
   if (!esCuentaPantalla(req.session?.user)) return next();
 
   const metodoLectura = req.method === "GET" || req.method === "HEAD";
+  const ruta = String(req.path || "/").replace(/\/+$/, "") || "/";
+  if (metodoLectura && ["/", "/dashboard"].includes(ruta)) {
+    return res.redirect("/taller/dashboard");
+  }
   const rutaPermitida = ["/taller/dashboard", "/taller/eventos-prioridades", "/logout"]
-    .includes(req.path);
+    .includes(ruta);
   if (metodoLectura && rutaPermitida) return next();
 
   return res.status(403).send("Esta cuenta de pantalla solo puede consultar el tablero asignado.");
