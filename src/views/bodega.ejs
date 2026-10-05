@@ -646,9 +646,9 @@
     <% } %>
     <div class="table-responsive">
       <table class="table table-sm table-modern align-middle">
-        <thead><tr><th>Cód. taller</th><th>Cód. proveedor</th><th>Repuesto</th><th>Proveedor consignación</th><th>Stock</th><th>Ubicación</th><th>Estado</th></tr></thead>
+        <thead><tr><th>Cód. taller</th><th>Cód. proveedor</th><th>Repuesto</th><th>Proveedor consignación</th><th>Stock</th><th>Ubicación</th><th>Estado</th><% if (puedeEditarConsignacion) { %><th>Acciones</th><% } %></tr></thead>
         <tbody>
-          <% if (!articulosConsignacion.length) { %><tr><td colspan="7" class="empty-row">No hay artículos de consignación con el filtro actual.</td></tr><% } %>
+          <% if (!articulosConsignacion.length) { %><tr><td colspan="<%= 7 + (puedeEditarConsignacion ? 1 : 0) %>" class="empty-row">No hay artículos de consignación con el filtro actual.</td></tr><% } %>
           <% articulosConsignacion.forEach(a => { const estado = estadoStock(a); %>
             <tr>
               <td><span class="code-badge"><%= a.codigo_taller || '-' %></span></td>
@@ -658,12 +658,42 @@
               <td class="money"><%= fmt(a.stock_actual) %> <%= a.unidad_medida %></td>
               <td><%= a.ubicacion || '-' %></td>
               <td><span class="stock-badge <%= estado.className %>"><%= estado.label %></span></td>
+              <% if (puedeEditarConsignacion) { %>
+                <td><button type="button" class="btn btn-sm btn-outline-primary js-editar-consignacion"
+                  data-bs-toggle="modal" data-bs-target="#editarConsignacionModal"
+                  data-id="<%= a.id %>" data-codigo="<%= a.codigo || '' %>"
+                  data-proveedor-id="<%= a.proveedor_id || '' %>"
+                  data-proveedor-nombre="<%= a.proveedor_nombre || a.proveedor_consignacion || '' %>">
+                  <i class="bi bi-pencil-square me-1"></i>Editar
+                </button></td>
+              <% } %>
             </tr>
           <% }) %>
         </tbody>
       </table>
     </div>
   </section>
+
+  <% if (paginaActual === 'consignacion' && puedeEditarConsignacion) { %>
+    <div class="modal fade" id="editarConsignacionModal" tabindex="-1" aria-labelledby="editarConsignacionTitulo" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <form method="POST" id="editarConsignacionForm">
+            <input type="hidden" name="redirect_to" value="consignacion">
+            <input type="hidden" name="sede" value="<%= sedeBodega || '' %>">
+            <input type="hidden" name="proveedor" value="<%= proveedorConsignacionSeleccionado || '' %>">
+            <div class="modal-header"><h2 class="modal-title fs-5" id="editarConsignacionTitulo">Editar producto de consignación</h2><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button></div>
+            <div class="modal-body d-grid gap-3">
+              <div><label class="form-label" for="consignacion-codigo">Código del proveedor</label><input class="form-control" id="consignacion-codigo" name="codigo" maxlength="80" required></div>
+              <div><label class="form-label" for="consignacion-proveedor">Proveedor</label><select class="form-select" id="consignacion-proveedor" name="proveedor_id" required><option value="">Seleccione un proveedor</option><% proveedores.forEach(p => { %><option value="<%= p.id %>"><%= p.nombre %></option><% }) %></select></div>
+              <div class="form-text">Solo cambiarán el código y el proveedor asociado. La existencia y los movimientos se conservan.</div>
+            </div>
+            <div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button><button class="btn btn-primary"><i class="bi bi-check2-circle me-1"></i>Guardar cambios</button></div>
+          </form>
+        </div>
+      </div>
+    </div>
+  <% } %>
 
   <section class="panel mb-3 <%= mostrar('entregas') ? '' : 'd-none' %>" id="busqueda-compatibilidad">
     <div class="panel-head">
@@ -1622,6 +1652,24 @@
     if (consignmentSupplier) {
       consignmentSupplier.disabled = data.origen !== 'CONSIGNACION';
       consignmentSupplier.placeholder = data.origen === 'CONSIGNACION' ? 'Proveedor registrado en consignación' : 'Solo aplica a artículos consignados';
+    }
+  });
+
+  const editarConsignacionModal = document.getElementById('editarConsignacionModal');
+  editarConsignacionModal?.addEventListener('show.bs.modal', event => {
+    const trigger = event.relatedTarget;
+    if (!trigger) return;
+    const data = trigger.dataset;
+    const form = document.getElementById('editarConsignacionForm');
+    form.action = `/bodega/consignacion/${encodeURIComponent(data.id)}/ficha`;
+    document.getElementById('consignacion-codigo').value = data.codigo || '';
+
+    const proveedor = document.getElementById('consignacion-proveedor');
+    proveedor.value = data.proveedorId || '';
+    if (!proveedor.value && data.proveedorNombre) {
+      const nombre = data.proveedorNombre.trim().toLocaleUpperCase();
+      const opcion = [...proveedor.options].find(item => item.text.trim().toLocaleUpperCase() === nombre);
+      if (opcion) proveedor.value = opcion.value;
     }
   });
 </script>

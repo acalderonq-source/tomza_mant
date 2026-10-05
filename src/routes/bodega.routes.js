@@ -9,6 +9,7 @@ const { TODAS_SEDES } = require("../utils/sedes");
 const ROLES_BODEGA = ["ADMIN", "TALLER", "PROVEEDURIA_TALLER", "BODEGA", "BODEGUERO"];
 const ROLES_AJUSTE = ["ADMIN", "TALLER", "BODEGUERO"];
 const ROLES_CATALOGO = ["ADMIN", "TALLER", "PROVEEDURIA_TALLER", "BODEGUERO"];
+const ROLES_EDITAR_CONSIGNACION = ["ADMIN", "TALLER", "PROVEEDURIA_TALLER"];
 const TIPOS_ARTICULO = ["REPUESTO", "CONSUMIBLE", "HERRAMIENTA", "OTRO"];
 const ORIGENES_INVENTARIO = ["PROPIO", "CONSIGNACION"];
 const PROVEEDOR_CONSIGNACION_DEFAULT = "MAXI REPUESTOS";
@@ -569,6 +570,8 @@ function redirectBodega(req, res) {
   const params = new URLSearchParams();
   if (q) params.set("q", q);
   if (sede) params.set("sede", sede);
+  const proveedor = pagina === "consignacion" ? limpiar(req.body.proveedor || req.query.proveedor) : "";
+  if (proveedor) params.set("proveedor", proveedor);
   res.redirect(`${base}${params.size ? `?${params}` : ""}`);
 }
 
@@ -876,6 +879,7 @@ async function renderBodega(req, res, pagina = "inicio") {
       pagina,
       puedeAjustar: puedeAjustar(req.session.user),
       puedeEditarCatalogo: ROLES_CATALOGO.includes(req.session.user.rol),
+      puedeEditarConsignacion: ROLES_EDITAR_CONSIGNACION.includes(req.session.user.rol),
       success: req.session.success || "",
       error: req.session.error || ""
     });
@@ -1471,6 +1475,76 @@ router.post("/articulos/:id/editar", async (req, res) => {
     await conn.rollback();
     console.error("ERROR editar artículo bodega:", error);
     req.session.error = error.message || "No se pudo actualizar el artículo.";
+  } finally {
+    conn.release();
+  }
+  redirectBodega(req, res);
+});
+
+router.post("/consignacion/:id/ficha", async (req, res) => {
+  if (!requiereRol(ROLES_EDITAR_CONSIGNACION, req, res)) return;
+  const conn = await pool.getConnection();
+  try {
+    await ensureBodegaTables();
+    const articuloId = Number(req.params.id);
+    const codigo = limpiar(req.body.codigo).slice(0, 80);
+    const proveedorId = Number(req.body.proveedor_id);
+    if (!Number.isSafeInteger(articuloId) || articuloId <= 0 || !codigo) {
+      throw new Error("Indique un código de proveedor válido.");
+    }
+    if (!Number.isSafeInteger(proveedorId) || proveedorId <= 0) {
+      throw new Error("Seleccione el proveedor correcto.");
+    }
+
+    await conn.beginTransaction();
+    const [[anterior]] = await conn.query(
+      "SELECT * FROM bodega_articulos WHERE id = ? AND activo = 1 FOR UPDATE",
+      [articuloId]
+    );
+    if (!anterior || anterior.origen_inventario !== "CONSIGNACION") {
+      throw new Error("El artículo ya no pertenece al inventario en consignación.");
+    }
+    const [[proveedor]] = await conn.query(
+      "SELECT id, nombre FROM proveedores WHERE id = ? LIMIT 1",
+      [proveedorId]
+    );
+    if (!proveedor) throw new Error("El proveedor seleccionado no existe.");
+
+    const despues = {
+      codigo,
+      proveedor_id: proveedor.id,
+      proveedor_nombre: proveedor.nombre,
+      proveedor_consignacion: proveedor.nombre
+    };
+    await conn.query(
+      `UPDATE bodega_articulos
+       SET codigo = ?, proveedor_id = ?, proveedor_nombre = ?, proveedor_consignacion = ?
+       WHERE id = ? AND origen_inventario = 'CONSIGNACION'`,
+      [codigo, proveedor.id, proveedor.nombre, proveedor.nombre, articuloId]
+    );
+    await registrarAuditoriaSistema({
+      modulo: "Bodega",
+      tabla: "bodega_articulos",
+      registro_id: articuloId,
+      accion: "EDITAR_CONSIGNACION",
+      resumen: `Código/proveedor de consignación actualizado: ${anterior.codigo_taller || articuloId}`,
+      antes: {
+        codigo: anterior.codigo,
+        proveedor_id: anterior.proveedor_id,
+        proveedor_nombre: anterior.proveedor_nombre,
+        proveedor_consignacion: anterior.proveedor_consignacion
+      },
+      despues,
+      usuario_id: req.session.user.id,
+      usuario_nombre: req.session.user.usuario
+    }, conn, { ensure: false });
+    await conn.commit();
+    req.body.proveedor = proveedor.nombre;
+    req.session.success = "Código y proveedor de consignación actualizados. El inventario no se modificó.";
+  } catch (error) {
+    await conn.rollback().catch(() => {});
+    console.error("ERROR actualizando código/proveedor de consignación:", error);
+    req.session.error = error.message || "No se pudo actualizar el código y proveedor.";
   } finally {
     conn.release();
   }

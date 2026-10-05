@@ -21,6 +21,7 @@ test("Bodega suggests active plates and rejects invented plates before changing 
       return [[{ id: 1, placa: "C164528", sede: "granel_la_cruz", marca: "Hino", modelo: "500" }]];
     }
     if (sql.includes("SELECT DISTINCT TRIM(sede) AS sede")) return [[{ sede: "Cartago" }]];
+    if (sql.includes("SELECT id, nombre FROM proveedores WHERE id = ?")) return [[{ id: Number(params[0]), nombre: "Proveedor actualizado" }]];
     if (sql.includes("FROM unidades") && sql.includes("WHERE REPLACE(UPPER(TRIM(placa))")) {
       return [params[0] === "C164528"
         ? [{ id: 1, placa: "C164528", sede: "granel_la_cruz", marca: "Hino", modelo: "500" }]
@@ -226,6 +227,20 @@ test("Bodega suggests active plates and rejects invented plates before changing 
     assert.match(actualizacionFicha.sql, /proveedor_consignacion/);
     assert.equal(actualizacionFicha.params[15], "MAXI REPUESTOS");
     assert.ok(writes.some((call, index) => index >= writesBeforeEdicion && call.sql.includes("INSERT INTO auditoria_sistema")));
+
+    session.user.rol = "PROVEEDURIA_TALLER";
+    const writesBeforeConsignacion = writes.length;
+    const guardarConsignacion = await post("/bodega/consignacion/1/ficha", {
+      codigo: "MAXI-2026", proveedor_id: "7", redirect_to: "consignacion", proveedor: "MAXI REPUESTOS"
+    });
+    assert.equal(guardarConsignacion.status, 302);
+    assert.equal(guardarConsignacion.headers.get("location"), "/bodega/consignacion?proveedor=Proveedor+actualizado");
+    assert.match(session.success, /Código y proveedor de consignación actualizados/);
+    const actualizacionConsignacion = writes.slice(writesBeforeConsignacion).find(call => call.sql.includes("UPDATE bodega_articulos"));
+    assert.ok(actualizacionConsignacion);
+    assert.deepEqual(actualizacionConsignacion.params, ["MAXI-2026", 7, "Proveedor actualizado", "Proveedor actualizado", 1]);
+    assert.doesNotMatch(actualizacionConsignacion.sql, /stock_actual|cantidad|existencias/);
+    assert.ok(writes.slice(writesBeforeConsignacion).some(call => call.sql.includes("INSERT INTO auditoria_sistema")));
 
     session.user.rol = "BODEGA";
     assert.equal((await post("/bodega/articulos/1/editar", {
