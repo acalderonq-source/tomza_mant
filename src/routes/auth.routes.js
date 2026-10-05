@@ -256,12 +256,14 @@ function getSafeNextUrl(value) {
  * LOGOUT
  */
 router.get("/logout", (req, res) => {
+  const esCuentaPantalla = ["PANTALLA_MECANICOS", "PANTALLA_PESADOS"]
+    .includes(String(req.session?.user?.rol || "").toUpperCase());
   req.session.destroy(err => {
     if (err) {
       console.error("Error cerrando sesión:", err);
       return res.redirect("/dashboard");
     }
-    res.redirect("/");
+    res.redirect(esCuentaPantalla ? "/login?departamento=TALLER" : "/");
   });
 });
 

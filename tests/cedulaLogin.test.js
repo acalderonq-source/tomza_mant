@@ -16,7 +16,7 @@ test("normaliza cédulas escritas con espacios o guiones y valida identificadore
   assert.equal(cedulaValida(""), true);
 });
 
-async function withLoginServer(queryHandler, run) {
+async function withLoginServer(queryHandler, run, initialUser = null) {
   const originalQuery = pool.query;
   pool.query = queryHandler;
 
@@ -26,7 +26,12 @@ async function withLoginServer(queryHandler, run) {
   app.use(express.urlencoded({ extended: true }));
   app.use((req, _res, next) => {
     req.session = {
+      user: initialUser,
       regenerate(callback) {
+        req.session = {};
+        callback(null);
+      },
+      destroy(callback) {
         req.session = {};
         callback(null);
       }
@@ -208,4 +213,12 @@ test("las cuentas de pantalla del taller pueden ingresar con su nombre y clave n
     assert.equal(response.status, 302);
     assert.equal(response.headers.get("location"), "/taller/dashboard");
   });
+});
+
+test("al salir de una cuenta de pantalla vuelve al login de Taller", async () => {
+  await withLoginServer(async () => [[]], async base => {
+    const response = await fetch(`${base}/logout`, { redirect: "manual" });
+    assert.equal(response.status, 302);
+    assert.equal(response.headers.get("location"), "/login?departamento=TALLER");
+  }, { rol: "PANTALLA_MECANICOS" });
 });
