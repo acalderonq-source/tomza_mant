@@ -15,5 +15,5 @@ test("Tomza Pantalla is installable as an Android TV launcher app and opens Tall
   assert.match(manifest, /android:banner="@drawable\/tv_banner"/);
   assert.match(appUrl, /login\?departamento=TALLER&amp;next=%2Ftaller%2Fdashboard/);
   assert.match(dashboard, /href="\/descargas\/TomzaPantalla\.apk\?v=2"/);
-  assert.match(dashboard, /href="\/logout" class="btn btn-outline-light btn-sm"[\s\S]*Cerrar sesión/);
+  assert.match(dashboard, /href="\/logout" class="btn btn-outline-light btn-sm flex-shrink-0"[\s\S]*Cerrar sesión/);
 });
