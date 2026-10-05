@@ -228,7 +228,10 @@ async function iniciarSesion(req, res, user, departamento, nextUrl) {
       }
 
       req.session.user = sessionUser;
-      const destino = user.requiere_cambio_password ? "/cambiar-clave" : nextUrl || "/dashboard";
+      const esCuentaPantalla = ["PANTALLA_MECANICOS", "PANTALLA_PESADOS"].includes(String(user.rol || "").toUpperCase());
+      const destino = esCuentaPantalla
+        ? "/taller/dashboard"
+        : user.requiere_cambio_password ? "/cambiar-clave" : nextUrl || "/dashboard";
       res.redirect(destino);
     });
 }

@@ -85,6 +85,8 @@ function departamentosInicialesPorRol(rol, usuario = "") {
     ADMIN: DEPARTAMENTOS.map(({ key }) => key),
     TALLER: ["TALLER"],
     MECANICO: ["TALLER"],
+    PANTALLA_MECANICOS: ["TALLER"],
+    PANTALLA_PESADOS: ["TALLER"],
     SUPERVISOR: ["OPERACIONES", "TALLER"],
     SUPERVISOR_PESADO: ["OPERACIONES"],
     CONTABILIDAD: ["CONTABILIDAD"],

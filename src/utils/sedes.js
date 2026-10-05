@@ -243,7 +243,7 @@ function unirSedesVisibles(...listas) {
 
 function esUsuarioMecanico(user) {
   const usuario = limpiarSede(user?.usuario).toLowerCase();
-  return user?.rol === "MECANICO" ||
+  return ["MECANICO", "PANTALLA_MECANICOS"].includes(user?.rol) ||
     usuario === "mecanico" ||
     usuario.startsWith("mecanico");
 }
@@ -260,7 +260,7 @@ function sedeGranelDesdeUsuario(user) {
 
 function esUsuarioPesados(user) {
   const usuario = limpiarSede(user?.usuario || user?.nombre).toLowerCase();
-  return user?.rol === "SUPERVISOR_PESADO" ||
+  return ["SUPERVISOR_PESADO", "PANTALLA_PESADOS"].includes(user?.rol) ||
     usuario === "pesados" ||
     usuario.includes("pesado");
 }

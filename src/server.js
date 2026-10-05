@@ -223,6 +223,7 @@ app.use(async (req, _res, next) => {
 });
 
 app.use(controlarAccesoPorDepartamento);
+app.use(require("./utils/usuariosPantalla").restringirCuentaPantalla);
 
 function esUsuarioMecanicoLimitado(user) {
   const usuario = String(user?.usuario || "").trim().toLowerCase();

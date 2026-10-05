@@ -26,9 +26,10 @@ function requireAuth(req, res, next) {
 
 router.use(requireAuth);
 
-const ROLES_VER_TALLER = ["ADMIN", "TALLER", "MECANICO", "SUPERVISOR", "SUPERVISOR_PESADO"];
+const ROLES_VER_TALLER = ["ADMIN", "TALLER", "MECANICO", "SUPERVISOR", "SUPERVISOR_PESADO", "PANTALLA_MECANICOS", "PANTALLA_PESADOS"];
 const ROLES_GESTION_TALLER = ["ADMIN", "TALLER", "MECANICO"];
 const ROLES_PRIORIDADES_TALLER = ["ADMIN", "TALLER", "SUPERVISOR_PESADO"];
+const ROLES_SOLO_PANTALLA = ["PANTALLA_MECANICOS", "PANTALLA_PESADOS"];
 const clientesPrioridadesEnVivo = new Set();
 const SQL_SEDE_TRANSPORTE_EXPR = "UPPER(TRIM(COALESCE(NULLIF(tp.sede, ''), un.sede, '')))";
 const SQL_ES_SEDE_TRANSPORTE = `(${SQL_SEDE_TRANSPORTE_EXPR} IN ('TRANSPORTADORA', 'GRANEL', 'GRANEL_CARTAGO', 'CABEZALES', 'CISTERNAS', 'CARRETAS', 'TANDEM', 'TÁNDEM', 'TAMDEN') OR ${SQL_SEDE_TRANSPORTE_EXPR} LIKE 'GRANEL_%')`;
@@ -84,17 +85,19 @@ function puedeVerTaller(user) {
 }
 
 function puedeGestionarTaller(user) {
-  return ROLES_GESTION_TALLER.includes(user.rol) || esUsuarioMecanico(user);
+  return !ROLES_SOLO_PANTALLA.includes(user.rol) &&
+    (ROLES_GESTION_TALLER.includes(user.rol) || esUsuarioMecanico(user));
 }
 
 function puedeGestionarPrioridades(user) {
-  return ROLES_PRIORIDADES_TALLER.includes(user.rol) || esUsuarioMecanico(user);
+  return !ROLES_SOLO_PANTALLA.includes(user.rol) &&
+    (ROLES_PRIORIDADES_TALLER.includes(user.rol) || esUsuarioMecanico(user));
 }
 
 function esUsuarioPesados(user) {
   const usuario = String(user.usuario || user.nombre || "").trim().toLowerCase();
   return (
-    user.rol === "SUPERVISOR_PESADO" ||
+    ["SUPERVISOR_PESADO", "PANTALLA_PESADOS"].includes(user.rol) ||
     usuario.includes("pesado")
   );
 }
@@ -104,7 +107,7 @@ function esUsuarioMecanico(user) {
   return (
     !esUsuarioPesados(user) &&
     (
-      user.rol === "MECANICO" ||
+      ["MECANICO", "PANTALLA_MECANICOS"].includes(user.rol) ||
       usuario === "mecanico" ||
       usuario.startsWith("mecanico")
     )
