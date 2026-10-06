@@ -2166,6 +2166,16 @@ router.post("/resumen-ejecutivo/presupuesto-taller", requireAuth, async (req, re
   }
 
   try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS taller_presupuestos_mensuales (
+        periodo CHAR(7) NOT NULL,
+        monto DECIMAL(14,2) NOT NULL DEFAULT 0,
+        observacion VARCHAR(255) NULL,
+        actualizado_por INT NULL,
+        actualizado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        PRIMARY KEY (periodo)
+      )
+    `);
     await pool.query(
       `INSERT INTO taller_presupuestos_mensuales (periodo, monto, actualizado_por)
        VALUES (?, ?, ?)
@@ -2175,8 +2185,8 @@ router.post("/resumen-ejecutivo/presupuesto-taller", requireAuth, async (req, re
     resumenEjecutivoCache.clear();
     req.session.success = `Presupuesto de Taller guardado para ${periodo}.`;
   } catch (error) {
-    console.error("ERROR guardando presupuesto de Taller:", error);
-    req.session.error = "No se pudo guardar el presupuesto. Verifique que estén aplicadas las migraciones.";
+    console.error("ERROR guardando presupuesto de Taller:", error.code || error.message);
+    req.session.error = `No se pudo guardar el presupuesto (${error.code || "error de base de datos"}).`;
   }
   res.redirect(redirectResumenEjecutivo(req));
 });
