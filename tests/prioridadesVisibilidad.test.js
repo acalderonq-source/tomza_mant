@@ -100,6 +100,8 @@ test("ADMIN decide la visibilidad y mecanicos no pueden editar ni cerrar una pri
 test("TALLER ve prioridades de todas las sedes aunque esten ocultas para las pantallas operativas", async () => {
   const originalQuery = pool.query;
   let consultaPrioridades = "";
+  const prioridadesInsertadas = [];
+  const prioridadesActualizadas = [];
   const placaOcultaDeOtraSede = {
     id: 71,
     placa: "C179927",
@@ -124,7 +126,14 @@ test("TALLER ve prioridades de todas las sedes aunque esten ocultas para las pan
       consultaPrioridades = sql;
       return [[{ ...placaOcultaDeOtraSede, placa_actual: "C179927", sede_guardada: "Guapiles", observacion_actual: "Prioridad de prueba" }]];
     }
-    if (sql.includes("UPDATE taller_prioridades")) return [{ affectedRows: 1 }];
+    if (sql.includes("INSERT INTO taller_prioridades")) {
+      prioridadesInsertadas.push(params);
+      return [{ insertId: prioridadesInsertadas.length }];
+    }
+    if (sql.includes("UPDATE taller_prioridades")) {
+      prioridadesActualizadas.push(params);
+      return [{ affectedRows: 1 }];
+    }
     if (sql.includes("COUNT(*) AS total")) return [[{ total: 0, en_taller: 0, disponibles: 0 }]];
     return [[]];
   };
@@ -150,16 +159,29 @@ test("TALLER ve prioridades de todas las sedes aunque esten ocultas para las pan
     assert.equal(response.status, 200);
     assert.ok(html.includes("C179927"));
     assert.ok(html.includes("ADMIN + Jefe de Taller"));
+    assert.ok(html.includes("id=\"mostrarOperativosNuevo\""));
+    assert.ok(html.includes("Si no se marca, solo la verán ADMIN y Jefe de Taller."));
     assert.doesNotMatch(consultaPrioridades, /tp\.mostrar_operativos = 1/);
     assert.doesNotMatch(consultaPrioridades, /COALESCE\(NULLIF\(tp\.sede, ''\), un\.sede\)\) IN/);
+
+    const agregar = async mostrarOperativos => fetch(`http://127.0.0.1:${server.address().port}/taller/prioridades`, {
+      method: "POST",
+      redirect: "manual",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ placa: "C179927", observacion: "Nueva prioridad", fecha_prioridad: "2026-10-06", ...(mostrarOperativos ? { mostrar_operativos: "1" } : {}) })
+    });
+    assert.equal((await agregar(false)).status, 302);
+    assert.equal((await agregar(true)).status, 302);
+    assert.deepEqual(prioridadesInsertadas.map(params => params.at(-1)), [0, 1]);
 
     const editar = await fetch(`http://127.0.0.1:${server.address().port}/taller/prioridades/71`, {
       method: "POST",
       redirect: "manual",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({ placa: "C179927", observacion: "Prioridad actualizada", fecha_prioridad: "2026-10-05" })
+      body: new URLSearchParams({ placa: "C179927", observacion: "Prioridad actualizada", fecha_prioridad: "2026-10-05", mostrar_operativos: "1" })
     });
     assert.equal(editar.status, 302);
+    assert.equal(prioridadesActualizadas[0][4], 1);
 
     const atender = await fetch(`http://127.0.0.1:${server.address().port}/taller/prioridades/71/atendida`, {
       method: "POST",

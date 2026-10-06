@@ -482,6 +482,7 @@
   const usuarioDashboard = String(user.usuario || '').trim().toLowerCase();
   const rolDashboard = String(user.rol || '').trim().toUpperCase();
   const esAdminPrioridades = rolDashboard === 'ADMIN';
+  const puedeConfigurarVisibilidadPrioridades = ['ADMIN', 'TALLER'].includes(rolDashboard);
   const esPantallaPesados = usuarioDashboard.includes('pesado') || ['SUPERVISOR_PESADO', 'PANTALLA_PESADOS'].includes(rolDashboard);
   const esPantallaMecanico = !esPantallaPesados && (
     usuarioDashboard === 'mecanico' ||
@@ -855,10 +856,11 @@
               <label class="form-label fw-bold">Observación</label>
               <textarea name="observacion" class="form-control" rows="3" placeholder="Prioridad para el día programado" required></textarea>
             </div>
-            <% if (esAdminPrioridades) { %>
+            <% if (puedeConfigurarVisibilidadPrioridades) { %>
               <div class="form-check mt-3">
                 <input class="form-check-input" type="checkbox" name="mostrar_operativos" value="1" id="mostrarOperativosNuevo">
-                <label class="form-check-label" for="mostrarOperativosNuevo">Mostrar en dashboard de mecánicos y Pesados</label>
+                <label class="form-check-label" for="mostrarOperativosNuevo">Mostrar también en tableros de mecánicos y Pesados</label>
+                <div class="form-text">Si no se marca, solo la verán ADMIN y Jefe de Taller.</div>
               </div>
             <% } %>
           </div>
@@ -907,10 +909,11 @@
                 <label class="form-label fw-bold">Observación</label>
                 <textarea name="observacion" class="form-control" rows="3" required><%= p.observacion %></textarea>
               </div>
-              <% if (esAdminPrioridades) { %>
+              <% if (puedeConfigurarVisibilidadPrioridades) { %>
                 <div class="form-check mt-3">
                   <input class="form-check-input" type="checkbox" name="mostrar_operativos" value="1" id="mostrarOperativos<%= p.id %>" <%= Number(p.mostrar_operativos) ? 'checked' : '' %>>
-                  <label class="form-check-label" for="mostrarOperativos<%= p.id %>">Mostrar en dashboard de mecánicos y Pesados</label>
+                  <label class="form-check-label" for="mostrarOperativos<%= p.id %>">Mostrar también en tableros de mecánicos y Pesados</label>
+                  <div class="form-text">Si no se marca, solo la verán ADMIN y Jefe de Taller.</div>
                 </div>
               <% } %>
             </div>

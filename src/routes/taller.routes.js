@@ -1056,7 +1056,7 @@ router.post("/prioridades", async (req, res) => {
       `INSERT INTO taller_prioridades (placa, sede, fecha_prioridad, observacion, creado_por, mostrar_operativos)
        VALUES (?, ?, ?, ?, ?, ?)`,
       [placa, sedeAsignada, fechaPrioridad, observacion, req.session.user.id,
-        esAdmin ? Number(req.body.mostrar_operativos === "1") : 1]
+        puedeVerTodasPrioridades(req.session.user) ? Number(req.body.mostrar_operativos === "1") : 1]
     );
     notificarPrioridadesEnVivo();
 
@@ -1196,7 +1196,9 @@ router.post("/prioridades/:id", async (req, res) => {
        WHERE id = ?
          AND estado = 'PENDIENTE'`,
       [placa, sedeAsignada, fechaPrioridad, observacion,
-        esAdmin ? Number(req.body.mostrar_operativos === "1") : Number(prioridadActual.mostrar_operativos), id]
+        puedeVerTodasPrioridades(req.session.user)
+          ? Number(req.body.mostrar_operativos === "1")
+          : Number(prioridadActual.mostrar_operativos), id]
     );
 
     req.session[result.affectedRows ? "success" : "error"] = result.affectedRows
