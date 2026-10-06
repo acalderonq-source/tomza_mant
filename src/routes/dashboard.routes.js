@@ -19,6 +19,11 @@ const { ensureNumeroMantenimientoColumn } = require("../utils/mantenimientosNume
 const { ensureTipoMantenimientoColumns, normalizarTipoMantenimiento } = require("../utils/tipoMantenimiento");
 const { construirResumenFinanciero, auditarResumenFinanciero } = require("../utils/resumenFinanciero");
 const { ensurePrioridadesVisibilidad } = require("../utils/prioridadesVisibilidad");
+const {
+  normalizarPeriodoCierre,
+  rangoFechasDesdePeriodo,
+  resolverFiltrosPeriodoResumen
+} = require("../utils/periodoResumenEjecutivo");
 
 const DB_CONNECTION_ERRORS = new Set(["ECONNRESET", "PROTOCOL_CONNECTION_LOST", "ETIMEDOUT", "ENOTFOUND", "ECONNREFUSED"]);
 const RESUMEN_EJECUTIVO_CACHE_MS = Number(process.env.RESUMEN_EJECUTIVO_CACHE_MS || 1000 * 60);
@@ -796,15 +801,10 @@ function armarFiltrosFecha(alias, fechaDesde, fechaHasta, params) {
     params.push(fechaDesde);
   }
   if (fechaHasta) {
-    partes.push(`${alias} <= ?`);
+    partes.push(`${alias} < DATE_ADD(?, INTERVAL 1 DAY)`);
     params.push(fechaHasta);
   }
   return partes;
-}
-
-function normalizarPeriodoCierre(value) {
-  const limpio = String(value || "").trim();
-  return /^\d{4}-\d{2}$/.test(limpio) ? limpio : "";
 }
 
 function periodoCierreDesdeRango(fechaDesde, fechaHasta) {
@@ -819,18 +819,6 @@ function periodoCierreDesdeRango(fechaDesde, fechaHasta) {
   const [year, month] = periodo.split("-").map(Number);
   const ultimoDia = new Date(year, month, 0).getDate();
   return hasta.endsWith(`-${String(ultimoDia).padStart(2, "0")}`) ? periodo : "";
-}
-
-function rangoFechasDesdePeriodo(periodo) {
-  const limpio = normalizarPeriodoCierre(periodo);
-  if (!limpio) return { desde: "", hasta: "" };
-
-  const [year, month] = limpio.split("-").map(Number);
-  const ultimoDia = new Date(year, month, 0).getDate();
-  return {
-    desde: `${limpio}-01`,
-    hasta: `${limpio}-${String(ultimoDia).padStart(2, "0")}`
-  };
 }
 
 function periodoActualCostaRica(fecha = new Date()) {
@@ -1981,14 +1969,13 @@ async function obtenerResumenEjecutivoCached(params) {
 // =========================================================
 
 async function prepararResumenEjecutivoRequest(req) {
-  let fechaDesde = String(req.query.fecha_desde || "").trim();
-  let fechaHasta = String(req.query.fecha_hasta || "").trim();
-  const periodoCierre = normalizarPeriodoCierre(req.query.periodo_cierre);
-  if (!fechaDesde && !fechaHasta && !periodoCierre) {
-    const rangoActual = rangoFechasDesdePeriodo(periodoActualCostaRica());
-    fechaDesde = rangoActual.desde;
-    fechaHasta = rangoActual.hasta;
-  }
+  const filtrosPeriodo = resolverFiltrosPeriodoResumen({
+    fechaDesde: req.query.fecha_desde,
+    fechaHasta: req.query.fecha_hasta,
+    periodoCierre: req.query.periodo_cierre,
+    periodoActual: periodoActualCostaRica()
+  });
+  const { fechaDesde, fechaHasta, periodoCierre } = filtrosPeriodo;
   const contextoSedes = await resolverSedesUsuario(req);
   const resumen = await obtenerResumenEjecutivoCached({
     fechaDesde,
