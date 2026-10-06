@@ -1051,6 +1051,7 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro, pe
       om.fecha,
       om.numero AS po_numero,
       p.nombre AS proveedor,
+      COALESCE(om.pagada, 0) AS pagada,
       COALESCE(om.tipo_mantenimiento, 'CORRECTIVO') AS tipo_mantenimiento,
       u.placa AS placa_registrada,
       UPPER(TRIM(COALESCE(
@@ -1163,6 +1164,25 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro, pe
       WHERE COALESCE(f.pagada, 0) = 1
         ${whereFacturasIndependientesPagadas}
     ) pagadas
+  `, [...facturasPagadasParams, ...facturasIndependientesParams]);
+
+  const facturasPagadasMes = await queryFinanciera(`
+    SELECT periodo, SUM(monto_pagado) AS total
+    FROM (
+      SELECT COALESCE(o.periodo_cierre, DATE_FORMAT(o.fecha_pago, '%Y-%m')) AS periodo,
+        ${montoPagadoFacturaSql("o", "o.total")} AS monto_pagado
+      FROM ordenes_compra o
+      WHERE o.facturada = 1 AND COALESCE(o.pagada, 0) = 1
+        ${whereFacturasOrdenesPagadas}
+      UNION ALL
+      SELECT COALESCE(f.periodo_cierre, DATE_FORMAT(f.fecha_pago, '%Y-%m')) AS periodo,
+        ${montoPagadoFacturaSql("f", "f.monto")} AS monto_pagado
+      FROM facturas f
+      WHERE COALESCE(f.pagada, 0) = 1
+        ${whereFacturasIndependientesPagadas}
+    ) pagos_facturas
+    WHERE periodo IS NOT NULL
+    GROUP BY periodo
   `, [...facturasPagadasParams, ...facturasIndependientesParams]);
 
   const unidadesReferencia = await safeQuery(
@@ -1840,7 +1860,54 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro, pe
   const costoPromedioPorUnidad = unidadesConGasto ? totalGastoConUnidad / unidadesConGasto : 0;
   const costoPromedioPorUnidadFlota = totalUnidadesFlota ? totalGastoConUnidad / totalUnidadesFlota : 0;
   const totalGastoSinUnidad = Math.max(totalGastos - totalGastoConUnidad, 0);
-  const meses = Array.from(porMes.values()).sort((a, b) => String(a.nombre).localeCompare(String(b.nombre), "es"));
+  const mesesMap = new Map(Array.from(porMes.entries()));
+  const pagadosPorMes = new Map();
+  for (const item of gastos) {
+    const pagado = (item.fuente === "ORDEN_MOTOR" && Number(item.pagada || 0) === 1)
+      || item.fuente === "CAJA_CHICA"
+      || (item.fuente === "PAGO_PROVEEDOR" && Number(item.pagada || 0) === 1);
+    if (!pagado) continue;
+    const periodo = item.fuente === "PAGO_PROVEEDOR" && item.periodo_cierre
+      ? item.periodo_cierre
+      : fechaMesKey(item.fecha);
+    pagadosPorMes.set(periodo, Number(pagadosPorMes.get(periodo) || 0) + Number(item.monto || 0));
+  }
+  facturasPagadasMes.forEach(item => {
+    pagadosPorMes.set(item.periodo, Number(pagadosPorMes.get(item.periodo) || 0) + Number(item.total || 0));
+  });
+  const paramsPresupuesto = [];
+  const condicionesPresupuesto = [];
+  if (fechaDesde) {
+    condicionesPresupuesto.push("periodo >= LEFT(?, 7)");
+    paramsPresupuesto.push(fechaDesde);
+  }
+  if (fechaHasta) {
+    condicionesPresupuesto.push("periodo <= LEFT(?, 7)");
+    paramsPresupuesto.push(fechaHasta);
+  }
+  const presupuestosMensuales = await safeQuery(
+    `SELECT periodo, monto FROM taller_presupuestos_mensuales ${condicionesPresupuesto.length ? `WHERE ${condicionesPresupuesto.join(" AND ")}` : ""} ORDER BY periodo`,
+    paramsPresupuesto,
+    []
+  );
+  presupuestosMensuales.forEach(item => {
+    if (!mesesMap.has(item.periodo)) mesesMap.set(item.periodo, { nombre: item.periodo, total: 0, registros: 0 });
+  });
+  const presupuestoPorMes = new Map(presupuestosMensuales.map(item => [item.periodo, Number(item.monto || 0)]));
+  const meses = Array.from(mesesMap.entries())
+    .sort(([a], [b]) => String(a).localeCompare(String(b)))
+    .map(([periodo, item]) => {
+      const presupuesto = Number(presupuestoPorMes.get(periodo) || 0);
+      const gasto = Number(item.total || 0);
+      return {
+        ...item,
+        periodo,
+        gasto,
+        pagado: Number(pagadosPorMes.get(periodo) || 0),
+        presupuesto,
+        saldo: presupuesto - gasto
+      };
+    });
   const familiasMant = ordenarTopConteo(mantPorFamilia, 10);
   const sedesMant = ordenarTopConteo(mantPorSede, 10);
   const placasMant = ordenarTopConteo(mantPorPlaca, 12);
@@ -1904,6 +1971,7 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro, pe
     negociosPorRubro,
     placasPorTipoUnidad,
     meses,
+    presupuestosMensuales,
     tiposMant,
     familiasMant,
     sedesMant,
@@ -2082,6 +2150,35 @@ router.post("/resumen-ejecutivo/reglas", requireAuth, async (req, res) => {
     req.session.error = "No se pudo guardar la regla. Ejecute las migraciones si la tabla no existe.";
     res.redirect(redirectResumenEjecutivo(req));
   }
+});
+
+router.post("/resumen-ejecutivo/presupuesto-taller", requireAuth, async (req, res) => {
+  if (!["ADMIN", "TALLER"].includes(req.session.user?.rol)) {
+    return res.status(403).send("No autorizado");
+  }
+
+  const periodo = String(req.body.periodo || "").trim();
+  const montoRaw = String(req.body.monto || "").replace(/,/g, "").trim();
+  const monto = Number(montoRaw);
+  if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(periodo) || !montoRaw || !Number.isFinite(monto) || monto < 0 || monto > 999999999999) {
+    req.session.error = "Indique un mes válido y un presupuesto igual o mayor que cero.";
+    return res.redirect(redirectResumenEjecutivo(req));
+  }
+
+  try {
+    await pool.query(
+      `INSERT INTO taller_presupuestos_mensuales (periodo, monto, actualizado_por)
+       VALUES (?, ?, ?)
+       ON DUPLICATE KEY UPDATE monto = VALUES(monto), actualizado_por = VALUES(actualizado_por)`,
+      [periodo, monto, req.session.user.id || null]
+    );
+    resumenEjecutivoCache.clear();
+    req.session.success = `Presupuesto de Taller guardado para ${periodo}.`;
+  } catch (error) {
+    console.error("ERROR guardando presupuesto de Taller:", error);
+    req.session.error = "No se pudo guardar el presupuesto. Verifique que estén aplicadas las migraciones.";
+  }
+  res.redirect(redirectResumenEjecutivo(req));
 });
 
 router.post("/resumen-ejecutivo/reglas/:id/desactivar", requireAuth, async (req, res) => {

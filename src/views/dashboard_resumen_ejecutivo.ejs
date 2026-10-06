@@ -2119,24 +2119,44 @@
     </section>
   <% } %>
 
-  <div class="section-label"><span>4. Tendencias y mantenimiento</span></div>
-  <section class="row g-3 mb-4">
-    <div class="col-lg-8">
-      <div class="chart-card">
-        <div class="card-head">
-          <div>
-            <h2 class="card-title"><i class="bi bi-bar-chart-fill me-1"></i>Tendencia mensual</h2>
-            <div class="card-subtitle">Tendencia general del dinero registrado.</div>
-          </div>
-        </div>
-        <div class="chart-body"><canvas id="chartMeses"></canvas></div>
+  <div class="section-label"><span>4. Presupuesto mensual de Taller</span></div>
+  <section class="panel mb-3">
+    <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-3">
+      <div>
+        <h2 class="card-title mb-1">Presupuesto, gasto y pagos</h2>
+        <div class="card-subtitle">El saldo es presupuesto asignado menos gasto registrado. Los pagos se muestran aparte para no duplicar el descuento.</div>
       </div>
+      <% if (['ADMIN', 'TALLER'].includes(user.rol)) { %>
+        <form method="POST" action="/dashboard/resumen-ejecutivo/presupuesto-taller" class="d-flex gap-2 align-items-end flex-wrap">
+          <div>
+            <label class="form-label mb-1" for="presupuestoPeriodo">Mes</label>
+            <input class="form-control form-control-sm" type="month" name="periodo" id="presupuestoPeriodo" value="<%= (filtros.fecha_desde || '').slice(0, 7) %>" required>
+          </div>
+          <div>
+            <label class="form-label mb-1" for="presupuestoMonto">Presupuesto ₡</label>
+            <input class="form-control form-control-sm" type="number" name="monto" id="presupuestoMonto" min="0" step="0.01" value="<%= Number(meses.find(item => item.periodo === (filtros.fecha_desde || '').slice(0, 7))?.presupuesto || 0).toFixed(2) === '0.00' ? '' : Number(meses.find(item => item.periodo === (filtros.fecha_desde || '').slice(0, 7))?.presupuesto || 0).toFixed(2) %>" placeholder="Monto asignado" required>
+          </div>
+          <button class="btn btn-primary btn-sm fw-bold" type="submit">Guardar mes</button>
+        </form>
+      <% } %>
     </div>
-    <div class="col-lg-4">
+    <div class="row g-2 mb-3">
+      <div class="col-md-3"><div class="control-item"><div class="control-label">Presupuesto del periodo</div><div class="control-value" id="tallerBudgetTotal">₡<%= money(meses.reduce((sum, item) => sum + Number(item.presupuesto || 0), 0)) %></div></div></div>
+      <div class="col-md-3"><div class="control-item"><div class="control-label">Gastado</div><div class="control-value" id="tallerBudgetSpent">₡<%= money(meses.reduce((sum, item) => sum + Number(item.gasto || 0), 0)) %></div></div></div>
+      <div class="col-md-3"><div class="control-item"><div class="control-label">Pagado</div><div class="control-value" id="tallerBudgetPaid">₡<%= money(meses.reduce((sum, item) => sum + Number(item.pagado || 0), 0)) %></div></div></div>
+      <div class="col-md-3"><div class="control-item"><div class="control-label">Saldo presupuestario</div><div class="control-value" id="tallerBudgetBalance">₡<%= money(meses.reduce((sum, item) => sum + Number(item.saldo || 0), 0)) %></div></div></div>
+    </div>
+    <div class="chart-body"><canvas id="chartMeses"></canvas></div>
+    <div class="small text-muted mt-2">La asignación corresponde al presupuesto global de Taller. El gasto y los pagos respetan los filtros de sede y fechas seleccionados.</div>
+  </section>
+
+  <div class="section-label"><span>5. Composición del gasto</span></div>
+  <section class="row g-3 mb-4">
+    <div class="col-lg-12">
       <div class="chart-card">
         <div class="card-head">
           <div>
-            <h2 class="card-title"><i class="bi bi-bar-chart-fill me-1"></i>Composición del gasto</h2>
+            <h2 class="card-title"><i class="bi bi-bar-chart-fill me-1"></i>Composición por familia</h2>
             <div class="card-subtitle">Resumen ejecutivo por familia de gasto.</div>
           </div>
         </div>
@@ -3063,6 +3083,7 @@
     const totalCategorias = categorias.reduce((sum, item) => sum + Number(item.total || 0), 0);
     const familiasMant = (data.familiasMant || []).filter(item => !isHiddenCategory(item.nombre));
     const placas = data.placas || [];
+    const meses = data.meses || [];
     const controlOk = Boolean(auditoria.consistenteNegocios && auditoria.consistenteRubros);
     const diferenciaControl = Math.max(
       Math.abs(Number(auditoria.diferenciaNegocios || 0)),
@@ -3080,6 +3101,10 @@
     setText('kpiMantenimientosFoot', `${familiasMant[0]?.nombre || '-'} es la familia más frecuente`);
     setText('kpiPlacaGasto', placas[0]?.nombre || '-');
     setText('kpiPlacaGastoFoot', `${formatMoney(placas[0]?.total || 0)} · ${placas[0]?.sede || '-'}`);
+    setText('tallerBudgetTotal', formatMoney(meses.reduce((sum, item) => sum + Number(item.presupuesto || 0), 0)));
+    setText('tallerBudgetSpent', formatMoney(meses.reduce((sum, item) => sum + Number(item.gasto || 0), 0)));
+    setText('tallerBudgetPaid', formatMoney(meses.reduce((sum, item) => sum + Number(item.pagado || 0), 0)));
+    setText('tallerBudgetBalance', formatMoney(meses.reduce((sum, item) => sum + Number(item.saldo || 0), 0)));
     setText('controlTotalPeriodo', formatMoney(auditoria.totalGastos ?? data.totalGastos ?? 0));
     setText('controlTotalNegocios', formatMoney(auditoria.totalNegocios || 0));
     setText('controlTotalRubros', formatMoney(auditoria.totalRubros || 0));
@@ -3124,20 +3149,42 @@
 
   const renderChartMeses = () => {
     const canvas = document.getElementById('chartMeses');
-    if (!canvas || !mesesData.length) return;
+    if (!canvas) return;
+    const labels = mesesData.map(item => item.periodo || item.nombre);
+    const series = [
+      { label: 'Presupuesto original', key: 'presupuesto', color: '#111827' },
+      { label: 'Saldo', key: 'saldo', color: '#e11d48' },
+      { label: 'Gastado', key: 'gasto', color: '#2563eb' },
+      { label: 'Pagado', key: 'pagado', color: '#059669' }
+    ];
     if (chartMeses) {
-      chartMeses.data.labels = mesesData.map(item => item.nombre);
-      chartMeses.data.datasets[0].data = mesesData.map(item => Number(item.total || 0));
+      chartMeses.data.labels = labels;
+      chartMeses.data.datasets.forEach((dataset, index) => {
+        dataset.data = mesesData.map(item => Number(item[series[index].key] || 0));
+      });
       chartMeses.update();
       return;
     }
     chartMeses = new Chart(canvas, {
-      type: 'bar',
+      type: 'line',
       data: {
-        labels: mesesData.map(item => item.nombre),
-        datasets: [{ label: 'Gasto', data: mesesData.map(item => Number(item.total || 0)), backgroundColor: '#0b3b82', borderRadius: 10 }]
+        labels,
+        datasets: series.map(item => ({
+          label: item.label,
+          data: mesesData.map(month => Number(month[item.key] || 0)),
+          borderColor: item.color,
+          backgroundColor: `${item.color}22`,
+          pointBackgroundColor: item.color,
+          pointRadius: 3,
+          borderWidth: 3,
+          tension: .25,
+          fill: item.key === 'presupuesto' || item.key === 'saldo'
+        }))
       },
-      options: chartOptions
+      options: {
+        ...chartOptions,
+        plugins: { ...chartOptions.plugins, tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}: ${formatMoney(ctx.raw)}` } } }
+      }
     });
   };
 
