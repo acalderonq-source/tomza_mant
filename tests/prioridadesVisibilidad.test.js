@@ -1,6 +1,7 @@
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
 const express = require("express");
+const path = require("node:path");
 const pool = require("../src/db");
 const taller = require("../src/routes/taller.routes");
 const api = require("../src/routes/api.routes");
@@ -90,6 +91,82 @@ test("ADMIN decide la visibilidad y mecanicos no pueden editar ni cerrar una pri
     user = { id: 2, usuario: "mecanico_guapiles", rol: "MECANICO", sede: "Guapiles" };
     assert.equal((await post("/taller/prioridades/5", data)).status, 403);
     assert.equal((await post("/taller/prioridades/5/atendida", {})).status, 403);
+  } finally {
+    pool.query = originalQuery;
+    await new Promise(resolve => server.close(resolve));
+  }
+});
+
+test("TALLER ve prioridades de todas las sedes aunque esten ocultas para las pantallas operativas", async () => {
+  const originalQuery = pool.query;
+  let consultaPrioridades = "";
+  const placaOcultaDeOtraSede = {
+    id: 71,
+    placa: "C179927",
+    sede: "Guapiles",
+    grupo_prioridad: "MECANICO",
+    fecha_prioridad: "2026-10-05",
+    fecha_prioridad_formato: "05/10/2026",
+    dias_pendiente: 2,
+    observacion: "Prioridad de prueba",
+    estado: "PENDIENTE",
+    mostrar_operativos: 0,
+    creado_en: "2026-10-05 10:00:00",
+    creado_por_nombre: "taller"
+  };
+  pool.query = async (sql, params = []) => {
+    if (/information_schema\.COLUMNS/i.test(sql)) return [[{ count: 1, total: 1 }]];
+    if (/CREATE TABLE IF NOT EXISTS/i.test(sql)) return [{}];
+    if (sql.includes("FROM unidades WHERE") && sql.includes("placa")) {
+      return [[{ id: 91, sede: "Guapiles" }]];
+    }
+    if (sql.includes("FROM taller_prioridades tp")) {
+      consultaPrioridades = sql;
+      return [[{ ...placaOcultaDeOtraSede, placa_actual: "C179927", sede_guardada: "Guapiles", observacion_actual: "Prioridad de prueba" }]];
+    }
+    if (sql.includes("UPDATE taller_prioridades")) return [{ affectedRows: 1 }];
+    if (sql.includes("COUNT(*) AS total")) return [[{ total: 0, en_taller: 0, disponibles: 0 }]];
+    return [[]];
+  };
+
+  const app = express();
+  app.set("view engine", "ejs");
+  app.set("views", path.join(__dirname, "../src/views"));
+  app.use(express.urlencoded({ extended: true }));
+  app.use((req, _res, next) => {
+    req.session = {
+      user: { id: 2, usuario: "taller", rol: "TALLER", sede: "Cartago" },
+      sedeSeleccionada: "Cartago"
+    };
+    next();
+  });
+  app.use("/taller", taller);
+  const server = await new Promise(resolve => {
+    const listening = app.listen(0, "127.0.0.1", () => resolve(listening));
+  });
+  try {
+    const response = await fetch(`http://127.0.0.1:${server.address().port}/taller/dashboard`);
+    const html = await response.text();
+    assert.equal(response.status, 200);
+    assert.ok(html.includes("C179927"));
+    assert.doesNotMatch(consultaPrioridades, /tp\.mostrar_operativos = 1/);
+    assert.doesNotMatch(consultaPrioridades, /COALESCE\(NULLIF\(tp\.sede, ''\), un\.sede\)\) IN/);
+
+    const editar = await fetch(`http://127.0.0.1:${server.address().port}/taller/prioridades/71`, {
+      method: "POST",
+      redirect: "manual",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ placa: "C179927", observacion: "Prioridad actualizada", fecha_prioridad: "2026-10-05" })
+    });
+    assert.equal(editar.status, 302);
+
+    const atender = await fetch(`http://127.0.0.1:${server.address().port}/taller/prioridades/71/atendida`, {
+      method: "POST",
+      redirect: "manual",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ fecha_salida: "2026-10-06T10:00" })
+    });
+    assert.equal(atender.status, 302);
   } finally {
     pool.query = originalQuery;
     await new Promise(resolve => server.close(resolve));

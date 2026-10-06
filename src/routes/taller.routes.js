@@ -94,6 +94,10 @@ function puedeGestionarPrioridades(user) {
     (ROLES_PRIORIDADES_TALLER.includes(user.rol) || esUsuarioMecanico(user));
 }
 
+function puedeVerTodasPrioridades(user) {
+  return ["ADMIN", "TALLER"].includes(user?.rol);
+}
+
 function esUsuarioPesados(user) {
   const usuario = String(user.usuario || user.nombre || "").trim().toLowerCase();
   return (
@@ -858,10 +862,11 @@ router.get("/dashboard", async (req, res) => {
         AND COALESCE(tp.fecha_prioridad, DATE(tp.creado_en)) <= ?
     `;
     let prioridadesParams = [fechaPrioridadHoy, fechaPrioridadHoy];
-    if (req.session.user.rol !== "ADMIN") {
+    const accesoGlobalPrioridades = puedeVerTodasPrioridades(req.session.user);
+    if (!accesoGlobalPrioridades) {
       prioridadesSql += " AND tp.mostrar_operativos = 1";
     }
-    if (sedesPermitidas.length > 0 && !esUsuarioPesados(req.session.user) && req.session.user.rol !== "ADMIN") {
+    if (sedesPermitidas.length > 0 && !esUsuarioPesados(req.session.user) && !accesoGlobalPrioridades) {
       prioridadesSql += " AND (UPPER(TRIM(COALESCE(NULLIF(tp.sede, ''), un.sede))) IN (?) OR tp.sede IS NULL OR tp.sede = '')";
       prioridadesParams.push(sedesPermitidas.map(sede => String(sede).trim().toUpperCase()));
     }
@@ -1108,7 +1113,7 @@ router.post("/prioridades/:id", async (req, res) => {
       return res.redirect("/taller/dashboard");
     }
 
-    if (!esAdmin && !Number(prioridadActual.mostrar_operativos)) {
+    if (!puedeVerTodasPrioridades(req.session.user) && !Number(prioridadActual.mostrar_operativos)) {
       return res.status(403).send("No autorizado");
     }
 
@@ -1123,7 +1128,7 @@ router.post("/prioridades/:id", async (req, res) => {
     }
 
     if (
-      !esAdmin && sedesPermitidas.length > 0 &&
+      !puedeVerTodasPrioridades(req.session.user) && sedesPermitidas.length > 0 &&
       prioridadActual.sede &&
       !sedesPermitidas
         .map(sede => String(sede).trim().toUpperCase())
@@ -1171,7 +1176,7 @@ router.post("/prioridades/:id", async (req, res) => {
     }
 
     if (
-      !esAdmin && sedesPermitidas.length > 0 &&
+      !puedeVerTodasPrioridades(req.session.user) && sedesPermitidas.length > 0 &&
       sedeAsignada &&
       !sedesPermitidas
         .map(sede => String(sede).trim().toUpperCase())
@@ -1269,7 +1274,7 @@ router.post("/prioridades/:id/atendida", async (req, res) => {
       return res.redirect("/taller/dashboard");
     }
 
-    if (req.session.user.rol !== "ADMIN" && !Number(prioridadActual.mostrar_operativos)) {
+    if (!puedeVerTodasPrioridades(req.session.user) && !Number(prioridadActual.mostrar_operativos)) {
       return res.status(403).send("No autorizado");
     }
 
@@ -1284,7 +1289,7 @@ router.post("/prioridades/:id/atendida", async (req, res) => {
     }
 
     if (
-      req.session.user.rol !== "ADMIN" && sedesPermitidas.length > 0 &&
+      !puedeVerTodasPrioridades(req.session.user) && sedesPermitidas.length > 0 &&
       prioridadActual.sede &&
       !sedesPermitidas
         .map(sede => String(sede).trim().toUpperCase())
