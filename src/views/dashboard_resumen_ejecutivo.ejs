@@ -1101,6 +1101,28 @@
       margin-top: .2rem;
     }
 
+    .budget-metrics {
+      background: #f8fafc;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      margin-bottom: .85rem;
+      overflow: hidden;
+    }
+
+    .budget-metric { padding: .7rem .85rem; }
+    .budget-metric + .budget-metric { border-left: 1px solid var(--line); }
+    .budget-chart-body { height: 250px; position: relative; }
+    .budget-chart-body canvas { max-height: 250px; }
+
+    @media (max-width: 768px) {
+      .budget-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .budget-metric:nth-child(3) { border-left: 0; border-top: 1px solid var(--line); }
+      .budget-metric:nth-child(4) { border-top: 1px solid var(--line); }
+      .budget-chart-body { height: 220px; }
+    }
+
     .control-ok { color: #166534; }
     .control-warn { color: #991b1b; }
 
@@ -1494,6 +1516,8 @@
     }))
     .filter(tipo => tipo.placas.length);
   const meses = safe(data.meses);
+  const periodoPresupuestoFormulario = (filtros.fecha_desde || '').slice(0, 7) || meses.at(-1)?.periodo || '';
+  const montoPresupuestoFormulario = Number(meses.find(item => item.periodo === periodoPresupuestoFormulario)?.presupuesto || 0);
   const familiasMant = safe(data.familiasMant).filter(item => !contieneCategoriaOculta(item.nombre));
   const sedesMant = safe(data.sedesMant);
   const placasMant = safe(data.placasMant);
@@ -2130,24 +2154,24 @@
         <form method="POST" action="/dashboard/resumen-ejecutivo/presupuesto-taller" class="d-flex gap-2 align-items-end flex-wrap">
           <div>
             <label class="form-label mb-1" for="presupuestoPeriodo">Mes</label>
-            <input class="form-control form-control-sm" type="month" name="periodo" id="presupuestoPeriodo" value="<%= (filtros.fecha_desde || '').slice(0, 7) %>" required>
+            <input class="form-control form-control-sm" type="month" name="periodo" id="presupuestoPeriodo" value="<%= periodoPresupuestoFormulario %>" required>
           </div>
           <div>
             <label class="form-label mb-1" for="presupuestoMonto">Presupuesto ₡</label>
-            <input class="form-control form-control-sm" type="number" name="monto" id="presupuestoMonto" min="0" step="0.01" value="<%= Number(meses.find(item => item.periodo === (filtros.fecha_desde || '').slice(0, 7))?.presupuesto || 0).toFixed(2) === '0.00' ? '' : Number(meses.find(item => item.periodo === (filtros.fecha_desde || '').slice(0, 7))?.presupuesto || 0).toFixed(2) %>" placeholder="Monto asignado" required>
+            <input class="form-control form-control-sm" type="number" name="monto" id="presupuestoMonto" min="0" step="1" value="<%= montoPresupuestoFormulario ? Math.round(montoPresupuestoFormulario) : '' %>" placeholder="Monto asignado" required>
           </div>
           <button class="btn btn-primary btn-sm fw-bold" type="submit">Guardar mes</button>
         </form>
       <% } %>
     </div>
-    <div class="row g-2 mb-3">
-      <div class="col-md-3"><div class="control-item"><div class="control-label">Presupuesto del periodo</div><div class="control-value" id="tallerBudgetTotal">₡<%= money(meses.reduce((sum, item) => sum + Number(item.presupuesto || 0), 0)) %></div></div></div>
-      <div class="col-md-3"><div class="control-item"><div class="control-label">Gastado</div><div class="control-value" id="tallerBudgetSpent">₡<%= money(meses.reduce((sum, item) => sum + Number(item.gasto || 0), 0)) %></div></div></div>
-      <div class="col-md-3"><div class="control-item"><div class="control-label">Pagado</div><div class="control-value" id="tallerBudgetPaid">₡<%= money(meses.reduce((sum, item) => sum + Number(item.pagado || 0), 0)) %></div></div></div>
-      <div class="col-md-3"><div class="control-item"><div class="control-label">Saldo presupuestario</div><div class="control-value" id="tallerBudgetBalance">₡<%= money(meses.reduce((sum, item) => sum + Number(item.saldo || 0), 0)) %></div></div></div>
+    <div class="budget-metrics">
+      <div class="budget-metric"><div class="control-label">Presupuesto · 12 meses</div><div class="control-value" id="tallerBudgetTotal">₡<%= money(meses.reduce((sum, item) => sum + Number(item.presupuesto || 0), 0)) %></div></div>
+      <div class="budget-metric"><div class="control-label">Gastado</div><div class="control-value" id="tallerBudgetSpent">₡<%= money(meses.reduce((sum, item) => sum + Number(item.gasto || 0), 0)) %></div></div>
+      <div class="budget-metric"><div class="control-label">Pagado</div><div class="control-value" id="tallerBudgetPaid">₡<%= money(meses.reduce((sum, item) => sum + Number(item.pagado || 0), 0)) %></div></div>
+      <div class="budget-metric"><div class="control-label">Saldo presupuestario</div><div class="control-value" id="tallerBudgetBalance">₡<%= money(meses.reduce((sum, item) => sum + Number(item.saldo || 0), 0)) %></div></div>
     </div>
-    <div class="chart-body"><canvas id="chartMeses"></canvas></div>
-    <div class="small text-muted mt-2">La asignación corresponde al presupuesto global de Taller. El gasto y los pagos respetan los filtros de sede y fechas seleccionados.</div>
+    <div class="budget-chart-body"><canvas id="chartMeses"></canvas></div>
+    <div class="small text-muted mt-2">Vista global de Taller, independiente de los filtros generales. Se muestran siempre los últimos 12 meses.</div>
   </section>
 
   <div class="section-label"><span>5. Composición del gasto</span></div>

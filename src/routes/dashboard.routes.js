@@ -143,6 +143,97 @@ function montoPagadoFacturaSql(alias, montoColumn) {
   return `CASE WHEN COALESCE(${alias}.monto_pagado_cierre, 0) > 0 THEN COALESCE(${alias}.monto_pagado_cierre, 0) WHEN COALESCE(${alias}.abono_monto, 0) > 0 THEN LEAST(COALESCE(${alias}.abono_monto, 0), ${base}) ELSE ${base} END`;
 }
 
+async function obtenerSeriePresupuestoTaller(fechaHasta) {
+  const periodoFinal = /^\d{4}-\d{2}/.test(String(fechaHasta || ""))
+    ? String(fechaHasta).slice(0, 7)
+    : periodoActualCostaRica();
+  const [anioFinal, mesFinal] = periodoFinal.split("-").map(Number);
+  const periodos = Array.from({ length: 12 }, (_, indice) => {
+    const fecha = new Date(Date.UTC(anioFinal, mesFinal - 1 - 11 + indice, 1));
+    return `${fecha.getUTCFullYear()}-${String(fecha.getUTCMonth() + 1).padStart(2, "0")}`;
+  });
+  const periodoInicio = periodos[0];
+  const desde = `${periodoInicio}-01`;
+  const hasta = new Date(Date.UTC(anioFinal, mesFinal, 0)).toISOString().slice(0, 10);
+  const fechaProveedor = "COALESCE(pp.fecha_pago, pp.fecha_solicitud, DATE(pp.creado_en))";
+
+  const movimientos = await queryFinanciera(`
+    SELECT periodo, SUM(gasto) AS gasto, SUM(pagado) AS pagado
+    FROM (
+      SELECT DATE_FORMAT(o.fecha, '%Y-%m') AS periodo, COALESCE(o.total, 0) AS gasto, 0 AS pagado
+      FROM ordenes_compra o
+      WHERE o.fecha >= ? AND o.fecha <= ?
+      UNION ALL
+      SELECT DATE_FORMAT(om.fecha, '%Y-%m'), COALESCE(om.total, 0), 0
+      FROM ordenes_motor om
+      WHERE om.fecha >= ? AND om.fecha <= ?
+      UNION ALL
+      SELECT COALESCE(om.periodo_cierre, DATE_FORMAT(COALESCE(om.fecha_pago, om.fecha), '%Y-%m')), 0,
+        CASE WHEN COALESCE(om.monto_pagado_cierre, 0) > 0 THEN om.monto_pagado_cierre ELSE COALESCE(om.total, 0) END
+      FROM ordenes_motor om
+      WHERE COALESCE(om.pagada, 0) = 1
+        AND COALESCE(om.periodo_cierre, DATE_FORMAT(COALESCE(om.fecha_pago, om.fecha), '%Y-%m')) BETWEEN ? AND ?
+      UNION ALL
+      SELECT COALESCE(pp.periodo_cierre, DATE_FORMAT(${fechaProveedor}, '%Y-%m')), COALESCE(pp.monto, 0),
+        CASE WHEN COALESCE(pp.pagada, 0) = 1 THEN COALESCE(pp.monto, 0) ELSE 0 END
+      FROM pagos_proveedor pp
+      WHERE COALESCE(pp.periodo_cierre, DATE_FORMAT(${fechaProveedor}, '%Y-%m')) BETWEEN ? AND ?
+      UNION ALL
+      SELECT DATE_FORMAT(cc.fecha, '%Y-%m'), COALESCE(cc.monto, 0), COALESCE(cc.monto, 0)
+      FROM caja_chica_reintegros cc
+      WHERE cc.fecha >= ? AND cc.fecha <= ?
+        AND NOT EXISTS (
+          SELECT 1 FROM caja_chica_cortes corte
+          WHERE corte.reintegro_id = cc.id AND corte.estado = 'REABIERTO'
+        )
+      UNION ALL
+      SELECT COALESCE(o.periodo_cierre, DATE_FORMAT(o.fecha_pago, '%Y-%m')), 0,
+        ${montoPagadoFacturaSql("o", "o.total")}
+      FROM ordenes_compra o
+      WHERE o.facturada = 1 AND COALESCE(o.pagada, 0) = 1
+        AND COALESCE(o.periodo_cierre, DATE_FORMAT(o.fecha_pago, '%Y-%m')) BETWEEN ? AND ?
+      UNION ALL
+      SELECT COALESCE(f.periodo_cierre, DATE_FORMAT(f.fecha_pago, '%Y-%m')), 0,
+        ${montoPagadoFacturaSql("f", "f.monto")}
+      FROM facturas f
+      WHERE COALESCE(f.pagada, 0) = 1
+        AND COALESCE(f.periodo_cierre, DATE_FORMAT(f.fecha_pago, '%Y-%m')) BETWEEN ? AND ?
+    ) movimientos_mes
+    WHERE periodo IS NOT NULL
+    GROUP BY periodo
+  `, [
+    desde, hasta, desde, hasta,
+    periodoInicio, periodoFinal,
+    periodoInicio, periodoFinal,
+    desde, hasta,
+    periodoInicio, periodoFinal,
+    periodoInicio, periodoFinal
+  ]);
+  const presupuestoRows = await safeQuery(
+    "SELECT periodo, monto FROM taller_presupuestos_mensuales WHERE periodo BETWEEN ? AND ?",
+    [periodoInicio, periodoFinal],
+    []
+  );
+  const movimientosPorMes = new Map(movimientos.map(item => [String(item.periodo).slice(0, 7), item]));
+  const presupuestoPorMes = new Map(presupuestoRows.map(item => [String(item.periodo).slice(0, 7), Number(item.monto || 0)]));
+
+  return periodos.map(periodo => {
+    const movimiento = movimientosPorMes.get(periodo) || {};
+    const gasto = Number(movimiento.gasto || 0);
+    const presupuesto = Number(presupuestoPorMes.get(periodo) || 0);
+    return {
+      nombre: periodo,
+      periodo,
+      gasto,
+      total: gasto,
+      pagado: Number(movimiento.pagado || 0),
+      presupuesto,
+      saldo: presupuesto - gasto,
+      registros: 0
+    };
+  });
+}
+
 function expandirSedeFiltro(sede) {
   if (!sede) return [];
   return expandirSedesEquivalentes(sede);
@@ -1166,25 +1257,6 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro, pe
     ) pagadas
   `, [...facturasPagadasParams, ...facturasIndependientesParams]);
 
-  const facturasPagadasMes = await queryFinanciera(`
-    SELECT periodo, SUM(monto_pagado) AS total
-    FROM (
-      SELECT COALESCE(o.periodo_cierre, DATE_FORMAT(o.fecha_pago, '%Y-%m')) AS periodo,
-        ${montoPagadoFacturaSql("o", "o.total")} AS monto_pagado
-      FROM ordenes_compra o
-      WHERE o.facturada = 1 AND COALESCE(o.pagada, 0) = 1
-        ${whereFacturasOrdenesPagadas}
-      UNION ALL
-      SELECT COALESCE(f.periodo_cierre, DATE_FORMAT(f.fecha_pago, '%Y-%m')) AS periodo,
-        ${montoPagadoFacturaSql("f", "f.monto")} AS monto_pagado
-      FROM facturas f
-      WHERE COALESCE(f.pagada, 0) = 1
-        ${whereFacturasIndependientesPagadas}
-    ) pagos_facturas
-    WHERE periodo IS NOT NULL
-    GROUP BY periodo
-  `, [...facturasPagadasParams, ...facturasIndependientesParams]);
-
   const unidadesReferencia = await safeQuery(
     "SELECT placa, sede FROM unidades WHERE placa IS NOT NULL AND TRIM(placa) <> ''",
     [],
@@ -1276,7 +1348,6 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro, pe
   const porProveedor = new Map();
   const porSede = new Map();
   const porPlaca = new Map();
-  const porMes = new Map();
   const porDetalleGeneral = new Map();
   const porDescripcion = new Map();
   const porNegocio = new Map();
@@ -1321,13 +1392,6 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro, pe
       placa.total += item.monto;
       placa.registros += 1;
     }
-
-    const mesKey = item.fuente === "PAGO_PROVEEDOR" && item.periodo_cierre
-      ? item.periodo_cierre
-      : fechaMesKey(item.fecha);
-    const mes = sumarGrupo(porMes, mesKey);
-    mes.total += item.monto;
-    mes.registros += 1;
 
     const descripcion = sumarGrupo(porDescripcion, describirCompraExacta(item), {
       categoria: rubroInfo.nombre,
@@ -1860,54 +1924,7 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro, pe
   const costoPromedioPorUnidad = unidadesConGasto ? totalGastoConUnidad / unidadesConGasto : 0;
   const costoPromedioPorUnidadFlota = totalUnidadesFlota ? totalGastoConUnidad / totalUnidadesFlota : 0;
   const totalGastoSinUnidad = Math.max(totalGastos - totalGastoConUnidad, 0);
-  const mesesMap = new Map(Array.from(porMes.entries()));
-  const pagadosPorMes = new Map();
-  for (const item of gastos) {
-    const pagado = (item.fuente === "ORDEN_MOTOR" && Number(item.pagada || 0) === 1)
-      || item.fuente === "CAJA_CHICA"
-      || (item.fuente === "PAGO_PROVEEDOR" && Number(item.pagada || 0) === 1);
-    if (!pagado) continue;
-    const periodo = item.fuente === "PAGO_PROVEEDOR" && item.periodo_cierre
-      ? item.periodo_cierre
-      : fechaMesKey(item.fecha);
-    pagadosPorMes.set(periodo, Number(pagadosPorMes.get(periodo) || 0) + Number(item.monto || 0));
-  }
-  facturasPagadasMes.forEach(item => {
-    pagadosPorMes.set(item.periodo, Number(pagadosPorMes.get(item.periodo) || 0) + Number(item.total || 0));
-  });
-  const paramsPresupuesto = [];
-  const condicionesPresupuesto = [];
-  if (fechaDesde) {
-    condicionesPresupuesto.push("periodo >= LEFT(?, 7)");
-    paramsPresupuesto.push(fechaDesde);
-  }
-  if (fechaHasta) {
-    condicionesPresupuesto.push("periodo <= LEFT(?, 7)");
-    paramsPresupuesto.push(fechaHasta);
-  }
-  const presupuestosMensuales = await safeQuery(
-    `SELECT periodo, monto FROM taller_presupuestos_mensuales ${condicionesPresupuesto.length ? `WHERE ${condicionesPresupuesto.join(" AND ")}` : ""} ORDER BY periodo`,
-    paramsPresupuesto,
-    []
-  );
-  presupuestosMensuales.forEach(item => {
-    if (!mesesMap.has(item.periodo)) mesesMap.set(item.periodo, { nombre: item.periodo, total: 0, registros: 0 });
-  });
-  const presupuestoPorMes = new Map(presupuestosMensuales.map(item => [item.periodo, Number(item.monto || 0)]));
-  const meses = Array.from(mesesMap.entries())
-    .sort(([a], [b]) => String(a).localeCompare(String(b)))
-    .map(([periodo, item]) => {
-      const presupuesto = Number(presupuestoPorMes.get(periodo) || 0);
-      const gasto = Number(item.total || 0);
-      return {
-        ...item,
-        periodo,
-        gasto,
-        pagado: Number(pagadosPorMes.get(periodo) || 0),
-        presupuesto,
-        saldo: presupuesto - gasto
-      };
-    });
+  const meses = await obtenerSeriePresupuestoTaller(fechaHasta);
   const familiasMant = ordenarTopConteo(mantPorFamilia, 10);
   const sedesMant = ordenarTopConteo(mantPorSede, 10);
   const placasMant = ordenarTopConteo(mantPorPlaca, 12);
