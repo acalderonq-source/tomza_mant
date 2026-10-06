@@ -149,6 +149,7 @@ test("TALLER ve prioridades de todas las sedes aunque esten ocultas para las pan
     const html = await response.text();
     assert.equal(response.status, 200);
     assert.ok(html.includes("C179927"));
+    assert.ok(html.includes("ADMIN + Jefe de Taller"));
     assert.doesNotMatch(consultaPrioridades, /tp\.mostrar_operativos = 1/);
     assert.doesNotMatch(consultaPrioridades, /COALESCE\(NULLIF\(tp\.sede, ''\), un\.sede\)\) IN/);
 

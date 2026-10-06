@@ -677,7 +677,7 @@
                         <div>
                           <span class="priority-plate"><%= p.placa %></span>
                           <div class="muted priority-meta"><%= p.sede || 'Sin sede' %></div>
-                          <% if (esAdminPrioridades && !Number(p.mostrar_operativos)) { %><span class="badge text-bg-secondary">Solo ADMIN</span><% } %>
+                          <% if (!Number(p.mostrar_operativos)) { %><span class="badge text-bg-secondary">ADMIN + Jefe de Taller</span><% } %>
                         </div>
                         <div>
                           <div class="priority-note"><%= p.observacion %></div>
@@ -729,7 +729,7 @@
                         <div>
                           <span class="priority-plate"><%= p.placa %></span>
                           <div class="muted priority-meta"><%= p.sede || 'Sin sede' %></div>
-                          <% if (esAdminPrioridades && !Number(p.mostrar_operativos)) { %><span class="badge text-bg-secondary">Solo ADMIN</span><% } %>
+                          <% if (!Number(p.mostrar_operativos)) { %><span class="badge text-bg-secondary">ADMIN + Jefe de Taller</span><% } %>
                         </div>
                         <div>
                           <div class="priority-note"><%= p.observacion %></div>
