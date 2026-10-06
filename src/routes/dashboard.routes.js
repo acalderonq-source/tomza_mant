@@ -157,7 +157,10 @@ async function obtenerSeriePresupuestoTaller(fechaHasta) {
   const hasta = new Date(Date.UTC(anioFinal, mesFinal, 0)).toISOString().slice(0, 10);
   const fechaProveedor = "COALESCE(pp.fecha_pago, pp.fecha_solicitud, DATE(pp.creado_en))";
 
-  const movimientos = await queryFinanciera(`
+  let movimientos = [];
+  let errorConsulta = false;
+  try {
+    movimientos = await queryFinanciera(`
     SELECT periodo, SUM(gasto) AS gasto, SUM(pagado) AS pagado
     FROM (
       SELECT DATE_FORMAT(o.fecha, '%Y-%m') AS periodo, COALESCE(o.total, 0) AS gasto, 0 AS pagado
@@ -201,14 +204,18 @@ async function obtenerSeriePresupuestoTaller(fechaHasta) {
     ) movimientos_mes
     WHERE periodo IS NOT NULL
     GROUP BY periodo
-  `, [
-    desde, hasta, desde, hasta,
-    periodoInicio, periodoFinal,
-    periodoInicio, periodoFinal,
-    desde, hasta,
-    periodoInicio, periodoFinal,
-    periodoInicio, periodoFinal
-  ]);
+    `, [
+      desde, hasta, desde, hasta,
+      periodoInicio, periodoFinal,
+      periodoInicio, periodoFinal,
+      desde, hasta,
+      periodoInicio, periodoFinal,
+      periodoInicio, periodoFinal
+    ]);
+  } catch (error) {
+    errorConsulta = true;
+    console.error("Error cargando tendencia de presupuesto de Taller:", error.code || error.message);
+  }
   const presupuestoRows = await safeQuery(
     "SELECT periodo, monto FROM taller_presupuestos_mensuales WHERE periodo BETWEEN ? AND ?",
     [periodoInicio, periodoFinal],
@@ -217,7 +224,7 @@ async function obtenerSeriePresupuestoTaller(fechaHasta) {
   const movimientosPorMes = new Map(movimientos.map(item => [String(item.periodo).slice(0, 7), item]));
   const presupuestoPorMes = new Map(presupuestoRows.map(item => [String(item.periodo).slice(0, 7), Number(item.monto || 0)]));
 
-  return periodos.map(periodo => {
+  const meses = periodos.map(periodo => {
     const movimiento = movimientosPorMes.get(periodo) || {};
     const gasto = Number(movimiento.gasto || 0);
     const presupuesto = Number(presupuestoPorMes.get(periodo) || 0);
@@ -232,6 +239,7 @@ async function obtenerSeriePresupuestoTaller(fechaHasta) {
       registros: 0
     };
   });
+  return { meses, error: errorConsulta };
 }
 
 function expandirSedeFiltro(sede) {
@@ -1924,7 +1932,8 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro, pe
   const costoPromedioPorUnidad = unidadesConGasto ? totalGastoConUnidad / unidadesConGasto : 0;
   const costoPromedioPorUnidadFlota = totalUnidadesFlota ? totalGastoConUnidad / totalUnidadesFlota : 0;
   const totalGastoSinUnidad = Math.max(totalGastos - totalGastoConUnidad, 0);
-  const meses = await obtenerSeriePresupuestoTaller(fechaHasta);
+  const seriePresupuestoTaller = await obtenerSeriePresupuestoTaller(fechaHasta);
+  const meses = seriePresupuestoTaller.meses;
   const familiasMant = ordenarTopConteo(mantPorFamilia, 10);
   const sedesMant = ordenarTopConteo(mantPorSede, 10);
   const placasMant = ordenarTopConteo(mantPorPlaca, 12);
@@ -1988,6 +1997,7 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro, pe
     negociosPorRubro,
     placasPorTipoUnidad,
     meses,
+    presupuestoTendenciaError: seriePresupuestoTaller.error,
     presupuestosMensuales,
     tiposMant,
     familiasMant,

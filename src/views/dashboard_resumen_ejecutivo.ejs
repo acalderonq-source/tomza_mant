@@ -2170,6 +2170,9 @@
       <div class="budget-metric"><div class="control-label">Pagado</div><div class="control-value" id="tallerBudgetPaid">₡<%= money(meses.reduce((sum, item) => sum + Number(item.pagado || 0), 0)) %></div></div>
       <div class="budget-metric"><div class="control-label">Saldo presupuestario</div><div class="control-value" id="tallerBudgetBalance">₡<%= money(meses.reduce((sum, item) => sum + Number(item.saldo || 0), 0)) %></div></div>
     </div>
+    <% if (data.presupuestoTendenciaError) { %>
+      <div class="alert alert-warning py-2 mb-2">La tendencia mensual no está disponible temporalmente; el resto del resumen sí cargó.</div>
+    <% } %>
     <div class="budget-chart-body"><canvas id="chartMeses"></canvas></div>
     <div class="small text-muted mt-2">Vista global de Taller, independiente de los filtros generales. Se muestran siempre los últimos 12 meses.</div>
   </section>
