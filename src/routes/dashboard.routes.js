@@ -57,6 +57,11 @@ async function safeQuery(sql, params = [], fallback = []) {
   return fallback;
 }
 
+async function queryFinanciera(sql, params = []) {
+  const [rows] = await pool.query(sql, params);
+  return rows;
+}
+
 const ROLES_OFICINA_DIA_DIA = ["ADMIN", "TALLER", "PROVEEDURIA_TALLER"];
 const ROLES_RESUMEN_EJECUTIVO = ["ADMIN", "TALLER", "PROVEEDURIA", "PROVEEDURIA_TALLER", "TRAMITES"];
 
@@ -953,7 +958,7 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro, pe
   const condicionesOrdenes = armarFiltrosFecha("o.fecha", fechaDesde, fechaHasta, paramsOrdenes);
   const whereOrdenes = condicionesOrdenes.length ? `WHERE ${condicionesOrdenes.join(" AND ")}` : "";
 
-  const ordenesLineas = await safeQuery(`
+  const ordenesLineas = await queryFinanciera(`
     WITH ordenes_periodo AS (
       SELECT o.*
       FROM ordenes_compra o
@@ -1013,10 +1018,10 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro, pe
       GROUP BY orden_compra_id
     ) placas_detalle ON placas_detalle.orden_compra_id = o.id
     LEFT JOIN (
-      SELECT orden_compra_id, SUM(COALESCE(subtotal, cantidad * precio_unitario, 0)) AS total_detalle
+      SELECT d.orden_compra_id, SUM(COALESCE(d.subtotal, d.cantidad * d.precio_unitario, 0)) AS total_detalle
       FROM ordenes_compra_detalle d
       JOIN ordenes_periodo op ON op.id = d.orden_compra_id
-      GROUP BY orden_compra_id
+      GROUP BY d.orden_compra_id
     ) detalle_totales ON detalle_totales.orden_compra_id = o.id
     LEFT JOIN ordenes_compra_detalle d ON d.orden_compra_id = o.id
     LEFT JOIN unidades u ON REPLACE(UPPER(TRIM(u.placa)), ' ', '') = UPPER(TRIM(COALESCE(
@@ -1033,12 +1038,12 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro, pe
       ) THEN 'ACEITES' END,
       CASE WHEN UPPER(TRIM(COALESCE(d.codigo, ''))) IN ('ACEITE', 'ACEITES') THEN 'ACEITES' END
     )))
-  `, paramsOrdenes, []);
+  `, paramsOrdenes);
 
   const paramsOrdenesMotor = [];
   const condicionesOrdenesMotor = armarFiltrosFecha("om.fecha", fechaDesde, fechaHasta, paramsOrdenesMotor);
   const whereOrdenesMotor = condicionesOrdenesMotor.length ? `WHERE ${condicionesOrdenesMotor.join(" AND ")}` : "";
-  const ordenesMotorLineas = await safeQuery(`
+  const ordenesMotorLineas = await queryFinanciera(`
     SELECT
       'ORDEN_MOTOR' AS fuente,
       om.id,
@@ -1077,13 +1082,13 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro, pe
       REPLACE(NULLIF(UPPER(TRIM(om.placa_unidad)), ''), ' ', '')
     )))
     ${whereOrdenesMotor}
-  `, paramsOrdenesMotor, []);
+  `, paramsOrdenesMotor);
 
   const pagosParams = [];
   const fechaPago = "COALESCE(pp.fecha_pago, pp.fecha_solicitud, DATE(pp.creado_en))";
   const condicionesPagos = armarFiltrosFechaConPeriodoCierre(fechaPago, "pp.periodo_cierre", fechaDesde, fechaHasta, pagosParams, periodoCierre);
   const wherePagos = condicionesPagos.length ? `WHERE ${condicionesPagos.join(" AND ")}` : "";
-  const pagosProveedor = await safeQuery(`
+  const pagosProveedor = await queryFinanciera(`
     SELECT
       'PAGO_PROVEEDOR' AS fuente,
       pp.id,
@@ -1105,13 +1110,13 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro, pe
     FROM pagos_proveedor pp
     LEFT JOIN unidades u ON REPLACE(UPPER(TRIM(u.placa)), ' ', '') = REPLACE(UPPER(TRIM(pp.placa)), ' ', '')
     ${wherePagos}
-  `, pagosParams, []);
+  `, pagosParams);
 
   const cajaParams = [];
   const condicionesCaja = armarFiltrosFecha("cc.fecha", fechaDesde, fechaHasta, cajaParams);
   condicionesCaja.push("NOT EXISTS (SELECT 1 FROM caja_chica_cortes corte WHERE corte.reintegro_id = cc.id AND corte.estado = 'REABIERTO')");
   const whereCaja = `WHERE ${condicionesCaja.join(" AND ")}`;
-  const cajaChica = await safeQuery(`
+  const cajaChica = await queryFinanciera(`
     SELECT
       'CAJA_CHICA' AS fuente,
       cc.id,
@@ -1130,7 +1135,7 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro, pe
       COALESCE(cc.monto, 0) AS monto
     FROM caja_chica_reintegros cc
     ${whereCaja}
-  `, cajaParams, []);
+  `, cajaParams);
 
   const facturasPagadasParams = [];
   const condicionesFacturasOrdenesPagadas = armarFiltrosFechaConPeriodoCierre("o.fecha_pago", "o.periodo_cierre", fechaDesde, fechaHasta, facturasPagadasParams, periodoCierre);
@@ -1142,7 +1147,7 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro, pe
   const whereFacturasIndependientesPagadas = condicionesFacturasIndependientesPagadas.length
     ? `AND ${condicionesFacturasIndependientesPagadas.join(" AND ")}`
     : "";
-  const [facturasPagadasRow] = await safeQuery(`
+  const [facturasPagadasRow] = await queryFinanciera(`
     SELECT
       COALESCE(SUM(monto_pagado), 0) AS total,
       COUNT(*) AS movimientos
@@ -1158,7 +1163,7 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro, pe
       WHERE COALESCE(f.pagada, 0) = 1
         ${whereFacturasIndependientesPagadas}
     ) pagadas
-  `, [...facturasPagadasParams, ...facturasIndependientesParams], [{ total: 0, movimientos: 0 }]);
+  `, [...facturasPagadasParams, ...facturasIndependientesParams]);
 
   const unidadesReferencia = await safeQuery(
     "SELECT placa, sede FROM unidades WHERE placa IS NOT NULL AND TRIM(placa) <> ''",
