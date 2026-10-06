@@ -1471,10 +1471,7 @@
     const value = String(texto || '').toLowerCase();
     return value.includes('otros por revisar') ||
       value.includes('cabezales, carretas y cisternas') ||
-      value.includes('pago de proveedor') ||
-      value === 'generales' ||
-      value === 'general' ||
-      value.includes('gastos generales');
+      value.includes('pago de proveedor');
   };
   const totalGastosNumero = Number(data.totalGastos || 0);
   const categorias = safe(data.categorias).filter(item => !contieneCategoriaOculta(item.nombre));
@@ -1672,7 +1669,7 @@
       <div class="metric-card" style="--accent:#0b3b82">
         <div class="metric-label">Total gastado</div>
         <div class="metric-value" id="kpiTotalGastado">₡<%= money(data.totalGastos) %></div>
-        <div class="metric-foot" id="kpiTotalGastadoFoot"><%= Number(data.totalRegistrosGasto || 0).toLocaleString('es-CR') %> movimientos de dinero</div>
+        <div class="metric-foot" id="kpiTotalGastadoFoot"><%= Number(data.totalRegistrosGasto || 0).toLocaleString('es-CR') %> movimientos · incluye ₡<%= money(data.totalGastosExcluidosGenerales || 0) %> en Generales</div>
       </div>
     </div>
     <div class="col-xl col-md-6">
@@ -1688,7 +1685,7 @@
       <div class="metric-card" style="--accent:#ef233c">
         <div class="metric-label">Rubro principal</div>
         <div class="metric-value" id="kpiMayorTipo"><%= categorias[0]?.nombre || '-' %></div>
-        <div class="metric-foot" id="kpiMayorTipoFoot">₡<%= money(categorias[0]?.total || 0) %> · <%= pct(categorias[0]?.total, totalCategoriasOperativas) %>% del gasto operativo</div>
+        <div class="metric-foot" id="kpiMayorTipoFoot">₡<%= money(categorias[0]?.total || 0) %> · <%= pct(categorias[0]?.total, totalCategoriasOperativas) %>% del gasto total</div>
       </div>
     </div>
     <div class="col-xl col-md-6">
@@ -1804,20 +1801,18 @@
                 <span><%= negocio.nombre %></span>
                 <span>₡<%= money(negocio.total || 0) %></span>
               </div>
-              <% if (negocio.clave !== 'generales') { %>
-                <div class="matrix-lines">
-                  <% if (!safe(negocio.rubros).length) { %>
-                    <div class="empty-state py-2">Sin movimiento.</div>
-                  <% } %>
-                  <% safe(negocio.rubros).slice(0, 7).forEach(rubro => { %>
-                    <div class="matrix-line">
-                      <span class="matrix-line-name"><%= rubro.nombre %></span>
-                      <span class="matrix-line-money">₡<%= money(rubro.total || 0) %></span>
-                      <span class="matrix-line-pct"><%= rubro.porcentaje || 0 %>%</span>
-                    </div>
-                  <% }) %>
-                </div>
-              <% } %>
+              <div class="matrix-lines">
+                <% if (!safe(negocio.rubros).length) { %>
+                  <div class="empty-state py-2">Sin movimiento.</div>
+                <% } %>
+                <% safe(negocio.rubros).slice(0, 7).forEach(rubro => { %>
+                  <div class="matrix-line">
+                    <span class="matrix-line-name"><%= rubro.nombre %></span>
+                    <span class="matrix-line-money">₡<%= money(rubro.total || 0) %></span>
+                    <span class="matrix-line-pct"><%= rubro.porcentaje || 0 %>%</span>
+                  </div>
+                <% }) %>
+              </div>
             </div>
           <% }) %>
         </div>
@@ -1843,7 +1838,6 @@
                 <span><%= tipo.nombre %></span>
                 <span>₡<%= money(tipo.total || 0) %></span>
               </div>
-              <% if (tipo.clave !== 'generales') { %>
                 <div class="matrix-lines">
                 <% safe(tipo.placas).forEach(placa => { %>
                   <details class="matrix-detail">
@@ -1887,7 +1881,6 @@
                   </details>
                 <% }) %>
                 </div>
-              <% } %>
             </div>
           <% }) %>
         </div>
@@ -1899,7 +1892,7 @@
   <section class="table-card mb-4">
     <div class="card-head">
       <div>
-        <h2 class="card-title"><i class="bi bi-table me-1"></i>Gasto operativo por negocio</h2>
+        <h2 class="card-title"><i class="bi bi-table me-1"></i>Gasto por negocio</h2>
         <div class="card-subtitle">Seleccione arriba el negocio para ver el detalle por rubro; en Todos se compara cada negocio completo.</div>
       </div>
       <span class="pill pill-blue">Tabla gerencial</span>
@@ -2487,10 +2480,7 @@
     const value = String(name || '').toLowerCase();
     return value.includes('otros por revisar') ||
       value.includes('cabezales, carretas y cisternas') ||
-      value.includes('pago de proveedor') ||
-      value === 'generales' ||
-      value === 'general' ||
-      value.includes('gastos generales');
+      value.includes('pago de proveedor');
   };
   const escapeHtml = (value) => String(value ?? '')
     .replace(/&/g, '&amp;')
@@ -2907,7 +2897,7 @@
           <span>${escapeHtml(negocio.nombre || '-')}</span>
           <span>${formatMoney(negocio.total || 0)}</span>
         </div>
-        ${negocio.clave === 'generales' ? '' : `<div class="matrix-lines">
+        <div class="matrix-lines">
           ${(negocio.rubros || []).length ? (negocio.rubros || []).slice(0, 7).map((rubro, rubroIndex) => {
             const rubroKey = `${negocioIndex}:${rubroIndex}`;
             const open = managerState.rubro[rubroKey];
@@ -2920,7 +2910,7 @@
               ${open ? renderSedesRubro(negocioIndex, rubroIndex, rubro.sedes || []) : ''}
             `;
           }).join('') : '<div class="empty-state py-2">Sin movimiento.</div>'}
-        </div>`}
+        </div>
       </div>
     `;
 
@@ -2949,7 +2939,7 @@
           <span>${escapeHtml(tipo.nombre || '-')}</span>
           <span>${formatMoney(tipo.total || 0)}</span>
         </div>
-        ${tipo.clave === 'generales' ? '' : `<div class="matrix-lines">
+        <div class="matrix-lines">
           ${(tipo.placas || []).length ? (tipo.placas || []).map(placa => `
             <details class="matrix-detail">
               <summary class="matrix-line">
@@ -2974,7 +2964,7 @@
               </div>
             </details>
           `).join('') : '<div class="empty-state py-2">Sin movimiento.</div>'}
-        </div>`}
+        </div>
       </div>
     `;
 
@@ -3080,10 +3070,10 @@
     );
 
     setText('kpiTotalGastado', formatMoney(data.totalGastos || 0));
-    setText('kpiTotalGastadoFoot', `${formatNumber(data.totalRegistrosGasto || 0)} movimientos de dinero`);
+    setText('kpiTotalGastadoFoot', `${formatNumber(data.totalRegistrosGasto || 0)} movimientos · incluye ${formatMoney(data.totalGastosExcluidosGenerales || 0)} en Generales`);
     setText('kpiTotalPagado', formatMoney(resumenFinanciero.totalPagado || 0));
     setText('kpiMayorTipo', categorias[0]?.nombre || '-');
-    setText('kpiMayorTipoFoot', `${formatMoney(categorias[0]?.total || 0)} · ${percent(categorias[0]?.total, totalCategorias)}% del gasto operativo`);
+    setText('kpiMayorTipoFoot', `${formatMoney(categorias[0]?.total || 0)} · ${percent(categorias[0]?.total, totalCategorias)}% del gasto total`);
     setText('kpiCostoUnidad', formatMoney(costoUnidad.costoPromedioPorUnidad || 0));
     setText('kpiCostoUnidadFoot', `${formatNumber(costoUnidad.unidadesConGasto || 0)} placa(s) con gasto · ${formatNumber(costoUnidad.totalUnidadesFlota || 0)} en flota`);
     setText('kpiMantenimientos', formatNumber(data.totalMantenimientos || 0));

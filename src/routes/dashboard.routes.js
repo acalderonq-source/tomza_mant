@@ -1259,7 +1259,8 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro, pe
   const porNegocioRubro = new Map();
   const porTipoUnidadPlaca = new Map();
 
-  gastosGerenciales.forEach(item => {
+  // El resumen financiero debe conciliar con todo el dinero registrado, incluidos los gastos generales.
+  gastos.forEach(item => {
     const fuenteNombre = item.fuente === "ORDEN"
       ? "Órdenes de compra"
       : item.fuente === "ORDEN_MOTOR"
@@ -1556,7 +1557,7 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro, pe
     }
   });
 
-  const totalGastos = gastosGerenciales.reduce((sum, item) => sum + item.monto, 0);
+  const totalGastos = gastos.reduce((sum, item) => sum + item.monto, 0);
   const totalGastosExcluidosGenerales = gastosExcluidosGenerales.reduce((sum, item) => sum + item.monto, 0);
   const resumenFinanciero = construirResumenFinanciero({ gastos, facturasPagadasRow });
   const resumenOperativo = construirResumenFinanciero({ gastos: gastosGerenciales, facturasPagadasRow: { total: 0, movimientos: 0 } });
@@ -1597,7 +1598,8 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro, pe
     { clave: "transportadora", nombre: "Transportadora", color: "#0b3b82" },
     { clave: "granel", nombre: "Graneleras", color: "#0f766e" },
     { clave: "comodines", nombre: "Comodines", color: "#7c3aed" },
-    { clave: "aceites", nombre: "Aceites", color: "#0f766e" }
+    { clave: "aceites", nombre: "Aceites", color: "#0f766e" },
+    { clave: "generales", nombre: "Generales", color: "#64748b" }
   ];
   const negociosGasto = negociosBase
     .map(base => {
@@ -1860,7 +1862,8 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro, pe
 
   return {
     totalGastos,
-    totalRegistrosGasto: gastosGerenciales.length,
+    totalGastosOperativos: gastosGerenciales.reduce((sum, item) => sum + item.monto, 0),
+    totalRegistrosGasto: gastos.length,
     totalGastosIncluyendoGenerales: gastos.reduce((sum, item) => sum + item.monto, 0),
     totalGastosExcluidosGenerales,
     movimientosGeneralesExcluidos: gastosExcluidosGenerales.length,
