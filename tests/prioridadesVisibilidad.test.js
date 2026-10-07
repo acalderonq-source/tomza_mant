@@ -195,3 +195,63 @@ test("TALLER ve prioridades de todas las sedes aunque esten ocultas para las pan
     await new Promise(resolve => server.close(resolve));
   }
 });
+
+test("la pantalla de mecanicos separa Cartago, Tecnicos y Taller", async () => {
+  const originalQuery = pool.query;
+  const consultasUnidades = [];
+  let prioridades = [
+    { id: 1, placa: "CARTAGO-1", sede: "Cartago", grupo_prioridad: "MECANICO", fecha_prioridad: "2026-10-06", fecha_prioridad_formato: "06/10/2026", dias_pendiente: 2, observacion: "Cartago", estado: "PENDIENTE", mostrar_operativos: 1, creado_en: "2026-10-06 08:00:00", creado_por_nombre: "admin" },
+    { id: 2, placa: "TECNICOS-1", sede: "Tecnicos", grupo_prioridad: "MECANICO", fecha_prioridad: "2026-10-06", fecha_prioridad_formato: "06/10/2026", dias_pendiente: 2, observacion: "Tecnicos", estado: "PENDIENTE", mostrar_operativos: 1, creado_en: "2026-10-06 08:00:00", creado_por_nombre: "admin" },
+    { id: 3, placa: "TALLER-1", sede: "Taller", grupo_prioridad: "MECANICO", fecha_prioridad: "2026-10-06", fecha_prioridad_formato: "06/10/2026", dias_pendiente: 2, observacion: "Taller", estado: "PENDIENTE", mostrar_operativos: 1, creado_en: "2026-10-06 08:00:00", creado_por_nombre: "admin" }
+  ];
+  pool.query = async (sql, params = []) => {
+    if (/information_schema\.COLUMNS/i.test(sql)) return [[{ count: 1, total: 1 }]];
+    if (/CREATE TABLE IF NOT EXISTS/i.test(sql)) return [{}];
+    if (sql.includes("COUNT(*) AS total")) return [[{ total: 0, en_taller: 0, disponibles: 0 }]];
+    if (sql.includes("FROM unidades u")) {
+      consultasUnidades.push({ sql, params });
+      return [[]];
+    }
+    if (sql.includes("FROM taller_prioridades tp")) return [prioridades];
+    if (sql.includes("FROM solicitudes_repuestos")) return [[]];
+    return [[]];
+  };
+
+  const app = express();
+  app.set("view engine", "ejs");
+  app.set("views", path.join(__dirname, "../src/views"));
+  app.use((req, _res, next) => {
+    req.session = {
+      user: { id: 90, usuario: "pantalla_mecanicos", nombre: "Pantalla Mecánicos", rol: "PANTALLA_MECANICOS", sede: "Todas" }
+    };
+    next();
+  });
+  app.use("/taller", taller);
+  const server = await new Promise(resolve => {
+    const listening = app.listen(0, "127.0.0.1", () => resolve(listening));
+  });
+  try {
+    const url = `http://127.0.0.1:${server.address().port}/taller/dashboard`;
+    const response = await fetch(url);
+    const html = await response.text();
+    assert.equal(response.status, 200);
+    assert.match(html, /Cilindreros · Cartago/);
+    assert.match(html, /Técnicos/);
+    assert.match(html, />Taller</);
+    assert.ok(html.includes("CARTAGO-1"));
+    assert.ok(html.includes("TECNICOS-1"));
+    assert.ok(html.includes("TALLER-1"));
+    assert.deepEqual(consultasUnidades[0].params.at(-1), ["Cartago", "Tecnicos", "Taller"]);
+
+    prioridades = [];
+    const responseSinPrioridades = await fetch(url);
+    const htmlSinPrioridades = await responseSinPrioridades.text();
+    assert.equal(responseSinPrioridades.status, 200);
+    assert.match(htmlSinPrioridades, /Cilindreros · Cartago/);
+    assert.match(htmlSinPrioridades, /Técnicos/);
+    assert.match(htmlSinPrioridades, />Taller</);
+  } finally {
+    pool.query = originalQuery;
+    await new Promise(resolve => server.close(resolve));
+  }
+});

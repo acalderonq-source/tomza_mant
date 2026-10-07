@@ -522,7 +522,13 @@
             .sort(([sedeA], [sedeB]) => sedeA.localeCompare(sedeB, 'es'))
             .map(([sede, items]) => ({ titulo: sede, prioridades: items }))
         ]
-      : [{ titulo: 'Mecánico / Taller', prioridades: prioridadesMecanicoLista }]
+      : esPantallaMecanico
+        ? [
+            { titulo: 'Cilindreros · Cartago', prioridades: prioridadesMecanicoLista.filter(p => normalizarSedePrioridad(p.sede) === 'CARTAGO') },
+            { titulo: 'Técnicos', prioridades: prioridadesMecanicoLista.filter(p => normalizarSedePrioridad(p.sede) === 'TECNICOS') },
+            { titulo: 'Taller', prioridades: prioridadesMecanicoLista.filter(p => normalizarSedePrioridad(p.sede) === 'TALLER' || !p.sede) }
+          ]
+        : [{ titulo: 'Mecánico / Taller', prioridades: prioridadesMecanicoLista }]
     : [];
   const prioridadesVisiblesLista = [
     ...(mostrarPrioridadesPesados ? prioridadesPesadosLista : []),
@@ -660,7 +666,7 @@
         </div>
 
         <div class="compact-panel-body priority-groups" id="taller-priority-groups" aria-live="polite">
-        <% if (!prioridadesVisiblesLista.length) { %>
+        <% if (!prioridadesVisiblesLista.length && !esPantallaMecanico) { %>
           <div class="empty-state">No hay prioridades pendientes activas para hoy.</div>
         <% } else { %>
             <% if (mostrarPrioridadesPesados) { %>
@@ -722,7 +728,7 @@
                   <span><%= grupo.prioridades.length %></span>
                 </div>
                 <% if (!grupo.prioridades.length) { %>
-                  <div class="empty-state py-2">Sin prioridades de mecánico.</div>
+                  <div class="empty-state py-2">Sin prioridades activas.</div>
                 <% } else { %>
                   <div class="priority-card-grid">
                     <% grupo.prioridades.forEach(p => { %>

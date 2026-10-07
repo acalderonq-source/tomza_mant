@@ -203,6 +203,10 @@ async function obtenerSedesPermitidas(req) {
   const user = req.session.user;
   const sedeGranelUsuario = sedeGranelDesdeUsuario(user);
 
+  if (user?.rol === "PANTALLA_MECANICOS") {
+    return ["Cartago", "Tecnicos", "Taller"];
+  }
+
   if (esUsuarioTodasSedes(user)) {
     if (req.session.sedeSeleccionada && req.session.sedeSeleccionada !== "TODAS") {
       return [req.session.sedeSeleccionada];
