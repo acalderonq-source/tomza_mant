@@ -30,8 +30,8 @@ test("Bodega suggests active plates and rejects invented plates before changing 
     if (sql.includes("FROM bodega_articulos WHERE id = ?")) {
       return [[{ id: Number(params[0]), stock_actual: 5, origen_inventario: origenArticulo, proveedor_consignacion: origenArticulo === "CONSIGNACION" ? "MAXI" : null, ubicacion: "A-02", precio_unitario: 100, nombre: "Filtro", codigo_taller: "0001", codigo: "F-1", tipo_articulo: "REPUESTO" }]];
     }
-    if (sql.includes("SELECT id, cantidad FROM bodega_existencias")) return [[{ id: Number(params[0]), cantidad: Number(params[0]) === 2 ? 0 : 5 }]];
-    if (sql.includes("SELECT COALESCE(SUM(cantidad), 0) AS total FROM bodega_existencias")) return [[{ total: Number(params[0]) === 2 ? 0 : 5 }]];
+    if (sql.includes("SELECT id, cantidad FROM bodega_existencias")) return [[{ id: Number(params[0]), cantidad: [2, 100].includes(Number(params[0])) ? 0 : 5 }]];
+    if (sql.includes("SELECT COALESCE(SUM(cantidad), 0) AS total FROM bodega_existencias")) return [[{ total: Number(params[0]) === 100 ? 4 : Number(params[0]) === 2 ? 0 : 5 }]];
     if (sql.includes("SELECT * FROM bodega_movimientos WHERE id = ? AND tipo_movimiento = 'SALIDA'")) {
       return [params[0] === 77 ? [{ id: 77, articulo_id: 1, tipo_movimiento: "SALIDA", cantidad: 2, sede: "Cartago", ubicacion: "A-02", origen_inventario: "PROPIO", precio_unitario: 100, placa: null, mecanico: "Taller" }] : []];
     }
@@ -40,6 +40,7 @@ test("Bodega suggests active plates and rejects invented plates before changing 
     }
     if (sql.includes("SELECT COALESCE(SUM(cantidad), 0) AS total FROM bodega_movimientos")) return [[{ total: 0 }]];
     if (/^\s*(?:INSERT|UPDATE|DELETE)\b/.test(sql)) writes.push({ sql, params });
+    if (sql.includes("INSERT INTO bodega_articulos")) return [{ insertId: 100 }];
     if (sql.includes("INSERT INTO bodega_entregas")) return [{ insertId: 501 }];
     if (sql.includes("INSERT INTO bodega_movimientos")) return [{ insertId: 601 }];
     return [[]];
@@ -143,7 +144,7 @@ test("Bodega suggests active plates and rejects invented plates before changing 
 
     const writesAntesArticuloSinSaldo = writes.length;
     assert.equal((await post("/bodega/articulos", { nombre: "Filtro", stock_actual: "5" })).status, 302);
-    assert.match(session.error, /sin existencia/);
+    assert.match(session.error, /sede válida/);
     assert.equal(writes.length, writesAntesArticuloSinSaldo);
 
     const transaccionesAntes = transactionEvents.length;
@@ -211,6 +212,34 @@ test("Bodega suggests active plates and rejects invented plates before changing 
     assert.equal((await post("/bodega/articulos", { nombre: "Nuevo filtro", stock_actual: "0" })).status, 302);
     assert.equal(writes.length, writesBeforeBodeguero + 1);
     assert.match(session.success, /Artículo creado/);
+
+    const writesBeforeStockInicial = writes.length;
+    assert.equal((await post("/bodega/articulos", {
+      nombre: "Filtro con stock inicial", stock_actual: "4", sede_stock_inicial: "Cartago", precio_unitario: "125"
+    })).status, 302);
+    assert.match(session.success, /Artículo creado/);
+    const entradaInicial = writes.slice(writesBeforeStockInicial).find(call =>
+      call.sql.includes("INSERT INTO bodega_movimientos") && call.sql.includes("Saldo inicial al crear artículo")
+    );
+    assert.ok(entradaInicial);
+    assert.equal(entradaInicial.params[4], 4);
+    assert.equal(entradaInicial.params[2], "Cartago");
+
+    const writesBeforeSuministro = writes.length;
+    assert.equal((await post("/bodega/suministros", {
+      nombre: "Suministro inicial", stock_actual: "3", sede_stock_inicial: "Cartago", precio_unitario: "50"
+    })).status, 302);
+    assert.match(session.success, /Suministro agregado/);
+    assert.ok(writes.slice(writesBeforeSuministro).some(call =>
+      call.sql.includes("INSERT INTO bodega_movimientos") && call.sql.includes("Saldo inicial al crear artículo")
+    ));
+
+    const writesBeforeSinSede = writes.length;
+    assert.equal((await post("/bodega/articulos", {
+      nombre: "Sin sede", stock_actual: "2", sede_stock_inicial: ""
+    })).status, 302);
+    assert.match(session.error, /sede válida/);
+    assert.equal(writes.length, writesBeforeSinSede);
 
     origenArticulo = "CONSIGNACION";
     const writesBeforeEdicion = writes.length;

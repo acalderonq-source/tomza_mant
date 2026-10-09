@@ -561,6 +561,36 @@ async function aplicarCambioExistencia(conn, articulo, sede, ubicacion, delta) {
   return { anterior, nueva: Math.max(0, nueva), total: Number(total.total || 0), ubicacion: lugar };
 }
 
+async function registrarStockInicial(conn, articulo, cantidad, sede, usuarioId, proveedor) {
+  if (cantidad <= 0) return;
+  const ubicacion = articulo.ubicacion || "";
+  const saldo = await aplicarCambioExistencia(conn, articulo, sede, ubicacion, cantidad);
+  await conn.query(
+    `INSERT INTO bodega_movimientos (
+      articulo_id, tipo_movimiento, origen_inventario, sede, ubicacion, cantidad, existencia_anterior, existencia_nueva,
+      destino_recepcion, proveedor_id, proveedor_nombre, precio_unitario, motivo, creado_por,
+      codigo_taller_snapshot, codigo_proveedor_snapshot, descripcion_snapshot, proveedor_snapshot
+    ) VALUES (?, 'ENTRADA', ?, ?, ?, ?, ?, ?, 'GENERALES', ?, ?, ?, 'Saldo inicial al crear artículo', ?, ?, ?, ?, ?)`,
+    [
+      articulo.id,
+      articulo.origen_inventario,
+      sede,
+      ubicacion,
+      cantidad,
+      saldo.anterior,
+      saldo.nueva,
+      proveedor.id,
+      proveedor.nombre,
+      Number(articulo.precio_unitario || 0),
+      usuarioId,
+      articulo.codigo_taller,
+      articulo.codigo,
+      articulo.nombre,
+      proveedor.nombre || articulo.proveedor_consignacion || null
+    ]
+  );
+}
+
 function redirectBodega(req, res) {
   const q = limpiar(req.body.q || req.query.q);
   const sede = limpiar(req.body.sede || req.body.sede_origen || req.query.sede);
@@ -1242,6 +1272,8 @@ router.post("/compatibilidad/:id/eliminar", async (req, res) => {
 
 router.post("/articulos", async (req, res) => {
   if (!requiereRol(ROLES_CATALOGO, req, res)) return;
+  let conn;
+  let transaccionIniciada = false;
   try {
     await ensureBodegaTables();
     const proveedor = await obtenerProveedor(req.body.proveedor_id, req.body.proveedor_nombre);
@@ -1251,19 +1283,24 @@ router.post("/articulos", async (req, res) => {
     const codigoInterno = codigoTaller(req.body.codigo_taller) || await siguienteCodigoTaller();
     const codigo = limpiar(req.body.codigo) || null;
     const nombre = limpiar(req.body.nombre);
+    const stockInicial = numeroFormularioNoNegativo(req.body.stock_actual);
+    const sedeStockInicial = stockInicial > 0 ? req.body.sede_stock_inicial : "";
     const stockMinimo = numeroFormularioNoNegativo(req.body.stock_minimo);
     const stockMaximo = numeroFormularioNoNegativo(req.body.stock_maximo);
     const precioUnitario = numeroFormularioNoNegativo(req.body.precio_unitario);
-    if (numero(req.body.stock_actual) !== 0) throw new Error("El artículo se crea sin existencia. Registre el saldo mediante una entrada para conservar trazabilidad.");
-    if (stockMinimo === null || stockMaximo === null || precioUnitario === null || stockMinimo > stockMaximo) {
-      throw new Error("Revise los mínimos, máximos y precio: deben ser números no negativos y el máximo no puede ser menor que el mínimo.");
+    if (stockInicial === null || stockMinimo === null || stockMaximo === null || precioUnitario === null || stockMinimo > stockMaximo) {
+      throw new Error("Revise el stock inicial, mínimos, máximos y precio: deben ser números no negativos y el máximo no puede ser menor que el mínimo.");
     }
     if (!nombre) {
       req.session.error = "Debe escribir el nombre del artículo.";
       return redirectBodega(req, res);
     }
 
-    await pool.query(
+    conn = await pool.getConnection();
+    await conn.beginTransaction();
+    transaccionIniciada = true;
+    const sede = stockInicial > 0 ? await validarSedeBodega(conn, sedeStockInicial) : null;
+    const [result] = await conn.query(
       `INSERT INTO bodega_articulos (
         codigo_taller, codigo, nombre, tipo_articulo, grupo_bodega, origen_inventario, categoria, marca, numero_parte, tipo_unidad, unidad_medida,
         stock_actual, stock_minimo, stock_maximo, ubicacion, precio_unitario,
@@ -1295,34 +1332,58 @@ router.post("/articulos", async (req, res) => {
       ]
     );
 
+    if (stockInicial > 0) {
+      await registrarStockInicial(conn, {
+        id: result.insertId,
+        codigo_taller: codigoInterno,
+        codigo,
+        nombre,
+        ubicacion: limpiar(req.body.ubicacion) || null,
+        origen_inventario: origen,
+        proveedor_consignacion: origen === "CONSIGNACION" ? (limpiar(req.body.proveedor_consignacion) || PROVEEDOR_CONSIGNACION_DEFAULT) : null,
+        precio_unitario: precioUnitario
+      }, stockInicial, sede, req.session.user.id, proveedor);
+    }
+
+    await conn.commit();
+    transaccionIniciada = false;
     req.session.success = "Artículo creado correctamente.";
   } catch (error) {
+    if (transaccionIniciada) await conn.rollback().catch(() => {});
     console.error("ERROR crear artículo bodega:", error);
     req.session.error = error.code === "ER_DUP_ENTRY" ? "Ya existe un artículo con ese código." : (error.message || "No se pudo crear el artículo.");
+  } finally {
+    conn?.release();
   }
   redirectBodega(req, res);
 });
 
 router.post("/suministros", async (req, res) => {
   if (!requiereRol(ROLES_CATALOGO, req, res)) return;
+  let conn;
+  let transaccionIniciada = false;
   try {
     await ensureBodegaTables();
     const proveedor = await obtenerProveedor(req.body.proveedor_id, req.body.proveedor_nombre);
     const codigoInterno = codigoTaller(req.body.codigo_taller) || await siguienteCodigoTaller();
     const nombre = limpiar(req.body.nombre);
+    const stockInicial = numeroFormularioNoNegativo(req.body.stock_actual);
     const stockMinimo = numeroFormularioNoNegativo(req.body.stock_minimo);
     const stockMaximo = numeroFormularioNoNegativo(req.body.stock_maximo);
     const precioUnitario = numeroFormularioNoNegativo(req.body.precio_unitario);
-    if (numero(req.body.stock_actual) !== 0) throw new Error("El suministro se crea sin existencia. Registre el saldo mediante una entrada para conservar trazabilidad.");
-    if (stockMinimo === null || stockMaximo === null || precioUnitario === null || stockMinimo > stockMaximo) {
-      throw new Error("Revise los mínimos, máximos y precio: deben ser números no negativos y el máximo no puede ser menor que el mínimo.");
+    if (stockInicial === null || stockMinimo === null || stockMaximo === null || precioUnitario === null || stockMinimo > stockMaximo) {
+      throw new Error("Revise el stock inicial, mínimos, máximos y precio: deben ser números no negativos y el máximo no puede ser menor que el mínimo.");
     }
     if (!nombre) {
       req.session.error = "Debe escribir el nombre del suministro.";
       return redirectBodega(req, res);
     }
 
-    await pool.query(
+    conn = await pool.getConnection();
+    await conn.beginTransaction();
+    transaccionIniciada = true;
+    const sede = stockInicial > 0 ? await validarSedeBodega(conn, req.body.sede_stock_inicial) : null;
+    const [result] = await conn.query(
       `INSERT INTO bodega_articulos (
         codigo_taller, codigo, nombre, tipo_articulo, grupo_bodega, origen_inventario, categoria, marca, numero_parte, tipo_unidad, unidad_medida,
         stock_actual, stock_minimo, stock_maximo, ubicacion, precio_unitario,
@@ -1350,10 +1411,27 @@ router.post("/suministros", async (req, res) => {
       ]
     );
 
+    if (stockInicial > 0) {
+      await registrarStockInicial(conn, {
+        id: result.insertId,
+        codigo_taller: codigoInterno,
+        codigo: limpiar(req.body.codigo) || null,
+        nombre,
+        ubicacion: limpiar(req.body.ubicacion) || null,
+        origen_inventario: "PROPIO",
+        precio_unitario: precioUnitario
+      }, stockInicial, sede, req.session.user.id, proveedor);
+    }
+
+    await conn.commit();
+    transaccionIniciada = false;
     req.session.success = "Suministro agregado correctamente.";
   } catch (error) {
+    if (transaccionIniciada) await conn.rollback().catch(() => {});
     console.error("ERROR crear suministro bodega:", error);
     req.session.error = error.code === "ER_DUP_ENTRY" ? "Ya existe un artículo con ese código." : (error.message || "No se pudo agregar el suministro.");
+  } finally {
+    conn?.release();
   }
   res.redirect("/bodega/inventario?grupo=SUMINISTRO");
 });
