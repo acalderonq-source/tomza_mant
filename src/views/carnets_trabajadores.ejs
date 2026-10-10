@@ -31,9 +31,41 @@
 <body>
   <main class="page">
     <div class="d-flex justify-content-between align-items-center gap-3 flex-wrap mb-4 no-print">
-      <div><h1 class="h3 mb-1">Carnets de trabajadores</h1><p class="text-secondary mb-0"><%= trabajadores.length %> perfiles registrados. Cargue las fotos y luego imprima los carnets.</p></div>
-      <div class="d-flex gap-2"><a href="/dashboard" class="btn btn-outline-secondary">Volver</a><button class="btn btn-primary" onclick="window.print()"><i class="bi bi-printer"></i> Imprimir carnets</button></div>
+      <div><h1 class="h3 mb-1">Accesos y carnets de trabajadores</h1><p class="text-secondary mb-0">Cree accesos por cédula, cargue fotos y descargue los carnets en PDF.</p></div>
+      <div class="d-flex gap-2"><a href="/admin/departamentos" class="btn btn-outline-primary">Accesos por área</a><a href="/dashboard" class="btn btn-outline-secondary">Volver</a><button class="btn btn-primary" onclick="window.print()"><i class="bi bi-printer"></i> Imprimir carnets</button></div>
     </div>
+    <% if (mensajeAcceso) { %><div class="alert alert-success no-print"><%= mensajeAcceso %></div><% } %>
+    <% if (errorAcceso) { %><div class="alert alert-danger no-print"><%= errorAcceso %></div><% } %>
+    <section class="card border-0 shadow-sm mb-4 no-print">
+      <div class="card-body p-4">
+        <h2 class="h5 mb-1">Crear acceso y carnet</h2>
+        <p class="small text-secondary mb-3">La persona ingresará con su cédula y el código de trabajador como PIN. Los permisos serán los del perfil seleccionado.</p>
+        <form method="post" action="/admin/carnets-trabajadores" class="row g-3">
+          <div class="col-md-5"><label class="form-label" for="nuevo-nombre">Nombre completo</label><input class="form-control" id="nuevo-nombre" name="nombre" maxlength="150" required></div>
+          <div class="col-md-3"><label class="form-label" for="nueva-cedula">Cédula</label><input class="form-control" id="nueva-cedula" name="cedula" inputmode="numeric" autocomplete="off" maxlength="15" placeholder="9 a 12 dígitos" required></div>
+          <div class="col-md-2"><label class="form-label" for="nuevo-codigo">Código trabajador / PIN</label><input class="form-control" id="nuevo-codigo" name="codigo_trabajador" inputmode="numeric" pattern="[0-9]{1,30}" maxlength="30" required></div>
+          <div class="col-md-2"><label class="form-label" for="nuevo-perfil">Puesto en carnet</label><input class="form-control" id="nuevo-perfil" name="perfil" maxlength="80" value="Trabajador"></div>
+          <div class="col-12">
+            <label class="form-label">Perfiles de acceso</label>
+            <% if (!perfilesAcceso.length) { %><div class="alert alert-warning mb-0">No hay cuentas de perfil disponibles. Cree primero las cuentas base del sistema.</div><% } else { %>
+              <div class="row g-2">
+                <% perfilesAcceso.forEach(perfilAcceso => { %>
+                  <div class="col-md-6 col-xl-4">
+                    <label class="form-check border rounded p-2 ps-5 h-100">
+                      <input class="form-check-input" type="checkbox" name="usuario_ids" value="<%= perfilAcceso.id %>">
+                      <span class="form-check-label"><strong><%= perfilAcceso.nombre || perfilAcceso.usuario %></strong><span class="d-block small text-secondary"><%= perfilAcceso.usuario %> · <%= perfilAcceso.rol %><%= perfilAcceso.sede ? ` · ${perfilAcceso.sede}` : '' %></span></span>
+                    </label>
+                  </div>
+                <% }) %>
+              </div>
+              <div class="form-text">Puede asignar varios perfiles; al ingresar, la persona elegirá cuál usar.</div>
+            <% } %>
+          </div>
+          <div class="col-12 d-flex justify-content-end"><button class="btn btn-success fw-bold" <%= !perfilesAcceso.length ? 'disabled' : '' %>><i class="bi bi-person-plus me-1"></i> Crear acceso y carnet</button></div>
+        </form>
+      </div>
+    </section>
+    <div class="d-flex justify-content-between align-items-center mb-3 no-print"><h2 class="h5 mb-0">Carnets registrados</h2><span class="badge text-bg-secondary"><%= trabajadores.length %></span></div>
     <div class="cards d-flex flex-wrap gap-3">
       <% trabajadores.forEach(worker => { %>
         <article class="worker-item">

@@ -3,7 +3,10 @@ const fs = require("node:fs");
 const path = require("node:path");
 const QRCode = require("qrcode");
 const PdfPrinter = require("pdfmake");
+const bcrypt = require("bcryptjs");
+const crypto = require("node:crypto");
 const pool = require("../db");
+const { normalizarCedula, cedulaValida } = require("../utils/cedula");
 
 const router = express.Router();
 const pdfPrinter = new PdfPrinter({
@@ -101,6 +104,12 @@ router.get("/admin/carnets-trabajadores", requireAdmin, async (_req, res) => {
       GROUP BY c.cedula, c.qr_token
       ORDER BY nombre
     `);
+    const [perfilesAcceso] = await pool.query(`
+      SELECT id, usuario, nombre, rol, sede
+      FROM usuarios
+      WHERE rol NOT IN ('ADMIN', 'PANTALLA_MECANICOS', 'PANTALLA_PESADOS')
+      ORDER BY nombre, usuario
+    `);
     const origin = basePublicUrl(_req);
     const trabajadores = await Promise.all(rows.map(async row => ({
       ...row,
@@ -110,11 +119,90 @@ router.get("/admin/carnets-trabajadores", requireAdmin, async (_req, res) => {
         width: 180
       })
     })));
-    res.render("carnets_trabajadores", { trabajadores });
+    res.render("carnets_trabajadores", {
+      trabajadores,
+      perfilesAcceso,
+      mensajeAcceso: _req.session.accesoCarnetMensaje || "",
+      errorAcceso: _req.session.accesoCarnetError || ""
+    });
+    delete _req.session.accesoCarnetMensaje;
+    delete _req.session.accesoCarnetError;
   } catch (error) {
     console.error("Error cargando carnets de trabajadores:", error.code || error.message);
     res.status(500).send("No se pudieron cargar los carnets.");
   }
+});
+
+router.post("/admin/carnets-trabajadores", requireAdmin, async (req, res) => {
+  const nombre = String(req.body.nombre || "").trim().replace(/\s+/g, " ");
+  const cedulaRaw = String(req.body.cedula || "").trim();
+  const cedula = normalizarCedula(cedulaRaw);
+  const codigo = String(req.body.codigo_trabajador || "").trim();
+  const perfil = String(req.body.perfil || "Trabajador").trim().replace(/\s+/g, " ").slice(0, 80);
+  const usuarioIds = [...new Set((Array.isArray(req.body.usuario_ids) ? req.body.usuario_ids : [req.body.usuario_ids])
+    .map(value => Number(value))
+    .filter(value => Number.isSafeInteger(value) && value > 0))];
+
+  if (!nombre || nombre.length > 150 || !cedulaValida(cedulaRaw) || !/^\d{9,12}$/.test(cedula) || !/^\d{1,30}$/.test(codigo) || !usuarioIds.length) {
+    req.session.accesoCarnetError = "Complete nombre, cédula válida, código de trabajador y al menos un perfil de acceso.";
+    return res.redirect("/admin/carnets-trabajadores");
+  }
+
+  let connection;
+  try {
+    connection = await pool.getConnection();
+    await connection.beginTransaction();
+    const [perfiles] = await connection.query(`
+      SELECT id, usuario, nombre, rol
+      FROM usuarios
+      WHERE id IN (?) AND rol NOT IN ('ADMIN', 'PANTALLA_MECANICOS', 'PANTALLA_PESADOS')
+      FOR UPDATE
+    `, [usuarioIds]);
+    if (perfiles.length !== usuarioIds.length) throw new Error("Seleccione perfiles de acceso válidos.");
+
+    const [cedulasExistentes] = await connection.query(
+      "SELECT cedula FROM usuario_cedulas WHERE cedula = ? LIMIT 1 FOR UPDATE",
+      [cedula]
+    );
+    if (cedulasExistentes.length) throw new Error("Ya existe un acceso registrado con esa cédula.");
+
+    const [cedulasLegacy] = await connection.query(
+      "SELECT id FROM usuarios WHERE cedula = ? LIMIT 1 FOR UPDATE",
+      [cedula]
+    );
+    if (cedulasLegacy.length) throw new Error("Esa cédula ya está asignada a una cuenta del sistema.");
+
+    const [codigosExistentes] = await connection.query(
+      "SELECT cedula FROM usuario_cedulas WHERE codigo_trabajador = ? LIMIT 1 FOR UPDATE",
+      [codigo]
+    );
+    if (codigosExistentes.length) throw new Error("Ese código de trabajador ya está asignado.");
+
+    const pinHash = await bcrypt.hash(codigo, 12);
+    const perfilCarnet = perfil || "Trabajador";
+    for (const cuenta of perfiles) {
+      await connection.query(`
+        INSERT INTO usuario_cedulas
+          (cedula, usuario_id, persona_nombre, codigo_trabajador, pin_hash, perfil_excel, requiere_cambio_pin)
+        VALUES (?, ?, ?, ?, ?, ?, 0)
+      `, [cedula, cuenta.id, nombre, codigo, pinHash, perfilCarnet]);
+    }
+    await connection.query(
+      "INSERT INTO carnets_trabajador (cedula, qr_token) VALUES (?, ?)",
+      [cedula, crypto.randomBytes(32).toString("hex")]
+    );
+    await connection.commit();
+    req.session.accesoCarnetMensaje = `Acceso y carnet creados para ${nombre}. El código de trabajador también es su PIN.`;
+  } catch (error) {
+    if (connection) await connection.rollback().catch(() => {});
+    console.error("Error creando acceso y carnet:", error.code || error.message);
+    req.session.accesoCarnetError = error.code === "ER_DUP_ENTRY"
+      ? "La cédula, código o perfil ya está registrado. Revise los datos existentes."
+      : error.message || "No se pudo crear el acceso y carnet.";
+  } finally {
+    connection?.release();
+  }
+  res.redirect("/admin/carnets-trabajadores");
 });
 
 router.get("/admin/carnets-trabajadores/:token.pdf", requireAdmin, async (req, res) => {
