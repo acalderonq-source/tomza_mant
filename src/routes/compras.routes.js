@@ -553,7 +553,7 @@ function rutaComprobantePagoEnDisco(rutaGuardada) {
   return absoluta;
 }
 
-async function registrarEnviosColilla({ colillaId, reciboNumero, fechaPago, tipoPago, comprobanteNumero, correoRespuesta, facturas }) {
+async function registrarEnviosColilla({ colillaId, reciboNumero, fechaPago, tipoPago, comprobanteNumero, comprobanteArchivo, correoRespuesta, facturas }) {
   const grupos = agruparFacturasPorProveedor(facturas);
   const correosCopia = await obtenerCorreosCopiaPagos();
   const copiasValidas = correosCopia.length === 3 && correosCopia.every(correoValido) && new Set(correosCopia).size === 3;
@@ -561,7 +561,10 @@ async function registrarEnviosColilla({ colillaId, reciboNumero, fechaPago, tipo
   const correoReplyTo = normalizarCorreo(correoRespuesta);
   for (const grupo of grupos) {
     const total = grupo.facturas.reduce((suma, factura) => suma + parseMonto(factura.monto_pago ?? factura.total), 0);
-    const comprobantes = [...new Set(grupo.facturas.map(factura => factura.comprobante_pago_archivo).filter(Boolean))];
+    const comprobantes = [...new Set([
+      ...grupo.facturas.map(factura => factura.comprobante_pago_archivo),
+      comprobanteArchivo
+    ].filter(Boolean))];
     const datos = JSON.stringify(grupo.facturas);
     await queryWithRetry(
       `INSERT IGNORE INTO colillas_pago_envios
@@ -7132,6 +7135,57 @@ router.post("/facturas/envios/:id/reintentar", requireAuth, allowRoles("ADMIN", 
   } catch (error) {
     console.error("Error reintentando correo de pago:", error);
     req.session.error = "No se pudo reintentar el correo de pago.";
+    return res.redirect("/compras/facturas/historial-pagos");
+  }
+});
+
+router.post("/facturas/colillas/:id/enviar", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER"), async (req, res) => {
+  try {
+    await ensureFacturasSchema();
+    await ensureNotificacionesPagoSchema();
+    if (!/^\d+$/.test(String(req.params.id || ""))) return res.sendStatus(404);
+    const [[colilla]] = await queryWithRetry(
+      `SELECT id, recibo_numero, DATE_FORMAT(fecha_pago, '%Y-%m-%d') AS fecha_pago,
+              tipo_pago, total_pagado, comprobante_numero, comprobante_archivo, facturas_json
+       FROM colillas_pago_proveedor WHERE id = ? LIMIT 1`,
+      [req.params.id]
+    );
+    if (!colilla) return res.sendStatus(404);
+
+    const facturas = typeof colilla.facturas_json === "string"
+      ? JSON.parse(colilla.facturas_json)
+      : colilla.facturas_json;
+    if (!Array.isArray(facturas) || !facturas.length) {
+      req.session.error = "Esta colilla no tiene detalle de facturas para enviar.";
+      return res.redirect("/compras/facturas/historial-pagos");
+    }
+
+    await queryWithRetry(
+      "UPDATE colillas_pago_envios SET estado = 'PENDIENTE', error = NULL WHERE colilla_id = ? AND estado <> 'ENVIANDO'",
+      [colilla.id]
+    );
+    const estados = await registrarEnviosColilla({
+      colillaId: colilla.id,
+      reciboNumero: colilla.recibo_numero,
+      fechaPago: colilla.fecha_pago,
+      tipoPago: colilla.tipo_pago,
+      comprobanteNumero: colilla.comprobante_numero,
+      comprobanteArchivo: colilla.comprobante_archivo,
+      facturas
+    });
+    if (!estados.length) {
+      req.session.error = "No se encontraron proveedores en el detalle de esta colilla.";
+    } else if (estados.includes("SIN_CORREO")) {
+      req.session.error = "Hay proveedores sin correo registrado. Actualice el correo del proveedor y vuelva a enviar.";
+    } else if (estados.includes("PENDIENTE_CONFIG")) {
+      req.session.error = "El envío quedó pendiente: revise el remitente y las tres copias internas configuradas.";
+    } else {
+      req.session.success = `Se programó el envío de la colilla ${colilla.recibo_numero} a ${estados.length} proveedor(es).`;
+    }
+    return res.redirect("/compras/facturas/historial-pagos");
+  } catch (error) {
+    console.error("Error preparando envío de colilla histórica:", error);
+    req.session.error = "No se pudo preparar el envío de esta colilla.";
     return res.redirect("/compras/facturas/historial-pagos");
   }
 });

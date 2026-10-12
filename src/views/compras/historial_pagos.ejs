@@ -102,7 +102,12 @@
                 <td class="delivery-row">
                   <% const envios = enviosCorreo.get(Number(colilla.id)) || []; %>
                   <% if (!envios.length) { %>
-                    <span class="text-secondary small">Sin envío automático</span>
+                    <div class="text-secondary small mb-1">Aún no enviado</div>
+                    <% if (['ADMIN', 'TALLER', 'PROVEEDURIA_TALLER'].includes(String(user.rol || '').toUpperCase())) { %>
+                      <form method="POST" action="/compras/facturas/colillas/<%= colilla.id %>/enviar" onsubmit="return confirm('¿Enviar ahora esta colilla y los comprobantes disponibles a los proveedores?')">
+                        <button class="btn btn-sm btn-outline-primary" type="submit"><i class="bi bi-envelope-arrow-up me-1"></i>Enviar al proveedor</button>
+                      </form>
+                    <% } %>
                   <% } %>
                   <% envios.forEach(envio => { %>
                     <% const claseEstado = envio.estado === 'ENVIADO' ? 'success' : envio.estado === 'ERROR' || envio.estado === 'SIN_CORREO' ? 'danger' : 'warning'; %>
