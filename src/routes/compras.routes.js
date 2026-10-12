@@ -344,6 +344,117 @@ async function queryWithRetry(sql, params = []) {
   }
 }
 
+async function guardarColillaPago({ reciboNumero, fechaPago, periodoCierre, tipoPago, totalPagado, comprobanteNumero, comprobanteArchivo, generadoPor, facturas, origen = "actual" }) {
+  await pool.query(
+    `INSERT INTO colillas_pago_proveedor
+      (recibo_numero, fecha_pago, periodo_cierre, tipo_pago, total_pagado, comprobante_numero, comprobante_archivo, generado_por, facturas_json, origen)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      reciboNumero,
+      fechaPago,
+      periodoCierre || null,
+      tipoPago,
+      totalPagado,
+      String(comprobanteNumero || "").trim() || null,
+      comprobanteArchivo || null,
+      generadoPor || "Sistema",
+      JSON.stringify(facturas || []),
+      origen
+    ]
+  );
+}
+
+async function reconstruirColillasHistoricas() {
+  const [registrosActuales] = await pool.query(
+    "SELECT facturas_json FROM colillas_pago_proveedor WHERE origen = 'actual'"
+  );
+  const pagosActualesPorFactura = new Set();
+  for (const registro of registrosActuales) {
+    try {
+      const detalle = typeof registro.facturas_json === "string" ? JSON.parse(registro.facturas_json) : registro.facturas_json;
+      for (const factura of Array.isArray(detalle) ? detalle : []) {
+        if (factura.factura_id && factura.tipo) pagosActualesPorFactura.add(`${factura.tipo}:${factura.factura_id}`);
+      }
+    } catch (_) {}
+  }
+
+  const [ordenes] = await pool.query(`
+    SELECT o.id, o.po_numero, o.factura, o.fecha_vencimiento_factura,
+           DATE_FORMAT(o.fecha_pago, '%Y-%m-%d') AS fecha_pago,
+           DATE_FORMAT(o.abono_fecha, '%Y-%m-%d') AS abono_fecha,
+           o.periodo_cierre, o.total, o.nota_credito_monto, o.abono_monto,
+           o.comprobante_pago_numero, o.comprobante_pago_archivo,
+           p.nombre AS proveedor_nombre, COALESCE(o.pagada, 0) AS pagada
+    FROM ordenes_compra o
+    LEFT JOIN proveedores p ON p.id = o.proveedor_id
+    WHERE ((COALESCE(o.pagada, 0) = 1 AND o.fecha_pago IS NOT NULL)
+       OR (COALESCE(o.pagada, 0) = 0 AND COALESCE(o.abono_monto, 0) > 0 AND o.abono_fecha IS NOT NULL))
+      AND NOT EXISTS (
+        SELECT 1 FROM colillas_pago_proveedor cp
+        WHERE cp.recibo_numero IN (CONCAT('LEG-ORD-', o.id), CONCAT('LEG-ABONO-ORD-', o.id))
+      )
+  `);
+  const [independientes] = await pool.query(`
+    SELECT f.id, f.numero_factura AS factura, f.proveedor_nombre,
+           DATE_FORMAT(f.fecha_pago, '%Y-%m-%d') AS fecha_pago,
+           DATE_FORMAT(f.abono_fecha, '%Y-%m-%d') AS abono_fecha,
+           f.periodo_cierre, f.monto, f.nota_credito_monto, f.abono_monto,
+           f.comprobante_pago_numero, f.comprobante_pago_archivo,
+           COALESCE(f.pagada, 0) AS pagada
+    FROM facturas f
+    WHERE ((COALESCE(f.pagada, 0) = 1 AND f.fecha_pago IS NOT NULL)
+       OR (COALESCE(f.pagada, 0) = 0 AND COALESCE(f.abono_monto, 0) > 0 AND f.abono_fecha IS NOT NULL))
+      AND NOT EXISTS (
+        SELECT 1 FROM colillas_pago_proveedor cp
+        WHERE cp.recibo_numero IN (CONCAT('LEG-FAC-', f.id), CONCAT('LEG-ABONO-FAC-', f.id))
+      )
+  `);
+
+  const historicos = [
+    ...ordenes.map(row => ({ ...row, tipo: "orden", montoFactura: row.total })),
+    ...independientes.map(row => ({ ...row, tipo: "independiente", montoFactura: row.monto }))
+  ];
+
+  for (const row of historicos) {
+    if (pagosActualesPorFactura.has(`${row.tipo}:${row.id}`)) continue;
+    const esAbono = !Number(row.pagada);
+    const fechaPago = esAbono ? row.abono_fecha : row.fecha_pago;
+    const montoBase = Math.max(parseMonto(row.montoFactura) - parseMonto(row.nota_credito_monto), 0);
+    const montoPago = esAbono ? parseMonto(row.abono_monto) : montoBase;
+    if (!fechaPago || montoPago <= 0) continue;
+
+    const reciboNumero = `LEG-${esAbono ? "ABONO-" : ""}${row.tipo === "orden" ? "ORD" : "FAC"}-${row.id}`;
+    const factura = {
+      factura_id: Number(row.id),
+      po_numero: row.po_numero || null,
+      proveedor_nombre: row.proveedor_nombre,
+      factura: row.factura,
+      fecha_vencimiento_factura: row.fecha_vencimiento_factura || null,
+      nota_credito_monto: parseMonto(row.nota_credito_monto),
+      abono_monto: 0,
+      abonos_previos: 0,
+      monto_pago: montoPago,
+      total: montoPago,
+      tipo: row.tipo
+    };
+    await pool.query(
+      `INSERT IGNORE INTO colillas_pago_proveedor
+        (recibo_numero, fecha_pago, periodo_cierre, tipo_pago, total_pagado, comprobante_numero, comprobante_archivo, generado_por, facturas_json, origen)
+       VALUES (?, ?, ?, ?, ?, ?, ?, 'Registro previo', ?, 'reconstruido')`,
+      [
+        reciboNumero,
+        fechaPago,
+        row.periodo_cierre || fechaPago.slice(0, 7),
+        esAbono ? "abono" : "pago",
+        montoPago,
+        row.comprobante_pago_numero || null,
+        row.comprobante_pago_archivo || null,
+        JSON.stringify([factura])
+      ]
+    );
+  }
+}
+
 const ensureFacturasState = {
   ready: false,
   promise: null
@@ -6591,6 +6702,104 @@ router.get("/facturas", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_
   }
 });
 
+router.get("/facturas/historial-pagos", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER", "CONTABILIDAD"), async (req, res) => {
+  try {
+    await ensureFacturasSchema();
+    await reconstruirColillasHistoricas();
+    const condiciones = [];
+    const params = [];
+    const desde = String(req.query.desde || "").trim();
+    const hasta = String(req.query.hasta || "").trim();
+    const tipo = ["pago", "abono", "pago_multiple"].includes(req.query.tipo) ? req.query.tipo : "";
+
+    if (/^\d{4}-\d{2}-\d{2}$/.test(desde)) {
+      condiciones.push("fecha_pago >= ?");
+      params.push(desde);
+    }
+    if (/^\d{4}-\d{2}-\d{2}$/.test(hasta)) {
+      condiciones.push("fecha_pago <= ?");
+      params.push(hasta);
+    }
+    if (tipo) {
+      condiciones.push("tipo_pago = ?");
+      params.push(tipo);
+    }
+
+    const where = condiciones.length ? `WHERE ${condiciones.join(" AND ")}` : "";
+    const [rows] = await pool.query(
+      `SELECT id, recibo_numero, DATE_FORMAT(fecha_pago, '%Y-%m-%d') AS fecha_pago,
+              periodo_cierre, tipo_pago, total_pagado, comprobante_numero,
+              generado_por, facturas_json, origen
+       FROM colillas_pago_proveedor ${where}
+       ORDER BY fecha_pago DESC, id DESC
+       LIMIT 250`,
+      params
+    );
+
+    const colillas = rows.map(row => {
+      let facturas = [];
+      try {
+        const parsed = typeof row.facturas_json === "string" ? JSON.parse(row.facturas_json) : row.facturas_json;
+        facturas = Array.isArray(parsed) ? parsed : [];
+      } catch (error) {
+        console.error(`Detalle inválido para colilla ${row.recibo_numero}:`, error.message);
+      }
+      return {
+        ...row,
+        facturas,
+        proveedores: [...new Set(facturas.map(f => String(f.proveedor_nombre || "Sin proveedor").trim()))].join(", "),
+        numerosFactura: facturas.map(f => f.factura).filter(Boolean).join(", ")
+      };
+    });
+
+    res.render("compras/historial_pagos", {
+      colillas,
+      filtros: { desde, hasta, tipo },
+      user: req.session.user,
+      limite: 250
+    });
+  } catch (error) {
+    console.error("Error cargando historial de pagos:", error);
+    res.status(500).send("No se pudo cargar el historial de pagos.");
+  }
+});
+
+router.get("/facturas/colillas/:id/descargar", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER", "CONTABILIDAD"), async (req, res) => {
+  try {
+    if (!/^\d+$/.test(String(req.params.id || ""))) return res.sendStatus(404);
+    const [[colilla]] = await pool.query(
+      `SELECT recibo_numero, DATE_FORMAT(fecha_pago, '%Y-%m-%d') AS fecha_pago,
+              total_pagado, comprobante_numero, generado_por, facturas_json
+       FROM colillas_pago_proveedor WHERE id = ? LIMIT 1`,
+      [req.params.id]
+    );
+    if (!colilla) return res.sendStatus(404);
+
+    const facturas = typeof colilla.facturas_json === "string"
+      ? JSON.parse(colilla.facturas_json)
+      : colilla.facturas_json;
+    if (!Array.isArray(facturas)) return res.status(500).send("El detalle de esta colilla no es válido.");
+
+    const { generarPDFReciboPago } = require("../utils/pdfReciboPago");
+    const buffer = await generarPDFReciboPago({
+      facturas,
+      fechaPago: colilla.fecha_pago,
+      totalPagado: colilla.total_pagado,
+      reciboNumero: colilla.recibo_numero,
+      comprobanteNumero: colilla.comprobante_numero,
+      generadoPor: colilla.generado_por
+    });
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename=colilla_pago_proveedor_${colilla.recibo_numero}.pdf`);
+    res.setHeader("Cache-Control", "no-store");
+    res.setHeader("Content-Length", buffer.length);
+    return res.end(buffer);
+  } catch (error) {
+    console.error("Error descargando colilla de pago:", error);
+    return res.status(500).send("No se pudo volver a generar la colilla.");
+  }
+});
+
 router.get("/facturas/dashboard", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER", "CONTABILIDAD"), async (req, res) => {
   try {
     await ensureFacturasSchema();
@@ -7729,6 +7938,17 @@ router.post("/facturas/:id/abono", requireAuth, allowRoles("ADMIN", "TALLER", "P
       comprobanteNumero: comprobante_numero,
       generadoPor: req.session.user?.usuario || "Sistema"
     });
+    await guardarColillaPago({
+      reciboNumero,
+      fechaPago: fechaAbono,
+      periodoCierre,
+      tipoPago: "abono",
+      totalPagado: montoAbono,
+      comprobanteNumero: comprobante_numero,
+      comprobanteArchivo: comprobante?.path,
+      generadoPor: req.session.user?.usuario || "Sistema",
+      facturas: [{ ...detalle[0], factura_id: Number(id), tipo, nota_credito_monto: factura.nota_credito_monto, abono_monto: saldos.abonoMonto, abonos_previos: saldos.abonoMonto, monto_pago: montoAbono, total: montoAbono, observacion: observacion_abono }]
+    });
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `attachment; filename=colilla_pago_proveedor_${reciboNumero}.pdf`);
     res.setHeader("Cache-Control", "no-store");
@@ -7821,6 +8041,17 @@ router.post("/facturas/:id/pagar", requireAuth, allowRoles("ADMIN", "TALLER", "P
       reciboNumero,
       comprobanteNumero,
       generadoPor: req.session.user?.usuario || "Sistema"
+    });
+    await guardarColillaPago({
+      reciboNumero,
+      fechaPago,
+      periodoCierre,
+      tipoPago: "pago",
+      totalPagado: montoPagoReal,
+      comprobanteNumero,
+      comprobanteArchivo: comprobante?.path,
+      generadoPor: req.session.user?.usuario || "Sistema",
+      facturas: [{ ...detalle[0], factura_id: Number(id), tipo, monto_pago: montoPagoReal, total: montoPagoReal }]
     });
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `attachment; filename=colilla_pago_proveedor_${reciboNumero}.pdf`);
@@ -8033,6 +8264,18 @@ router.post("/facturas/pagar-multiple", requireAuth, allowRoles("ADMIN", "TALLER
       reciboNumero,
       comprobanteNumero,
       generadoPor: req.session.user?.usuario || "Sistema"
+    });
+
+    await guardarColillaPago({
+      reciboNumero,
+      fechaPago,
+      periodoCierre,
+      tipoPago: "pago_multiple",
+      totalPagado,
+      comprobanteNumero,
+      comprobanteArchivo: comprobante?.path,
+      generadoPor: req.session.user?.usuario || "Sistema",
+      facturas: facturas.map(factura => ({ ...factura, factura_id: Number(factura.id) }))
     });
 
     res.setHeader('Content-Type', 'application/pdf');
