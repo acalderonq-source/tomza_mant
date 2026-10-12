@@ -800,6 +800,81 @@ router.get("/", async (req, res) => {
   }
 });
 
+router.get("/estanones/:id", async (req, res) => {
+  try {
+    await ensureAceiteTables();
+    if (!/^\d+$/.test(String(req.params.id || ""))) return res.sendStatus(404);
+    const sedesPermitidas = await getSedesPermitidasAceite(req);
+    const sedesInventario = expandirSedesInventarioAceite(sedesPermitidas);
+    const [[estanon]] = await pool.query(
+      `SELECT ae.*, DATE_FORMAT(ae.fecha_compra, '%d/%m/%Y') AS fecha_compra_formato,
+              COALESCE(entrada.litros_entrada, 0) AS litros_entrada,
+              COALESCE(salidas.litros_consumidos, 0) AS litros_consumidos,
+              COALESCE(salidas.cantidad, 0) AS cantidad_salidas
+       FROM aceite_estanones ae
+       LEFT JOIN (
+         SELECT estanon_id, SUM(litros) AS litros_entrada
+         FROM aceite_movimientos WHERE tipo = 'ENTRADA' GROUP BY estanon_id
+       ) entrada ON entrada.estanon_id = ae.id
+       LEFT JOIN (
+         SELECT estanon_id, SUM(litros) AS litros_consumidos, COUNT(*) AS cantidad
+         FROM aceite_movimientos WHERE tipo = 'SALIDA' GROUP BY estanon_id
+       ) salidas ON salidas.estanon_id = ae.id
+       WHERE ae.id = ? AND ae.sede IN (?)
+       LIMIT 1`,
+      [req.params.id, sedesInventario]
+    );
+    if (!estanon) return res.sendStatus(404);
+
+    const [movimientos] = await pool.query(
+      `SELECT am.id, am.tipo, am.litros, am.sede, am.descripcion, am.placa, am.unidad_id,
+              am.cambio_aceite_id,
+              DATE_FORMAT(am.creado_en, '%d/%m/%Y %H:%i') AS fecha_formato,
+              us.nombre AS usuario_nombre, ca.km_actual
+       FROM aceite_movimientos am
+       LEFT JOIN usuarios us ON us.id = am.creado_por
+       LEFT JOIN cambios_aceite ca ON ca.id = am.cambio_aceite_id
+       WHERE am.estanon_id = ?
+       ORDER BY am.creado_en DESC, am.id DESC`,
+      [estanon.id]
+    );
+    const litrosBaseCosto = Number(estanon.litros_entrada || estanon.litros_capacidad || 0);
+    const costoPorLitro = litrosBaseCosto > 0 && Number(estanon.monto_total || 0) > 0
+      ? Number(estanon.monto_total) / litrosBaseCosto
+      : null;
+    const gastoConsumido = costoPorLitro === null
+      ? null
+      : Number(estanon.litros_consumidos || 0) * costoPorLitro;
+    const destinos = new Map();
+    for (const movimiento of movimientos) {
+      if (movimiento.tipo !== "SALIDA") continue;
+      const placa = String(movimiento.placa || "").trim() || "Uso general / sin placa";
+      const destino = destinos.get(placa) || { placa, litros: 0, movimientos: 0, gasto: 0 };
+      destino.litros += Number(movimiento.litros || 0);
+      destino.movimientos += 1;
+      if (costoPorLitro !== null) destino.gasto += Number(movimiento.litros || 0) * costoPorLitro;
+      destinos.set(placa, destino);
+      movimiento.gasto_estimado = costoPorLitro === null
+        ? null
+        : Number(movimiento.litros || 0) * costoPorLitro;
+    }
+
+    return res.render("aceite_estanon_detalle", {
+      estanon,
+      movimientos,
+      destinos: [...destinos.values()].sort((a, b) => b.litros - a.litros),
+      costoPorLitro,
+      gastoConsumido,
+      user: req.session.user,
+      etiquetaSede: etiquetaSedeInventarioAceite,
+      galonALitros: GALON_A_LITROS
+    });
+  } catch (error) {
+    console.error("Error cargando detalle de estañón de aceite:", error);
+    res.status(500).send("No se pudo cargar el detalle del estañón.");
+  }
+});
+
 router.get("/nuevo", async (req, res) => {
   try {
     if (!puedeGestionarAceite(req.session.user)) {

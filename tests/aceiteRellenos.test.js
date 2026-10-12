@@ -119,3 +119,27 @@ test('rendered fill form supports an optional plate and requires a site for gene
   assert.match(form, /name="galones_usados"/);
   assert.match(form, /value="Guapiles" selected/);
 });
+
+test('drum detail displays the consumption breakdown and movement ledger', async () => {
+  const html = await ejs.renderFile(path.join(__dirname, '../src/views/aceite_estanon_detalle.ejs'), {
+    estanon: {
+      id: 12, descripcion: 'Aceite 15W40', sede: 'Guapiles', fecha_compra_formato: '12/10/2026',
+      estado: 'ACTIVO', litros_capacidad: 208.2, litros_restantes: 180, litros_entrada: 208.2,
+      litros_consumidos: 28.2, cantidad_salidas: 2, monto_total: 100000
+    },
+    movimientos: [{
+      id: 5, tipo: 'SALIDA', litros: 10, sede: 'Guapiles', descripcion: 'Relleno semanal',
+      placa: 'C123456', fecha_formato: '12/10/2026 10:00', usuario_nombre: 'Bodeguero', gasto_estimado: 4803
+    }],
+    destinos: [{ placa: 'C123456', litros: 10, movimientos: 1, gasto: 4803 }],
+    costoPorLitro: 480.3,
+    gastoConsumido: 13544.46,
+    etiquetaSede: value => value,
+    galonALitros: 3.78541,
+    user: bodeguero
+  });
+  assert.match(html, /Gasto consumido estimado/);
+  assert.match(html, /C123456/);
+  assert.match(html, /Relleno semanal/);
+  assert.match(html, /Movimientos del estañón/);
+});

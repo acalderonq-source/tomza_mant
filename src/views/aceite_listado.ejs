@@ -596,6 +596,9 @@
                 <span><%= formatoGalones(litrosAGalones(item.litros_consumidos)) %> gal consumidos</span>
               </div>
               <div class="small muted mt-2"><%= Number(item.salidas || 0).toLocaleString('es-CR') %> rebajo(s) registrados</div>
+              <a class="btn btn-sm btn-outline-primary mt-3" href="/aceite/estanones/<%= item.id %>">
+                <i class="bi bi-clipboard-data me-1"></i> Ver gasto detallado
+              </a>
               <% if (puedeGestionar) { %>
                 <form method="POST" action="/aceite/estanones/<%= item.id %>/costo" class="cost-edit-form">
                   <div>
@@ -645,13 +648,13 @@
             <th class="text-end">Consumido</th>
             <th class="text-end">Restante</th>
             <th class="text-end">Rebajos</th>
-            <% if (puedeEliminarEstanones) { %><th class="text-end">Acción</th><% } %>
+            <th>Detalle / acción</th>
           </tr>
         </thead>
         <tbody>
           <% if (!estanonesHistorial.length) { %>
             <tr>
-              <td colspan="<%= puedeEliminarEstanones ? 9 : 8 %>" class="text-center muted fw-bold py-4">Sin estañones en historial.</td>
+              <td colspan="9" class="text-center muted fw-bold py-4">Sin estañones en historial.</td>
             </tr>
           <% } %>
           <% estanonesHistorial.forEach(item => { %>
@@ -672,13 +675,18 @@
               <td class="text-end fw-bold"><%= formatoGalones(litrosAGalones(item.litros_consumidos)) %> gal</td>
               <td class="text-end"><%= formatoGalones(litrosAGalones(item.litros_restantes)) %> gal</td>
               <td class="text-end"><%= Number(item.salidas || 0).toLocaleString('es-CR') %></td>
-              <% if (puedeEliminarEstanones) { %>
-                <td class="text-end">
+              <td>
+                <div class="d-flex justify-content-end gap-2 flex-wrap">
+                  <a class="btn btn-sm btn-outline-primary" href="/aceite/estanones/<%= item.id %>" title="Ver gasto y movimientos">
+                    <i class="bi bi-clipboard-data me-1"></i>Detalle
+                  </a>
+                  <% if (puedeEliminarEstanones) { %>
                   <form method="POST" action="/aceite/estanones/<%= item.id %>/eliminar" onsubmit="return confirm('¿Eliminar este estañón histórico y todos sus movimientos? Esta acción afecta el gasto de aceite por placas.');">
                     <button class="btn btn-sm btn-outline-danger fw-bold"><i class="bi bi-trash"></i></button>
                   </form>
-                </td>
-              <% } %>
+                  <% } %>
+                </div>
+              </td>
             </tr>
           <% }) %>
         </tbody>
