@@ -3179,7 +3179,6 @@
     if (!canvas) return;
     const labels = mesesData.map(item => item.periodo || item.nombre);
     const series = [
-      { label: 'Presupuesto original', key: 'presupuesto', color: '#111827' },
       { label: 'Saldo', key: 'saldo', color: '#e11d48' },
       { label: 'Gastado', key: 'gasto', color: '#2563eb' },
       { label: 'Pagado', key: 'pagado', color: '#059669' }
@@ -3205,7 +3204,7 @@
           pointRadius: 3,
           borderWidth: 3,
           tension: .25,
-          fill: item.key === 'presupuesto' || item.key === 'saldo'
+          fill: item.key === 'saldo'
         }))
       },
       options: {

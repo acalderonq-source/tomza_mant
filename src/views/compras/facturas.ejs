@@ -1546,6 +1546,89 @@
     });
   });
 
+  [
+    'pagarFacturaForm',
+    'multiplePagoForm',
+    'abonoFacturaForm'
+  ].forEach(formId => {
+    const form = document.getElementById(formId);
+    if (!form) return;
+
+    form.addEventListener('submit', async event => {
+      if (event.defaultPrevented) return;
+      event.preventDefault();
+      if (form.dataset.receiptSubmitting === '1') return;
+      form.dataset.receiptSubmitting = '1';
+
+      const submitter = event.submitter || form.querySelector('[type="submit"]');
+      const originalButtonHtml = submitter?.innerHTML;
+      if (submitter) {
+        submitter.disabled = true;
+        submitter.innerHTML = '<span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>Procesando y generando colilla...';
+      }
+
+      try {
+        const body = new URLSearchParams();
+        new FormData(form).forEach((value, key) => {
+          if (typeof value === 'string') body.append(key, value);
+        });
+
+        const response = await fetch(form.action || window.location.href, {
+          method: 'POST',
+          body,
+          credentials: 'same-origin',
+          headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        });
+        const contentType = response.headers.get('content-type') || '';
+
+        if (response.ok && contentType.includes('application/pdf')) {
+          const blob = await response.blob();
+          if (!blob.size) throw new Error('La colilla llegó vacía. No se descargó el archivo.');
+
+          const disposition = response.headers.get('content-disposition') || '';
+          const filenameMatch = disposition.match(/filename\*?=(?:UTF-8''|")?([^;"]+)/i);
+          const filename = filenameMatch?.[1]?.trim() || 'colilla_pago_proveedor.pdf';
+          const downloadUrl = URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.href = downloadUrl;
+          link.download = filename;
+          document.body.appendChild(link);
+          link.click();
+          link.remove();
+          window.setTimeout(() => URL.revokeObjectURL(downloadUrl), 60000);
+
+          const modal = form.closest('.modal');
+          if (modal && window.bootstrap?.Modal) {
+            window.bootstrap.Modal.getInstance(modal)?.hide();
+          }
+          window.setTimeout(() => window.location.reload(), 1000);
+          return;
+        }
+
+        let message = 'No se pudo registrar el pago ni generar la colilla.';
+        if (contentType.includes('text/html')) {
+          const html = await response.text();
+          const parsed = new DOMParser().parseFromString(html, 'text/html');
+          const alertMessage = parsed.querySelector('.alert-danger, .alert-warning')?.textContent?.trim();
+          if (alertMessage) message = alertMessage;
+          else if (response.url.includes('/login')) message = 'La sesión venció. Ingrese de nuevo e intente pagar la factura.';
+        } else {
+          const text = (await response.text()).trim();
+          if (text) message = text.slice(0, 500);
+        }
+        window.alert(message);
+      } catch (error) {
+        window.alert(error.message || 'Ocurrió un error al generar la colilla de pago. Intente de nuevo.');
+      } finally {
+        form.dataset.receiptSubmitting = '0';
+        if (submitter) {
+          submitter.disabled = false;
+          submitter.innerHTML = originalButtonHtml || 'Confirmar';
+        }
+      }
+    });
+  });
+
   function periodoDesdeFecha(fecha) {
     return /^\d{4}-\d{2}-\d{2}$/.test(String(fecha || '')) ? fecha.slice(0, 7) : '<%= hoy.slice(0, 7) %>';
   }
