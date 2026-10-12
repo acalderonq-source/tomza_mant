@@ -11,5 +11,4 @@ ALTER TABLE dekra_control
   ADD COLUMN recordatorio_15d_enviado TINYINT(1) NOT NULL DEFAULT 0,
   ADD COLUMN recordatorio_2d_enviado TINYINT(1) NOT NULL DEFAULT 0,
   ADD COLUMN recordatorio_15d_segundo_enviado TINYINT(1) NOT NULL DEFAULT 0,
-  ADD COLUMN recordatorio_2d_segundo_enviado TINYINT(1) NOT NULL DEFAULT 0,
-  ADD COLUMN cita_creada_por INT NULL;
+  ADD COLUMN recordatorio_2d_segundo_enviado TINYINT(1) NOT NULL DEFAULT 0;

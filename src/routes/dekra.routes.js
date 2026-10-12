@@ -2,7 +2,7 @@ const express = require("express");
 const router = express.Router();
 const pool = require("../db");
 const { esUsuarioTodasSedes, sedeGranelDesdeUsuario } = require("../utils/sedes");
-const { obtenerCorreosSupervisores, enviarAvisoCitaDekra, asegurarColumnaRemitenteCita } = require("../utils/dekraMail");
+const { obtenerCorreosSupervisores, enviarAvisoCitaDekra } = require("../utils/dekraMail");
 
 const mesesPorCiclo = {
   "ENE-JUL": ["Enero", "Julio"],
@@ -298,15 +298,14 @@ async function guardarCita(req, res, slot) {
     if (!mesEsperado || Number(fecha.slice(5, 7)) !== mesEsperado) {
       return res.status(400).send(`La fecha de esta cita debe quedar dentro del mes de ${meses?.[indiceMes] || "revisión"}.`);
     }
-    await asegurarColumnaRemitenteCita();
     await pool.query(
       `UPDATE dekra_control
-       SET ${campos.fecha} = ?, ${campos.hora} = ?, ${campos.lugar} = ?, cita_correos = ?, cita_creada_por = ?,
+       SET ${campos.fecha} = ?, ${campos.hora} = ?, ${campos.lugar} = ?, cita_correos = ?,
            ${campos.estado} = 'PENDIENTE', ${campos.observacion} = NULL,
            ${campos.recordatorio15} = 0, ${campos.recordatorio2} = 0,
            actualizado_por = ?, fecha_actualizacion = NOW()
        WHERE id = ?`,
-      [fecha, hora || null, lugar?.trim() || null, destinatarios.join(","), req.session.user.id, req.session.user.id, req.params.id]
+      [fecha, hora || null, lugar?.trim() || null, destinatarios.join(","), req.session.user.id, req.params.id]
     );
 
     const aviso = await enviarAvisoCitaDekra({
@@ -315,7 +314,7 @@ async function guardarCita(req, res, slot) {
       cita_hora: hora,
       cita_lugar: lugar,
       mes_revision: meses?.[indiceMes] || `Revisión ${indiceMes + 1}`
-    }, destinatarios, null, req.session.user.id);
+    }, destinatarios);
     res.redirect(`/dekra?cita=${aviso ? "enviada" : "correo_error"}`);
   } catch (error) {
     console.error("❌ Error programando cita DEKRA:", error);

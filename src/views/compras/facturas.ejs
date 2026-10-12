@@ -421,7 +421,6 @@
       <a href="/compras/ordenes" class="btn btn-sm btn-outline-light ms-2">← Órdenes</a>
       <a href="/dashboard" class="btn btn-sm btn-outline-light ms-2">Dashboard</a>
     <% } %>
-    <a href="/compras/facturas/correo/remitente" class="btn btn-sm btn-outline-info ms-2">Correo remitente</a>
     <% if (String(user.rol || '').toUpperCase() === 'ADMIN') { %>
       <a href="/compras/facturas/correo" class="btn btn-sm btn-outline-info ms-2"><i class="bi bi-envelope-arrow-down"></i> Correo electrónico</a>
     <% } %>
@@ -1202,7 +1201,7 @@
           <div class="mb-3">
             <label class="form-label">Correo para respuestas (opcional)</label>
             <input type="email" name="correo_respuesta" class="form-control" autocomplete="email">
-            <small class="text-muted">Si vinculó Outlook, las respuestas irán a su cuenta. Si no, puede indicar aquí un correo alternativo.</small>
+            <small class="text-muted">Opcional: dirección a la que el proveedor puede responder. El envío sale del remitente general.</small>
           </div>
           <div class="mb-3">
             <label class="form-label">N.° de comprobante</label>
@@ -1251,7 +1250,7 @@
         <div class="mb-3">
           <label class="form-label">Correo para respuestas (opcional)</label>
           <input type="email" name="correo_respuesta" class="form-control" autocomplete="email" form="multiplePagoForm">
-          <small class="text-muted">Si vinculó Outlook, las respuestas irán a su cuenta. Si no, puede indicar aquí un correo alternativo.</small>
+          <small class="text-muted">Opcional: dirección para respuestas del proveedor; se aplicará a las colillas del pago múltiple.</small>
         </div>
         <div class="mb-3">
           <label class="form-label">N.° de comprobante</label>
@@ -1350,7 +1349,7 @@
           <div class="mb-3">
             <label class="form-label">Correo para respuestas (opcional)</label>
             <input type="email" name="correo_respuesta" class="form-control" autocomplete="email">
-            <small class="text-muted">Si vinculó Outlook, las respuestas irán a su cuenta. Si no, puede indicar aquí un correo alternativo.</small>
+            <small class="text-muted">Opcional: dirección a la que el proveedor puede responder. El envío sale del remitente general.</small>
           </div>
           <div class="mb-3">
             <label class="form-label">Observación</label>

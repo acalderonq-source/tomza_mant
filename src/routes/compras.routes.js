@@ -15,7 +15,6 @@ const { consumptionOrderLines, reportPeriod } = require("../utils/bodegaReportes
 const { ensureUploadDirectory } = require("../utils/uploadStorage");
 const { UPLOAD_ROOT } = require("../utils/uploadStorage");
 const enviarCorreo = require("../utils/mail");
-const employeeMail = require("../utils/employeeMail");
 const { normalizarCorreo, correoValido, agruparFacturasPorProveedor, construirCorreoPago } = require("../utils/pagoProveedorCorreo");
 const { fechaValida: fechaCajaValida, centavos: centavosCaja, datosDocumento: validarDocumentoCaja, monedaCRC } = require('../utils/cajaChicaValidacion');
 const { asegurarColumnasReapertura, reabrirCorteCajaChica } = require('../utils/cajaChicaReapertura');
@@ -504,7 +503,6 @@ async function ensureNotificacionesPagoSchema() {
     CREATE TABLE IF NOT EXISTS colillas_pago_envios (
       id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
       colilla_id BIGINT UNSIGNED NOT NULL,
-      usuario_id INT NULL,
       clave_proveedor VARCHAR(220) NOT NULL,
       proveedor_id BIGINT UNSIGNED NULL,
       proveedor_nombre VARCHAR(220) NOT NULL,
@@ -532,9 +530,6 @@ async function ensureNotificacionesPagoSchema() {
   if (!(await columnExists("colillas_pago_envios", "correo_respuesta"))) {
     await queryWithRetry("ALTER TABLE colillas_pago_envios ADD COLUMN correo_respuesta VARCHAR(254) NULL AFTER correo_destino");
   }
-  if (!(await columnExists("colillas_pago_envios", "usuario_id"))) {
-    await queryWithRetry("ALTER TABLE colillas_pago_envios ADD COLUMN usuario_id INT NULL AFTER colilla_id");
-  }
 }
 
 async function obtenerCorreosCopiaPagos() {
@@ -558,14 +553,11 @@ function rutaComprobantePagoEnDisco(rutaGuardada) {
   return absoluta;
 }
 
-async function registrarEnviosColilla({ colillaId, usuarioId, reciboNumero, fechaPago, tipoPago, comprobanteNumero, correoRespuesta, facturas }) {
+async function registrarEnviosColilla({ colillaId, reciboNumero, fechaPago, tipoPago, comprobanteNumero, correoRespuesta, facturas }) {
   const grupos = agruparFacturasPorProveedor(facturas);
   const correosCopia = await obtenerCorreosCopiaPagos();
   const copiasValidas = correosCopia.length === 3 && correosCopia.every(correoValido) && new Set(correosCopia).size === 3;
-  const tieneCorreoPersonal = usuarioId && employeeMail.ready()
-    ? Boolean(await employeeMail.getConnection(usuarioId).catch(() => null))
-    : false;
-  const remitenteValido = enviarCorreo.estaConfigurado("facturas") || tieneCorreoPersonal;
+  const remitenteValido = enviarCorreo.estaConfigurado("facturas");
   const correoReplyTo = normalizarCorreo(correoRespuesta);
   for (const grupo of grupos) {
     const total = grupo.facturas.reduce((suma, factura) => suma + parseMonto(factura.monto_pago ?? factura.total), 0);
@@ -573,11 +565,11 @@ async function registrarEnviosColilla({ colillaId, usuarioId, reciboNumero, fech
     const datos = JSON.stringify(grupo.facturas);
     await queryWithRetry(
       `INSERT IGNORE INTO colillas_pago_envios
-        (colilla_id, usuario_id, clave_proveedor, proveedor_id, proveedor_nombre, correo_destino, correo_respuesta, correos_copia,
+        (colilla_id, clave_proveedor, proveedor_id, proveedor_nombre, correo_destino, correo_respuesta, correos_copia,
          recibo_numero, fecha_pago, tipo_pago, comprobante_numero, monto, facturas_json, comprobantes_json, estado)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
-        colillaId, usuarioId || null, grupo.clave, grupo.proveedor_id, grupo.proveedor_nombre,
+        colillaId, grupo.clave, grupo.proveedor_id, grupo.proveedor_nombre,
         correoValido(grupo.proveedor_email) ? grupo.proveedor_email : null,
         correoValido(correoReplyTo) ? correoReplyTo : null,
         JSON.stringify(correosCopia), reciboNumero, fechaPago, tipoPago, String(comprobanteNumero || "").trim() || null, total, datos,
@@ -731,25 +723,12 @@ async function procesarEnvioColilla(envioId) {
       tipoPago: envio.tipo_pago,
       comprobanteNumero: envio.comprobante_numero
     });
-    let enviadoPersonal = false;
-    if (envio.usuario_id) {
-      try {
-        enviadoPersonal = Boolean(await employeeMail.sendAsUser(envio.usuario_id, {
-          to: correoDestino, subject: correo.subject, html: correo.html, cc: copias, attachments
-        }));
-      } catch (error) {
-        console.warn(`No se pudo usar el correo personal del usuario ${envio.usuario_id}; se usará el remitente general:`, error.message);
-      }
-    }
-    if (!enviadoPersonal) {
-      const cuentaPersonal = envio.usuario_id ? await employeeMail.getConnection(envio.usuario_id).catch(() => null) : null;
-      await enviarCorreo(correoDestino, correo.subject, correo.html, {
-        perfil: "facturas",
-        cc: copias,
-        replyTo: correoValido(envio.correo_respuesta) ? normalizarCorreo(envio.correo_respuesta) : cuentaPersonal?.correo,
-        attachments
-      });
-    }
+    await enviarCorreo(correoDestino, correo.subject, correo.html, {
+      perfil: "facturas",
+      cc: copias,
+      replyTo: correoValido(envio.correo_respuesta) ? normalizarCorreo(envio.correo_respuesta) : undefined,
+      attachments
+    });
     await queryWithRetry(
       "UPDATE colillas_pago_envios SET estado = 'ENVIADO', error = NULL, enviado_en = NOW() WHERE id = ?",
       [envioId]
@@ -8351,7 +8330,7 @@ router.post("/facturas/:id/abono", requireAuth, allowRoles("ADMIN", "TALLER", "P
       facturas: facturasColilla
     });
     const estadoCorreo = await notificarPagoProveedorSeguro({
-      colillaId, usuarioId: req.session.user?.id, correoRespuesta,
+      colillaId, correoRespuesta,
       reciboNumero, fechaPago: fechaAbono, tipoPago: "abono", comprobanteNumero: comprobante_numero, facturas: facturasColilla
     });
     res.setHeader("X-Email-Notification", estadoCorreo);
@@ -8468,7 +8447,7 @@ router.post("/facturas/:id/pagar", requireAuth, allowRoles("ADMIN", "TALLER", "P
       facturas: facturasColilla
     });
     const estadoCorreo = await notificarPagoProveedorSeguro({
-      colillaId, usuarioId: req.session.user?.id, correoRespuesta, reciboNumero, fechaPago, tipoPago: "pago", comprobanteNumero, facturas: facturasColilla
+      colillaId, correoRespuesta, reciboNumero, fechaPago, tipoPago: "pago", comprobanteNumero, facturas: facturasColilla
     });
     res.setHeader("X-Email-Notification", estadoCorreo);
     res.setHeader("Content-Type", "application/pdf");
@@ -8712,7 +8691,7 @@ router.post("/facturas/pagar-multiple", requireAuth, allowRoles("ADMIN", "TALLER
     });
 
     const estadoCorreo = await notificarPagoProveedorSeguro({
-      colillaId, usuarioId: req.session.user?.id, correoRespuesta, reciboNumero, fechaPago, tipoPago: "pago_multiple", comprobanteNumero, facturas: facturasConComprobantes
+      colillaId, correoRespuesta, reciboNumero, fechaPago, tipoPago: "pago_multiple", comprobanteNumero, facturas: facturasConComprobantes
     });
     res.setHeader("X-Email-Notification", estadoCorreo);
 

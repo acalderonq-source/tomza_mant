@@ -1,17 +1,5 @@
 const pool = require("../db");
 const enviarCorreo = require("./mail");
-const employeeMail = require("./employeeMail");
-
-let actorColumnReady;
-async function asegurarColumnaRemitenteCita() {
-  if (!actorColumnReady) {
-    actorColumnReady = (async () => {
-      const [rows] = await pool.query("SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'dekra_control' AND COLUMN_NAME = 'cita_creada_por' LIMIT 1");
-      if (!rows.length) await pool.query("ALTER TABLE dekra_control ADD COLUMN cita_creada_por INT NULL");
-    })().catch(error => { actorColumnReady = null; throw error; });
-  }
-  return actorColumnReady;
-}
 
 const correos = [
   { sede: "Cartago", negocio: null, email: "MGomez.M@tomza.com" },
@@ -36,23 +24,10 @@ function escaparHtml(valor) {
   })[caracter]);
 }
 
-async function enviarCorreoALista(destinatarios, asunto, html, userId = null) {
+async function enviarCorreoALista(destinatarios, asunto, html) {
   const resultados = await Promise.all(destinatarios.map(async email => {
     try {
-      let enviadoPersonal = false;
-      let correoPersonal = null;
-      if (userId) {
-        correoPersonal = await employeeMail.getConnection(userId).catch(() => null);
-        try {
-          enviadoPersonal = Boolean(await employeeMail.sendAsUser(userId, { to: email, subject: asunto, html }));
-        } catch (error) {
-          console.warn(`No se pudo usar el correo DEKRA del usuario ${userId}; se usará el remitente general:`, error.message);
-        }
-      }
-      if (!enviadoPersonal) await enviarCorreo(email, asunto, html, {
-        perfil: "dekra",
-        replyTo: correoPersonal?.correo || undefined
-      });
+      await enviarCorreo(email, asunto, html, { perfil: "dekra" });
       return true;
     } catch (error) {
       console.error(`Error enviando correo DEKRA a ${email}:`, error.message);
@@ -94,11 +69,11 @@ function generarCorreoCitaDekra(registro, diasAntes = null) {
     </div>`;
 }
 
-async function enviarAvisoCitaDekra(registro, destinatarios, diasAntes = null, userId = registro.cita_creada_por || null) {
+async function enviarAvisoCitaDekra(registro, destinatarios, diasAntes = null) {
   const asunto = diasAntes === null
     ? `Cita DEKRA programada - ${registro.placa}`
     : `Recordatorio DEKRA (${diasAntes} días) - ${registro.placa}`;
-  return enviarCorreoALista(destinatarios, asunto, generarCorreoCitaDekra(registro, diasAntes), userId);
+  return enviarCorreoALista(destinatarios, asunto, generarCorreoCitaDekra(registro, diasAntes));
 }
 
 function fechaCostaRicaMasDias(dias) {
@@ -108,7 +83,6 @@ function fechaCostaRicaMasDias(dias) {
 }
 
 async function enviarRecordatoriosCitasDekra(diasAntes, slot = "primera") {
-  await asegurarColumnaRemitenteCita();
   const slots = {
     primera: { fecha: "cita_fecha", estado: "estado", quince: "recordatorio_15d_enviado", dos: "recordatorio_2d_enviado", indice: 0 },
     segunda: { fecha: "cita_fecha_segunda", estado: "estado_segunda", quince: "recordatorio_15d_segundo_enviado", dos: "recordatorio_2d_segundo_enviado", indice: 1 }
@@ -122,7 +96,7 @@ async function enviarRecordatoriosCitasDekra(diasAntes, slot = "primera") {
     `SELECT d.id, d.sede, d.negocio, d.mes, d.${campos.fecha} AS cita_fecha,
             d.${slot === "primera" ? "cita_hora" : "cita_hora_segunda"} AS cita_hora,
             d.${slot === "primera" ? "cita_lugar" : "cita_lugar_segunda"} AS cita_lugar,
-            d.cita_correos, d.cita_creada_por, u.placa
+            d.cita_correos, u.placa
      FROM dekra_control d
      JOIN unidades u ON u.id = d.unidad_id
      WHERE d.${campos.estado} = 'PENDIENTE' AND d.${campos.fecha} = ? AND d.${bandera} = 0`,
@@ -138,7 +112,7 @@ async function enviarRecordatoriosCitasDekra(diasAntes, slot = "primera") {
       "MAY-NOV": ["Mayo", "Noviembre"], "JUN-DIC": ["Junio", "Diciembre"]
     };
     registro.mes_revision = ciclos[registro.mes]?.[campos.indice] || `Revisión ${campos.indice + 1}`;
-    const enviado = await enviarAvisoCitaDekra(registro, destinatarios, diasAntes, registro.cita_creada_por);
+    const enviado = await enviarAvisoCitaDekra(registro, destinatarios, diasAntes);
     if (enviado) {
       await pool.query(`UPDATE dekra_control SET ${bandera} = 1 WHERE id = ?`, [registro.id]);
     }
@@ -217,5 +191,4 @@ async function enviarAlertasDekra() {
 module.exports = enviarAlertasDekra;
 module.exports.obtenerCorreosSupervisores = obtenerCorreosSupervisores;
 module.exports.enviarAvisoCitaDekra = enviarAvisoCitaDekra;
-module.exports.asegurarColumnaRemitenteCita = asegurarColumnaRemitenteCita;
 module.exports.enviarRecordatoriosCitasDekra = enviarRecordatoriosCitasDekra;
