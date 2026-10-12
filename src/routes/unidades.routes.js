@@ -40,7 +40,7 @@ function requireAuth(req, res, next) {
 router.use(requireAuth);
 
 function puedeEditarUnidades(user) {
-  return ["ADMIN", "TALLER", "MECANICO"].includes(user.rol);
+  return ["ADMIN", "TALLER", "PROVEEDURIA_TALLER", "MECANICO"].includes(user.rol);
 }
 
 async function columnExists(tableName, columnName) {

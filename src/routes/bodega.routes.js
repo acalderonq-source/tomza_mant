@@ -7,7 +7,7 @@ const { defaultPeriod, reportPeriod, consumption, consumptionOrderLines, invento
 const { TODAS_SEDES } = require("../utils/sedes");
 
 const ROLES_BODEGA = ["ADMIN", "TALLER", "PROVEEDURIA_TALLER", "BODEGA", "BODEGUERO"];
-const ROLES_AJUSTE = ["ADMIN", "TALLER", "BODEGUERO"];
+const ROLES_AJUSTE = ["ADMIN", "TALLER", "PROVEEDURIA_TALLER", "BODEGUERO"];
 const ROLES_CATALOGO = ["ADMIN", "TALLER", "PROVEEDURIA_TALLER", "BODEGUERO"];
 const ROLES_EDITAR_CONSIGNACION = ["ADMIN", "TALLER", "PROVEEDURIA_TALLER"];
 const TIPOS_ARTICULO = ["REPUESTO", "CONSUMIBLE", "HERRAMIENTA", "OTRO"];

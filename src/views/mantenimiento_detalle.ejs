@@ -109,7 +109,7 @@
         <div class="card-body">
           <h2 class="page-title fs-5 mb-3"><i class="bi bi-clipboard-check"></i> Plan del taller</h2>
 
-          <% if (['ADMIN','TALLER'].includes(user.rol)) { %>
+          <% if (['ADMIN','TALLER','PROVEEDURIA_TALLER'].includes(user.rol)) { %>
             <form method="POST" action="/mantenimientos/<%= mantenimiento.id %>/plan" id="formPlanTaller">
               <div class="plan-toolbar">
                 <button type="button" class="btn btn-outline-danger btn-sm" id="btnPlanRojo">

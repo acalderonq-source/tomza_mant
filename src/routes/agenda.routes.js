@@ -331,7 +331,7 @@ router.get("/nuevo", async (req, res) => {
   try {
     if (!req.session.user) return res.redirect("/login");
 
-    if (!["SUPERVISOR_PESADO", "ADMIN", "TALLER"].includes(req.session.user.rol)) {
+    if (!["SUPERVISOR_PESADO", "ADMIN", "TALLER", "PROVEEDURIA_TALLER"].includes(req.session.user.rol)) {
       return res.status(403).send("No autorizado");
     }
 
@@ -366,7 +366,7 @@ router.post("/nuevo", async (req, res) => {
   try {
     if (!req.session.user) return res.redirect("/login");
 
-    if (!["SUPERVISOR_PESADO", "ADMIN", "TALLER"].includes(req.session.user.rol)) {
+    if (!["SUPERVISOR_PESADO", "ADMIN", "TALLER", "PROVEEDURIA_TALLER"].includes(req.session.user.rol)) {
       return res.status(403).send("No autorizado");
     }
 

@@ -126,14 +126,21 @@ test("Contabilidad ve facturas y asientos sin ver módulos operativos de Taller"
   assert.ok(!html.includes('href="/unidades"'));
 });
 
-test("Proveeduría ve compras y bodega con sus módulos visibles", async () => {
+test("Proveeduría-Taller ve sus módulos de compras y todas las opciones de Taller", async () => {
   const html = await renderDashboard("PROVEEDURIA", "PROVEEDURIA_TALLER", "proveeduria");
-  for (const href of ["/compras/ordenes", "/compras/facturas", "/bodega", "/repuestos-semanales", "/repuestos"]) {
-    assert.ok(html.includes(`href="${href}"`), `Falta el acceso autorizado ${href} en Proveeduría`);
+  for (const href of [
+    "/compras/ordenes", "/compras/facturas", "/bodega", "/repuestos-semanales", "/repuestos",
+    "/mantenimientos", "/unidades", "/taller/dashboard", "/lavado-unidades", "/dekra",
+    "/minae", "/aceite", "/aires", "/llantas", "/reportes-supervisores", "/dashboard/resumen-ejecutivo"
+  ]) {
+    assert.ok(html.includes(`href="${href}"`), `Falta el acceso autorizado ${href} para Proveeduría-Taller`);
   }
+});
+
+test("Proveeduría sin perfil Taller mantiene el acceso limitado a sus módulos", async () => {
+  const html = await renderDashboard("PROVEEDURIA", "PROVEEDURIA", "proveeduria");
   assert.ok(!html.includes('href="/mantenimientos"'));
   assert.ok(!html.includes('href="/unidades"'));
-  assert.ok(!html.includes('href="/dashboard/resumen-ejecutivo"'));
 });
 
 test("cada módulo visible que pertenece a Taller es accesible desde el área activa", async () => {
@@ -153,7 +160,7 @@ test("cada módulo visible que pertenece a Taller es accesible desde el área ac
       const pathname = new URL(href, "http://localhost").pathname;
       if (!rutaPerteneceATaller(pathname)) continue;
       assert.equal(
-        puedeAbrirRutaPorDepartamento(caso.departamento, pathname),
+        puedeAbrirRutaPorDepartamento(caso.departamento, pathname, caso.rol),
         true,
         `${caso.rol} ve ${pathname} en ${caso.departamento}, pero el middleware lo bloquea`
       );

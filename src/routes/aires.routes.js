@@ -5,7 +5,7 @@ const { fechaActualCostaRica } = require("../utils/fechaCostaRica");
 const { getSedesPermitidas } = require("../utils/sedes");
 const { agregarFiltroPlacaSql } = require("../utils/placas");
 
-const ROLES_GESTION_AIRE = ["ADMIN", "TALLER", "MECANICO"];
+const ROLES_GESTION_AIRE = ["ADMIN", "TALLER", "PROVEEDURIA_TALLER", "MECANICO"];
 
 function requireAuth(req, res, next) {
   if (!req.session.user) return res.redirect("/login");

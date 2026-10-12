@@ -26,9 +26,9 @@ function requireAuth(req, res, next) {
 
 router.use(requireAuth);
 
-const ROLES_VER_TALLER = ["ADMIN", "TALLER", "MECANICO", "SUPERVISOR", "SUPERVISOR_PESADO", "PANTALLA_MECANICOS", "PANTALLA_PESADOS"];
-const ROLES_GESTION_TALLER = ["ADMIN", "TALLER", "MECANICO"];
-const ROLES_PRIORIDADES_TALLER = ["ADMIN", "TALLER", "SUPERVISOR_PESADO"];
+const ROLES_VER_TALLER = ["ADMIN", "TALLER", "PROVEEDURIA_TALLER", "MECANICO", "SUPERVISOR", "SUPERVISOR_PESADO", "PANTALLA_MECANICOS", "PANTALLA_PESADOS"];
+const ROLES_GESTION_TALLER = ["ADMIN", "TALLER", "PROVEEDURIA_TALLER", "MECANICO"];
+const ROLES_PRIORIDADES_TALLER = ["ADMIN", "TALLER", "PROVEEDURIA_TALLER", "SUPERVISOR_PESADO"];
 const ROLES_SOLO_PANTALLA = ["PANTALLA_MECANICOS", "PANTALLA_PESADOS"];
 const clientesPrioridadesEnVivo = new Set();
 const SQL_SEDE_TRANSPORTE_EXPR = "UPPER(TRIM(COALESCE(NULLIF(tp.sede, ''), un.sede, '')))";
@@ -95,7 +95,7 @@ function puedeGestionarPrioridades(user) {
 }
 
 function puedeVerTodasPrioridades(user) {
-  return ["ADMIN", "TALLER"].includes(user?.rol);
+  return ["ADMIN", "TALLER", "PROVEEDURIA_TALLER"].includes(user?.rol);
 }
 
 function esUsuarioPesados(user) {

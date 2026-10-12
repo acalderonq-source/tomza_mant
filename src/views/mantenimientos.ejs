@@ -31,7 +31,7 @@
     return fecha.getTime() === hoy.getTime();
   }).length;
   const prioridades = ['ALTA', 'MEDIA', 'BAJA'];
-  const puedeReprogramarLista = typeof puedeReprogramar !== 'undefined' ? puedeReprogramar : ['ADMIN','TALLER'].includes(user.rol);
+  const puedeReprogramarLista = typeof puedeReprogramar !== 'undefined' ? puedeReprogramar : ['ADMIN','TALLER','PROVEEDURIA_TALLER'].includes(user.rol);
   const paramsRetorno = new URLSearchParams();
   if (filtrosActuales.filtro) paramsRetorno.set('filtro', filtrosActuales.filtro);
   if (filtrosActuales.placa) paramsRetorno.set('placa', filtrosActuales.placa);
@@ -259,7 +259,7 @@
         <h2 class="page-title fs-5"><i class="bi bi-wrench-adjustable text-danger"></i> Correctivos</h2>
         <p class="page-subtitle"><%= correctivosLista.length %> trabajos realizados o registrados.</p>
       </div>
-      <% if (['MECANICO','ADMIN','TALLER'].includes(user.rol)) { %>
+      <% if (['MECANICO','ADMIN','TALLER','PROVEEDURIA_TALLER'].includes(user.rol)) { %>
         <a href="/mantenimientos/correctivos/nuevo" class="btn btn-danger btn-sm"><i class="bi bi-plus-circle"></i> Nuevo</a>
       <% } %>
     </div>

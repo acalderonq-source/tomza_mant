@@ -301,7 +301,7 @@
   const usuarioDashboardLower = String(user.usuario || '').trim().toLowerCase();
   const departamentoActivo = user.departamentoActivo || 'TALLER';
   const esAdminDashboard = user.rol === 'ADMIN';
-  const areaTaller = departamentoActivo === 'TALLER';
+  const areaTaller = departamentoActivo === 'TALLER' || user.rol === 'PROVEEDURIA_TALLER';
   const adminEnTaller = esAdminDashboard && areaTaller;
   const areaOperaciones = departamentoActivo === 'OPERACIONES' || adminEnTaller || (!esAdminDashboard && ['SUPERVISOR', 'SUPERVISOR_PESADO', 'TRAMITES'].includes(user.rol));
   const areaContabilidad = departamentoActivo === 'CONTABILIDAD' || adminEnTaller || (!esAdminDashboard && user.rol === 'CONTABILIDAD');
@@ -312,15 +312,15 @@
   const puedeVerCompras = !esMecanicoLimitado && ['ADMIN', 'TALLER', 'PROVEEDURIA_TALLER', 'CONTABILIDAD'].includes(user.rol) && (areaContabilidad || areaProveeduria);
   const puedeVerOrdenesCompra = (puedeVerCompras || user.rol === 'BODEGUERO') && (areaContabilidad || areaProveeduria);
   const puedeVerOperaciones = user.rol !== 'CONTABILIDAD' && !esMensajeroDashboard && !esBodegaDashboard && areaTaller;
-  const puedeVerReportesSupervisores = !esMecanicoLimitado && ['ADMIN', 'TALLER', 'MECANICO', 'SUPERVISOR', 'SUPERVISOR_PESADO'].includes(user.rol) && (esAdminDashboard ? areaOperaciones : (areaTaller || areaOperaciones));
-  const puedeVerAceite = (esMecanicoLimitado || ['ADMIN', 'MECANICO', 'BODEGA', 'BODEGUERO'].includes(user.rol)
+  const puedeVerReportesSupervisores = !esMecanicoLimitado && ['ADMIN', 'TALLER', 'PROVEEDURIA_TALLER', 'MECANICO', 'SUPERVISOR', 'SUPERVISOR_PESADO'].includes(user.rol) && (esAdminDashboard ? areaOperaciones : (areaTaller || areaOperaciones));
+  const puedeVerAceite = (esMecanicoLimitado || ['ADMIN', 'TALLER', 'PROVEEDURIA_TALLER', 'MECANICO', 'BODEGA', 'BODEGUERO'].includes(user.rol)
     || usuarioDashboardLower === 'supervisor_rio_claro') && (areaTaller || areaProveeduria);
-  const puedeVerAires = !esMecanicoLimitado && ['ADMIN', 'TALLER', 'MECANICO'].includes(user.rol) && areaTaller;
-  const puedeVerRevisionRuta = (esMecanicoLimitado || ['ADMIN', 'TALLER', 'MECANICO', 'SUPERVISOR', 'SUPERVISOR_PESADO'].includes(user.rol)) && (esAdminDashboard ? areaOperaciones : (areaTaller || areaOperaciones));
-  const puedeVerGiras = !esMecanicoLimitado && ['ADMIN', 'TALLER', 'MECANICO', 'SUPERVISOR', 'SUPERVISOR_PESADO'].includes(user.rol) && (esAdminDashboard ? areaOperaciones : (areaTaller || areaOperaciones));
-  const puedeVerDashboardTaller = (esMecanicoLimitado || ['ADMIN', 'TALLER', 'MECANICO', 'SUPERVISOR', 'SUPERVISOR_PESADO'].includes(user.rol)) && areaTaller;
+  const puedeVerAires = !esMecanicoLimitado && ['ADMIN', 'TALLER', 'PROVEEDURIA_TALLER', 'MECANICO'].includes(user.rol) && areaTaller;
+  const puedeVerRevisionRuta = (esMecanicoLimitado || ['ADMIN', 'TALLER', 'PROVEEDURIA_TALLER', 'MECANICO', 'SUPERVISOR', 'SUPERVISOR_PESADO'].includes(user.rol)) && (esAdminDashboard ? areaOperaciones : (areaTaller || areaOperaciones));
+  const puedeVerGiras = !esMecanicoLimitado && ['ADMIN', 'TALLER', 'PROVEEDURIA_TALLER', 'MECANICO', 'SUPERVISOR', 'SUPERVISOR_PESADO'].includes(user.rol) && (esAdminDashboard ? areaOperaciones : (areaTaller || areaOperaciones));
+  const puedeVerDashboardTaller = (esMecanicoLimitado || ['ADMIN', 'TALLER', 'PROVEEDURIA_TALLER', 'MECANICO', 'SUPERVISOR', 'SUPERVISOR_PESADO'].includes(user.rol)) && areaTaller;
   const puedeVerLogisticaTaller = !esMecanicoLimitado && ['ADMIN', 'TALLER', 'MECANICO', 'PROVEEDURIA_TALLER'].includes(user.rol) && areaTaller;
-  const puedeVerLavadoUnidades = (esMecanicoLimitado || ['ADMIN', 'TALLER', 'MECANICO', 'SUPERVISOR', 'SUPERVISOR_PESADO'].includes(user.rol)) && (esAdminDashboard ? areaOperaciones : (areaTaller || areaOperaciones));
+  const puedeVerLavadoUnidades = (esMecanicoLimitado || ['ADMIN', 'TALLER', 'PROVEEDURIA_TALLER', 'MECANICO', 'SUPERVISOR', 'SUPERVISOR_PESADO'].includes(user.rol)) && (esAdminDashboard ? areaOperaciones : (areaTaller || areaOperaciones));
   const puedeVerKpisMecanicos = !esMecanicoLimitado && ['ADMIN', 'TALLER', 'PROVEEDURIA_TALLER'].includes(user.rol) && areaTaller;
   const puedeVerOrdenesMotor = !esMecanicoLimitado && ['ADMIN', 'TALLER', 'PROVEEDURIA_TALLER'].includes(user.rol) && areaTaller;
   const puedeVerResumenEjecutivo = areaTaller && (esMecanicoLimitado || ['ADMIN', 'TALLER', 'PROVEEDURIA_TALLER'].includes(user.rol));
@@ -501,7 +501,7 @@
             <span class="module-icon icon-blue"><i class="bi bi-clipboard-pulse"></i></span>
             <div><div class="module-title">Reportes supervisores</div><p class="module-copy">Fallas reportadas por unidad.</p></div>
           </a>
-          <% if (['ADMIN', 'TALLER', 'SUPERVISOR', 'SUPERVISOR_PESADO'].includes(user.rol) && (!esAdminDashboard || areaOperaciones)) { %>
+          <% if (['ADMIN', 'TALLER', 'PROVEEDURIA_TALLER', 'SUPERVISOR', 'SUPERVISOR_PESADO'].includes(user.rol) && (!esAdminDashboard || areaOperaciones)) { %>
             <a href="/reportes-supervisores/rutas" class="module-card">
               <span class="module-icon icon-green"><i class="bi bi-signpost-split"></i></span>
               <div><div class="module-title">Rutas y choferes</div><p class="module-copy">Asignación semanal e historial de cambios.</p></div>

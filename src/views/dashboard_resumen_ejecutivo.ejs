@@ -1537,7 +1537,7 @@
   const calidadDatos = data.calidadDatos || {};
   const reglasClasificacion = safe(data.reglasClasificacion);
   const familiasClasificacion = safe(data.familiasClasificacion);
-  const puedeAdministrarReglas = ['ADMIN', 'TALLER'].includes(user.rol);
+  const puedeAdministrarReglas = ['ADMIN', 'TALLER', 'PROVEEDURIA_TALLER'].includes(user.rol);
   const horaActualizacion = new Intl.DateTimeFormat('es-CR', {
     timeZone: 'America/Costa_Rica',
     hour: '2-digit',
@@ -2150,7 +2150,7 @@
         <h2 class="card-title mb-1">Presupuesto, gasto y pagos</h2>
         <div class="card-subtitle">El saldo es presupuesto asignado menos gasto registrado. Los pagos se muestran aparte para no duplicar el descuento.</div>
       </div>
-      <% if (['ADMIN', 'TALLER'].includes(user.rol)) { %>
+      <% if (['ADMIN', 'TALLER', 'PROVEEDURIA_TALLER'].includes(user.rol)) { %>
         <form method="POST" action="/dashboard/resumen-ejecutivo/presupuesto-taller" class="d-flex gap-2 align-items-end flex-wrap">
           <div>
             <label class="form-label mb-1" for="presupuestoPeriodo">Mes</label>

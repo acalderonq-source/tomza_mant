@@ -5,7 +5,7 @@ const { fechaActualCostaRica } = require("../utils/fechaCostaRica");
 const { getSedesPermitidas } = require("../utils/sedes");
 const { agregarFiltroPlacaSql } = require("../utils/placas");
 
-const ROLES_REVISION_RUTA = ["ADMIN", "TALLER", "MECANICO", "SUPERVISOR", "SUPERVISOR_PESADO"];
+const ROLES_REVISION_RUTA = ["ADMIN", "TALLER", "PROVEEDURIA_TALLER", "MECANICO", "SUPERVISOR", "SUPERVISOR_PESADO"];
 const ROLES_CREAR_REVISION_RUTA = ["ADMIN", "MECANICO"];
 
 const ITEMS_REVISION = [

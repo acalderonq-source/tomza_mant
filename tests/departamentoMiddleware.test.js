@@ -3,10 +3,10 @@ const assert = require("node:assert/strict");
 const express = require("express");
 const { controlarAccesoPorDepartamento, RUTAS_TALLER } = require("../src/utils/departamentos");
 
-async function withServer(departamento, run) {
+async function withServer(departamento, run, rol = "") {
   const app = express();
   app.use((req, _res, next) => {
-    req.session = departamento ? { user: { departamentoActivo: departamento } } : {};
+    req.session = departamento ? { user: { departamentoActivo: departamento, rol } } : {};
     next();
   });
   app.use(controlarAccesoPorDepartamento);
@@ -116,4 +116,13 @@ test("Proveeduría puede abrir bodega y compras sin recibir acceso a mantenimien
     assert.equal(ordenes.status, 200);
     assert.equal(taller.status, 403);
   });
+});
+
+test("Proveeduría-Taller conserva acceso a todas las rutas de Taller desde su área activa", async () => {
+  await withServer("PROVEEDURIA", async base => {
+    for (const prefix of RUTAS_TALLER) {
+      const response = await fetch(`${base}${prefix}`);
+      assert.equal(response.status, 200, `${prefix} debe estar disponible para Proveeduría-Taller`);
+    }
+  }, "PROVEEDURIA_TALLER");
 });

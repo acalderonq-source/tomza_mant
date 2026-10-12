@@ -5,8 +5,8 @@ const ExcelJS = require("exceljs");
 const { fechaActualCostaRica } = require("../utils/fechaCostaRica");
 const { esUsuarioTodasSedes, TODAS_SEDES } = require("../utils/sedes");
 
-const ROLES_VER_GIRAS = ["ADMIN", "TALLER", "MECANICO", "SUPERVISOR", "SUPERVISOR_PESADO"];
-const ROLES_GESTION_GIRAS = ["ADMIN", "TALLER"];
+const ROLES_VER_GIRAS = ["ADMIN", "TALLER", "PROVEEDURIA_TALLER", "MECANICO", "SUPERVISOR", "SUPERVISOR_PESADO"];
+const ROLES_GESTION_GIRAS = ["ADMIN", "TALLER", "PROVEEDURIA_TALLER"];
 
 function requireAuth(req, res, next) {
   if (!req.session.user) return res.redirect("/login");

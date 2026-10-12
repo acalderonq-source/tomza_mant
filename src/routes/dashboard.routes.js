@@ -2158,7 +2158,7 @@ router.get("/resumen-ejecutivo/datos", requireAuth, async (req, res) => {
 
 router.post("/resumen-ejecutivo/reglas", requireAuth, async (req, res) => {
   try {
-    if (!["ADMIN", "TALLER"].includes(req.session.user?.rol)) {
+    if (!["ADMIN", "TALLER", "PROVEEDURIA_TALLER"].includes(req.session.user?.rol)) {
       return res.status(403).send("No autorizado");
     }
 
@@ -2201,7 +2201,7 @@ router.post("/resumen-ejecutivo/reglas", requireAuth, async (req, res) => {
 });
 
 router.post("/resumen-ejecutivo/presupuesto-taller", requireAuth, async (req, res) => {
-  if (!["ADMIN", "TALLER"].includes(req.session.user?.rol)) {
+  if (!["ADMIN", "TALLER", "PROVEEDURIA_TALLER"].includes(req.session.user?.rol)) {
     return res.status(403).send("No autorizado");
   }
 
@@ -2241,7 +2241,7 @@ router.post("/resumen-ejecutivo/presupuesto-taller", requireAuth, async (req, re
 
 router.post("/resumen-ejecutivo/reglas/:id/desactivar", requireAuth, async (req, res) => {
   try {
-    if (!["ADMIN", "TALLER"].includes(req.session.user?.rol)) {
+    if (!["ADMIN", "TALLER", "PROVEEDURIA_TALLER"].includes(req.session.user?.rol)) {
       return res.status(403).send("No autorizado");
     }
 
@@ -2261,7 +2261,7 @@ router.post("/resumen-ejecutivo/reglas/:id/desactivar", requireAuth, async (req,
 
 router.post("/resumen-ejecutivo/clasificacion-manual", requireAuth, async (req, res) => {
   try {
-    if (!["ADMIN", "TALLER"].includes(req.session.user?.rol)) {
+    if (!["ADMIN", "TALLER", "PROVEEDURIA_TALLER"].includes(req.session.user?.rol)) {
       return res.status(403).send("No autorizado");
     }
 

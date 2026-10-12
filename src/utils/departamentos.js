@@ -60,17 +60,17 @@ function rutaPerteneceATaller(pathname) {
   return coincideRuta(pathname, RUTAS_TALLER);
 }
 
-function puedeAbrirRutaPorDepartamento(departamento, pathname) {
+function puedeAbrirRutaPorDepartamento(departamento, pathname, rol = "") {
   if (!rutaPerteneceATaller(pathname)) return true;
 
   const area = String(departamento || "TALLER").toUpperCase();
-  if (area === "TALLER") return true;
+  if (area === "TALLER" || String(rol || "").toUpperCase() === "PROVEEDURIA_TALLER") return true;
   return coincideRuta(pathname, RUTAS_COMPARTIDAS_POR_DEPARTAMENTO[area] || []);
 }
 
 function controlarAccesoPorDepartamento(req, res, next) {
   const user = req.session?.user;
-  if (!user || puedeAbrirRutaPorDepartamento(user.departamentoActivo, req.path)) return next();
+  if (!user || puedeAbrirRutaPorDepartamento(user.departamentoActivo, req.path, user.rol)) return next();
 
   const mensaje = "Este modulo pertenece a Taller. Cambie el area activa a Taller para continuar.";
   if (req.xhr || req.headers.accept?.includes("application/json")) {

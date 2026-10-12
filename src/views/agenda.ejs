@@ -107,7 +107,7 @@
   </div>
 
   <!-- Botón nuevo mantenimiento preventivo -->
-  <% if (user && (user.rol === 'SUPERVISOR_PESADO' || user.rol === 'ADMIN' || user.rol === 'TALLER')) { %>
+  <% if (user && ['SUPERVISOR_PESADO', 'ADMIN', 'TALLER', 'PROVEEDURIA_TALLER'].includes(user.rol)) { %>
     <div class="mb-3">
       <a href="/agenda/nuevo" class="btn btn-warning">
         ➕ Nuevo mantenimiento preventivo

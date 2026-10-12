@@ -22,10 +22,10 @@ const { agregarFiltroPlacaSql } = require("../utils/placas");
 const { normalizarTipoMantenimiento, detectarTipoMantenimiento } = require("../utils/tipoMantenimiento");
 const { ensureRutasSupervisoresTables } = require("../utils/rutasSupervisoresDb");
 
-const ROLES_VER = ["ADMIN", "TALLER", "MECANICO", "SUPERVISOR", "SUPERVISOR_PESADO"];
-const ROLES_CREAR = ["ADMIN", "TALLER", "SUPERVISOR", "SUPERVISOR_PESADO"];
-const ROLES_EDITAR = ["ADMIN", "TALLER"];
-const ROLES_RUTAS = ["ADMIN", "TALLER", "SUPERVISOR", "SUPERVISOR_PESADO"];
+const ROLES_VER = ["ADMIN", "TALLER", "PROVEEDURIA_TALLER", "MECANICO", "SUPERVISOR", "SUPERVISOR_PESADO"];
+const ROLES_CREAR = ["ADMIN", "TALLER", "PROVEEDURIA_TALLER", "SUPERVISOR", "SUPERVISOR_PESADO"];
+const ROLES_EDITAR = ["ADMIN", "TALLER", "PROVEEDURIA_TALLER"];
+const ROLES_RUTAS = ["ADMIN", "TALLER", "PROVEEDURIA_TALLER", "SUPERVISOR", "SUPERVISOR_PESADO"];
 
 function requireAuth(req, res, next) {
   if (!req.session.user) return res.redirect("/login");
@@ -42,7 +42,7 @@ function allowRoles(...roles) {
 
 async function obtenerSedesPermitidas(req) {
   const user = req.session.user;
-  if (["ADMIN", "TALLER"].includes(user.rol)) {
+  if (["ADMIN", "TALLER", "PROVEEDURIA_TALLER"].includes(user.rol)) {
     if (req.session.sedeSeleccionada && req.session.sedeSeleccionada !== "TODAS") {
       return expandirSedesEquivalentes(req.session.sedeSeleccionada);
     }

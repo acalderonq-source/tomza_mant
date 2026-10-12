@@ -40,7 +40,7 @@ function esUsuarioMecanicoLimitado(user) {
 }
 
 function puedeTrabajarComoMecanico(user) {
-  return ["ADMIN", "TALLER"].includes(user?.rol) || esUsuarioMecanicoLimitado(user);
+  return ["ADMIN", "TALLER", "PROVEEDURIA_TALLER"].includes(user?.rol) || esUsuarioMecanicoLimitado(user);
 }
 
 const MECANICOS_USUARIOS_CENTRALES = [
@@ -67,7 +67,7 @@ function esUsuarioMecanicosCentrales(user) {
 }
 
 function puedeRegistrarTrabajoSinPlaca(user) {
-  return ["ADMIN", "TALLER"].includes(user?.rol) || esUsuarioMecanicosCentrales(user);
+  return ["ADMIN", "TALLER", "PROVEEDURIA_TALLER"].includes(user?.rol) || esUsuarioMecanicosCentrales(user);
 }
 
 // =====================================================
@@ -117,12 +117,12 @@ function tieneSedePermitida(sede, sedesPermitidas) {
 
 function puedeAccederSedeMantenimiento(user, sede, sedesPermitidas) {
   const sedesDefinidas = Array.isArray(sedesPermitidas) && sedesPermitidas.length > 0;
-  if (!sedesDefinidas && ["ADMIN", "TALLER"].includes(user?.rol)) return true;
+  if (!sedesDefinidas && ["ADMIN", "TALLER", "PROVEEDURIA_TALLER"].includes(user?.rol)) return true;
   return tieneSedePermitida(sede, sedesPermitidas);
 }
 
 function puedeReprogramarMantenimientos(user) {
-  return ["ADMIN", "TALLER"].includes(user.rol);
+  return ["ADMIN", "TALLER", "PROVEEDURIA_TALLER"].includes(user.rol);
 }
 
 function escapeHtml(value) {
@@ -1380,7 +1380,7 @@ router.post("/correctivos", requireAuth, async (req, res) => {
     } catch (error) {
       console.error("Error generando sugerencias para el correctivo guardado:", error);
     }
-    if (sugerencias.length && ["ADMIN", "TALLER"].includes(req.session.user.rol)) {
+    if (sugerencias.length && ["ADMIN", "TALLER", "PROVEEDURIA_TALLER"].includes(req.session.user.rol)) {
       return res.redirect(`/reportes-supervisores?correctivo_id=${correctivoId}`);
     }
 
@@ -1772,7 +1772,7 @@ router.get("/:id", requireAuth, async (req, res) => {
 
 router.post("/:id/plan", requireAuth, async (req, res) => {
   try {
-    if (!["ADMIN", "TALLER"].includes(req.session.user.rol)) return res.status(403).send("No autorizado");
+    if (!["ADMIN", "TALLER", "PROVEEDURIA_TALLER"].includes(req.session.user.rol)) return res.status(403).send("No autorizado");
 
     const id = String(req.params.id || "");
     if (!/^\d+$/.test(id)) return res.status(400).send("Mantenimiento inválido.");
