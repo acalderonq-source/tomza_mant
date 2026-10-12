@@ -421,6 +421,7 @@
       <a href="/compras/ordenes" class="btn btn-sm btn-outline-light ms-2">← Órdenes</a>
       <a href="/dashboard" class="btn btn-sm btn-outline-light ms-2">Dashboard</a>
     <% } %>
+    <a href="/compras/facturas/correo/remitente" class="btn btn-sm btn-outline-info ms-2">Correo remitente</a>
     <% if (String(user.rol || '').toUpperCase() === 'ADMIN') { %>
       <a href="/compras/facturas/correo" class="btn btn-sm btn-outline-info ms-2"><i class="bi bi-envelope-arrow-down"></i> Correo electrónico</a>
     <% } %>
