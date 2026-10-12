@@ -508,7 +508,7 @@
                 <div class="modal-body">
                   <div class="week-actions mb-3">
                     <a href="<%= cotizacionSemanaUrl(grupo) %>" class="btn btn-sm btn-outline-dark">
-                      <i class="bi bi-file-earmark-pdf me-1"></i> Descargar cotización
+                      <i class="bi bi-file-earmark-pdf me-1"></i> Descargar formato de entrega
                     </a>
                     <% if (puedeCotizar && pendientesCotizarSemana.length) { %>
                       <button class="btn btn-sm btn-primary" type="button" data-bs-toggle="collapse" data-bs-target="#cotizarSemana<%= collapseId %>">
@@ -672,7 +672,7 @@
                                     </button>
                                   <% } %>
 
-                                  <a href="/llantas/<%= s.id %>/cotizacion.pdf" class="btn btn-sm btn-outline-dark"><i class="bi bi-file-pdf me-1"></i> Descargar cotización</a>
+                                  <a href="/llantas/<%= s.id %>/cotizacion.pdf" class="btn btn-sm btn-outline-dark"><i class="bi bi-file-pdf me-1"></i> Hoja de entrega</a>
 
                                   <% if (puedeComprar && ['SOLICITADA', 'COTIZADA'].includes(s.estado)) { %>
                                     <form method="POST" action="/llantas/<%= s.id %>/comprar">

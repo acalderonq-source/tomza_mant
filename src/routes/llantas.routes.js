@@ -16,6 +16,7 @@ const {
   sedeGranelDesdeUsuario
 } = require("../utils/sedes");
 const { agregarFiltroPlacaSql } = require("../utils/placas");
+const { prepararCotizacion } = require("../utils/llantasEntrega");
 
 const router = express.Router();
 
@@ -249,24 +250,6 @@ function construirFiltrosSolicitudes(sedesPermitidas, filtros = {}) {
   };
 }
 
-function nombreCedi(sede) {
-  if (sede === "Perez Zeledon") return "PZ";
-  return sede || "";
-}
-
-function destinoEntrega(sede) {
-  const sedeNormalizada = String(sede || "").trim().toLowerCase().replace(/\s+/g, "_");
-  return ["alajuela", "san_carlos", "orotina", "granel_alajuela"].includes(sedeNormalizada) ? "ALAJUELA" : "CARTAGO";
-}
-
-function descripcionLlanta(solicitud) {
-  return [
-    solicitud.medida,
-    solicitud.marca_sugerida,
-    solicitud.posicion
-  ].filter(Boolean).join(", ");
-}
-
 function negocioLlanta(solicitud) {
   const sede = String(solicitud.sede || "").trim();
   const placa = String(solicitud.placa || "").trim().toUpperCase();
@@ -275,60 +258,6 @@ function negocioLlanta(solicitud) {
   if (sede.toUpperCase() === "TRANSPORTADORA" || esSedeTransportadoraDetalle(sede) || /^S\d{5,6}$/.test(placa) || /^EE\d{5,6}$/.test(placa)) return "Transportadora";
   if (["TALLER", "TECNICOS"].includes(sede.toUpperCase())) return "Otros";
   return "Cilindros";
-}
-
-function prepararCotizacion(solicitudes) {
-  const ordenSedes = [
-    "Cartago",
-    "Perez Zeledon",
-    "Guapiles",
-    "La Cruz",
-    "Transportadora",
-    "Granel",
-    "Tecnicos",
-    "Taller",
-    "Nicoya",
-    "Orotina",
-    "Alajuela",
-    "San Carlos",
-    "Rio Claro"
-  ];
-  const ordenEntrega = { CARTAGO: 1, ALAJUELA: 2 };
-
-  const filas = solicitudes
-    .map(solicitud => ({
-      ...solicitud,
-      negocio: negocioLlanta(solicitud),
-      cedi: nombreCedi(solicitud.sede),
-      entregar: destinoEntrega(solicitud.sede),
-      descripcion: descripcionLlanta(solicitud)
-    }))
-    .sort((a, b) => {
-      const entregaA = ordenEntrega[a.entregar] || 99;
-      const entregaB = ordenEntrega[b.entregar] || 99;
-      if (entregaA !== entregaB) return entregaA - entregaB;
-
-      const sedeA = ordenSedes.indexOf(a.sede);
-      const sedeB = ordenSedes.indexOf(b.sede);
-      if (sedeA !== sedeB) return (sedeA === -1 ? 99 : sedeA) - (sedeB === -1 ? 99 : sedeB);
-
-      return String(a.placa).localeCompare(String(b.placa));
-    });
-
-  const grupos = [];
-  filas.forEach(fila => {
-    let grupo = grupos[grupos.length - 1];
-    if (!grupo || grupo.entregar !== fila.entregar) {
-      grupo = { entregar: fila.entregar, filas: [] };
-      grupos.push(grupo);
-    }
-    grupo.filas.push(fila);
-  });
-
-  return {
-    grupos,
-    totalUnidades: filas.reduce((total, fila) => total + (parseInt(fila.cantidad, 10) || 0), 0)
-  };
 }
 
 function pdfStreamToBuffer(pdfDoc) {
@@ -405,7 +334,7 @@ function crearTablaCotizacion(cotizacion) {
           rowSpan: grupo.filas.length,
           bold: true,
           alignment: "center",
-          fillColor: entregar === "ALAJUELA" ? "#f8cbad" : "#fff59d",
+          fillColor: ({ CARTAGO: "#bdd7ee", ALAJUELA: "#f4b183", GUANACASTE: "#ffd966" })[entregar] || "#ffffff",
           margin: [0, Math.max(8, Math.min(30, grupo.filas.length * 4)), 0, 0]
         });
       } else {
@@ -578,11 +507,11 @@ router.get("/cotizacion.pdf", allowRoles(...ROLES_VER_COTIZACION), async (req, r
 
     const buffer = await generarPdfCotizacionLlantas(prepararCotizacion(solicitudes), {
       fechaGeneracion: new Date().toLocaleDateString("es-CR"),
-      titulo: "Cotización de llantas"
+      titulo: "Formato de entrega de llantas"
     });
 
     res.setHeader("Content-Type", "application/pdf");
-    res.setHeader("Content-Disposition", "attachment; filename=cotizacion_llantas.pdf");
+    res.setHeader("Content-Disposition", "attachment; filename=formato_entrega_llantas.pdf");
     res.send(buffer);
   } catch (error) {
     console.error("Error generando PDF de cotización:", error);
@@ -896,11 +825,11 @@ router.get("/:id/cotizacion.pdf", allowRoles(...ROLES_VER_COTIZACION), async (re
 
     const buffer = await generarPdfCotizacionLlantas(prepararCotizacion([solicitud]), {
       fechaGeneracion: new Date().toLocaleDateString("es-CR"),
-      titulo: `Cotización de llanta ${solicitud.placa}`
+      titulo: `Entrega de llanta ${solicitud.placa}`
     });
 
     res.setHeader("Content-Type", "application/pdf");
-    res.setHeader("Content-Disposition", `attachment; filename=cotizacion_llanta_${solicitud.placa}_${solicitud.id}.pdf`);
+    res.setHeader("Content-Disposition", `attachment; filename=entrega_llanta_${solicitud.placa}_${solicitud.id}.pdf`);
     res.send(buffer);
   } catch (error) {
     console.error("Error generando PDF de cotización:", error);
