@@ -507,6 +507,7 @@ async function ensureNotificacionesPagoSchema() {
       proveedor_id BIGINT UNSIGNED NULL,
       proveedor_nombre VARCHAR(220) NOT NULL,
       correo_destino VARCHAR(254) NULL,
+      correo_respuesta VARCHAR(254) NULL,
       correos_copia TEXT NULL,
       recibo_numero VARCHAR(80) NOT NULL,
       fecha_pago DATE NOT NULL,
@@ -526,6 +527,9 @@ async function ensureNotificacionesPagoSchema() {
       KEY idx_colillas_envios_proveedor (proveedor_id)
     )
   `);
+  if (!(await columnExists("colillas_pago_envios", "correo_respuesta"))) {
+    await queryWithRetry("ALTER TABLE colillas_pago_envios ADD COLUMN correo_respuesta VARCHAR(254) NULL AFTER correo_destino");
+  }
 }
 
 async function obtenerCorreosCopiaPagos() {
@@ -549,23 +553,25 @@ function rutaComprobantePagoEnDisco(rutaGuardada) {
   return absoluta;
 }
 
-async function registrarEnviosColilla({ colillaId, reciboNumero, fechaPago, tipoPago, comprobanteNumero, facturas }) {
+async function registrarEnviosColilla({ colillaId, reciboNumero, fechaPago, tipoPago, comprobanteNumero, correoRespuesta, facturas }) {
   const grupos = agruparFacturasPorProveedor(facturas);
   const correosCopia = await obtenerCorreosCopiaPagos();
   const copiasValidas = correosCopia.length === 3 && correosCopia.every(correoValido) && new Set(correosCopia).size === 3;
   const remitenteValido = enviarCorreo.estaConfigurado("facturas");
+  const correoReplyTo = normalizarCorreo(correoRespuesta);
   for (const grupo of grupos) {
     const total = grupo.facturas.reduce((suma, factura) => suma + parseMonto(factura.monto_pago ?? factura.total), 0);
     const comprobantes = [...new Set(grupo.facturas.map(factura => factura.comprobante_pago_archivo).filter(Boolean))];
     const datos = JSON.stringify(grupo.facturas);
     await queryWithRetry(
       `INSERT IGNORE INTO colillas_pago_envios
-        (colilla_id, clave_proveedor, proveedor_id, proveedor_nombre, correo_destino, correos_copia,
+        (colilla_id, clave_proveedor, proveedor_id, proveedor_nombre, correo_destino, correo_respuesta, correos_copia,
          recibo_numero, fecha_pago, tipo_pago, comprobante_numero, monto, facturas_json, comprobantes_json, estado)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         colillaId, grupo.clave, grupo.proveedor_id, grupo.proveedor_nombre,
         correoValido(grupo.proveedor_email) ? grupo.proveedor_email : null,
+        correoValido(correoReplyTo) ? correoReplyTo : null,
         JSON.stringify(correosCopia), reciboNumero, fechaPago, tipoPago, String(comprobanteNumero || "").trim() || null, total, datos,
         JSON.stringify(comprobantes), !correoValido(grupo.proveedor_email)
           ? "SIN_CORREO"
@@ -590,6 +596,20 @@ async function notificarPagoProveedorSeguro(datos) {
     console.error(`No se pudo registrar el envío de la colilla ${datos.reciboNumero}:`, error);
     return "pendiente";
   }
+}
+
+function validarCorreoRespuestaPago(req, res) {
+  const correo = normalizarCorreo(req.body.correo_respuesta);
+  if (correoValido(correo)) return correo;
+
+  const mensaje = "Indique un correo válido para que el proveedor pueda responder a la persona responsable del pago.";
+  if (req.xhr || req.get("X-Requested-With") === "XMLHttpRequest") {
+    res.status(400).type("text/plain").send(mensaje);
+  } else {
+    req.session.error = mensaje;
+    res.redirect("/compras/facturas");
+  }
+  return null;
 }
 
 let procesandoColillas = false;
@@ -702,7 +722,12 @@ async function procesarEnvioColilla(envioId) {
       tipoPago: envio.tipo_pago,
       comprobanteNumero: envio.comprobante_numero
     });
-    await enviarCorreo(correoDestino, correo.subject, correo.html, { perfil: "facturas", cc: copias, attachments });
+    await enviarCorreo(correoDestino, correo.subject, correo.html, {
+      perfil: "facturas",
+      cc: copias,
+      replyTo: correoValido(envio.correo_respuesta) ? normalizarCorreo(envio.correo_respuesta) : undefined,
+      attachments
+    });
     await queryWithRetry(
       "UPDATE colillas_pago_envios SET estado = 'ENVIADO', error = NULL, enviado_en = NOW() WHERE id = ?",
       [envioId]
@@ -7043,7 +7068,7 @@ router.get("/facturas/historial-pagos", requireAuth, allowRoles("ADMIN", "TALLER
     const enviosCorreo = new Map();
     if (idsColillas.length) {
       const [envios] = await pool.query(
-        `SELECT id, colilla_id, proveedor_id, proveedor_nombre, correo_destino, estado, error, intentos, enviado_en
+        `SELECT id, colilla_id, proveedor_id, proveedor_nombre, correo_destino, correo_respuesta, estado, error, intentos, enviado_en
          FROM colillas_pago_envios WHERE colilla_id IN (${idsColillas.map(() => "?").join(",")}) ORDER BY id`,
         idsColillas
       );
@@ -8194,6 +8219,8 @@ router.post("/facturas/:id/abono", requireAuth, allowRoles("ADMIN", "TALLER", "P
   try {
     await ensureFacturasSchema();
     await ensureNotificacionesPagoSchema();
+    const correoRespuesta = validarCorreoRespuestaPago(req, res);
+    if (!correoRespuesta) return;
 
     const id = req.params.id;
     const { tipo, monto_abono, fecha_abono, observacion_abono, periodo_cierre, comprobante_numero, comprobante_data, comprobante_nombre } = req.body;
@@ -8302,7 +8329,7 @@ router.post("/facturas/:id/abono", requireAuth, allowRoles("ADMIN", "TALLER", "P
       facturas: facturasColilla
     });
     const estadoCorreo = await notificarPagoProveedorSeguro({
-      colillaId,
+      colillaId, correoRespuesta,
       reciboNumero, fechaPago: fechaAbono, tipoPago: "abono", comprobanteNumero: comprobante_numero, facturas: facturasColilla
     });
     res.setHeader("X-Email-Notification", estadoCorreo);
@@ -8321,6 +8348,8 @@ router.post("/facturas/:id/pagar", requireAuth, allowRoles("ADMIN", "TALLER", "P
   try {
     await ensureFacturasSchema();
     await ensureNotificacionesPagoSchema();
+    const correoRespuesta = validarCorreoRespuestaPago(req, res);
+    if (!correoRespuesta) return;
     const id = req.params.id;
     const { tipo } = req.body;
     const fechaPago = String(req.body.fecha_pago || "").trim();
@@ -8417,7 +8446,7 @@ router.post("/facturas/:id/pagar", requireAuth, allowRoles("ADMIN", "TALLER", "P
       facturas: facturasColilla
     });
     const estadoCorreo = await notificarPagoProveedorSeguro({
-      colillaId, reciboNumero, fechaPago, tipoPago: "pago", comprobanteNumero, facturas: facturasColilla
+      colillaId, correoRespuesta, reciboNumero, fechaPago, tipoPago: "pago", comprobanteNumero, facturas: facturasColilla
     });
     res.setHeader("X-Email-Notification", estadoCorreo);
     res.setHeader("Content-Type", "application/pdf");
@@ -8490,6 +8519,8 @@ router.post("/facturas/pagar-multiple", requireAuth, allowRoles("ADMIN", "TALLER
   try {
     await ensureFacturasSchema();
     await ensureNotificacionesPagoSchema();
+    const correoRespuesta = validarCorreoRespuestaPago(req, res);
+    if (!correoRespuesta) return;
     const { facturas_ids } = req.body;
     const seleccionadas = toArray(facturas_ids).map(parseFacturaRef).filter(Boolean);
     const fechaPago = String(req.body.fecha_pago || "").trim();
@@ -8659,7 +8690,7 @@ router.post("/facturas/pagar-multiple", requireAuth, allowRoles("ADMIN", "TALLER
     });
 
     const estadoCorreo = await notificarPagoProveedorSeguro({
-      colillaId, reciboNumero, fechaPago, tipoPago: "pago_multiple", comprobanteNumero, facturas: facturasConComprobantes
+      colillaId, correoRespuesta, reciboNumero, fechaPago, tipoPago: "pago_multiple", comprobanteNumero, facturas: facturasConComprobantes
     });
     res.setHeader("X-Email-Notification", estadoCorreo);
 

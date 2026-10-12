@@ -109,6 +109,7 @@
                     <div class="mb-2">
                       <div><span class="badge text-bg-<%= claseEstado %>"><%= envio.estado %></span> <small><%= envio.proveedor_nombre %></small></div>
                       <div class="small text-secondary"><%= envio.correo_destino || 'Sin correo de proveedor' %></div>
+                      <% if (envio.correo_respuesta) { %><div class="small text-secondary">Respuestas a: <%= envio.correo_respuesta %></div><% } %>
                       <% if (envio.error) { %><div class="small text-danger"><%= envio.error %></div><% } %>
                       <% if (envio.estado !== 'ENVIANDO') { %>
                         <form method="POST" action="/compras/facturas/envios/<%= envio.id %>/reintentar" class="mt-1">

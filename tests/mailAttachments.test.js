@@ -40,6 +40,7 @@ test("el servicio de correo permite CC y adjuntar PDF/comprobante", async t => {
   ];
   await enviarCorreo("proveedor@tomza.test", "Pago", "Detalle", {
     perfil: "facturas",
+    replyTo: "emily@tomza.test",
     cc: ["contabilidad@tomza.test", "proveeduria@tomza.test", "taller@tomza.test"],
     attachments
   });
@@ -49,6 +50,7 @@ test("el servicio de correo permite CC y adjuntar PDF/comprobante", async t => {
   const mensaje = transporteFacturas.mensaje;
   assert.equal(mensaje.to, "proveedor@tomza.test");
   assert.equal(mensaje.from, '"Sistema Taller Tomza" <facturas@tomza.test>');
+  assert.equal(mensaje.replyTo, "emily@tomza.test");
   assert.deepEqual(mensaje.cc, ["contabilidad@tomza.test", "proveeduria@tomza.test", "taller@tomza.test"]);
   assert.deepEqual(mensaje.attachments, attachments);
   assert.equal(transporteFacturas.config.host, "smtp.facturas.test");

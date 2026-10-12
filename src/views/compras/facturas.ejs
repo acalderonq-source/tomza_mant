@@ -1199,6 +1199,11 @@
             <input type="month" name="periodo_cierre" id="pagarFacturaPeriodo" class="form-control" value="<%= hoy.slice(0, 7) %>">
           </div>
           <div class="mb-3">
+            <label class="form-label">Correo para respuestas</label>
+            <input type="email" name="correo_respuesta" class="form-control" autocomplete="email" required>
+            <small class="text-muted">El proveedor responderá a esta dirección. El remitente institucional de Facturas no cambia.</small>
+          </div>
+          <div class="mb-3">
             <label class="form-label">N.° de comprobante</label>
             <input type="text" name="comprobante_numero" id="pagarComprobanteNumero" class="form-control" maxlength="120">
           </div>
@@ -1241,6 +1246,11 @@
         <div class="mb-3">
           <label class="form-label">Periodo de cierre</label>
           <input type="month" name="periodo_cierre" id="pagarMultiplePeriodo" class="form-control" value="<%= hoy.slice(0, 7) %>" form="multiplePagoForm">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Correo para respuestas</label>
+          <input type="email" name="correo_respuesta" class="form-control" autocomplete="email" required form="multiplePagoForm">
+          <small class="text-muted">El proveedor responderá a esta dirección. Se aplicará a todas las colillas del pago múltiple.</small>
         </div>
         <div class="mb-3">
           <label class="form-label">N.° de comprobante</label>
@@ -1335,6 +1345,11 @@
           <div class="mb-3">
             <label class="form-label">Periodo de cierre si queda pagada</label>
             <input type="month" name="periodo_cierre" id="abonoPeriodo" class="form-control" value="<%= hoy.slice(0, 7) %>">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Correo para respuestas</label>
+            <input type="email" name="correo_respuesta" class="form-control" autocomplete="email" required>
+            <small class="text-muted">El proveedor responderá a esta dirección. El remitente institucional de Facturas no cambia.</small>
           </div>
           <div class="mb-3">
             <label class="form-label">Observación</label>
