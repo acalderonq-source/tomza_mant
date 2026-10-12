@@ -25,7 +25,14 @@ const {
   resolverFiltrosPeriodoResumen
 } = require("../utils/periodoResumenEjecutivo");
 
-const DB_CONNECTION_ERRORS = new Set(["ECONNRESET", "PROTOCOL_CONNECTION_LOST", "ETIMEDOUT", "ENOTFOUND", "ECONNREFUSED"]);
+const DB_CONNECTION_ERRORS = new Set([
+  "ECONNRESET",
+  "PROTOCOL_CONNECTION_LOST",
+  "PROTOCOL_ENQUEUE_AFTER_FATAL_ERROR",
+  "ETIMEDOUT",
+  "ENOTFOUND",
+  "ECONNREFUSED"
+]);
 const RESUMEN_EJECUTIVO_CACHE_MS = Number(process.env.RESUMEN_EJECUTIVO_CACHE_MS || 1000 * 60);
 const RESUMEN_EJECUTIVO_STALE_MS = Number(process.env.RESUMEN_EJECUTIVO_STALE_MS || 1000 * 60 * 5);
 const resumenEjecutivoCache = new Map();
@@ -58,8 +65,23 @@ async function safeQuery(sql, params = [], fallback = []) {
 }
 
 async function queryFinanciera(sql, params = []) {
-  const [rows] = await pool.query(sql, params);
-  return rows;
+  for (let intento = 1; intento <= 3; intento += 1) {
+    try {
+      const [rows] = await pool.query(sql, params);
+      return rows;
+    } catch (error) {
+      const temporal = DB_CONNECTION_ERRORS.has(error.code);
+      if (temporal && intento < 3) {
+        console.warn(`Reintentando consulta financiera por error MySQL: ${error.code} (${intento}/3)`);
+        await sleep(300 * intento);
+        continue;
+      }
+
+      throw error;
+    }
+  }
+
+  return [];
 }
 
 const ROLES_OFICINA_DIA_DIA = ["ADMIN", "TALLER", "PROVEEDURIA_TALLER"];
@@ -1998,7 +2020,6 @@ async function obtenerResumenEjecutivo({ fechaDesde, fechaHasta, sedesFiltro, pe
     placasPorTipoUnidad,
     meses,
     presupuestoTendenciaError: seriePresupuestoTaller.error,
-    presupuestosMensuales,
     tiposMant,
     familiasMant,
     sedesMant,
