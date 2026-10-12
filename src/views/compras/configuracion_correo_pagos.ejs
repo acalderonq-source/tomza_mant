@@ -22,7 +22,7 @@
     <% if (smtpConfigurado) { %>
       <div class="alert alert-success">Remitente configurado: <strong><%= remitente %></strong></div>
     <% } else { %>
-      <div class="alert alert-warning">Falta configurar EMAIL_USER y EMAIL_PASS en las variables del servidor. Los pagos se guardarán y los correos quedarán pendientes hasta configurar el remitente.</div>
+      <div class="alert alert-warning">Falta configurar EMAIL_USER_FACTURAS y EMAIL_PASS_FACTURAS en las variables del servidor. Los pagos se guardarán y los correos quedarán pendientes hasta configurar el remitente.</div>
     <% } %>
     <form method="POST" action="/compras/facturas/configuracion-correo" class="bg-white border rounded-3 p-4">
       <% [1, 2, 3].forEach(numero => { const campo = `copia_${numero}`; %>

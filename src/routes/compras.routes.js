@@ -553,7 +553,7 @@ async function registrarEnviosColilla({ colillaId, reciboNumero, fechaPago, tipo
   const grupos = agruparFacturasPorProveedor(facturas);
   const correosCopia = await obtenerCorreosCopiaPagos();
   const copiasValidas = correosCopia.length === 3 && correosCopia.every(correoValido) && new Set(correosCopia).size === 3;
-  const remitenteValido = Boolean(process.env.EMAIL_USER && process.env.EMAIL_PASS);
+  const remitenteValido = enviarCorreo.estaConfigurado("facturas");
   for (const grupo of grupos) {
     const total = grupo.facturas.reduce((suma, factura) => suma + parseMonto(factura.monto_pago ?? factura.total), 0);
     const comprobantes = [...new Set(grupo.facturas.map(factura => factura.comprobante_pago_archivo).filter(Boolean))];
@@ -654,8 +654,8 @@ async function procesarEnvioColilla(envioId) {
     return { estado: "SIN_CORREO" };
   }
 
-  if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-    await queryWithRetry("UPDATE colillas_pago_envios SET estado = 'PENDIENTE_CONFIG', error = ? WHERE id = ?", ["Configure EMAIL_USER y EMAIL_PASS en el servidor.", envioId]);
+  if (!enviarCorreo.estaConfigurado("facturas")) {
+    await queryWithRetry("UPDATE colillas_pago_envios SET estado = 'PENDIENTE_CONFIG', error = ? WHERE id = ?", ["Configure EMAIL_USER_FACTURAS y EMAIL_PASS_FACTURAS en el servidor.", envioId]);
     return { estado: "PENDIENTE_CONFIG" };
   }
 
@@ -702,7 +702,7 @@ async function procesarEnvioColilla(envioId) {
       tipoPago: envio.tipo_pago,
       comprobanteNumero: envio.comprobante_numero
     });
-    await enviarCorreo(correoDestino, correo.subject, correo.html, { cc: copias, attachments });
+    await enviarCorreo(correoDestino, correo.subject, correo.html, { perfil: "facturas", cc: copias, attachments });
     await queryWithRetry(
       "UPDATE colillas_pago_envios SET estado = 'ENVIADO', error = NULL, enviado_en = NOW() WHERE id = ?",
       [envioId]
@@ -4360,7 +4360,7 @@ router.get("/facturas/configuracion-correo", requireAuth, allowRoles("ADMIN"), a
     const [[config]] = await queryWithRetry("SELECT copia_1, copia_2, copia_3 FROM configuracion_correo_pagos WHERE id = 1 LIMIT 1");
     res.render("compras/configuracion_correo_pagos", {
       config: config || {}, user: req.session.user, error: null, success: req.session.success || null,
-      remitente: process.env.EMAIL_USER || "", smtpConfigurado: Boolean(process.env.EMAIL_USER && process.env.EMAIL_PASS)
+      remitente: enviarCorreo.obtenerRemitente("facturas"), smtpConfigurado: enviarCorreo.estaConfigurado("facturas")
     });
     delete req.session.success;
   } catch (error) {
@@ -4377,8 +4377,8 @@ router.post("/facturas/configuracion-correo", requireAuth, allowRoles("ADMIN"), 
     if (correos.some(correo => !correoValido(correo)) || new Set(correos).size !== 3) {
       const config = { copia_1: req.body.copia_1, copia_2: req.body.copia_2, copia_3: req.body.copia_3 };
       return res.status(400).render("compras/configuracion_correo_pagos", {
-        config, user: req.session.user, success: null, remitente: process.env.EMAIL_USER || "",
-        smtpConfigurado: Boolean(process.env.EMAIL_USER && process.env.EMAIL_PASS),
+        config, user: req.session.user, success: null, remitente: enviarCorreo.obtenerRemitente("facturas"),
+        smtpConfigurado: enviarCorreo.estaConfigurado("facturas"),
         error: "Ingrese tres correos válidos y diferentes."
       });
     }

@@ -66,7 +66,7 @@ async function enviarAlertasDekra() {
         <p>Total pendientes: <strong>${pendientes.length}</strong></p>
       `;
 
-      await enviarCorreo(destino.email, "⚠️ Alerta DEKRA", html);
+      await enviarCorreo(destino.email, "⚠️ Alerta DEKRA", html, { perfil: "dekra" });
 
     }
 
