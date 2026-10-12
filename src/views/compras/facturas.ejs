@@ -668,6 +668,11 @@
         <a href="/compras/facturas/historial-pagos" class="btn btn-outline-success btn-sm">
           <i class="bi bi-clock-history"></i> Historial de pagos
         </a>
+        <% if (user.rol === 'ADMIN') { %>
+          <a href="/compras/facturas/configuracion-correo" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-envelope-gear"></i> Correos de pagos
+          </a>
+        <% } %>
         <a href="/compras/facturas/caja-chica" class="btn btn-outline-warning btn-sm">
           <i class="bi bi-wallet2"></i> Caja chica
         </a>
@@ -1599,6 +1604,13 @@
           link.click();
           link.remove();
           window.setTimeout(() => URL.revokeObjectURL(downloadUrl), 60000);
+
+          const emailEstado = response.headers.get('x-email-notification');
+          if (emailEstado) {
+            window.alert(emailEstado === 'programado'
+              ? 'Pago registrado. El correo quedó en cola para enviarse al proveedor y las copias internas; revise el historial para confirmar el estado.'
+              : 'Pago registrado y colilla descargada. El correo quedó pendiente; revise el historial de pagos para corregirlo o reintentarlo.');
+          }
 
           const modal = form.closest('.modal');
           if (modal && window.bootstrap?.Modal) {

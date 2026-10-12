@@ -13,6 +13,9 @@ const { construirResumenFinanciero } = require("../utils/resumenFinanciero");
 const { esSedeTransportadoraDetalle } = require("../utils/sedes");
 const { consumptionOrderLines, reportPeriod } = require("../utils/bodegaReportes");
 const { ensureUploadDirectory } = require("../utils/uploadStorage");
+const { UPLOAD_ROOT } = require("../utils/uploadStorage");
+const enviarCorreo = require("../utils/mail");
+const { normalizarCorreo, correoValido, agruparFacturasPorProveedor, construirCorreoPago } = require("../utils/pagoProveedorCorreo");
 const { fechaValida: fechaCajaValida, centavos: centavosCaja, datosDocumento: validarDocumentoCaja, monedaCRC } = require('../utils/cajaChicaValidacion');
 const { asegurarColumnasReapertura, reabrirCorteCajaChica } = require('../utils/cajaChicaReapertura');
 const {
@@ -345,7 +348,7 @@ async function queryWithRetry(sql, params = []) {
 }
 
 async function guardarColillaPago({ reciboNumero, fechaPago, periodoCierre, tipoPago, totalPagado, comprobanteNumero, comprobanteArchivo, generadoPor, facturas, origen = "actual" }) {
-  await pool.query(
+  const [result] = await pool.query(
     `INSERT INTO colillas_pago_proveedor
       (recibo_numero, fecha_pago, periodo_cierre, tipo_pago, total_pagado, comprobante_numero, comprobante_archivo, generado_por, facturas_json, origen)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -362,6 +365,7 @@ async function guardarColillaPago({ reciboNumero, fechaPago, periodoCierre, tipo
       origen
     ]
   );
+  return result.insertId;
 }
 
 async function reconstruirColillasHistoricas() {
@@ -481,6 +485,235 @@ async function ensureColillasPagoTable() {
       KEY idx_colillas_pago_origen (origen)
     )
   `);
+}
+
+async function ensureNotificacionesPagoSchema() {
+  await queryWithRetry(`
+    CREATE TABLE IF NOT EXISTS configuracion_correo_pagos (
+      id TINYINT UNSIGNED NOT NULL PRIMARY KEY,
+      copia_1 VARCHAR(254) NULL,
+      copia_2 VARCHAR(254) NULL,
+      copia_3 VARCHAR(254) NULL,
+      actualizado_por INT NULL,
+      actualizado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    )
+  `);
+  await queryWithRetry("INSERT IGNORE INTO configuracion_correo_pagos (id) VALUES (1)");
+  await queryWithRetry(`
+    CREATE TABLE IF NOT EXISTS colillas_pago_envios (
+      id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+      colilla_id BIGINT UNSIGNED NOT NULL,
+      clave_proveedor VARCHAR(220) NOT NULL,
+      proveedor_id BIGINT UNSIGNED NULL,
+      proveedor_nombre VARCHAR(220) NOT NULL,
+      correo_destino VARCHAR(254) NULL,
+      correos_copia TEXT NULL,
+      recibo_numero VARCHAR(80) NOT NULL,
+      fecha_pago DATE NOT NULL,
+      tipo_pago VARCHAR(24) NOT NULL,
+      comprobante_numero VARCHAR(120) NULL,
+      monto DECIMAL(14,2) NOT NULL DEFAULT 0,
+      facturas_json LONGTEXT NOT NULL,
+      comprobantes_json LONGTEXT NOT NULL,
+      estado VARCHAR(30) NOT NULL DEFAULT 'PENDIENTE',
+      error TEXT NULL,
+      intentos INT NOT NULL DEFAULT 0,
+      enviado_en DATETIME NULL,
+      creado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      actualizado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      UNIQUE KEY uq_colilla_proveedor_envio (colilla_id, clave_proveedor),
+      KEY idx_colillas_envios_estado (estado, actualizado_en),
+      KEY idx_colillas_envios_proveedor (proveedor_id)
+    )
+  `);
+}
+
+async function obtenerCorreosCopiaPagos() {
+  const [[config]] = await queryWithRetry(
+    "SELECT copia_1, copia_2, copia_3 FROM configuracion_correo_pagos WHERE id = 1 LIMIT 1"
+  );
+  return [config?.copia_1, config?.copia_2, config?.copia_3].map(normalizarCorreo);
+}
+
+function rutaComprobantePagoEnDisco(rutaGuardada) {
+  const ruta = String(rutaGuardada || "").trim();
+  const prefijo = "/uploads/facturas/";
+  if (!ruta.startsWith(prefijo)) throw new Error("La ruta del comprobante no es válida.");
+  const archivo = path.basename(ruta.slice(prefijo.length));
+  if (!archivo || archivo === "." || archivo === "..") throw new Error("No se encontró el archivo del comprobante.");
+  const absoluta = path.resolve(UPLOAD_ROOT, "facturas", archivo);
+  const relativo = path.relative(path.resolve(UPLOAD_ROOT, "facturas"), absoluta);
+  if (relativo.startsWith("..") || path.isAbsolute(relativo) || !fs.existsSync(absoluta)) {
+    throw new Error("No se encontró el archivo del comprobante guardado.");
+  }
+  return absoluta;
+}
+
+async function registrarEnviosColilla({ colillaId, reciboNumero, fechaPago, tipoPago, comprobanteNumero, facturas }) {
+  const grupos = agruparFacturasPorProveedor(facturas);
+  const correosCopia = await obtenerCorreosCopiaPagos();
+  const copiasValidas = correosCopia.length === 3 && correosCopia.every(correoValido) && new Set(correosCopia).size === 3;
+  const remitenteValido = Boolean(process.env.EMAIL_USER && process.env.EMAIL_PASS);
+  for (const grupo of grupos) {
+    const total = grupo.facturas.reduce((suma, factura) => suma + parseMonto(factura.monto_pago ?? factura.total), 0);
+    const comprobantes = [...new Set(grupo.facturas.map(factura => factura.comprobante_pago_archivo).filter(Boolean))];
+    const datos = JSON.stringify(grupo.facturas);
+    await queryWithRetry(
+      `INSERT IGNORE INTO colillas_pago_envios
+        (colilla_id, clave_proveedor, proveedor_id, proveedor_nombre, correo_destino, correos_copia,
+         recibo_numero, fecha_pago, tipo_pago, comprobante_numero, monto, facturas_json, comprobantes_json, estado)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        colillaId, grupo.clave, grupo.proveedor_id, grupo.proveedor_nombre,
+        correoValido(grupo.proveedor_email) ? grupo.proveedor_email : null,
+        JSON.stringify(correosCopia), reciboNumero, fechaPago, tipoPago, String(comprobanteNumero || "").trim() || null, total, datos,
+        JSON.stringify(comprobantes), !correoValido(grupo.proveedor_email)
+          ? "SIN_CORREO"
+          : !copiasValidas || !remitenteValido ? "PENDIENTE_CONFIG" : "PENDIENTE"
+      ]
+    );
+  }
+  const [envios] = await queryWithRetry(
+    "SELECT id, estado FROM colillas_pago_envios WHERE colilla_id = ? ORDER BY id",
+    [colillaId]
+  );
+  const pendientes = envios.filter(envio => envio.estado === "PENDIENTE").map(envio => envio.id);
+  if (pendientes.length) setImmediate(() => procesarEnviosColilla(pendientes));
+  return envios.map(item => item.estado);
+}
+
+async function notificarPagoProveedorSeguro(datos) {
+  try {
+    const estados = await registrarEnviosColilla(datos);
+    return estados.length && estados.every(estado => estado === "PENDIENTE") ? "programado" : "pendiente";
+  } catch (error) {
+    console.error(`No se pudo registrar el envío de la colilla ${datos.reciboNumero}:`, error);
+    return "pendiente";
+  }
+}
+
+let procesandoColillas = false;
+async function procesarEnviosColilla(ids) {
+  for (const id of ids) {
+    try {
+      await procesarEnvioColilla(id);
+    } catch (error) {
+      console.error(`Error procesando el envío de colilla ${id}:`, error);
+    }
+  }
+}
+
+async function procesarColillasPendientes() {
+  if (procesandoColillas) return;
+  procesandoColillas = true;
+  try {
+    await ensureFacturasSchema();
+    await ensureNotificacionesPagoSchema();
+    await queryWithRetry(
+      "UPDATE colillas_pago_envios SET estado = 'ERROR', error = 'El proceso se interrumpió durante el envío. Verifique si el correo llegó antes de reenviar.' WHERE estado = 'ENVIANDO' AND actualizado_en < NOW() - INTERVAL 10 MINUTE"
+    );
+    const [pendientes] = await queryWithRetry(
+      "SELECT id FROM colillas_pago_envios WHERE estado = 'PENDIENTE' ORDER BY id LIMIT 10"
+    );
+    await procesarEnviosColilla(pendientes.map(item => item.id));
+  } catch (error) {
+    console.error("Error procesando cola de colillas de pago:", error);
+  } finally {
+    procesandoColillas = false;
+  }
+}
+
+const procesadorColillasTimer = setInterval(procesarColillasPendientes, 60 * 1000);
+procesadorColillasTimer.unref?.();
+
+async function procesarEnvioColilla(envioId) {
+  const [[envio]] = await queryWithRetry("SELECT * FROM colillas_pago_envios WHERE id = ? LIMIT 1", [envioId]);
+  if (!envio) throw new Error("No se encontró el registro de envío.");
+
+  let correoDestino = normalizarCorreo(envio.correo_destino);
+  if (envio.proveedor_id) {
+    const [[proveedor]] = await queryWithRetry("SELECT nombre, email FROM proveedores WHERE id = ? LIMIT 1", [envio.proveedor_id]);
+    if (proveedor) {
+      envio.proveedor_nombre = proveedor.nombre || envio.proveedor_nombre;
+      correoDestino = correoValido(proveedor.email) ? normalizarCorreo(proveedor.email) : "";
+    }
+  } else {
+    const [[proveedor]] = await queryWithRetry(
+      "SELECT id, nombre, email FROM proveedores WHERE UPPER(TRIM(nombre)) = UPPER(TRIM(?)) ORDER BY id LIMIT 1",
+      [envio.proveedor_nombre]
+    );
+    if (proveedor) {
+      envio.proveedor_id = proveedor.id;
+      envio.proveedor_nombre = proveedor.nombre || envio.proveedor_nombre;
+      correoDestino = correoValido(proveedor.email) ? normalizarCorreo(proveedor.email) : "";
+      await queryWithRetry("UPDATE colillas_pago_envios SET proveedor_id = ? WHERE id = ?", [proveedor.id, envioId]);
+    }
+  }
+  if (!correoValido(correoDestino)) {
+    await queryWithRetry("UPDATE colillas_pago_envios SET estado = 'SIN_CORREO', error = ? WHERE id = ?", ["Agregue un correo válido al proveedor para enviar la colilla.", envioId]);
+    return { estado: "SIN_CORREO" };
+  }
+
+  if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+    await queryWithRetry("UPDATE colillas_pago_envios SET estado = 'PENDIENTE_CONFIG', error = ? WHERE id = ?", ["Configure EMAIL_USER y EMAIL_PASS en el servidor.", envioId]);
+    return { estado: "PENDIENTE_CONFIG" };
+  }
+
+  const copias = await obtenerCorreosCopiaPagos();
+  if (copias.length !== 3 || copias.some(correo => !correoValido(correo)) || new Set(copias).size !== 3) {
+    await queryWithRetry("UPDATE colillas_pago_envios SET estado = 'PENDIENTE_CONFIG', error = ? WHERE id = ?", ["Configure tres correos internos válidos y diferentes.", envioId]);
+    return { estado: "PENDIENTE_CONFIG" };
+  }
+
+  const [inicio] = await queryWithRetry(
+    "UPDATE colillas_pago_envios SET estado = 'ENVIANDO', correo_destino = ?, correos_copia = ?, error = NULL, intentos = intentos + 1 WHERE id = ? AND estado <> 'ENVIANDO'",
+    [correoDestino, JSON.stringify(copias), envioId]
+  );
+  if (!inicio.affectedRows) return { estado: "ENVIANDO" };
+
+  try {
+    const facturas = typeof envio.facturas_json === "string" ? JSON.parse(envio.facturas_json) : envio.facturas_json;
+    if (!Array.isArray(facturas) || !facturas.length) throw new Error("El detalle de facturas del envío está vacío.");
+    const comprobantes = typeof envio.comprobantes_json === "string" ? JSON.parse(envio.comprobantes_json) : envio.comprobantes_json;
+    const { generarPDFReciboPago } = require("../utils/pdfReciboPago");
+    const bufferColilla = await generarPDFReciboPago({
+      facturas,
+      fechaPago: envio.fecha_pago,
+      totalPagado: envio.monto,
+      reciboNumero: envio.recibo_numero,
+      comprobanteNumero: envio.comprobante_numero,
+      generadoPor: "Gas Tomza"
+    });
+    const attachments = [{
+      filename: `colilla_${String(envio.recibo_numero).replace(/[^a-z0-9_-]/gi, "_")}.pdf`,
+      content: bufferColilla,
+      contentType: "application/pdf"
+    }];
+    for (const archivo of Array.isArray(comprobantes) ? comprobantes : []) {
+      const absolutePath = rutaComprobantePagoEnDisco(archivo);
+      attachments.push({ filename: path.basename(absolutePath), path: absolutePath });
+    }
+    const correo = construirCorreoPago({
+      proveedor: envio.proveedor_nombre,
+      facturas,
+      reciboNumero: envio.recibo_numero,
+      fechaPago: String(envio.fecha_pago).slice(0, 10),
+      totalPagado: envio.monto,
+      tipoPago: envio.tipo_pago,
+      comprobanteNumero: envio.comprobante_numero
+    });
+    await enviarCorreo(correoDestino, correo.subject, correo.html, { cc: copias, attachments });
+    await queryWithRetry(
+      "UPDATE colillas_pago_envios SET estado = 'ENVIADO', error = NULL, enviado_en = NOW() WHERE id = ?",
+      [envioId]
+    );
+    return { estado: "ENVIADO" };
+  } catch (error) {
+    const mensaje = String(error?.message || "No se pudo enviar el correo.").slice(0, 1500);
+    await queryWithRetry("UPDATE colillas_pago_envios SET estado = 'ERROR', error = ? WHERE id = ?", [mensaje, envioId]);
+    console.error(`Error enviando colilla ${envio.recibo_numero} a ${correoDestino}:`, error);
+    return { estado: "ERROR", error: mensaje };
+  }
 }
 
 async function ensureFacturasSchema() {
@@ -4120,6 +4353,47 @@ function agruparOrdenesPorDescripcion(ordenes = []) {
 }
 
 // ===================== PROVEEDORES =====================
+router.get("/facturas/configuracion-correo", requireAuth, allowRoles("ADMIN"), async (req, res) => {
+  try {
+    await ensureFacturasSchema();
+    await ensureNotificacionesPagoSchema();
+    const [[config]] = await queryWithRetry("SELECT copia_1, copia_2, copia_3 FROM configuracion_correo_pagos WHERE id = 1 LIMIT 1");
+    res.render("compras/configuracion_correo_pagos", {
+      config: config || {}, user: req.session.user, error: null, success: req.session.success || null,
+      remitente: process.env.EMAIL_USER || "", smtpConfigurado: Boolean(process.env.EMAIL_USER && process.env.EMAIL_PASS)
+    });
+    delete req.session.success;
+  } catch (error) {
+    console.error("Error cargando configuración de correos de pagos:", error);
+    res.status(500).send("No se pudo cargar la configuración de correos.");
+  }
+});
+
+router.post("/facturas/configuracion-correo", requireAuth, allowRoles("ADMIN"), async (req, res) => {
+  try {
+    await ensureFacturasSchema();
+    await ensureNotificacionesPagoSchema();
+    const correos = [req.body.copia_1, req.body.copia_2, req.body.copia_3].map(normalizarCorreo);
+    if (correos.some(correo => !correoValido(correo)) || new Set(correos).size !== 3) {
+      const config = { copia_1: req.body.copia_1, copia_2: req.body.copia_2, copia_3: req.body.copia_3 };
+      return res.status(400).render("compras/configuracion_correo_pagos", {
+        config, user: req.session.user, success: null, remitente: process.env.EMAIL_USER || "",
+        smtpConfigurado: Boolean(process.env.EMAIL_USER && process.env.EMAIL_PASS),
+        error: "Ingrese tres correos válidos y diferentes."
+      });
+    }
+    await queryWithRetry(
+      `UPDATE configuracion_correo_pagos SET copia_1 = ?, copia_2 = ?, copia_3 = ?, actualizado_por = ? WHERE id = 1`,
+      [...correos, req.session.user.id || null]
+    );
+    req.session.success = "Correos internos guardados. Los envíos pendientes se pueden reintentar desde el historial de pagos.";
+    return res.redirect("/compras/facturas/configuracion-correo");
+  } catch (error) {
+    console.error("Error guardando configuración de correos de pagos:", error);
+    res.status(500).send("No se pudo guardar la configuración de correos.");
+  }
+});
+
 router.get("/proveedores", requireAuth, allowRoles("ADMIN", "PROVEEDURIA_TALLER"), async (req, res) => {
   try {
     const [proveedores] = await pool.query("SELECT * FROM proveedores ORDER BY nombre");
@@ -4148,15 +4422,19 @@ router.get("/proveedores/editar/:id", requireAuth, allowRoles("ADMIN", "PROVEEDU
 router.post("/proveedores", requireAuth, allowRoles("ADMIN", "PROVEEDURIA_TALLER"), async (req, res) => {
   try {
     const { id, nombre, direccion, telefono, email, contacto, cedula_juridica } = req.body;
+    const correoProveedor = normalizarCorreo(email);
+    if (correoProveedor && !correoValido(correoProveedor)) {
+      return res.status(400).send("El correo del proveedor no tiene un formato válido.");
+    }
     if (id) {
       await pool.query(
         "UPDATE proveedores SET nombre=?, direccion=?, telefono=?, email=?, contacto=?, cedula_juridica=? WHERE id=?",
-        [nombre, direccion, telefono, email, contacto, cedula_juridica || null, id]
+        [nombre, direccion, telefono, correoProveedor || null, contacto, cedula_juridica || null, id]
       );
     } else {
       await pool.query(
         "INSERT INTO proveedores (nombre, direccion, telefono, email, contacto, cedula_juridica) VALUES (?,?,?,?,?,?)",
-        [nombre, direccion, telefono, email, contacto, cedula_juridica || null]
+        [nombre, direccion, telefono, correoProveedor || null, contacto, cedula_juridica || null]
       );
     }
     res.redirect("/compras/proveedores");
@@ -6729,6 +7007,7 @@ router.get("/facturas", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_
 router.get("/facturas/historial-pagos", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER", "CONTABILIDAD"), async (req, res) => {
   try {
     await ensureFacturasSchema();
+    await ensureNotificacionesPagoSchema();
     await reconstruirColillasHistoricas();
     const condiciones = [];
     const params = [];
@@ -6760,6 +7039,21 @@ router.get("/facturas/historial-pagos", requireAuth, allowRoles("ADMIN", "TALLER
       params
     );
 
+    const idsColillas = rows.map(row => Number(row.id)).filter(Number.isFinite);
+    const enviosCorreo = new Map();
+    if (idsColillas.length) {
+      const [envios] = await pool.query(
+        `SELECT id, colilla_id, proveedor_id, proveedor_nombre, correo_destino, estado, error, intentos, enviado_en
+         FROM colillas_pago_envios WHERE colilla_id IN (${idsColillas.map(() => "?").join(",")}) ORDER BY id`,
+        idsColillas
+      );
+      for (const envio of envios) {
+        const idColilla = Number(envio.colilla_id);
+        if (!enviosCorreo.has(idColilla)) enviosCorreo.set(idColilla, []);
+        enviosCorreo.get(idColilla).push(envio);
+      }
+    }
+
     const colillas = rows.map(row => {
       let facturas = [];
       try {
@@ -6776,15 +7070,43 @@ router.get("/facturas/historial-pagos", requireAuth, allowRoles("ADMIN", "TALLER
       };
     });
 
+    const success = req.session.success || null;
+    const error = req.session.error || null;
+    delete req.session.success;
+    delete req.session.error;
     res.render("compras/historial_pagos", {
       colillas,
       filtros: { desde, hasta, tipo },
       user: req.session.user,
-      limite: 250
+      limite: 250,
+      enviosCorreo,
+      success,
+      error
     });
   } catch (error) {
     console.error("Error cargando historial de pagos:", error);
     res.status(500).send("No se pudo cargar el historial de pagos.");
+  }
+});
+
+router.post("/facturas/envios/:id/reintentar", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER"), async (req, res) => {
+  try {
+    await ensureFacturasSchema();
+    await ensureNotificacionesPagoSchema();
+    if (!/^\d+$/.test(String(req.params.id || ""))) return res.sendStatus(404);
+    const resultado = await procesarEnvioColilla(Number(req.params.id));
+    req.session.success = resultado.estado === "ENVIADO"
+      ? "Correo enviado al proveedor con copia a las direcciones internas."
+      : resultado.estado === "ERROR"
+        ? `No se pudo enviar el correo: ${resultado.error}`
+        : resultado.estado === "SIN_CORREO"
+          ? "Agregue un correo válido al proveedor antes de reenviar."
+          : "Configure los tres correos internos antes de reenviar.";
+    return res.redirect("/compras/facturas/historial-pagos");
+  } catch (error) {
+    console.error("Error reintentando correo de pago:", error);
+    req.session.error = "No se pudo reintentar el correo de pago.";
+    return res.redirect("/compras/facturas/historial-pagos");
   }
 });
 
@@ -7871,6 +8193,7 @@ router.post("/facturas/:id/nota-credito", requireAuth, allowRoles("ADMIN", "TALL
 router.post("/facturas/:id/abono", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER"), async (req, res) => {
   try {
     await ensureFacturasSchema();
+    await ensureNotificacionesPagoSchema();
 
     const id = req.params.id;
     const { tipo, monto_abono, fecha_abono, observacion_abono, periodo_cierre, comprobante_numero, comprobante_data, comprobante_nombre } = req.body;
@@ -7897,6 +8220,7 @@ router.post("/facturas/:id/abono", requireAuth, allowRoles("ADMIN", "TALLER", "P
               ${montoColumn} AS monto,
               COALESCE(nota_credito_monto, 0) AS nota_credito_monto,
               COALESCE(abono_monto, 0) AS abono_monto,
+              comprobante_pago_archivo,
               COALESCE(pagada, 0) AS pagada
        FROM ${table}
        WHERE id = ? ${extraWhere}`,
@@ -7950,19 +8274,23 @@ router.post("/facturas/:id/abono", requireAuth, allowRoles("ADMIN", "TALLER", "P
     );
 
     const [detalle] = tipo === "orden"
-      ? await pool.query(`SELECT o.po_numero, o.factura, o.fecha_vencimiento_factura, p.nombre AS proveedor_nombre FROM ordenes_compra o JOIN proveedores p ON p.id = o.proveedor_id WHERE o.id = ?`, [id])
-      : await pool.query(`SELECT NULL AS po_numero, f.numero_factura AS factura, NULL AS fecha_vencimiento_factura, f.proveedor_nombre FROM facturas f WHERE f.id = ?`, [id]);
+      ? await pool.query(`SELECT o.po_numero, o.factura, o.fecha_vencimiento_factura, p.id AS proveedor_id, p.email AS proveedor_email, p.nombre AS proveedor_nombre FROM ordenes_compra o JOIN proveedores p ON p.id = o.proveedor_id WHERE o.id = ?`, [id])
+      : await pool.query(`SELECT NULL AS po_numero, f.numero_factura AS factura, NULL AS fecha_vencimiento_factura,
+          (SELECT p.id FROM proveedores p WHERE UPPER(TRIM(p.nombre)) = UPPER(TRIM(f.proveedor_nombre)) ORDER BY p.id LIMIT 1) AS proveedor_id,
+          (SELECT p.email FROM proveedores p WHERE UPPER(TRIM(p.nombre)) = UPPER(TRIM(f.proveedor_nombre)) ORDER BY p.id LIMIT 1) AS proveedor_email,
+          f.proveedor_nombre FROM facturas f WHERE f.id = ?`, [id]);
     const { generarPDFReciboPago } = require("../utils/pdfReciboPago");
     const reciboNumero = `CP-${fechaAbono.replace(/-/g, "")}-${String(Date.now()).slice(-6)}`;
+    const facturasColilla = [{ ...detalle[0], factura_id: Number(id), tipo, nota_credito_monto: factura.nota_credito_monto, abono_monto: saldos.abonoMonto, abonos_previos: saldos.abonoMonto, monto_pago: montoAbono, total: montoAbono, observacion: observacion_abono, comprobante_pago_archivo: comprobante?.path || factura.comprobante_pago_archivo }];
     const buffer = await generarPDFReciboPago({
-      facturas: [{ ...detalle[0], tipo, nota_credito_monto: factura.nota_credito_monto, abono_monto: saldos.abonoMonto, abonos_previos: saldos.abonoMonto, monto_pago: montoAbono, total: montoAbono, observacion: observacion_abono }],
+      facturas: facturasColilla,
       fechaPago: fechaAbono,
       totalPagado: montoAbono,
       reciboNumero,
       comprobanteNumero: comprobante_numero,
       generadoPor: req.session.user?.usuario || "Sistema"
     });
-    await guardarColillaPago({
+    const colillaId = await guardarColillaPago({
       reciboNumero,
       fechaPago: fechaAbono,
       periodoCierre,
@@ -7971,8 +8299,13 @@ router.post("/facturas/:id/abono", requireAuth, allowRoles("ADMIN", "TALLER", "P
       comprobanteNumero: comprobante_numero,
       comprobanteArchivo: comprobante?.path,
       generadoPor: req.session.user?.usuario || "Sistema",
-      facturas: [{ ...detalle[0], factura_id: Number(id), tipo, nota_credito_monto: factura.nota_credito_monto, abono_monto: saldos.abonoMonto, abonos_previos: saldos.abonoMonto, monto_pago: montoAbono, total: montoAbono, observacion: observacion_abono }]
+      facturas: facturasColilla
     });
+    const estadoCorreo = await notificarPagoProveedorSeguro({
+      colillaId,
+      reciboNumero, fechaPago: fechaAbono, tipoPago: "abono", comprobanteNumero: comprobante_numero, facturas: facturasColilla
+    });
+    res.setHeader("X-Email-Notification", estadoCorreo);
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `attachment; filename=colilla_pago_proveedor_${reciboNumero}.pdf`);
     res.setHeader("Cache-Control", "no-store");
@@ -7987,6 +8320,7 @@ router.post("/facturas/:id/abono", requireAuth, allowRoles("ADMIN", "TALLER", "P
 router.post("/facturas/:id/pagar", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER"), async (req, res) => {
   try {
     await ensureFacturasSchema();
+    await ensureNotificacionesPagoSchema();
     const id = req.params.id;
     const { tipo } = req.body;
     const fechaPago = String(req.body.fecha_pago || "").trim();
@@ -8005,7 +8339,7 @@ router.post("/facturas/:id/pagar", requireAuth, allowRoles("ADMIN", "TALLER", "P
       const [[saldoAntes]] = await pool.query(`SELECT total, COALESCE(nota_credito_monto, 0) AS nota_credito_monto, COALESCE(abono_monto, 0) AS abono_monto FROM ordenes_compra WHERE id = ? AND facturada = 1`, [id]);
       if (saldoAntes) montoPagoReal = Math.max(parseMonto(saldoAntes.total) - parseMonto(saldoAntes.nota_credito_monto) - parseMonto(saldoAntes.abono_monto), 0);
     } else if (tipo === "independiente") {
-      const [[saldoAntes]] = await pool.query(`SELECT monto, COALESCE(nota_credito_monto, 0) AS nota_credito_monto, COALESCE(abono_monto, 0) AS abono_monto FROM facturas WHERE id = ?`, [id]);
+      const [[saldoAntes]] = await pool.query(`SELECT monto, COALESCE(nota_credito_monto, 0) AS nota_credito_monto, COALESCE(abono_monto, 0) AS abono_monto, comprobante_pago_archivo FROM facturas WHERE id = ?`, [id]);
       if (saldoAntes) montoPagoReal = Math.max(parseMonto(saldoAntes.monto) - parseMonto(saldoAntes.nota_credito_monto) - parseMonto(saldoAntes.abono_monto), 0);
     }
 
@@ -8054,19 +8388,24 @@ router.post("/facturas/:id/pagar", requireAuth, allowRoles("ADMIN", "TALLER", "P
     }
 
     const [detalle] = tipo === "orden"
-      ? await pool.query(`SELECT o.po_numero, o.factura, o.fecha_vencimiento_factura, o.total - COALESCE(o.nota_credito_monto, 0) AS total, COALESCE(o.nota_credito_monto, 0) AS nota_credito_monto, p.nombre AS proveedor_nombre FROM ordenes_compra o JOIN proveedores p ON p.id = o.proveedor_id WHERE o.id = ?`, [id])
-      : await pool.query(`SELECT NULL AS po_numero, f.numero_factura AS factura, NULL AS fecha_vencimiento_factura, f.monto - COALESCE(f.nota_credito_monto, 0) AS total, COALESCE(f.nota_credito_monto, 0) AS nota_credito_monto, f.proveedor_nombre FROM facturas f WHERE f.id = ?`, [id]);
+      ? await pool.query(`SELECT o.po_numero, o.factura, o.fecha_vencimiento_factura, o.total - COALESCE(o.nota_credito_monto, 0) AS total, COALESCE(o.nota_credito_monto, 0) AS nota_credito_monto, o.comprobante_pago_archivo, p.id AS proveedor_id, p.email AS proveedor_email, p.nombre AS proveedor_nombre FROM ordenes_compra o JOIN proveedores p ON p.id = o.proveedor_id WHERE o.id = ?`, [id])
+      : await pool.query(`SELECT NULL AS po_numero, f.numero_factura AS factura, NULL AS fecha_vencimiento_factura,
+          f.monto - COALESCE(f.nota_credito_monto, 0) AS total, COALESCE(f.nota_credito_monto, 0) AS nota_credito_monto, f.comprobante_pago_archivo,
+          (SELECT p.id FROM proveedores p WHERE UPPER(TRIM(p.nombre)) = UPPER(TRIM(f.proveedor_nombre)) ORDER BY p.id LIMIT 1) AS proveedor_id,
+          (SELECT p.email FROM proveedores p WHERE UPPER(TRIM(p.nombre)) = UPPER(TRIM(f.proveedor_nombre)) ORDER BY p.id LIMIT 1) AS proveedor_email,
+          f.proveedor_nombre FROM facturas f WHERE f.id = ?`, [id]);
     const { generarPDFReciboPago } = require("../utils/pdfReciboPago");
     const reciboNumero = `CP-${fechaPago.replace(/-/g, "")}-${String(Date.now()).slice(-6)}`;
+    const facturasColilla = [{ ...detalle[0], factura_id: Number(id), tipo, monto_pago: montoPagoReal, total: montoPagoReal, comprobante_pago_archivo: comprob?.path || detalle[0].comprobante_pago_archivo }];
     const buffer = await generarPDFReciboPago({
-      facturas: [{ ...detalle[0], tipo, monto_pago: montoPagoReal, total: montoPagoReal }],
+      facturas: facturasColilla,
       fechaPago,
       totalPagado: montoPagoReal,
       reciboNumero,
       comprobanteNumero,
       generadoPor: req.session.user?.usuario || "Sistema"
     });
-    await guardarColillaPago({
+    const colillaId = await guardarColillaPago({
       reciboNumero,
       fechaPago,
       periodoCierre,
@@ -8075,8 +8414,12 @@ router.post("/facturas/:id/pagar", requireAuth, allowRoles("ADMIN", "TALLER", "P
       comprobanteNumero,
       comprobanteArchivo: comprobante?.path,
       generadoPor: req.session.user?.usuario || "Sistema",
-      facturas: [{ ...detalle[0], factura_id: Number(id), tipo, monto_pago: montoPagoReal, total: montoPagoReal }]
+      facturas: facturasColilla
     });
+    const estadoCorreo = await notificarPagoProveedorSeguro({
+      colillaId, reciboNumero, fechaPago, tipoPago: "pago", comprobanteNumero, facturas: facturasColilla
+    });
+    res.setHeader("X-Email-Notification", estadoCorreo);
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `attachment; filename=colilla_pago_proveedor_${reciboNumero}.pdf`);
     res.setHeader("Cache-Control", "no-store");
@@ -8146,6 +8489,7 @@ router.get("/facturas/recibo-preview", requireAuth, allowRoles("ADMIN", "TALLER"
 router.post("/facturas/pagar-multiple", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER"), async (req, res) => {
   try {
     await ensureFacturasSchema();
+    await ensureNotificacionesPagoSchema();
     const { facturas_ids } = req.body;
     const seleccionadas = toArray(facturas_ids).map(parseFacturaRef).filter(Boolean);
     const fechaPago = String(req.body.fecha_pago || "").trim();
@@ -8183,6 +8527,9 @@ router.post("/facturas/pagar-multiple", requireAuth, allowRoles("ADMIN", "TALLER
           o.factura_observacion,
           o.abono_observacion,
           o.nota_credito_motivo,
+          o.comprobante_pago_archivo,
+          p.id AS proveedor_id,
+          p.email AS proveedor_email,
           COALESCE(
             NULLIF(o.factura_observacion, ''),
             NULLIF(o.abono_observacion, ''),
@@ -8216,6 +8563,9 @@ router.post("/facturas/pagar-multiple", requireAuth, allowRoles("ADMIN", "TALLER
           f.factura_observacion,
           f.abono_observacion,
           f.nota_credito_motivo,
+          f.comprobante_pago_archivo,
+          (SELECT p.id FROM proveedores p WHERE UPPER(TRIM(p.nombre)) = UPPER(TRIM(f.proveedor_nombre)) ORDER BY p.id LIMIT 1) AS proveedor_id,
+          (SELECT p.email FROM proveedores p WHERE UPPER(TRIM(p.nombre)) = UPPER(TRIM(f.proveedor_nombre)) ORDER BY p.id LIMIT 1) AS proveedor_email,
           COALESCE(
             NULLIF(f.factura_observacion, ''),
             NULLIF(f.abono_observacion, ''),
@@ -8273,7 +8623,13 @@ router.post("/facturas/pagar-multiple", requireAuth, allowRoles("ADMIN", "TALLER
       );
     }
 
-    const totalPagado = facturas.reduce((sum, f) => sum + parseFloat(f.total), 0);
+    const facturasConComprobantes = facturas.map(factura => ({
+      ...factura,
+      factura_id: Number(factura.id),
+      monto_pago: parseMonto(factura.total),
+      comprobante_pago_archivo: comprobante?.path || factura.comprobante_pago_archivo || null
+    }));
+    const totalPagado = facturasConComprobantes.reduce((sum, f) => sum + parseFloat(f.total), 0);
     const logoPath = path.join(__dirname, "../../public/img/logo_tomza.jpg");
     const logoDataUri = fs.existsSync(logoPath)
       ? `data:image/jpeg;base64,${fs.readFileSync(logoPath).toString("base64")}`
@@ -8281,7 +8637,7 @@ router.post("/facturas/pagar-multiple", requireAuth, allowRoles("ADMIN", "TALLER
     const reciboNumero = `RP-${fechaPago.replace(/-/g, "")}-${String(Date.now()).slice(-6)}`;
     const { generarPDFReciboPago } = require("../utils/pdfReciboPago");
     const buffer = await generarPDFReciboPago({
-      facturas,
+      facturas: facturasConComprobantes,
       fechaPago,
       totalPagado,
       logoDataUri,
@@ -8290,7 +8646,7 @@ router.post("/facturas/pagar-multiple", requireAuth, allowRoles("ADMIN", "TALLER
       generadoPor: req.session.user?.usuario || "Sistema"
     });
 
-    await guardarColillaPago({
+    const colillaId = await guardarColillaPago({
       reciboNumero,
       fechaPago,
       periodoCierre,
@@ -8299,8 +8655,13 @@ router.post("/facturas/pagar-multiple", requireAuth, allowRoles("ADMIN", "TALLER
       comprobanteNumero,
       comprobanteArchivo: comprobante?.path,
       generadoPor: req.session.user?.usuario || "Sistema",
-      facturas: facturas.map(factura => ({ ...factura, factura_id: Number(factura.id) }))
+      facturas: facturasConComprobantes
     });
+
+    const estadoCorreo = await notificarPagoProveedorSeguro({
+      colillaId, reciboNumero, fechaPago, tipoPago: "pago_multiple", comprobanteNumero, facturas: facturasConComprobantes
+    });
+    res.setHeader("X-Email-Notification", estadoCorreo);
 
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename=colilla_pago_proveedores_${reciboNumero}.pdf`);

@@ -14,6 +14,7 @@
     .table td { vertical-align: middle; }
     .amount { white-space: nowrap; font-weight: 750; }
     .receipt { font-weight: 750; color: #12366e; }
+    .delivery-row { min-width: 230px; }
   </style>
 </head>
 <body>
@@ -24,8 +25,13 @@
         <h1 class="h3 fw-bold mt-2 mb-1">Historial de pagos</h1>
         <p class="text-secondary mb-0">Consulte cada pago o abono y vuelva a descargar su colilla.</p>
       </div>
-      <a href="/compras/facturas" class="btn btn-outline-primary"><i class="bi bi-receipt me-1"></i> Volver a facturas</a>
+      <div class="d-flex gap-2">
+        <% if (user.rol === 'ADMIN') { %><a href="/compras/facturas/configuracion-correo" class="btn btn-outline-secondary"><i class="bi bi-envelope-gear me-1"></i> Configurar copias</a><% } %>
+        <a href="/compras/facturas" class="btn btn-outline-primary"><i class="bi bi-receipt me-1"></i> Volver a facturas</a>
+      </div>
     </div>
+    <% if (success) { %><div class="alert alert-success"><%= success %></div><% } %>
+    <% if (error) { %><div class="alert alert-danger"><%= error %></div><% } %>
 
     <form method="GET" class="panel p-3 mb-3">
       <div class="row g-3 align-items-end">
@@ -63,12 +69,12 @@
           <thead>
             <tr>
               <th>Colilla</th><th>Fecha de pago</th><th>Tipo</th><th>Proveedor(es)</th>
-              <th>Facturas</th><th class="text-end">Monto</th><th>Registrado por</th><th>Documento</th>
+              <th>Facturas</th><th class="text-end">Monto</th><th>Registrado por</th><th>Correo proveedor</th><th>Documento</th>
             </tr>
           </thead>
           <tbody>
             <% if (!colillas.length) { %>
-              <tr><td colspan="8" class="text-center text-secondary py-5">No hay pagos para los filtros seleccionados.</td></tr>
+              <tr><td colspan="9" class="text-center text-secondary py-5">No hay pagos para los filtros seleccionados.</td></tr>
             <% } %>
             <% colillas.forEach(colilla => { %>
               <tr>
@@ -93,6 +99,26 @@
                 </td>
                 <td class="text-end amount">₡<%= Number(colilla.total_pagado || 0).toLocaleString('es-CR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %></td>
                 <td><%= colilla.generado_por || 'Sistema' %></td>
+                <td class="delivery-row">
+                  <% const envios = enviosCorreo.get(Number(colilla.id)) || []; %>
+                  <% if (!envios.length) { %>
+                    <span class="text-secondary small">Sin envío automático</span>
+                  <% } %>
+                  <% envios.forEach(envio => { %>
+                    <% const claseEstado = envio.estado === 'ENVIADO' ? 'success' : envio.estado === 'ERROR' || envio.estado === 'SIN_CORREO' ? 'danger' : 'warning'; %>
+                    <div class="mb-2">
+                      <div><span class="badge text-bg-<%= claseEstado %>"><%= envio.estado %></span> <small><%= envio.proveedor_nombre %></small></div>
+                      <div class="small text-secondary"><%= envio.correo_destino || 'Sin correo de proveedor' %></div>
+                      <% if (envio.error) { %><div class="small text-danger"><%= envio.error %></div><% } %>
+                      <% if (envio.estado !== 'ENVIANDO') { %>
+                        <form method="POST" action="/compras/facturas/envios/<%= envio.id %>/reintentar" class="mt-1">
+                          <button class="btn btn-sm btn-outline-primary" type="submit"><i class="bi bi-envelope-arrow-up me-1"></i><%= envio.estado === 'ENVIADO' ? 'Reenviar' : 'Reintentar envío' %></button>
+                          <% if (envio.estado === 'SIN_CORREO') { %><a class="btn btn-sm btn-link" href="<%= envio.proveedor_id ? `/compras/proveedores/editar/${envio.proveedor_id}` : '/compras/proveedores' %>">Revisar proveedor</a><% } %>
+                        </form>
+                      <% } %>
+                    </div>
+                  <% }) %>
+                </td>
                 <td>
                   <a class="btn btn-sm btn-outline-primary" href="/compras/facturas/colillas/<%= colilla.id %>/descargar">
                     <i class="bi bi-download me-1"></i> Descargar PDF
