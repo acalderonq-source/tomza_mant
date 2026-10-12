@@ -5,6 +5,7 @@ const path = require("path");
 const { ConfidentialClientApplication } = require("@azure/msal-node");
 const pool = require("../db");
 const { UPLOAD_ROOT, ensureUploadDirectory } = require("../utils/uploadStorage");
+const employeeMail = require("../utils/employeeMail");
 
 const router = express.Router();
 const GRAPH_ROOT = "https://graph.microsoft.com/v1.0";
@@ -30,6 +31,11 @@ function requireAdmin(req, res, next) {
   if (!ALLOWED_ROLES.has(String(req.session.user.rol || "").toUpperCase())) {
     return res.status(403).send("No autorizado");
   }
+  return next();
+}
+
+function requireSignedIn(req, res, next) {
+  if (!req.session?.user) return res.redirect("/login");
   return next();
 }
 
@@ -255,6 +261,77 @@ router.get("/oauth/iniciar", requireAdmin, async (req, res) => {
   } catch (error) {
     console.error("No se pudo iniciar OAuth Microsoft:", error.message);
     res.redirect("/compras/facturas/correo?error=No%20se%20pudo%20iniciar%20la%20conexi%C3%B3n.");
+  }
+});
+
+router.get("/remitente", requireSignedIn, async (req, res) => {
+  try {
+    const connection = await employeeMail.getConnection(req.session.user.id);
+    const notice = req.query.ok ? "Correo corporativo conectado." : req.query.error || "";
+    const csrf = String(res.locals.csrfToken || "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" }[c]));
+    const html = `<!doctype html><html lang="es"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Mi correo corporativo</title><body style="font:16px Arial;max-width:680px;margin:48px auto;padding:0 20px;color:#15233b"><h1>Mi correo para envíos</h1><p>Esta conexión es opcional. Si no conecta Outlook, los mensajes seguirán saliendo desde el remitente general del sistema.</p>${notice ? `<p>${String(notice).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]))}</p>` : ""}${connection ? `<p>Cuenta vinculada: <strong>${connection.correo}</strong></p><form method="post" action="/compras/facturas/correo/remitente/desconectar"><input type="hidden" name="_csrf" value="${csrf}"><button>Desvincular mi cuenta</button></form>` : `<p>No hay una cuenta personal vinculada.</p><a href="/compras/facturas/correo/remitente/oauth/iniciar">Vincular mi Outlook corporativo</a>`}<p><a href="/dashboard">Volver al sistema</a></p></body></html>`;
+    res.type("html").send(html);
+  } catch (error) {
+    console.error("No se pudo cargar la conexión de correo personal:", error.message);
+    res.status(500).send("No se pudo cargar la configuración de correo.");
+  }
+});
+
+router.get("/remitente/oauth/iniciar", requireSignedIn, async (req, res) => {
+  if (!employeeMail.ready()) return res.redirect("/compras/facturas/correo/remitente?error=Microsoft%20no%20est%C3%A1%20configurado%20en%20el%20servidor.");
+  try {
+    const state = crypto.randomBytes(32).toString("hex");
+    req.session.senderOAuthState = state;
+    const url = await employeeMail.client().getAuthCodeUrl({
+      scopes: employeeMail.SCOPES,
+      redirectUri: process.env.MS_REDIRECT_URI,
+      state,
+      prompt: "select_account"
+    });
+    res.redirect(url);
+  } catch (error) {
+    console.error("No se pudo iniciar OAuth de remitente personal:", error.message);
+    res.redirect("/compras/facturas/correo/remitente?error=No%20se%20pudo%20iniciar%20la%20conexi%C3%B3n.");
+  }
+});
+
+router.post("/remitente/desconectar", requireSignedIn, async (req, res) => {
+  try {
+    await employeeMail.ensureSchema();
+    await pool.query("DELETE FROM usuario_correo_conexiones WHERE usuario_id = ?", [req.session.user.id]);
+    res.redirect("/compras/facturas/correo/remitente?ok=Cuenta%20desvinculada.%20Se%20usar%C3%A1%20el%20remitente%20general.");
+  } catch (error) {
+    console.error("No se pudo desvincular correo personal:", error.message);
+    res.redirect("/compras/facturas/correo/remitente?error=No%20se%20pudo%20desvincular%20la%20cuenta.");
+  }
+});
+
+router.get("/oauth/callback", async (req, res, next) => {
+  if (!req.session?.senderOAuthState) return requireAdmin(req, res, next);
+  const expectedState = req.session.senderOAuthState;
+  delete req.session.senderOAuthState;
+  const actual = Buffer.from(String(req.query.state || ""));
+  const expected = Buffer.from(String(expectedState || ""));
+  if (!req.session.user || !expected.length || actual.length !== expected.length || !crypto.timingSafeEqual(expected, actual)) {
+    return res.redirect("/compras/facturas/correo/remitente?error=La%20validaci%C3%B3n%20de%20seguridad%20fall%C3%B3.");
+  }
+  if (req.query.error || !req.query.code || !employeeMail.ready()) {
+    return res.redirect("/compras/facturas/correo/remitente?error=Microsoft%20cancel%C3%B3%20o%20rechaz%C3%B3%20la%20autorizaci%C3%B3n.");
+  }
+  try {
+    const msal = employeeMail.client();
+    const result = await msal.acquireTokenByCode({ code: String(req.query.code), scopes: employeeMail.SCOPES, redirectUri: process.env.MS_REDIRECT_URI });
+    const email = result.account?.username;
+    const accountId = result.account?.homeAccountId;
+    if (!email || !accountId) throw new Error("Microsoft no devolvió los datos de la cuenta.");
+    await employeeMail.ensureSchema();
+    await pool.query(`INSERT INTO usuario_correo_conexiones (usuario_id, correo, cuenta_id, token_cache)
+      VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE correo = VALUES(correo), cuenta_id = VALUES(cuenta_id), token_cache = VALUES(token_cache), conectado_en = NOW()`,
+    [req.session.user.id, email, accountId, employeeMail.encrypt(await msal.getTokenCache().serialize())]);
+    return res.redirect("/compras/facturas/correo/remitente?ok=1");
+  } catch (error) {
+    console.error("Falló OAuth personal de Microsoft:", error.message);
+    return res.redirect("/compras/facturas/correo/remitente?error=No%20se%20pudo%20vincular%20la%20cuenta.");
   }
 });
 

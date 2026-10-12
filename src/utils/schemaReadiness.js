@@ -45,7 +45,7 @@ const COLUMNAS_ESENCIALES_TALLER = {
   revisiones_ruta_detalle: ["revision_id", "item_clave", "estado"],
   solicitudes_llantas: ["id", "unidad_id", "placa", "sede", "estado", "solicitado_por"],
   solicitudes_llantas_historial: ["solicitud_id", "estado_anterior", "estado_nuevo", "usuario_id"],
-  dekra_control: ["id", "unidad_id", "sede", "mes", "estado", "negocio"],
+  dekra_control: ["id", "unidad_id", "sede", "mes", "estado", "negocio", "cita_fecha", "cita_hora", "cita_lugar", "cita_correos", "estado_segunda", "observacion_segunda", "cita_fecha_segunda", "cita_hora_segunda", "cita_lugar_segunda", "recordatorio_15d_enviado", "recordatorio_2d_enviado", "recordatorio_15d_segundo_enviado", "recordatorio_2d_segundo_enviado"],
   minae_tramites: ["id", "unidad_id", "sede", "tipo", "estado", "vencimiento", "negocio"],
   bodega_articulos: ["id", "nombre", "tipo_articulo", "grupo_bodega", "origen_inventario", "stock_actual", "precio_unitario", "activo"],
   bodega_existencias: ["id", "articulo_id", "sede", "ubicacion", "cantidad"],

@@ -7,6 +7,7 @@ const MySQLStore = require("express-mysql-session")(session);
 const cron = require("node-cron");
 const pool = require("./db");
 const enviarAlertasDekra = require("./utils/dekraMail");
+const { enviarRecordatoriosCitasDekra } = require("./utils/dekraMail");
 const { enviarRecordatoriosMantenimientos, ensurePushTables } = require("./utils/notificacionesPush");
 const { ensureCsrfToken, injectSecurityAssets } = require("./middleware/security");
 const { seedBundledUploads, verificarAlmacenamientoUploads } = require("./utils/uploadStorage");
@@ -413,6 +414,19 @@ cron.schedule("0 7 * * *", async () => {
     await enviarAlertasDekra();
   }
 });
+
+cron.schedule("0 8 * * *", async () => {
+  try {
+    for (const diasAntes of [15, 2]) {
+      for (const slot of ["primera", "segunda"]) {
+        const cantidad = await enviarRecordatoriosCitasDekra(diasAntes, slot);
+        if (cantidad) console.log(`📧 Citas DEKRA (${slot}) con recordatorio de ${diasAntes} días: ${cantidad}`);
+      }
+    }
+  } catch (error) {
+    console.error("Error enviando recordatorios de citas DEKRA:", error);
+  }
+}, { timezone: "America/Costa_Rica" });
 
 cron.schedule("0 8 * * *", async () => {
   try {

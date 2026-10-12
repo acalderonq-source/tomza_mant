@@ -43,6 +43,16 @@
 <%
   const data = resumen || { total: 0, realizados: 0, noRealizados: 0, pendientes: 0, cumplimiento: 0 };
   const puedeEditar = user.rol !== 'SUPERVISOR' && user.rol !== 'SUPERVISOR_PESADO';
+  const ciclosDekra = {
+    'ENE-JUL': 'Enero y julio',
+    'FEB-AGO': 'Febrero y agosto',
+    'MAR-SET': 'Marzo y setiembre',
+    'ABR-OCT': 'Abril y octubre',
+    'MAY-NOV': 'Mayo y noviembre',
+    'JUN-DIC': 'Junio y diciembre'
+  };
+  const claseEstado = estado => estado === 'REALIZADO' ? 'status-ok' : estado === 'NO_REALIZADO' ? 'status-bad' : 'status-wait';
+  const textoEstado = estado => estado === 'REALIZADO' ? 'Realizado' : estado === 'NO_REALIZADO' ? 'No realizado' : 'Pendiente';
 %>
 
 <nav class="navbar navbar-dark px-3 py-2">
@@ -57,13 +67,19 @@
     <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
       <div>
         <h1 class="hero-title">Cumplimiento DEKRA</h1>
-        <p class="hero-copy">Sede: <strong><%= sedeSeleccionada || 'TODAS' %></strong> · Control por mes, negocio y estado.</p>
+      <p class="hero-copy">Sede: <strong><%= sedeSeleccionada || 'TODAS' %></strong> · Cada ciclo incluye dos revisiones al año, separadas por seis meses.</p>
       </div>
       <% if (puedeEditar) { %>
         <a href="/dekra/nuevo" class="btn btn-warning"><i class="bi bi-plus-circle me-1"></i> Nuevo registro</a>
       <% } %>
     </div>
   </section>
+
+  <% if (citaAviso === 'enviada') { %>
+    <div class="alert alert-success">La cita quedó programada y se envió el correo a los supervisores indicados.</div>
+  <% } else if (citaAviso === 'correo_error') { %>
+    <div class="alert alert-warning">La cita quedó guardada, pero no se pudo confirmar el envío del correo. Revise la configuración de correo.</div>
+  <% } %>
 
   <section class="kpi-grid mb-3">
     <div class="kpi-card"><div class="kpi-label">Registros</div><div class="kpi-value"><%= data.total %></div><div class="kpi-foot">En la vista actual</div></div>
@@ -76,11 +92,11 @@
   <section class="panel p-3 mb-3">
     <form method="GET" action="/dekra" class="row g-3 align-items-end">
       <div class="col-md-3">
-        <label class="filter-label">Mes</label>
+        <label class="filter-label">Ciclo de revisión</label>
         <select name="mes" class="form-select form-select-sm">
-          <option value="">Todos los meses</option>
-          <% ['ENE-JUL','FEB-AGO','MAR-SET','ABR-OCT','MAY-NOV'].forEach(mes => { %>
-            <option value="<%= mes %>" <%= mesSeleccionado === mes ? 'selected' : '' %>><%= mes %></option>
+          <option value="">Todos los ciclos</option>
+          <% Object.entries(ciclosDekra).forEach(([mes, nombre]) => { %>
+            <option value="<%= mes %>" <%= mesSeleccionado === mes ? 'selected' : '' %>><%= nombre %> (<%= mes %>)</option>
           <% }) %>
         </select>
       </div>
@@ -125,9 +141,10 @@
           <tr>
             <th>Placa</th>
             <th>Sede</th>
-            <th>Mes</th>
+            <th>Ciclo (2 revisiones/año)</th>
             <th>Negocio</th>
             <th>Estado</th>
+            <th>Cita DEKRA</th>
             <th>Observación</th>
             <th>Actualizado</th>
             <th class="text-end">Acciones</th>
@@ -135,38 +152,84 @@
         </thead>
         <tbody>
           <% registros.forEach(r => { %>
+            <% const mesesRevision = mesesPorCiclo[r.mes] || ['Primera revisión', 'Segunda revisión']; %>
             <tr>
               <td><strong><%= r.placa %></strong></td>
               <td><%= r.sede %></td>
-              <td><%= r.mes %></td>
+              <td><strong><%= ciclosDekra[r.mes] || r.mes %></strong><div class="small text-muted"><%= r.mes %></div></td>
               <td><span class="business-pill <%= r.negocio === 'GRANEL' ? 'text-bg-danger' : 'text-bg-primary' %>"><%= r.negocio %></span></td>
               <td>
-                <% if (r.estado === 'REALIZADO') { %>
-                  <span class="status-pill status-ok">Pasó</span>
-                <% } else if (r.estado === 'NO_REALIZADO') { %>
-                  <span class="status-pill status-bad">No realizó</span>
-                <% } else { %>
-                  <span class="status-pill status-wait">Pendiente</span>
-                <% } %>
+                <div class="mb-1"><span class="small fw-bold"><%= mesesRevision[0] %></span> <span class="status-pill <%= claseEstado(r.estado) %>"><%= textoEstado(r.estado) %></span></div>
+                <div><span class="small fw-bold"><%= mesesRevision[1] %></span> <span class="status-pill <%= claseEstado(r.estado_segunda) %>"><%= textoEstado(r.estado_segunda) %></span></div>
               </td>
-              <td><div class="obs-box"><%= r.observacion || 'Sin observación' %></div></td>
+              <td>
+                <% [[r.cita_fecha, r.cita_hora, r.cita_lugar], [r.cita_fecha_segunda, r.cita_hora_segunda, r.cita_lugar_segunda]].forEach((cita, indice) => { %>
+                  <div class="mb-2">
+                    <div><strong><%= mesesRevision[indice] %>:</strong> <%= cita[0] || 'Sin cita' %><%= cita[1] ? ` · ${cita[1]}` : '' %></div>
+                    <% if (cita[2]) { %><div class="small text-muted"><%= cita[2] %></div><% } %>
+                  </div>
+                <% }) %>
+              </td>
+              <td><div class="obs-box"><strong><%= mesesRevision[0] %>:</strong> <%= r.observacion || 'Sin observación' %><br><strong><%= mesesRevision[1] %>:</strong> <%= r.observacion_segunda || 'Sin observación' %></div></td>
               <td><%= r.fecha_registro || '—' %></td>
               <td class="text-end">
                 <% if (puedeEditar) { %>
-                  <div class="d-flex gap-2 justify-content-end flex-wrap">
-                    <form method="POST" action="/dekra/<%= r.id %>/realizado">
-                      <button class="btn btn-success btn-sm"><i class="bi bi-check-circle me-1"></i> Pasó</button>
-                    </form>
-                    <button class="btn btn-outline-danger btn-sm" data-bs-toggle="collapse" data-bs-target="#obs-<%= r.id %>">
-                      <i class="bi bi-x-circle me-1"></i> No pudo ir
-                    </button>
-                  </div>
-                  <div class="collapse mt-2" id="obs-<%= r.id %>">
-                    <form method="POST" action="/dekra/<%= r.id %>/no-realizado">
-                      <textarea name="observacion" class="form-control form-control-sm mb-2" rows="2" placeholder="Motivo del no realizado" required></textarea>
-                      <button class="btn btn-danger btn-sm">Guardar motivo</button>
-                    </form>
-                  </div>
+                  <% [
+                    { slot: 'primera', nombre: mesesRevision[0], estado: r.estado, fecha: r.cita_fecha, hora: r.cita_hora, lugar: r.cita_lugar },
+                    { slot: 'segunda', nombre: mesesRevision[1], estado: r.estado_segunda, fecha: r.cita_fecha_segunda, hora: r.cita_hora_segunda, lugar: r.cita_lugar_segunda }
+                  ].forEach(revision => { %>
+                    <div class="border rounded p-2 mb-2 text-start">
+                      <div class="small fw-bold mb-1"><%= revision.nombre %></div>
+                      <% if (revision.estado === 'PENDIENTE' || revision.estado === 'NO_REALIZADO') { %>
+                        <div class="d-flex gap-1 flex-wrap">
+                          <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#cita-<%= r.id %>-<%= revision.slot %>">
+                            <i class="bi bi-calendar-plus me-1"></i><%= revision.fecha ? 'Cambiar cita' : 'Sacar cita' %>
+                          </button>
+                          <form method="POST" action="/dekra/<%= r.id %>/<%= revision.slot %>/realizado">
+                            <button class="btn btn-success btn-sm">Pasó</button>
+                          </form>
+                          <button class="btn btn-outline-danger btn-sm" data-bs-toggle="collapse" data-bs-target="#obs-<%= r.id %>-<%= revision.slot %>">No pudo ir</button>
+                        </div>
+                        <div class="collapse mt-2" id="obs-<%= r.id %>-<%= revision.slot %>">
+                          <form method="POST" action="/dekra/<%= r.id %>/<%= revision.slot %>/no-realizado">
+                            <textarea name="observacion" class="form-control form-control-sm mb-2" rows="2" placeholder="Motivo" required></textarea>
+                            <button class="btn btn-danger btn-sm">Guardar motivo</button>
+                          </form>
+                        </div>
+                        <div class="modal fade" id="cita-<%= r.id %>-<%= revision.slot %>" tabindex="-1" aria-hidden="true">
+                          <div class="modal-dialog modal-dialog-centered">
+                            <div class="modal-content">
+                              <form method="POST" action="/dekra/<%= r.id %>/cita/<%= revision.slot %>">
+                                <div class="modal-header">
+                                  <div>
+                                    <h2 class="modal-title fs-5"><%= revision.fecha ? 'Cambiar cita' : 'Sacar cita' %> · <%= revision.nombre %></h2>
+                                    <div class="small text-muted"><%= r.placa %> · <%= r.sede %></div>
+                                  </div>
+                                  <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                                </div>
+                                <div class="modal-body d-grid gap-3">
+                                  <div><label class="form-label">Fecha</label><input type="date" name="fecha" min="<%= hoyCostaRica %>" class="form-control" value="<%= revision.fecha || '' %>" required></div>
+                                  <div><label class="form-label">Hora</label><input type="time" name="hora" class="form-control" value="<%= revision.hora || '' %>"></div>
+                                  <div><label class="form-label">Lugar</label><input type="text" name="lugar" class="form-control" value="<%= revision.lugar || '' %>" maxlength="200" placeholder="Estación DEKRA"></div>
+                                  <div>
+                                    <label class="form-label">Correos de los supervisores</label>
+                                    <input type="text" name="correos" class="form-control" value="<%= r.correos_sugeridos %>" placeholder="supervisor@tomza.com, otro@tomza.com">
+                                    <div class="form-text">Se enviará la confirmación y se programarán recordatorios para esta revisión.</div>
+                                  </div>
+                                </div>
+                                <div class="modal-footer">
+                                  <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                  <button class="btn btn-primary"><i class="bi bi-envelope me-1"></i>Guardar cita y avisar</button>
+                                </div>
+                              </form>
+                            </div>
+                          </div>
+                        </div>
+                      <% } else { %>
+                        <span class="status-pill <%= claseEstado(revision.estado) %>"><%= textoEstado(revision.estado) %></span>
+                      <% } %>
+                    </div>
+                  <% }) %>
                 <% } else { %>
                   <span class="badge text-bg-secondary">Solo lectura</span>
                 <% } %>
@@ -174,7 +237,7 @@
             </tr>
           <% }) %>
           <% if (!registros.length) { %>
-            <tr><td colspan="8" class="empty-state">No hay registros DEKRA con los filtros seleccionados.</td></tr>
+            <tr><td colspan="9" class="empty-state">No hay registros DEKRA con los filtros seleccionados.</td></tr>
           <% } %>
         </tbody>
       </table>
