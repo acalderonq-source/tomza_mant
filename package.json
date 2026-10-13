@@ -4,7 +4,7 @@
   "main": "src/server.js",
   "type": "commonjs",
   "scripts": {
-    "dev": "nodemon src/server.js",
+    "dev": "node --watch src/server.js",
     "start": "node src/server.js",
     "migrate": "node src/scripts/runMigrations.js",
     "test": "node --test"
@@ -28,9 +28,6 @@
     "pdfmake": "^0.2.7",
     "qrcode": "^1.5.4",
     "web-push": "^3.6.7"
-  },
-  "devDependencies": {
-    "nodemon": "^3.1.4"
   },
   "overrides": {
     "exceljs": {
