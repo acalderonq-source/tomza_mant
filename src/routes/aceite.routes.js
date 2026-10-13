@@ -15,6 +15,7 @@ const {
 } = require("../utils/sedes");
 
 const ROLES_GESTION_ACEITE = ["ADMIN", "TALLER", "PROVEEDURIA_TALLER", "MECANICO", "BODEGA", "BODEGUERO"];
+const SEDE_ACEITE_LIMON = "ACEITE LIMON";
 const CAPACIDAD_ESTANON_GALONES = 55;
 const GALON_A_LITROS = 3.78541;
 const CAPACIDAD_ESTANON_LITROS = CAPACIDAD_ESTANON_GALONES * GALON_A_LITROS;
@@ -63,8 +64,8 @@ function sedesAceitePorUsuario(user) {
     mecanicos_rio_claro: ["Rio Claro"],
     mecanico_nicoya: ["Nicoya"],
     mecanicos_nicoya: ["Nicoya"],
-    mecanico_limon: ["Transportadora", "Cabezales", "Cisternas", "Carretas", "Tandem", "Tándem"],
-    mecanicos_limon: ["Transportadora", "Cabezales", "Cisternas", "Carretas", "Tandem", "Tándem"]
+    mecanico_limon: ["Transportadora", "Cabezales", "Cisternas", "Carretas", "Tandem", "Tándem", SEDE_ACEITE_LIMON],
+    mecanicos_limon: ["Transportadora", "Cabezales", "Cisternas", "Carretas", "Tandem", "Tándem", SEDE_ACEITE_LIMON]
   };
 
   return sedesPorUsuario[usuario] || sedesEspecialesPorUsuario(user);
@@ -85,6 +86,7 @@ async function getSedesPermitidasAceite(req) {
       TODAS_SEDES,
       SEDES_TRANSPORTADORA_DETALLE,
       sedesReales,
+      [SEDE_ACEITE_LIMON],
       expandirSedesOperativasRepuestosAceites(unirSedesAceite(TODAS_SEDES, sedesReales))
     );
   }
@@ -95,6 +97,17 @@ async function getSedesPermitidasAceite(req) {
   }
 
   const sedesBase = getSedesPermitidas(req);
+  const sedeSeleccionada = String(req.session.sedeSeleccionada || "").toUpperCase();
+  if (
+    ["ADMIN", "TALLER", "PROVEEDURIA_TALLER"].includes(user.rol) &&
+    (!sedeSeleccionada || sedeSeleccionada === "TODAS")
+  ) {
+    return unirSedesAceite(
+      expandirSedesOperativasRepuestosAceites(sedesBase),
+      [SEDE_ACEITE_LIMON]
+    );
+  }
+
   if (!user.id) {
     return expandirSedesOperativasRepuestosAceites(sedesBase);
   }
@@ -332,6 +345,7 @@ function puedeUsarSede(sede, sedesPermitidas) {
 async function obtenerSedesGestionAceite(sedesPermitidas) {
   return unirSedesAceite(
     (await obtenerTodasSedes(pool))
+      .concat(sedesPermitidas.includes(SEDE_ACEITE_LIMON) ? [SEDE_ACEITE_LIMON] : [])
       .filter(sede => puedeUsarSede(sede, sedesPermitidas))
       .map(sedeInventarioAceite)
   );

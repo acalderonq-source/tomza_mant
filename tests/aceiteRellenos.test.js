@@ -67,6 +67,32 @@ test('shared San Carlos inventory consumes Guapiles stock without a vehicle', as
   assert.ok(reads[0].params[0].includes('San Carlos'));
   assert.equal(writes.at(-1).params[2], 'Guapiles');
 });
+test('ACEITE LIMON is an independent oil inventory site', async () => {
+  const result = await fill({ sede: 'ACEITE LIMON', galones_usados: '1' });
+  assert.equal(result.status, 200);
+  assert.equal(committed, true);
+  assert.deepEqual(reads[0].params, [['ACEITE LIMON']]);
+  assert.equal(writes.at(-1).params[2], 'ACEITE LIMON');
+  assert.match(result.session.success, /ACEITE LIMON/);
+});
+test('only Limón oil users can see their independent oil inventory', async () => {
+  const result = await fill(
+    { sede: 'ACEITE LIMON', galones_usados: '1' },
+    { id: 2, rol: 'MECANICO', usuario: 'mecanico_rio_claro' }
+  );
+  assert.equal(result.status, 403);
+  assert.equal(connected, false);
+  assert.equal(writes.length, 0);
+});
+test('Limón mechanic can register a fill against ACEITE LIMON', async () => {
+  const result = await fill(
+    { sede: 'ACEITE LIMON', galones_usados: '1' },
+    { id: 4, rol: 'MECANICO', usuario: 'mecanico_limon' }
+  );
+  assert.equal(result.status, 200);
+  assert.equal(committed, true);
+  assert.equal(writes.at(-1).params[2], 'ACEITE LIMON');
+});
 test('Granel and Transportadora keep their shared inventory', async () => {
   await fill({ sede: 'granel_guapiles', galones_usados: '1' });
   assert.equal(committed, true);
