@@ -1,0 +1,44 @@
+const test=require('node:test');
+const assert=require('node:assert/strict');
+const ejs=require('ejs');
+const path=require('node:path');
+const fs=require('node:fs');
+const {claveProveedor,proveedoresUnicos,leerContactosTSV,correosValidos}=require('../src/utils/proveeduriaProveedores');
+const nombres=require('../src/data/proveeduriaProveedores.json');
+test('catálogo mantiene todos los proveedores, elimina repeticiones y conserva nombres legales',()=>{
+  const proveedores=proveedoresUnicos(nombres);
+  assert.equal(proveedores.length,78);
+  assert.equal(new Set(proveedores.map(p=>p.clave)).size,78);
+  for(const nombre of ['Cilindros Zaragoza, S.A. de C.V.','Roger Alberto','ACEROS CARAZO REIMERS','Geocycle - Holcim (Costa Rica) S.A.','Equipos de Salud Ocupacional S.A. (ESOSA)'])assert.ok(proveedores.some(p=>p.nombre===nombre));
+  const repetidos=proveedoresUnicos([' Café Rey ','CAFE REY','Yacopi','Yacopi S.A.','Arte Textil Producción y Diseño de CR Ltda •','Arte Textil Producción y Diseño de CR Ltda','-','']);
+  assert.equal(repetidos.length,3);
+  assert.equal(claveProveedor('Yacopi'),claveProveedor('Yacopi S.A.'));
+  assert.notEqual(claveProveedor('ABC Sanitarios'),claveProveedor('ABC Extintores (PERALTA BOLANOS GEBER IGNACIO)'));
+});
+test('importa 94 fichas sin inventar correos o condiciones y admite varios destinatarios',async()=>{
+  const contactos=leerContactosTSV(fs.readFileSync(path.join(__dirname,'../src/data/proveeduriaProveedoresContactos.tsv'),'utf8'));
+  assert.equal(contactos.length,94);assert.equal(new Set(contactos.map(p=>p.clave)).size,94);
+  const encontrar=nombre=>contactos.find(p=>p.nombre===nombre);
+  assert.deepEqual(encontrar('Representaciones Sumicomp Equipos S.A').correos,['confirmacionfae@sumicomp.cr','jmora@sumicomp.cr']);
+  assert.equal(encontrar('Representaciones Sumicomp Equipos S.A').condicion_pago,'CREDITO');
+  assert.equal(encontrar('Hules del Salvador S.A').condicion_pago,null);
+  assert.deepEqual(encontrar('ABC Sanitarios').correos,[]);
+  assert.equal(encontrar('Ferrtería Industrial La Florida').correo_original,'Ferrtería Industrial La Florida');
+  assert.deepEqual(encontrar('Ferrtería Industrial La Florida').correos,[]);
+  assert.equal(encontrar('ATC Tecnoval S.A').telefono,'25868585');
+  assert.equal(encontrar('Cilindros Zaragoza, S.A. de C.V.').telefono,'(503) 2408 3686');
+  assert.deepEqual(correosValidos('uno@example.com, dos@example.com'),['uno@example.com','dos@example.com']);
+  assert.deepEqual(correosValidos('uno@example.com, no-es-correo'),[]);
+  const html=await ejs.renderFile(path.join(__dirname,'../src/views/proveeduria/proveedores.ejs'),{proveedores:contactos});
+  assert.match(html,/Crédito · plazo por definir/);assert.match(html,/Por corregir: Ferrtería Industrial La Florida/);assert.match(html,/25868585/);
+});
+test('listado y formulario compartido muestran proveedores antes de tener órdenes previas',async()=>{
+  const proveedores=proveedoresUnicos(nombres);
+  const listado=await ejs.renderFile(path.join(__dirname,'../src/views/proveeduria/proveedores.ejs'),{proveedores});
+  assert.match(listado,/78 proveedores registrados/);assert.match(listado,/Roger Alberto/);
+  const form=await ejs.renderFile(path.join(__dirname,'../src/views/compras/orden_form.ejs'),{orden:null,lineas:[],proveedores,siguientePO:'Se asigna al guardar',esProveeduria:true,solicitudId:'',sedesPermitidas:['Cartago'],sedeActual:'Cartago',formAction:'/proveeduria/ordenes'});
+  assert.match(form,/list="proveedores-prov"/);
+  assert.match(form,/<option value="Cilindros Zaragoza, S.A. de C.V.">/);
+  assert.match(form,/<option value="Equipos de Salud Ocupacional S.A. \(ESOSA\)">/);
+  assert.doesNotMatch(form,/<option value="-">/);
+});

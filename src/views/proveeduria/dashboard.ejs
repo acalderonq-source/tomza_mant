@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Dashboard · Proveeduría</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+<%- include('../partials/dashboard_styles') %>
+</head><body>
+<nav class="navbar navbar-dark topbar px-3 py-2"><span class="navbar-brand fw-semibold"><span class="brand-box"><i class="bi bi-house"></i></span>Gas Tomza</span>
+<div class="text-white d-flex gap-2 align-items-center flex-wrap">
+<% if(user.departamentos?.length>1){ %><form method="POST" action="/departamento/activo" class="d-flex gap-2 align-items-center"><label for="area" class="small">Área</label><select id="area" name="departamento" class="form-select form-select-sm" onchange="this.form.submit()"><% user.departamentos.forEach(a=>{ %><option value="<%= a %>" <%= a===user.departamentoActivo?'selected':'' %>><%= a==='PROVEEDURIA'?'Proveeduría':a==='TALLER'?'Taller':a %></option><% }) %></select></form><% } %>
+<span class="small"><%= user.usuario %> · Proveeduría</span><a href="/logout" class="btn btn-warning btn-sm rounded-pill px-3">Salir</a></div></nav>
+<main class="container-fluid shell py-3">
+<section class="simple-hero mb-2"><div class="d-flex justify-content-between align-items-start gap-3 flex-wrap"><div><h1 class="page-title">Inicio</h1><div class="page-subtitle">Departamento: <strong>Proveeduría</strong> · Sede: <strong><%= sedeActual %></strong> · <%= new Date().toLocaleDateString('es-CR',{timeZone:'America/Costa_Rica'}) %></div></div><a class="btn btn-dark btn-sm rounded-pill px-3" href="/proveeduria/solicitudes"><i class="bi bi-clipboard-check"></i> Solicitudes recibidas</a></div></section>
+<%
+const ordenes=docs.filter(d=>d.tipo==='oc');
+const solicitudes=docs.filter(d=>d.tipo==='solicitud'&&['PENDIENTE','COTIZADA'].includes(d.datos.estado));
+const facturas=ordenes.filter(d=>['PENDIENTE','CONTABILIDAD'].includes(d.datos.factura?.estado));
+const salidas=docs.filter(d=>d.tipo==='salida'&&d.datos.estado!=='RECIBIDA');
+const indicadores=[['Solicitudes pendientes',solicitudes.length,'Pendientes de orden de compra'],['Órdenes por recibir',ordenes.filter(d=>d.datos.estado!=='RECIBIDA').length,'Mercadería pendiente de recepción'],['Facturas por revisar',facturas.length,'Aceptación y revisión contable'],['Pedidos en proceso',salidas.length,'Alistando o en camino']];
+const modulos=[
+['Solicitudes','/proveeduria/solicitudes','bi-clipboard-check','icon-blue','Recibir solicitudes de otros departamentos, cotizar y gestionar la entrega.'],
+['Órdenes de compra','/proveeduria/ordenes','bi-receipt','icon-green','Cotizaciones, órdenes manuales, PDF y envío al proveedor.'],
+['Proveedores','/proveeduria/proveedores','bi-building','icon-green','Consultar el catálogo de proveedores de Proveeduría.'],
+['Inventario de Proveeduría','/proveeduria/inventario','bi-box-seam','icon-amber','Consultar existencias e ingresar mercadería recibida.'],
+['Recepciones de OC','/proveeduria/recepciones','bi-box-arrow-in-down','icon-green','Registrar mercadería recibida, entregas parciales y cantidades pendientes.'],
+['Salidas de inventario','/proveeduria/salidas','bi-truck','icon-blue','Imprimir salidas y confirmar la recepción del pedido.'],
+['Facturas','/proveeduria/facturas','bi-receipt-cutoff','icon-amber','Comparar con la OC, aceptar o devolver facturas.'],
+['Pagos y comprobantes','/proveeduria/pagos','bi-cash-coin','icon-green','Consultar pagos, comprobantes y saldos por orden.'],
+['Conciliación','/proveeduria/conciliacion','bi-journal-check','icon-blue','Revisar estados de cuenta, depósitos y diferencias.'],
+['Alertas','/proveeduria/avisos','bi-bell','icon-dark','Ver solicitudes nuevas y avisos de cada proceso.']
+];
+%>
+<section class="summary-grid mb-2" aria-label="Resumen de Proveeduría"><% indicadores.forEach(i=>{ %><article class="summary-card"><div class="summary-label"><%= i[0] %></div><div class="summary-value"><%= i[1] %></div><div class="summary-foot"><%= i[2] %></div></article><% }) %></section>
+<% if(docs.length===500){ %><p class="small-muted">Resumen de los últimos 500 documentos.</p><% } %>
+<section class="mb-2"><h2 class="section-title">Módulos</h2><div class="module-grid"><% modulos.forEach(m=>{ %><a class="module-card" href="<%= m[1] %>"><span class="module-icon <%= m[3] %>"><i class="bi <%= m[2] %>"></i></span><div><div class="module-title"><%= m[0] %></div><p class="module-copy"><%= m[4] %></p></div></a><% }) %></div></section>
+<section class="plain-card p-3 mb-2"><div class="d-flex justify-content-between align-items-center gap-2 flex-wrap mb-2"><h2 class="section-title">Órdenes recientes</h2><a href="/proveeduria/ordenes">Ver órdenes →</a></div>
+<div class="table-responsive"><table class="table table-sm align-middle mb-0"><thead><tr><th>OC</th><th>Proveedor</th><th>Sede</th><th>Estado</th><th>Total</th><th></th></tr></thead><tbody><% if(!ordenes.length){ %><tr><td colspan="6" class="text-center text-muted py-4">Todavía no hay órdenes de compra. Comience creando una solicitud.</td></tr><% } %><% ordenes.slice(0,6).forEach(d=>{ %><tr><td>PR-<%= d.id %></td><td><%= d.datos.proveedor %></td><td><%= d.sede %></td><td><span class="badge text-bg-light"><%= d.datos.estado %></span></td><td><%= Number(d.datos.total).toLocaleString('es-CR',{style:'currency',currency:d.datos.moneda}) %></td><td><a href="/proveeduria/ordenes/<%= d.id %>/pdf" target="_blank">Ver OC</a></td></tr><% }) %></tbody></table></div></section>
+<section id="Alertas" class="plain-card p-3 mb-2"><h2 class="section-title">Alertas recientes</h2><div id="nuevas-alertas" role="status" aria-live="polite"></div><% if(!alertas.length){ %><p class="small-muted mb-0">No hay alertas recientes.</p><% } %><% alertas.slice(0,5).forEach(a=>{ %><p class="mb-2"><i class="bi bi-bell text-primary"></i> <%= a.mensaje %></p><% }) %></section>
+</main><script id="prov-datos" type="application/json"><%- JSON.stringify({ultimaAlerta:alertas[0]?.id||0}).replace(/</g,'\\u003c') %></script><script src="/js/proveeduria.js" defer></script></body></html>

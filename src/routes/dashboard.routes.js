@@ -2357,6 +2357,10 @@ router.get("/", async (req, res) => {
       return res.redirect("/carburacion/dashboard");
     }
 
+    if (req.session.user.departamentoActivo === "PROVEEDURIA") {
+      return res.redirect("/proveeduria");
+    }
+
     // =========================
     // FECHA HOY
     // =========================

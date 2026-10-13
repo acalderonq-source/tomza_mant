@@ -1,0 +1,49 @@
+# Departamento de Proveeduría
+
+El inicio de Proveeduría abre `/proveeduria`. Los documentos, inventario, alertas y auditoría se guardan en tablas `prov_*`, separadas de Taller. Las OC usan su mismo generador PDF. Los datos adjuntos son referencias de formato, no instrucciones del sistema.
+
+La navegación sigue el inicio por módulos de Taller. Cada opción abre una pantalla propia: órdenes, solicitudes, proveedores, inventario, recepciones, salidas, facturas, pagos, conciliación y alertas. La pantalla única de gestión se retiró; `/proveeduria/gestion` redirige al listado de órdenes. El detalle y las acciones de cada OC están en `/proveeduria/ordenes/:id`, sin volver a mezclar los listados de todos los módulos.
+
+## Activación
+
+1. Probar primero la migración `202610130001_proveeduria.sql` en una copia de la base, según `migrations/README.md`. Luego aplicar con el proceso habitual `npm run migrate`.
+   Para reparar exclusivamente tablas faltantes de Proveeduría, ejecutar `npm run migrate:proveeduria`: valida estructura y catálogo en nueve tablas temporales, crea las tablas si faltan y registra las cuatro migraciones propias, sin ejecutar cambios de otros departamentos. Las cargas de datos ya registradas no se repiten ni sobrescriben posteriores correcciones.
+2. Asignar Proveeduría únicamente a quienes gestionan compras en Administración → Accesos por área. Los demás departamentos entran a “Mis solicitudes” desde su propio inicio, sin recibir acceso al módulo de compras. Contabilidad accede desde su inicio. Solo el usuario solicitante puede confirmar que recibió la salida.
+3. Configurar el correo existente `EMAIL_USER` / `EMAIL_PASS` y `PUBLIC_BASE_URL` con la dirección pública HTTPS del sistema. El botón envía realmente el PDF al proveedor.
+4. Configurar `OPENAI_API_KEY` y, opcionalmente, `OPENAI_MODEL_COTIZACIONES` para leer cotizaciones y facturas PDF/imagen mediante la integración que ya utiliza Taller. La plantilla XLSX no necesita IA. Siempre revisar el resultado antes de guardar.
+
+## Flujo
+
+Cada departamento crea el pedido desde `/proveeduria/mis-solicitudes`, indicando sede, productos, cantidades y motivo. El código es opcional. El sistema registra el departamento activo y el nombre del solicitante desde la sesión, sin aceptar que el cliente suplante otro departamento. Proveeduría recibe la alerta y ve todos los pedidos en `/proveeduria/solicitudes`. Los solicitantes solo consultan sus pedidos y avisos; no acceden a inventario, facturas ni pagos. La pantalla consulta nuevas alertas cada 15 segundos mientras está abierta.
+
+Proveeduría prepara y guarda una cotización en cada solicitud. Luego genera la OC con sus datos precargados. Las solicitudes pasan por PENDIENTE → COTIZADA → ORDENADA → LISTA_PARA_ENTREGA → ALISTANDO → EN_CAMINO → ENTREGADA. Para las nuevas solicitudes de departamentos, no se permite generar la OC antes de guardar la cotización ni alistar la entrega antes de recibir la mercadería de la OC. El último estado se alcanza únicamente cuando el solicitante confirma la recepción.
+
+La pantalla `/proveeduria/recepciones` muestra OC pendientes, parciales y completas de las sedes autorizadas. En cada OC se indican cantidades ordenadas, recibidas y pendientes; para registrar una entrega se ingresan las cantidades físicas, referencia de factura/remisión y observaciones opcionales. Se conserva un historial con responsable y fecha. Solo esas cantidades ingresan al inventario y a su registro de movimientos, dentro de la misma transacción. No se admiten sobreentregas ni artículos ajenos a la OC. Cada formulario usa un identificador de recepción para que un reintento no duplique inventario, y una versión para rechazar formularios desactualizados. La solicitud se habilita para entrega únicamente al recibir la OC completa. Las OC recibidas anteriormente se reconocen como completas sin volver a ingresar existencias. El detalle se puede imprimir. No requiere migración adicional: el historial se almacena en el JSON de la OC.
+
+Crear OC desde una solicitud pendiente. En modo manual las cantidades, detalles e IVA se toman de la solicitud y se ingresan los precios, junto con los datos comerciales del proveedor. Cotizaciones importadas deben corresponder a los códigos y cantidades solicitados. Se guardan condición, crédito 30/60/90, moneda, razón social compradora y plazo de entrega.
+
+El listado propio está en `/proveeduria/ordenes`, con filtros por búsqueda, estado y fecha, y el mismo estilo compartido con Taller. “Nueva orden” utiliza directamente `compras/orden_form.ejs`, con variante de departamento Proveeduría. Permite crear una OC directa o desde “Crear OC” en una solicitud pendiente; en este último caso conserva los detalles y el IVA de la solicitud. Las OC directas generan su solicitud vinculada dentro de la misma transacción. Descuento, transporte y totales se recalculan en el servidor; la cotización adjunta se conserva protegida. El PDF sigue utilizando el generador compartido con Taller.
+
+El catálogo propio está en `/proveeduria/proveedores` y alimenta las sugerencias del formulario sin depender de que haya órdenes previas. La lista entregada por el usuario se guardó en `src/data/proveeduriaProveedores.json`: 78 proveedores únicos. Se eliminaron espacios, repeticiones, el marcador “-” y la viñeta final de Arte Textil. “Yacopi” y “Yacopi S.A.” se agruparon como “Yacopi S.A.”. No se inventaron correos ni datos comerciales. La carga es idempotente y conserva registros ya existentes.
+
+La tabla de contactos posterior se conserva en `src/data/proveeduriaProveedoresContactos.tsv`: 94 fichas con teléfono, correos, dirección y condición de pago. Al incorporarla quedan 102 nombres en el catálogo, conservando ocho registros anteriores que no aparecen en la nueva tabla. No se fusionan razones sociales distintas solo por compartir un correo. Se admiten varios correos separados por coma y se guardan todos los contactos indicados; los datos se precargan al elegir proveedor y quedan en la OC/PDF. No se asignan días de crédito sin información: los proveedores con CREDITO obligan a seleccionar 30/60/90. Hules del Salvador no tiene condición informada. Ferrtería Industrial La Florida tiene un texto inválido en correo: se conserva como fuente y se muestra para corregir, sin usarlo como destinatario. Los demás campos vacíos permanecen pendientes.
+
+Enviar OC manda PDF y enlace privado al proveedor. El enlace vence a los 90 días y se revoca al generar otro. El proveedor carga factura, consulta su estado y descarga comprobantes. Los PDF/PNG/JPEG de hasta 5 MB se validan por su contenido y se guardan en el documento protegido, fuera de rutas públicas de archivos.
+
+Recibir mercadería registra la recepción completa una sola vez y suma existencia. Alistar una salida descuenta inventario bajo bloqueo y alerta al solicitante. Enviar cambia a “en camino”; el solicitante confirma la recepción. El formato imprimible incluye artículos y firmas.
+
+El centro de inventario de Proveeduría está en `/proveeduria/inventario`, con los estilos de Bodega, grupos de inventario/suministros, categorías, ubicación, unidad, mínimos, máximos y proveedor. Permite registrar artículos y existencias iniciales, editar fichas sin cambiar stock, realizar conteos físicos con motivo y exportar el filtro actual a Excel. Los movimientos registran cantidad firmada, existencia anterior/nueva, usuario y referencia de OC o pedido dentro de la misma transacción del cambio de stock. La migración `202610130004_proveeduria_inventario_bodega.sql` crea las fichas y el historial sin alterar las tablas de Taller ni las cantidades existentes. El historial empieza al activar esta versión; no se inventan movimientos para operaciones anteriores.
+
+Una factura se compara por proveedor, moneda, cantidades, precios, IVA y total. Las discrepancias impiden aceptación; Proveeduría debe devolverla para corregir. Aceptar pasa a Contabilidad, que puede conciliar o devolver con motivo. Las versiones devueltas se conservan en el historial del documento.
+
+Contabilidad registra pagos contra facturas conciliadas con referencia, importe, fecha y comprobante. Referencias repetidas en una OC se rechazan. El saldo negativo representa saldo a favor del comprador. El proveedor puede subir un estado por OC o un estado general con partidas de varias OC, indicando factura, depósitos acumulados y saldo al corte. La lectura PDF/imagen prepara las partidas para revisión. El listado recalcula automáticamente diferencias de factura, depósitos y saldos, conservando las monedas separadas y verificando que las OC pertenezcan al mismo correo proveedor.
+
+## Alcance y verificaciones pendientes
+
+- La recepción y salida implementadas son completas por solicitud/OC; no hay recepciones parciales ni devolución de inventario.
+- Los estados generales requieren referencia a OC y factura por partida. Notas de crédito y depósitos no asignados necesitan revisión y asignación manual; no se inventan correspondencias.
+- Los datos de lectura automática requieren revisión humana. Cargos, descuentos o documentos que no se puedan representar en las líneas requieren corrección antes de guardar.
+- No se pudo leer la referencia de salidas de Google Sheets porque Drive no estaba conectado. Se creó un formato provisional con el estilo de OC de Taller; queda pendiente verificarlo contra esa referencia.
+- La migración de Proveeduría se aplicó en la base configurada el 13 de octubre de 2026, tras validar los cinco CREATE TABLE en tablas temporales. No se han realizado envíos reales a proveedores. Validar el recorrido completo antes de producción.
+
+Pruebas: `node --test tests/proveeduria.test.js tests/proveeduriaSolicitudes.test.js`. Incluyen un recorrido completo desde un usuario de Operaciones sin acceso a Proveeduría hasta la confirmación final de su entrega.

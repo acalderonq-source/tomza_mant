@@ -4,7 +4,7 @@ const DEPARTAMENTOS = [
   { key: "CONTABILIDAD", nombre: "Contabilidad", icono: "bi-journal-check", descripcion: "Área en preparación; sus procesos se habilitarán en una versión posterior." },
   { key: "SEGURIDAD_OCUPACIONAL", nombre: "Seguridad Ocupacional", icono: "bi-shield-check", descripcion: "Área lista para incorporar sus procesos." },
   { key: "LOGISTICA", nombre: "Logística", icono: "bi-diagram-3", descripcion: "Área lista para incorporar sus procesos." },
-  { key: "PROVEEDURIA", nombre: "Proveeduría", icono: "bi-box-seam", descripcion: "Área en preparación; sus procesos se habilitarán en una versión posterior." },
+  { key: "PROVEEDURIA", nombre: "Proveeduría", icono: "bi-box-seam", descripcion: "Solicitudes, órdenes de compra, inventario, facturas y pagos." },
   { key: "RECURSOS_HUMANOS", nombre: "Recursos Humanos", icono: "bi-people", descripcion: "Área lista para incorporar sus procesos." },
   { key: "CARBURACION", nombre: "Carburación", icono: "bi-fuel-pump", descripcion: "Área lista para incorporar sus procesos." }
 ];

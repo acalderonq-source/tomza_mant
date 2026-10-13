@@ -111,13 +111,14 @@ function generarBuffer(docDefinition) {
 
 async function generarPDFOrden(orden, proveedor = {}, lineas = []) {
   const empresa = getEmpresa(orden);
+  if (orden.departamento && orden.razon_social) empresa.nombre = orden.razon_social;
   const subtotal = toNumber(orden.subtotal);
   const montoDescuento = toNumber(orden.descuento);
   const transporte = toNumber(orden.transporte);
   const ivaPorc = orden.iva === null || orden.iva === undefined || orden.iva === "" ? 13 : toNumber(orden.iva);
   const subtotalConDescuento = Math.max(subtotal - montoDescuento, 0);
   const baseIva = subtotalConDescuento + transporte;
-  const montoIva = baseIva * ivaPorc / 100;
+  const montoIva = orden.departamento && orden.impuesto !== undefined ? toNumber(orden.impuesto) : baseIva * ivaPorc / 100;
   const total = toNumber(orden.total) || (baseIva + montoIva);
 
   const itemRows = lineas.length
@@ -186,13 +187,13 @@ async function generarPDFOrden(orden, proveedor = {}, lineas = []) {
             [
               { text: "Cotizacion", style: "miniHeader" },
               { text: "Forma de pago", style: "miniHeader" },
-              { text: "Tipo", style: "miniHeader" },
+              { text: orden.departamento ? "Departamento" : "Tipo", style: "miniHeader" },
               { text: "Fecha envio", style: "miniHeader" }
             ],
             [
               { text: orden.cotizacion_nombre || orden.cotizacion || "-", alignment: "center" },
               { text: orden.forma_pago || "Credito", alignment: "center" },
-              { text: orden.tipo_mantenimiento || "CORRECTIVO", alignment: "center" },
+              { text: orden.departamento || orden.tipo_mantenimiento || "CORRECTIVO", alignment: "center" },
               { text: formatDate(orden.fecha_envio), alignment: "center" }
             ]
           ]
@@ -242,7 +243,7 @@ async function generarPDFOrden(orden, proveedor = {}, lineas = []) {
                 ["Descuento", { text: formatMoney(montoDescuento), alignment: "right" }],
                 ["Transporte", { text: formatMoney(transporte), alignment: "right" }],
                 ["Subtotal gravable", { text: formatMoney(baseIva), alignment: "right" }],
-                [`IVA (${formatMoney(ivaPorc)}%)`, { text: formatMoney(montoIva), alignment: "right" }],
+                [orden.departamento ? 'IVA' : `IVA (${formatMoney(ivaPorc)}%)`, { text: formatMoney(montoIva), alignment: "right" }],
                 [
                   { text: "TOTAL", bold: true, fillColor: "#eaf2ff" },
                   { text: formatMoney(total), bold: true, alignment: "right", fillColor: "#eaf2ff" }

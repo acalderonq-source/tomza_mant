@@ -151,8 +151,9 @@
 </head>
 <body>
 <%
-  const esEdicion = !!orden;
+  const esEdicion = !!orden && !(typeof esNuevaOrden !== 'undefined' && esNuevaOrden);
   const carburacion = typeof esCarburacion !== 'undefined' && esCarburacion;
+  const proveeduria = typeof esProveeduria !== 'undefined' && esProveeduria;
   const clientesOrden = carburacion && typeof clientes !== 'undefined' ? clientes : [];
   const safeOrden = orden || {};
   const lineasIniciales = Array.isArray(lineas) ? lineas : [];
@@ -175,6 +176,8 @@
 
   <div class="form-card">
     <form id="ordenForm" method="POST" action="<%= accionFormulario %>">
+      <% if(proveeduria){ %><input type="hidden" name="origen_formulario" value="taller"><input type="hidden" name="solicitud_id" value="<%= solicitudId %>"><div class="alert alert-light border">Departamento de Proveeduría<% if(solicitudId){ %> · Sede: <%= sedeActual %> · Solicitud PR-<%= solicitudId %>. Ingrese los precios; el detalle y el IVA se toman de la solicitud.<% } %></div>
+      <% if(!solicitudId){ %><div class="mb-3"><label for="sedeOrden">Sede de la orden</label><select id="sedeOrden" name="sede" class="form-select" required><option value="">Seleccione la sede</option><% sedesPermitidas.forEach(s=>{ %><option value="<%= s %>" <%= s===sedeActual?'selected':'' %>><%= s %></option><% }) %></select></div><% } %><% } %>
       <div class="row">
         <div class="col-md-3">
           <label>N° PO <%= esEdicion ? '' : '(se genera automático)' %></label>
@@ -186,12 +189,16 @@
         </div>
         <div class="col-md-3">
           <label>Proveedor</label>
+          <% if(proveeduria){ %>
+          <input name="proveedor" class="form-control" list="proveedores-prov" required value="<%= safeOrden.proveedor || '' %>"><datalist id="proveedores-prov"><% proveedores.forEach(p=>{ %><option value="<%= p.nombre %>"></option><% }) %></datalist>
+          <% }else{ %>
           <select name="proveedor_id" class="form-select" required>
             <option value="">Seleccione</option>
             <% proveedores.forEach(p => { %>
               <option value="<%= p.id %>" <%= safeOrden.proveedor_id == p.id ? 'selected' : '' %>><%= p.nombre %></option>
             <% }) %>
           </select>
+          <% } %>
         </div>
         <div class="col-md-3">
           <% if (typeof esCarburacion !== 'undefined' && esCarburacion) { %>
@@ -219,7 +226,7 @@
           </select>
         </div>
         <div class="col-md-3">
-          <label><%= carburacion ? 'Cliente' : 'Placa / general de orden' %></label>
+          <label><%= proveeduria ? 'Referencia de la compra' : carburacion ? 'Cliente' : 'Placa / general de orden' %></label>
           <% if (carburacion) { %>
           <select name="cliente_id" id="clienteOrden" class="form-select">
             <option value="">Seleccione un cliente</option>
@@ -232,16 +239,16 @@
             class="form-control text-uppercase"
             placeholder="<%= carburacion ? 'Nombre del cliente' : 'Placa, GENERAL o ACEITES' %>"
             value="<%= safeOrden.placa_unidad || '' %>"
-            data-placa-autocomplete
+            <% if(!proveeduria){ %>data-placa-autocomplete
             data-placa-mode="placa"
             data-placa-allow-free="true"
-            data-placa-allow-general="true"
+            data-placa-allow-general="true"<% } %>
           >
           <% } %>
         </div>
         <div class="col-md-2">
-          <label><%= carburacion ? 'Área' : 'Tipo mantenimiento' %></label>
-          <% if (carburacion) { %><div class="form-control-plaintext">Carburación</div><% } else { %>
+          <label><%= (carburacion || proveeduria) ? 'Área' : 'Tipo mantenimiento' %></label>
+          <% if (proveeduria) { %><div class="form-control-plaintext">Proveeduría</div><% } else if (carburacion) { %><div class="form-control-plaintext">Carburación</div><% } else { %>
           <select name="tipo_mantenimiento" class="form-select">
             <option value="CORRECTIVO" <%= (safeOrden.tipo_mantenimiento || 'CORRECTIVO') === 'CORRECTIVO' ? 'selected' : '' %>>Correctivo</option>
             <option value="PREVENTIVO" <%= safeOrden.tipo_mantenimiento === 'PREVENTIVO' ? 'selected' : '' %>>Preventivo</option>
@@ -251,12 +258,20 @@
         </div>
         <div class="col-md-2 d-flex align-items-end">
           <div class="small text-muted">
-            <% if (carburacion) { %>Indique la referencia de la compra de Carburación.<% } else { %>Use una placa para compras de unidad, <strong>GENERAL TALLER</strong> para taller, <strong>GENERAL GASTOS</strong> para gastos generales o <strong>ACEITES</strong> para compras de aceites.<% } %>
+            <% if (proveeduria) { %>Indique el área, destino o referencia de esta compra.<% } else if (carburacion) { %>Indique la referencia de la compra de Carburación.<% } else { %>Use una placa para compras de unidad, <strong>GENERAL TALLER</strong> para taller, <strong>GENERAL GASTOS</strong> para gastos generales o <strong>ACEITES</strong> para compras de aceites.<% } %>
           </div>
         </div>
       </div>
 
       <hr>
+      <% if(proveeduria){ %><div class="row mb-3">
+        <div class="col-md-4"><label>Correo del proveedor</label><input required type="email" multiple name="email" class="form-control" value="<%= safeOrden.email || '' %>"><div class="form-text">Puede incluir varios correos separados por coma.</div></div>
+        <div class="col-md-4"><label>Plazo de entrega</label><input required name="entrega" class="form-control" value="<%= safeOrden.entrega || '' %>"></div>
+        <div class="col-md-4"><label>Crédito</label><select name="credito" class="form-select" required><option value="">Seleccione el plazo</option><% [0,30,60,90].forEach(n=>{ %><option value="<%= n %>" <%= Number(safeOrden.credito||0)===n?'selected':'' %>><%= n===0?'Contado':n+' días' %></option><% }) %></select></div>
+        <div class="col-md-4 mt-3"><label>Teléfono del proveedor</label><input name="proveedor_telefono" class="form-control" value="<%= safeOrden.proveedor_telefono||'' %>"></div>
+        <div class="col-md-8 mt-3"><label>Dirección del proveedor</label><input name="proveedor_direccion" class="form-control" value="<%= safeOrden.proveedor_direccion||'' %>"></div>
+        <div class="col-12"><p id="proveedorAviso" class="form-text mb-0" role="status"></p></div>
+      </div><% } %>
       <h4 class="page-title fs-5 mb-3">Detalle de productos/servicios</h4>
       <div class="order-lines-wrap">
         <table class="table table-bordered order-lines-table" id="itemsTable">
@@ -341,11 +356,24 @@
   </div>
 </div>
 
-<% if (!carburacion) { %><script src="/js/placa-search.js?v=20260811-3"></script><% } %>
+<% if (!carburacion && !proveeduria) { %><script src="/js/placa-search.js?v=20260811-3"></script><% } %>
 <script>
   let rowIndex = 0;
   const lineasIniciales = <%- JSON.stringify(lineasIniciales) %>;
   const clientesOrden = <%- JSON.stringify(clientesOrden).replace(/</g, '\\u003c') %>;
+  <% if(proveeduria){ %>
+  const catalogoProveedores=<%- JSON.stringify(proveedores).replace(/</g,'\\u003c') %>;
+  const normalizarProveedor=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().replace(/[^A-Z0-9]/g,'');
+  document.querySelector('[name="proveedor"]').addEventListener('change',e=>{
+    const p=catalogoProveedores.find(p=>normalizarProveedor(p.nombre)===normalizarProveedor(e.target.value));
+    if(!p){['email','proveedor_telefono','proveedor_direccion','forma_pago','credito'].forEach(k=>document.querySelector(`[name="${k}"]`).value='');document.getElementById('proveedorAviso').textContent='Proveedor sin ficha registrada: complete sus datos y condición de pago.';return;}
+    e.target.value=p.nombre;
+    const campos={email:(p.correos||[]).join(', '),proveedor_telefono:p.telefono||'',proveedor_direccion:p.direccion||'',forma_pago:p.condicion_pago==='CREDITO'?'Crédito':p.condicion_pago==='CONTADO'?'Contado':''};
+    Object.entries(campos).forEach(([k,v])=>document.querySelector(`[name="${k}"]`).value=v);
+    document.querySelector('[name="credito"]').value=p.condicion_pago==='CONTADO'?'0':'';
+    document.getElementById('proveedorAviso').textContent=p.correo_original&&!p.correos?.length?'El correo registrado requiere corrección. Ingrese un correo válido.':p.condicion_pago==='CREDITO'?'Proveedor a crédito: seleccione 30, 60 o 90 días.':!p.condicion_pago?'Condición de pago pendiente: seleccione contado o plazo de crédito.':!p.correos?.length?'Proveedor sin correo registrado: complételo antes de guardar.':'';
+  });
+  <% } %>
   document.getElementById('clienteOrden')?.addEventListener('change', event => {
     const cliente = clientesOrden.find(c => String(c.id) === event.target.value);
     if (cliente) document.querySelectorAll('[data-cliente-linea]').forEach(select => {
@@ -357,7 +385,7 @@
     const tbody = document.querySelector("#itemsTable tbody");
     const newRow = document.createElement("tr");
     newRow.innerHTML = `
-      <td data-label="<%= carburacion ? 'Cliente' : 'Placa' %>"><% if(carburacion){ %><select name="lineas[${rowIndex}][codigo]" class="form-select" data-cliente-linea><option value="">Seleccione un cliente</option></select><% } else { %><input type="text" name="lineas[${rowIndex}][codigo]" class="form-control text-uppercase" placeholder="Placa, GENERAL o ACEITES" data-placa-autocomplete data-placa-mode="placa" data-placa-allow-free="true" data-placa-allow-general="true"><% } %></td>
+      <td data-label="<%= proveeduria ? 'Referencia' : carburacion ? 'Cliente' : 'Placa' %>"><% if(carburacion){ %><select name="lineas[${rowIndex}][codigo]" class="form-select" data-cliente-linea><option value="">Seleccione un cliente</option></select><% } else { %><input type="text" name="lineas[${rowIndex}][codigo]" class="form-control text-uppercase" placeholder="<%= proveeduria ? 'Área o destino' : 'Placa, GENERAL o ACEITES' %>" <% if(!proveeduria){ %>data-placa-autocomplete data-placa-mode="placa" data-placa-allow-free="true" data-placa-allow-general="true"<% } %>><% } %></td>
       <td data-label="Código"><input type="text" name="lineas[${rowIndex}][codigo_producto]" class="form-control text-uppercase" placeholder="Código"></td>
       <td data-label="Descripción"><textarea name="lineas[${rowIndex}][descripcion]" class="form-control" rows="3" required></textarea></td>
       <td data-label="Cantidad"><input type="number" name="lineas[${rowIndex}][cantidad]" class="form-control cantidad" value="1" step="0.01"></td>
@@ -380,6 +408,13 @@
     newRow.querySelector(`[name="lineas[${rowIndex}][subtotal]"]`).value = linea.subtotal ?? '';
     rowIndex++;
     attachEventsToRow(newRow);
+    <% if(proveeduria && solicitudId){ %>
+    newRow.dataset.iva=linea.iva??13;
+    newRow.querySelectorAll('textarea,input:not(.precio):not(.subtotal)').forEach(i=>i.readOnly=true);
+    newRow.querySelector('.removeRow').disabled=true;
+    document.getElementById('addRowBtn').disabled=true;
+    document.getElementById('iva').readOnly=true;
+    <% } %>
     window.TomzaPlacaSearch?.initAll(newRow);
     updateTotals();
   }
@@ -414,7 +449,12 @@
     const subtotalDespuesDescuento = Math.max(subtotal - descuento, 0);
     const totalConTransporte = subtotalDespuesDescuento + transporte;
     const iva = totalConTransporte * ivaPorc / 100;
-    const total = totalConTransporte + iva;
+    let impuestoCalculado=iva;
+    <% if(proveeduria && solicitudId){ %>
+    const impuestoLineas=[...document.querySelectorAll('#itemsTable tbody tr')].reduce((s,r)=>s+Math.round(Number(r.querySelector('.subtotal').value||0)*Number(r.dataset.iva||0))/100,0);
+    impuestoCalculado=Math.round((impuestoLineas*(subtotal?(subtotal-descuento)/subtotal:0)+transporte*ivaPorc/100)*100)/100;
+    <% } %>
+    const total = totalConTransporte + impuestoCalculado;
     document.getElementById("subtotal").value = subtotal.toFixed(2);
     document.getElementById("total").value = total.toFixed(2);
   }
@@ -455,7 +495,15 @@
   }
 
   function llenarOrdenDesdeCotizacion(orden) {
-    const proveedorAsignado = setSelectValue('select[name="proveedor_id"]', orden.proveedor_id);
+    <% if(proveeduria){ %>
+    if(orden.proveedor_nombre)document.querySelector('[name="proveedor"]').value=orden.proveedor_nombre;
+    if(orden.email)document.querySelector('[name="email"]').value=orden.email;
+    if(orden.entrega)document.querySelector('[name="entrega"]').value=orden.entrega;
+    if(orden.credito!==null && orden.credito!==undefined)document.querySelector('[name="credito"]').value=orden.credito;
+    <% } %>
+    const proveedorAsignado = <%= proveeduria ? 'true' : 'false' %>
+      ? Array.from(document.querySelectorAll('#proveedores-prov option')).some(o => o.value.trim().toLowerCase() === String(orden.proveedor_nombre || '').trim().toLowerCase())
+      : setSelectValue('select[name="proveedor_id"]', orden.proveedor_id);
     if (orden.forma_pago) document.querySelector('[name="forma_pago"]').value = orden.forma_pago;
     if (orden.moneda) setSelectValue('select[name="moneda"]', orden.moneda);
     document.getElementById("descuento").value = orden.descuento ?? 0;
@@ -540,7 +588,7 @@
       cotizacionPreview.innerHTML = '<span class="text-muted">Analizando cotización con IA...</span>';
 
       try {
-        const response = await fetch("/compras/cotizacion/analizar", {
+        const response = await fetch("<%= proveeduria ? '/proveeduria/cotizacion/analizar' : '/compras/cotizacion/analizar' %>", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -568,7 +616,7 @@
   } else {
     addRow();
   }
-  <% if (!carburacion) { %>
+  <% if (!carburacion && !proveeduria) { %>
   document.addEventListener("DOMContentLoaded", () => {
     const script = document.createElement("script");
     script.src = "/js/tipo-mantenimiento.js";

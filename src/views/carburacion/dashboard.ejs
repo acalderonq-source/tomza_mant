@@ -10,6 +10,7 @@
 <div class="text-white d-flex align-items-center gap-2 flex-wrap"><span class="small"><%= user.nombre || 'Carburación' %> · Carburación</span><a href="/logout" class="btn btn-warning btn-sm rounded-pill px-3">Salir</a></div>
 </nav>
 <main class="container-fluid shell py-3">
+<%- include('../partials/solicitudes_proveeduria_acceso') %>
 
 <%
   const money = (n, moneda) => Number(n || 0).toLocaleString('es-CR', { style: 'currency', currency: moneda });

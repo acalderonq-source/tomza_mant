@@ -117,6 +117,7 @@
 
 <main class="container-fluid shell py-3">
   <section class="simple-hero mb-2">
+    <% if (departamentoActivo === 'CONTABILIDAD') { %><a class="btn btn-primary mb-2" href="/proveeduria">Facturas y conciliación de Proveeduría</a><% } %>
     <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
       <div>
         <h1 class="page-title">Inicio</h1>
@@ -128,6 +129,7 @@
     </div>
   </section>
 
+  <%- include('partials/solicitudes_proveeduria_acceso') %>
   <% if (!esBodegaDashboard && !esMecanicoLimitado && (usuarioTodasSedes || sedes.length > 1) && sedes.length) { %>
     <section class="plain-card p-2 mb-2">
       <h2 class="section-title">Cambiar sede</h2>

@@ -239,6 +239,7 @@ function esUsuarioMecanicoLimitado(user) {
 }
 
 function mecanicoPuedeUsarRuta(pathname) {
+  if(['/proveeduria/mis-solicitudes','/proveeduria/solicitudes','/proveeduria/alertas'].includes(pathname)||/^\/proveeduria\/salidas\/\d+\/aceptar$/.test(pathname))return true;
   const rutasPermitidas = [
     "/",
     "/login",
@@ -391,6 +392,7 @@ app.use("/minae", minaeRoutes);
 app.use("/aresep", aresepRoutes);
 app.use("/compras/facturas/correo", facturasCorreoRoutes);
 app.use("/compras", comprasRoutes);
+app.use("/proveeduria", require("./routes/proveeduria.routes"));
 app.use("/carburacion", require("./routes/carburacion.routes"));
 app.use("/llantas", llantasRoutes);
 app.use("/notificaciones", notificacionesRoutes);
