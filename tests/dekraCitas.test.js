@@ -1,6 +1,8 @@
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
 const express = require("express");
+const ejs = require("ejs");
+const path = require("node:path");
 const pool = require("../src/db");
 const dekraRoutes = require("../src/routes/dekra.routes");
 const { obtenerCorreosSupervisores } = require("../src/utils/dekraMail");
@@ -13,6 +15,100 @@ test("DEKRA usa el correo del supervisor asociado a sede y negocio", () => {
 
 test("DEKRA permite detectar sedes sin correo de supervisor configurado", () => {
   assert.deepEqual(obtenerCorreosSupervisores("Orotina", "GRANEL"), []);
+});
+
+test("ADMIN puede filtrar DEKRA por sede además de ciclo y negocio", async () => {
+  const originalQuery = pool.query;
+  const calls = [];
+  pool.query = async (sql, params = []) => {
+    calls.push({ sql, params });
+    if (sql.includes("SELECT DISTINCT sede") && sql.includes("FROM dekra_control")) {
+      return [[{ sede: "Cartago" }, { sede: "La Cruz" }]];
+    }
+    if (sql.includes("FROM dekra_control d") && sql.includes("JOIN unidades u")) return [[]];
+    throw new Error(`Consulta inesperada: ${sql}`);
+  };
+  const app = express();
+  app.use((req, res, next) => {
+    req.session = { user: { id: 1, rol: "ADMIN", usuario: "admin" } };
+    res.render = (_view, locals) => res.json({
+      registros: locals.registros,
+      sedesDisponibles: locals.sedesDisponibles,
+      sedeSeleccionada: locals.sedeSeleccionada
+    });
+    next();
+  });
+  app.use("/dekra", dekraRoutes);
+  const server = await new Promise(resolve => {
+    const listening = app.listen(0, "127.0.0.1", () => resolve(listening));
+  });
+
+  try {
+    const response = await fetch(`http://127.0.0.1:${server.address().port}/dekra?sede=La%20Cruz&mes=ENE-JUL&negocio=GRANEL`);
+    assert.equal(response.status, 200);
+    const payload = await response.json();
+    assert.deepEqual(payload.sedesDisponibles, ["Cartago", "La Cruz"]);
+    assert.equal(payload.sedeSeleccionada, "La Cruz");
+    const listado = calls.find(call => call.sql.includes("FROM dekra_control d") && call.sql.includes("JOIN unidades u"));
+    assert.match(listado.sql, /AND d\.sede = \?/);
+    assert.deepEqual(listado.params, ["La Cruz", "ENE-JUL", "GRANEL"]);
+  } finally {
+    pool.query = originalQuery;
+    await new Promise(resolve => server.close(resolve));
+  }
+});
+
+test("el filtro DEKRA no permite a un supervisor cambiar su sede autorizada", async () => {
+  const originalQuery = pool.query;
+  const calls = [];
+  pool.query = async (sql, params = []) => {
+    calls.push({ sql, params });
+    if (sql.includes("FROM dekra_control d") && sql.includes("JOIN unidades u")) return [[]];
+    throw new Error(`Consulta inesperada: ${sql}`);
+  };
+  const app = express();
+  app.use((req, res, next) => {
+    req.session = { user: { id: 8, rol: "SUPERVISOR", usuario: "supervisor", sede: "Cartago" } };
+    res.render = (_view, locals) => res.json({ sedeSeleccionada: locals.sedeSeleccionada, sedesDisponibles: locals.sedesDisponibles });
+    next();
+  });
+  app.use("/dekra", dekraRoutes);
+  const server = await new Promise(resolve => {
+    const listening = app.listen(0, "127.0.0.1", () => resolve(listening));
+  });
+
+  try {
+    const response = await fetch(`http://127.0.0.1:${server.address().port}/dekra?sede=La%20Cruz`);
+    assert.equal(response.status, 200);
+    const payload = await response.json();
+    assert.equal(payload.sedeSeleccionada, "Cartago");
+    assert.deepEqual(payload.sedesDisponibles, ["Cartago"]);
+    const listado = calls.find(call => call.sql.includes("FROM dekra_control d") && call.sql.includes("JOIN unidades u"));
+    assert.deepEqual(listado.params, ["Cartago"]);
+  } finally {
+    pool.query = originalQuery;
+    await new Promise(resolve => server.close(resolve));
+  }
+});
+
+test("la pantalla DEKRA muestra el selector de sede con la selección activa", async () => {
+  const html = await ejs.renderFile(path.join(__dirname, "../src/views/dekra.ejs"), {
+    registros: [],
+    user: { rol: "ADMIN" },
+    mesSeleccionado: "ENE-JUL",
+    negocioSeleccionado: "GRANEL",
+    estadoSeleccionado: "",
+    sedeSeleccionada: "La Cruz",
+    sedesDisponibles: ["Cartago", "La Cruz"],
+    citaAviso: "",
+    mesesPorCiclo: { "ENE-JUL": ["Enero", "Julio"] },
+    hoyCostaRica: "2026-10-13",
+    resumen: { total: 0, realizados: 0, noRealizados: 0, pendientes: 0, cumplimiento: 0 }
+  });
+  assert.match(html, /<label class="filter-label">Sede<\/label>/);
+  assert.match(html, /<option value="La Cruz" selected>La Cruz<\/option>/);
+  assert.match(html, /<select name="mes"/);
+  assert.match(html, /<select name="negocio"/);
 });
 
 test("los supervisores no pueden programar citas DEKRA", async () => {

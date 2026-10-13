@@ -92,6 +92,18 @@
   <section class="panel p-3 mb-3">
     <form method="GET" action="/dekra" class="row g-3 align-items-end">
       <div class="col-md-3">
+        <label class="filter-label">Sede</label>
+        <select name="sede" class="form-select form-select-sm" <%= sedesDisponibles.length <= 1 ? 'disabled' : '' %>>
+          <% if (!sedeSeleccionada || sedeSeleccionada === 'TODAS') { %>
+            <option value="">Todas las sedes</option>
+          <% } %>
+          <% sedesDisponibles.forEach(sede => { %>
+            <option value="<%= sede %>" <%= sedeSeleccionada === sede ? 'selected' : '' %>><%= sede %></option>
+          <% }) %>
+        </select>
+        <% if (sedesDisponibles.length === 1) { %><input type="hidden" name="sede" value="<%= sedeSeleccionada %>"><% } %>
+      </div>
+      <div class="col-md-2">
         <label class="filter-label">Ciclo de revisión</label>
         <select name="mes" class="form-select form-select-sm">
           <option value="">Todos los ciclos</option>
@@ -100,7 +112,7 @@
           <% }) %>
         </select>
       </div>
-      <div class="col-md-3">
+      <div class="col-md-2">
         <label class="filter-label">Negocio</label>
         <select name="negocio" class="form-select form-select-sm">
           <option value="">Todos los negocios</option>
@@ -109,7 +121,7 @@
           <% }) %>
         </select>
       </div>
-      <div class="col-md-3">
+      <div class="col-md-2">
         <label class="filter-label">Estado</label>
         <select name="estado" class="form-select form-select-sm">
           <option value="">Todos los estados</option>

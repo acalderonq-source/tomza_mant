@@ -89,7 +89,21 @@ async function registroAutorizado(req, id) {
 // =========================
 router.get("/", requireAuth, async (req, res) => {
   try {
-    const sedeFiltro = obtenerSedeFiltro(req);
+    const sedeFiltroSesion = obtenerSedeFiltro(req);
+    let sedesDisponibles = [];
+    if (sedeFiltroSesion) {
+      sedesDisponibles = [sedeFiltroSesion];
+    } else if (esUsuarioTodasSedes(req.session.user)) {
+      const [sedes] = await pool.query(`
+        SELECT DISTINCT sede
+        FROM dekra_control
+        WHERE sede IS NOT NULL AND TRIM(sede) <> ''
+        ORDER BY sede
+      `);
+      sedesDisponibles = sedes.map(row => row.sede);
+    }
+    const sedeSolicitada = String(req.query.sede || "").trim();
+    const sedeFiltro = sedeFiltroSesion || (sedesDisponibles.includes(sedeSolicitada) ? sedeSolicitada : "");
     const mes = req.query.mes || "";
     const negocio = req.query.negocio || "";
     const estado = req.query.estado || "";
@@ -171,6 +185,7 @@ router.get("/", requireAuth, async (req, res) => {
       negocioSeleccionado: negocio,
       estadoSeleccionado: estado,
       resumen,
+      sedesDisponibles,
       sedeSeleccionada: sedeFiltro || "TODAS",
       citaAviso: req.query.cita || "",
       mesesPorCiclo,
