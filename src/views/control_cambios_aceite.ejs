@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Programación de cambios de aceite | Transportadora</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+  <style>
+    :root { --ink:#15233c; --muted:#60718b; --line:#dbe4ef; --navy:#102a56; --blue:#1769d2; }
+    body { background:#f3f6fa; color:var(--ink); font-family:"Segoe UI",Arial,sans-serif; }
+    .topbar { background:var(--navy); color:white; }
+    .page { max-width:1440px; }
+    .hero,.metric,.unit-row { background:white; border:1px solid var(--line); border-radius:8px; }
+    .hero { padding:1.25rem; }
+    .hero h1 { font-size:1.65rem; font-weight:800; margin:0; }
+    .muted { color:var(--muted); }
+    .metric { padding:1rem; height:100%; }
+    .metric-label { color:var(--muted); font-size:.75rem; font-weight:800; text-transform:uppercase; }
+    .metric-value { font-size:1.5rem; font-weight:800; margin-top:.2rem; }
+    .unit-row { padding:1rem; }
+    .status { display:inline-flex; border-radius:999px; padding:.28rem .65rem; font-size:.78rem; font-weight:800; }
+    .status-vencido { background:#fee2e2;color:#991b1b; }
+    .status-hoy { background:#ffedd5;color:#9a3412; }
+    .status-proximo { background:#fef3c7;color:#854d0e; }
+    .status-programado { background:#dcfce7;color:#166534; }
+    .not-set { color:#64748b; background:#eef2f7; }
+    .table-wrap { overflow-x:auto; }
+    .table { min-width:1000px; }
+    .table thead th { background:#edf2f8; color:#40516d; font-size:.75rem; text-transform:uppercase; white-space:nowrap; }
+    .form-control { min-width:110px; }
+    @media (max-width:700px) { .hero h1 {font-size:1.35rem;} .save-row {min-width:90px;} }
+  </style>
+</head>
+<body>
+  <nav class="topbar py-2">
+    <div class="container-fluid page d-flex justify-content-between align-items-center">
+      <strong><i class="bi bi-calendar2-check me-2"></i>Control de cambios de aceite</strong>
+      <a href="/dashboard" class="btn btn-sm btn-outline-light">Volver al inicio</a>
+    </div>
+  </nav>
+  <main class="container-fluid page py-4">
+    <% if (success) { %><div class="alert alert-success"><%= success %></div><% } %>
+    <% if (error) { %><div class="alert alert-danger"><%= error %></div><% } %>
+    <section class="hero mb-3 d-flex justify-content-between align-items-center gap-3 flex-wrap">
+      <div>
+        <div class="small fw-bold text-uppercase text-primary mb-1">Mantenimiento preventivo · Transportadora</div>
+        <h1>Programación de cambios de aceite</h1>
+        <p class="muted mb-0 mt-1">La fecha se proyecta con los kilómetros promedio al mes y el intervalo de cambio asignado a cada unidad. Aviso próximo: 30 días antes.</p>
+      </div>
+      <span class="badge text-bg-primary fs-6"><%= resumen.unidades %> unidades</span>
+    </section>
+    <section class="row g-3 mb-3">
+      <div class="col-6 col-lg"><div class="metric"><div class="metric-label">Programadas</div><div class="metric-value"><%= resumen.programadas %></div></div></div>
+      <div class="col-6 col-lg"><div class="metric"><div class="metric-label">Sin programar</div><div class="metric-value"><%= resumen.sinProgramar %></div></div></div>
+      <div class="col-6 col-lg"><div class="metric"><div class="metric-label">Vencidas o para hoy</div><div class="metric-value text-danger"><%= resumen.urgentes %></div></div></div>
+      <div class="col-6 col-lg"><div class="metric"><div class="metric-label">Próximos 30 días</div><div class="metric-value text-warning"><%= resumen.proximos %></div></div></div>
+    </section>
+    <section class="unit-row">
+      <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+        <div><h2 class="h5 fw-bold mb-1">Unidades de Transportadora</h2><div class="muted small">Configure el promedio mensual, el intervalo recomendado y la fecha real del último cambio.</div></div>
+        <input id="buscarUnidad" type="search" class="form-control" style="max-width:280px" placeholder="Buscar placa o sede">
+      </div>
+      <% if (!unidades.length) { %><div class="alert alert-info mb-0">No se encontraron unidades activas de Transportadora.</div><% } else { %>
+      <div class="table-wrap">
+        <table class="table align-middle mb-0" id="tablaUnidades">
+          <thead><tr><th>Placa</th><th>Sede</th><th>Km promedio/mes</th><th>Intervalo (km)</th><th>Último cambio</th><th>Próximo cambio</th><th>Aviso</th><th>Observaciones</th><th></th></tr></thead>
+          <tbody>
+            <% unidades.forEach(unidad => { %>
+              <% const formId = `programacion-aceite-${unidad.id}`; %>
+              <tr data-filter="<%= `${unidad.placa} ${unidad.sede}`.toLowerCase() %>">
+                <td class="fw-bold"><%= unidad.placa %></td><td><%= unidad.sede %></td>
+                <td><input form="<%= formId %>" class="form-control form-control-sm" name="kilometros_mes" type="number" min="1" max="100000" step="1" value="<%= unidad.kilometros_mes || '' %>" required aria-label="Kilómetros promedio al mes para <%= unidad.placa %>"></td>
+                <td><input form="<%= formId %>" class="form-control form-control-sm" name="intervalo_km" type="number" min="1000" max="100000" step="500" value="<%= unidad.intervalo_km || '' %>" required aria-label="Intervalo en kilómetros para <%= unidad.placa %>"></td>
+                <td><input form="<%= formId %>" class="form-control form-control-sm" name="fecha_ultimo_cambio" type="date" value="<%= unidad.fecha_ultimo_cambio || '' %>" required aria-label="Fecha de último cambio para <%= unidad.placa %>"></td>
+                  <td class="fw-bold"><%= unidad.fecha_proximo_cambio || 'Se calcula al guardar' %></td>
+                  <td><% if (unidad.estado) { %><span class="status status-<%= unidad.estado.clave %>"><%= unidad.estado.etiqueta %></span><% } else { %><span class="status not-set">Sin programar</span><% } %></td>
+                <td><input form="<%= formId %>" class="form-control form-control-sm" name="observaciones" maxlength="500" value="<%= unidad.observaciones || '' %>" aria-label="Observaciones para <%= unidad.placa %>"></td>
+                <td><form id="<%= formId %>" method="POST" action="/control-cambios-aceite/<%= unidad.id %>"><button class="btn btn-sm btn-primary save-row" type="submit"><i class="bi bi-save me-1"></i>Guardar</button></form></td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+      <% } %>
+    </section>
+  </main>
+  <script>
+    document.getElementById('buscarUnidad')?.addEventListener('input', event => {
+      const term = event.target.value.trim().toLowerCase();
+      document.querySelectorAll('#tablaUnidades tbody tr').forEach(row => {
+        row.hidden = !row.dataset.filter.includes(term);
+      });
+    });
+  </script>
+</body>
+</html>

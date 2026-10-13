@@ -17,6 +17,7 @@ const RUTAS_TALLER = [
   "/unidades",
   "/kpis",
   "/aceite",
+  "/control-cambios-aceite",
   "/aires",
   "/dekra",
   "/minae",

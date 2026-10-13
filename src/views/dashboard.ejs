@@ -48,6 +48,7 @@
   const puedeVerReportesSupervisores = !esMecanicoLimitado && ['ADMIN', 'TALLER', 'PROVEEDURIA_TALLER', 'MECANICO', 'SUPERVISOR', 'SUPERVISOR_PESADO'].includes(user.rol) && (esAdminDashboard ? areaOperaciones : (areaTaller || areaOperaciones));
   const puedeVerAceite = (esMecanicoLimitado || ['ADMIN', 'TALLER', 'PROVEEDURIA_TALLER', 'MECANICO', 'BODEGA', 'BODEGUERO'].includes(user.rol)
     || usuarioDashboardLower === 'supervisor_rio_claro') && (areaTaller || areaProveeduria);
+  const puedeVerControlCambiosAceite = ['ADMIN', 'TALLER', 'PROVEEDURIA_TALLER'].includes(user.rol) && areaTaller;
   const puedeVerAires = !esMecanicoLimitado && ['ADMIN', 'TALLER', 'PROVEEDURIA_TALLER', 'MECANICO'].includes(user.rol) && areaTaller;
   const puedeVerRevisionRuta = (esMecanicoLimitado || ['ADMIN', 'TALLER', 'PROVEEDURIA_TALLER', 'MECANICO', 'SUPERVISOR', 'SUPERVISOR_PESADO'].includes(user.rol)) && (esAdminDashboard ? areaOperaciones : (areaTaller || areaOperaciones));
   const puedeVerGiras = !esMecanicoLimitado && ['ADMIN', 'TALLER', 'PROVEEDURIA_TALLER', 'MECANICO', 'SUPERVISOR', 'SUPERVISOR_PESADO'].includes(user.rol) && (esAdminDashboard ? areaOperaciones : (areaTaller || areaOperaciones));
@@ -335,6 +336,12 @@
           <a href="/aceite" class="module-card">
             <span class="module-icon icon-amber"><i class="bi bi-droplet-half"></i></span>
             <div><div class="module-title">Aceite</div><p class="module-copy">Estañones, litros por sede y cambios.</p></div>
+          </a>
+        <% } %>
+        <% if (puedeVerControlCambiosAceite) { %>
+          <a href="/control-cambios-aceite" class="module-card">
+            <span class="module-icon icon-amber"><i class="bi bi-calendar2-check"></i></span>
+            <div><div class="module-title">Programación de cambios de aceite</div><p class="module-copy">Proyección y avisos de Transportadora.</p></div>
           </a>
         <% } %>
         <% if (puedeVerAires) { %>
