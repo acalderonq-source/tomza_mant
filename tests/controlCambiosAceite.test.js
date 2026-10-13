@@ -32,3 +32,12 @@ test("inicializa solo la tabla independiente del nuevo control", async () => {
   assert.match(sqlEjecutado, /CREATE TABLE IF NOT EXISTS control_cambios_aceite_programaciones/);
   assert.doesNotMatch(sqlEjecutado, /cambios_aceite_historial|aceite_estanones|aceite_movimientos/);
 });
+
+test("incluye Granel y excluye Cisternas y Carretas del filtro Transportadora", () => {
+  assert.equal(router.grupoUnidad("granel_perez_zeledon"), "granel");
+  assert.equal(router.grupoUnidad("Granel"), "granel");
+  assert.equal(router.grupoUnidad("Cabezales"), "transportadora");
+  assert.ok(router.sedesGranel.includes("granel_alajuela"));
+  assert.ok(!router.sedesTransportadora.includes("Cisternas"));
+  assert.ok(!router.sedesTransportadora.includes("Carretas"));
+});

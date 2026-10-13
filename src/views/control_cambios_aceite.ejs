@@ -44,7 +44,7 @@
     <% if (error) { %><div class="alert alert-danger"><%= error %></div><% } %>
     <section class="hero mb-3 d-flex justify-content-between align-items-center gap-3 flex-wrap">
       <div>
-        <div class="small fw-bold text-uppercase text-primary mb-1">Mantenimiento preventivo · Transportadora</div>
+        <div class="small fw-bold text-uppercase text-primary mb-1">Mantenimiento preventivo · Transportadora y Granel</div>
         <h1>Programación de cambios de aceite</h1>
         <p class="muted mb-0 mt-1">La fecha se proyecta con los kilómetros promedio al mes y el intervalo de cambio asignado a cada unidad. Aviso próximo: 30 días antes.</p>
       </div>
@@ -58,17 +58,26 @@
     </section>
     <section class="unit-row">
       <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
-        <div><h2 class="h5 fw-bold mb-1">Unidades de Transportadora</h2><div class="muted small">Configure el promedio mensual, el intervalo recomendado y la fecha real del último cambio.</div></div>
-        <input id="buscarUnidad" type="search" class="form-control" style="max-width:280px" placeholder="Buscar placa o sede">
+        <div><h2 class="h5 fw-bold mb-1">Unidades de <%= filtro === 'todas' ? 'Transportadora y Granel' : (filtro === 'granel' ? 'Granel' : 'Transportadora') %></h2><div class="muted small">La sede de cada unidad aparece junto a su placa.</div></div>
+        <div class="d-flex gap-2 flex-wrap">
+          <form method="GET" action="/control-cambios-aceite">
+            <select class="form-select" name="tipo" aria-label="Filtrar por negocio" onchange="this.form.submit()">
+              <option value="todas" <%= filtro === 'todas' ? 'selected' : '' %>>Todas</option>
+              <option value="transportadora" <%= filtro === 'transportadora' ? 'selected' : '' %>>Transportadora</option>
+              <option value="granel" <%= filtro === 'granel' ? 'selected' : '' %>>Granel</option>
+            </select>
+          </form>
+          <input id="buscarUnidad" type="search" class="form-control" style="max-width:240px" placeholder="Buscar placa o sede">
+        </div>
       </div>
-      <% if (!unidades.length) { %><div class="alert alert-info mb-0">No se encontraron unidades activas de Transportadora.</div><% } else { %>
+      <% if (!unidades.length) { %><div class="alert alert-info mb-0">No se encontraron unidades activas para este filtro.</div><% } else { %>
       <div class="table-wrap">
         <table class="table align-middle mb-0" id="tablaUnidades">
           <thead><tr><th>Placa</th><th>Sede</th><th>Km promedio/mes</th><th>Intervalo (km)</th><th>Último cambio</th><th>Próximo cambio</th><th>Aviso</th><th>Observaciones</th><th></th></tr></thead>
           <tbody>
             <% unidades.forEach(unidad => { %>
               <% const formId = `programacion-aceite-${unidad.id}`; %>
-              <tr data-filter="<%= `${unidad.placa} ${unidad.sede}`.toLowerCase() %>">
+              <tr data-filter="<%= `${unidad.placa} ${unidad.sede} ${unidad.grupo}`.toLowerCase() %>">
                 <td class="fw-bold"><%= unidad.placa %></td><td><%= unidad.sede %></td>
                 <td><input form="<%= formId %>" class="form-control form-control-sm" name="kilometros_mes" type="number" min="1" max="100000" step="1" value="<%= unidad.kilometros_mes || '' %>" required aria-label="Kilómetros promedio al mes para <%= unidad.placa %>"></td>
                 <td><input form="<%= formId %>" class="form-control form-control-sm" name="intervalo_km" type="number" min="1000" max="100000" step="500" value="<%= unidad.intervalo_km || '' %>" required aria-label="Intervalo en kilómetros para <%= unidad.placa %>"></td>
@@ -76,7 +85,7 @@
                   <td class="fw-bold"><%= unidad.fecha_proximo_cambio || 'Se calcula al guardar' %></td>
                   <td><% if (unidad.estado) { %><span class="status status-<%= unidad.estado.clave %>"><%= unidad.estado.etiqueta %></span><% } else { %><span class="status not-set">Sin programar</span><% } %></td>
                 <td><input form="<%= formId %>" class="form-control form-control-sm" name="observaciones" maxlength="500" value="<%= unidad.observaciones || '' %>" aria-label="Observaciones para <%= unidad.placa %>"></td>
-                <td><form id="<%= formId %>" method="POST" action="/control-cambios-aceite/<%= unidad.id %>"><button class="btn btn-sm btn-primary save-row" type="submit"><i class="bi bi-save me-1"></i>Guardar</button></form></td>
+                <td><form id="<%= formId %>" method="POST" action="/control-cambios-aceite/<%= unidad.id %>"><input type="hidden" name="tipo" value="<%= filtro %>"><button class="btn btn-sm btn-primary save-row" type="submit"><i class="bi bi-save me-1"></i>Guardar</button></form></td>
               </tr>
             <% }) %>
           </tbody>

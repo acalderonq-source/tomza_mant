@@ -1,9 +1,16 @@
 const express = require("express");
 const pool = require("../db");
-const { SEDES_TRANSPORTADORA_DETALLE } = require("../utils/sedes");
+const { SEDES_TRANSPORTADORA_DETALLE, SEDES_GRANEL } = require("../utils/sedes");
 
 const router = express.Router();
-const SEDES_TRANSPORTADORA = ["Transportadora", ...SEDES_TRANSPORTADORA_DETALLE];
+const SEDES_TRANSPORTADORA = [
+  "Transportadora",
+  ...SEDES_TRANSPORTADORA_DETALLE.filter(sede => !["Cisternas", "Carretas"].includes(sede))
+];
+const SEDES_CONTROL = [...new Set([...SEDES_TRANSPORTADORA, ...SEDES_GRANEL])];
+const SEDES_GRANEL_NORMALIZADAS = new Set(SEDES_GRANEL.map(valor =>
+  valor.normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLowerCase()
+));
 const ROLES_PERMITIDOS = ["ADMIN", "TALLER", "PROVEEDURIA_TALLER"];
 
 function autorizado(req, res, next) {
@@ -47,6 +54,11 @@ function estadoProgramacion(fechaProximoCambio, hoy = fechaActualCostaRica()) {
   return { clave: "programado", etiqueta: `En ${dias} día(s)`, dias };
 }
 
+function grupoUnidad(sede) {
+  const clave = String(sede || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLowerCase();
+  return SEDES_GRANEL_NORMALIZADAS.has(clave) ? "granel" : "transportadora";
+}
+
 async function asegurarTablaProgramaciones() {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS control_cambios_aceite_programaciones (
@@ -74,6 +86,14 @@ router.use(autorizado);
 router.get("/", async (req, res) => {
   try {
     await asegurarTablaProgramaciones();
+    const filtro = ["transportadora", "granel"].includes(String(req.query.tipo || "").toLowerCase())
+      ? String(req.query.tipo).toLowerCase()
+      : "todas";
+    const sedesFiltro = filtro === "granel"
+      ? SEDES_GRANEL
+      : filtro === "transportadora"
+        ? SEDES_TRANSPORTADORA
+        : SEDES_CONTROL;
     const [unidades] = await pool.query(
       `SELECT u.id, u.placa, u.sede,
               p.kilometros_mes, p.intervalo_km,
@@ -84,12 +104,13 @@ router.get("/", async (req, res) => {
        LEFT JOIN control_cambios_aceite_programaciones p ON p.unidad_id = u.id AND p.activo = 1
        WHERE COALESCE(u.activa, 1) = 1 AND u.sede IN (?)
        ORDER BY u.sede, u.placa`,
-      [SEDES_TRANSPORTADORA]
+      [sedesFiltro]
     );
 
     const hoy = fechaActualCostaRica();
     const registros = unidades.map(unidad => ({
       ...unidad,
+      grupo: grupoUnidad(unidad.sede),
       estado: unidad.fecha_proximo_cambio ? estadoProgramacion(unidad.fecha_proximo_cambio, hoy) : null
     }));
     const resumen = registros.reduce((total, unidad) => {
@@ -103,6 +124,7 @@ router.get("/", async (req, res) => {
     res.render("control_cambios_aceite", {
       unidades: registros,
       resumen,
+      filtro,
       success: req.session.controlAceiteSuccess,
       error: req.session.controlAceiteError,
       user: req.session.user
@@ -117,6 +139,10 @@ router.get("/", async (req, res) => {
 
 router.post("/:unidadId", async (req, res) => {
   const { unidadId } = req.params;
+  const tipo = ["transportadora", "granel"].includes(String(req.body.tipo || "").toLowerCase())
+    ? String(req.body.tipo).toLowerCase()
+    : "todas";
+  const returnUrl = `/control-cambios-aceite${tipo === "todas" ? "" : `?tipo=${tipo}`}`;
   const kilometrosMes = Number(req.body.kilometros_mes);
   const intervaloKm = Number(req.body.intervalo_km);
   const fechaCambio = String(req.body.fecha_ultimo_cambio || "");
@@ -125,14 +151,14 @@ router.post("/:unidadId", async (req, res) => {
   if (!/^\d+$/.test(unidadId) || !Number.isFinite(kilometrosMes) || kilometrosMes <= 0 || kilometrosMes > 100000 ||
       !Number.isInteger(intervaloKm) || intervaloKm < 1000 || intervaloKm > 100000 || !fechaValida(fechaCambio) || fechaCambio > fechaActualCostaRica()) {
     req.session.controlAceiteError = "Revise el promedio mensual, el intervalo en kilómetros y la fecha del último cambio.";
-    return res.redirect("/control-cambios-aceite");
+    return res.redirect(returnUrl);
   }
 
   try {
     await asegurarTablaProgramaciones();
     const [[unidad]] = await pool.query(
       "SELECT id FROM unidades WHERE id = ? AND COALESCE(activa, 1) = 1 AND sede IN (?) LIMIT 1",
-      [unidadId, SEDES_TRANSPORTADORA]
+      [unidadId, SEDES_CONTROL]
     );
     if (!unidad) return res.sendStatus(404);
 
@@ -156,7 +182,7 @@ router.post("/:unidadId", async (req, res) => {
     console.error("Error guardando programación de cambios de aceite:", error);
     req.session.controlAceiteError = "No se pudo guardar la programación.";
   }
-  res.redirect("/control-cambios-aceite");
+  res.redirect(returnUrl);
 });
 
 module.exports = router;
@@ -164,3 +190,6 @@ module.exports.calcularFechaProximoCambio = calcularFechaProximoCambio;
 module.exports.estadoProgramacion = estadoProgramacion;
 module.exports.fechaValida = fechaValida;
 module.exports.asegurarTablaProgramaciones = asegurarTablaProgramaciones;
+module.exports.grupoUnidad = grupoUnidad;
+module.exports.sedesTransportadora = SEDES_TRANSPORTADORA;
+module.exports.sedesGranel = SEDES_GRANEL;
