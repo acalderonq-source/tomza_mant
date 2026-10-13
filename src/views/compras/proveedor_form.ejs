@@ -20,12 +20,13 @@
   <link rel="stylesheet" href="/css/compras.css">
 </head>
 <body>
+<% const base = typeof baseCompras !== "undefined" ? baseCompras : "/compras"; const carburacion = typeof esCarburacion !== "undefined" && esCarburacion; %>
 
 <nav class="navbar navbar-dark bg-dark px-3 py-2">
   <span class="navbar-brand fw-semibold"><i class="bi bi-building"></i> <%= proveedor ? 'Editar Proveedor' : 'Nuevo Proveedor' %></span>
   <div class="text-white">
-    <%= user.usuario %> (<%= user.rol %>)
-    <a href="/compras/proveedores" class="btn btn-sm btn-outline-light ms-2">← Volver</a>
+    <%= carburacion ? 'Carburación' : user.usuario + ' (' + user.rol + ')' %>
+    <a href="<%= base %>/proveedores" class="btn btn-sm btn-outline-light ms-2">← Volver</a>
   </div>
 </nav>
 
@@ -38,7 +39,7 @@
   </div>
 
   <div class="form-card">
-    <form method="POST" action="/compras/proveedores">
+    <form method="POST" action="<%= base %>/proveedores">
       <input type="hidden" name="id" value="<%= proveedor ? proveedor.id : '' %>">
       
       <div class="mb-3">
@@ -74,7 +75,7 @@
       
       <div class="d-flex gap-2">
         <button type="submit" class="btn btn-success">Guardar Proveedor</button>
-        <a href="/compras/proveedores" class="btn btn-secondary">Cancelar</a>
+        <a href="<%= base %>/proveedores" class="btn btn-secondary">Cancelar</a>
       </div>
     </form>
   </div>

@@ -1,0 +1,270 @@
+{
+  "archivo": "estaciones de servicio.xlsx",
+  "hoja": "Hoja1",
+  "clientes": [
+    {
+      "nombre": "Tike Tibás",
+      "fila": 2
+    },
+    {
+      "nombre": "Trova Alajuelita",
+      "fila": 3
+    },
+    {
+      "nombre": "Eusse Guápiles",
+      "fila": 4
+    },
+    {
+      "nombre": "Servicentro Guápiles S.A.",
+      "fila": 5
+    },
+    {
+      "nombre": "Estación de Servicio Acón",
+      "fila": 6
+    },
+    {
+      "nombre": "Servicentro del Oeste",
+      "fila": 7
+    },
+    {
+      "nombre": "Estación El Trapiche",
+      "fila": 8
+    },
+    {
+      "nombre": "Conoco",
+      "fila": 9
+    },
+    {
+      "nombre": "Servicentro Chamú",
+      "fila": 10
+    },
+    {
+      "nombre": "Coopetarrazú",
+      "fila": 11
+    },
+    {
+      "nombre": "Combustibles Coronado",
+      "fila": 12
+    },
+    {
+      "nombre": "Promotora Agroindustrial Samayco",
+      "fila": 13
+    },
+    {
+      "nombre": "Estación de Servicio Tucurrique S.A.",
+      "fila": 14
+    },
+    {
+      "nombre": "ECH Isla Grande Enríquez Chacón",
+      "fila": 15
+    },
+    {
+      "nombre": "Tike Avenida 10 - La Castellana",
+      "fila": 16
+    },
+    {
+      "nombre": "Trova Aserri",
+      "fila": 17
+    },
+    {
+      "nombre": "Estación de Servicio La Lima - Zavillana",
+      "fila": 18
+    },
+    {
+      "nombre": "Servicentro G24 Coyol",
+      "fila": 19
+    },
+    {
+      "nombre": "Servicentro El Bosque",
+      "fila": 20
+    },
+    {
+      "nombre": "Servicentro Cerro Cortes",
+      "fila": 21
+    },
+    {
+      "nombre": "Gasolinera La Cristalina",
+      "fila": 22
+    },
+    {
+      "nombre": "GSC Florencia",
+      "fila": 23
+    },
+    {
+      "nombre": "Bomba Orotina",
+      "fila": 24
+    },
+    {
+      "nombre": "Estación de Servicio Costanera 27",
+      "fila": 25
+    },
+    {
+      "nombre": "Servicentro Parrita Zavillana",
+      "fila": 26
+    },
+    {
+      "nombre": "Servicentro Santa María San Juan",
+      "fila": 27
+    },
+    {
+      "nombre": "Servicentro Alvarado y Molina",
+      "fila": 28
+    },
+    {
+      "nombre": "Coopevictoria",
+      "fila": 29
+    },
+    {
+      "nombre": "Trova Taras",
+      "fila": 30
+    },
+    {
+      "nombre": "Trova El Guarco",
+      "fila": 31
+    },
+    {
+      "nombre": "Trova Ipís",
+      "fila": 32
+    },
+    {
+      "nombre": "Eusse Tárcoles 20-ene",
+      "fila": 33
+    },
+    {
+      "nombre": "Servicentro CoopeAgri",
+      "fila": 34
+    },
+    {
+      "nombre": "Trova Cajón",
+      "fila": 35
+    },
+    {
+      "nombre": "Trova Pérez",
+      "fila": 36
+    },
+    {
+      "nombre": "Eusse Naranjo",
+      "fila": 37
+    },
+    {
+      "nombre": "Servicentro Santa María 1",
+      "fila": 38
+    },
+    {
+      "nombre": "Gasotica Buenos Aires Fonseca Hermanos",
+      "fila": 39
+    },
+    {
+      "nombre": "Trova Sabalito",
+      "fila": 40
+    },
+    {
+      "nombre": "Trova San Vito",
+      "fila": 41
+    },
+    {
+      "nombre": "Servicentro Río Claro",
+      "fila": 42
+    },
+    {
+      "nombre": "Gasolinera Río Tempisque",
+      "fila": 43
+    },
+    {
+      "nombre": "Estación de Servicio Pacífico Esparza",
+      "fila": 44
+    },
+    {
+      "nombre": "Estación de Servicio Reina del Campo",
+      "fila": 45
+    },
+    {
+      "nombre": "Gasolinera La Alianza S.A.",
+      "fila": 46
+    },
+    {
+      "nombre": "Servicentro Cañas",
+      "fila": 47
+    },
+    {
+      "nombre": "Servicentro El Roble",
+      "fila": 48
+    },
+    {
+      "nombre": "Corporacíon Inmobiliaria RyY Bomba El Carmen",
+      "fila": 49
+    },
+    {
+      "nombre": "Servicentro El Higuerón",
+      "fila": 50
+    },
+    {
+      "nombre": "Gasolinera Anatot",
+      "fila": 51
+    },
+    {
+      "nombre": "Estación de Servicio Global Fuel La Paz",
+      "fila": 52
+    },
+    {
+      "nombre": "Servi Indoor Curridabat",
+      "fila": 53
+    },
+    {
+      "nombre": "Servi Indoor Tres Ríos",
+      "fila": 54
+    },
+    {
+      "nombre": "Coope Heredia",
+      "fila": 55
+    },
+    {
+      "nombre": "Servicentro San Juan - Heredia",
+      "fila": 56
+    },
+    {
+      "nombre": "Servicentro San Pablo de Heredia",
+      "fila": 57
+    },
+    {
+      "nombre": "GS La Colonia",
+      "fila": 58
+    },
+    {
+      "nombre": "Trova Zapote",
+      "fila": 59
+    },
+    {
+      "nombre": "Mayecasi",
+      "fila": 60
+    },
+    {
+      "nombre": "Servi Plaza Don Pancho (La Hibrida)",
+      "fila": 61
+    },
+    {
+      "nombre": "M&S Jimenez",
+      "fila": 62
+    },
+    {
+      "nombre": "Servicentro Jaco",
+      "fila": 63
+    },
+    {
+      "nombre": "Estación El Ceibo",
+      "fila": 64
+    },
+    {
+      "nombre": "Estación Santa Clara",
+      "fila": 65
+    },
+    {
+      "nombre": "Estación Raúl Molina",
+      "fila": 66
+    },
+    {
+      "nombre": "Eusse Barranca",
+      "fila": 67
+    }
+  ]
+}

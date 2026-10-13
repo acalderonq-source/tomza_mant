@@ -206,7 +206,7 @@ async function generarPDFOrden(orden, proveedor = {}, lineas = []) {
           widths: [62, 58, "*", 55, 78, 78],
           body: [
             [
-              { text: "Placa", style: "tableHeader" },
+              { text: orden.etiqueta_referencia || "Placa", style: "tableHeader" },
               { text: "Codigo", style: "tableHeader" },
               { text: "Descripcion", style: "tableHeader" },
               { text: "Cantidad", style: "tableHeader" },

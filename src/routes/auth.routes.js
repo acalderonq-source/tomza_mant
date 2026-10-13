@@ -115,7 +115,19 @@ router.post("/login", loginLimiter, async (req, res) => {
       });
     }
 
-    const uniqueCandidates = [...new Map(usersWithValidPassword.map(user => [user.id, user])).values()];
+    let uniqueCandidates = [...new Map(usersWithValidPassword.map(user => [user.id, user])).values()];
+    if (departamento === "CARBURACION") {
+      const permitidos = [];
+      for (const candidate of uniqueCandidates) {
+        const [areas] = await pool.query("SELECT departamento FROM usuario_departamentos WHERE usuario_id = ?", [candidate.id]);
+        if (departamentosPermitidosPorRol(candidate.rol, areas.map(area => area.departamento)).includes(departamento)) permitidos.push(candidate);
+      }
+      uniqueCandidates = permitidos;
+      if (!uniqueCandidates.length) return res.status(403).render("login", {
+        error: "Su cuenta no tiene acceso a Carburación.", next: nextUrl,
+        departamento, departamentoNombre: "Carburación"
+      });
+    }
     if (uniqueCandidates.length > 1) {
       req.session.pendingCedulaLogin = {
         usuarioIds: uniqueCandidates.map(user => user.id),
@@ -217,7 +229,8 @@ async function iniciarSesion(req, res, user, departamento, nextUrl) {
       rol: user.rol,
       sede: user.sede,
       requiereCambioPassword: Boolean(user.requiere_cambio_password),
-      departamentos: departamentosPermitidos,
+      departamentos: departamento === "CARBURACION" ? ["CARBURACION"] : departamentosPermitidos,
+      departamentoIngreso: departamento,
       departamentoActivo: departamento
     };
 
@@ -231,7 +244,7 @@ async function iniciarSesion(req, res, user, departamento, nextUrl) {
       const esCuentaPantalla = ["PANTALLA_MECANICOS", "PANTALLA_PESADOS"].includes(String(user.rol || "").toUpperCase());
       const destino = esCuentaPantalla
         ? "/taller/dashboard"
-        : user.requiere_cambio_password ? "/cambiar-clave" : nextUrl || "/dashboard";
+        : user.requiere_cambio_password ? "/cambiar-clave" : departamento === "CARBURACION" ? "/dashboard" : nextUrl || "/dashboard";
       res.redirect(destino);
     });
 }
@@ -239,6 +252,9 @@ async function iniciarSesion(req, res, user, departamento, nextUrl) {
 router.post("/departamento/activo", (req, res) => {
   const departamento = String(req.body.departamento || "").toUpperCase();
   const user = req.session.user;
+  if (user?.departamentoIngreso === "CARBURACION" && departamento !== "CARBURACION") {
+    return res.status(403).send("Esta sesión pertenece a Carburación. Cierre sesión para ingresar a otro departamento.");
+  }
   if (!user || !Array.isArray(user.departamentos) || !user.departamentos.includes(departamento)) {
     return res.status(403).send("No tiene acceso a ese departamento.");
   }

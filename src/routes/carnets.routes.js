@@ -93,6 +93,8 @@ function basePublicUrl(req) {
 
 router.get("/admin/carnets-trabajadores", requireAdmin, async (_req, res) => {
   try {
+    const buscar = String(_req.query.buscar || '').trim().slice(0,150);
+    const filtro = buscar ? 'WHERE (uc.persona_nombre LIKE ? OR uc.cedula LIKE ? OR uc.codigo_trabajador LIKE ?)' : '';
     const [rows] = await pool.query(`
       SELECT c.qr_token,
         MAX(uc.persona_nombre) AS nombre,
@@ -101,9 +103,10 @@ router.get("/admin/carnets-trabajadores", requireAdmin, async (_req, res) => {
         (c.foto_data IS NOT NULL) AS tiene_foto
       FROM carnets_trabajador c
       JOIN usuario_cedulas uc ON uc.cedula = c.cedula
+      ${filtro}
       GROUP BY c.cedula, c.qr_token
       ORDER BY nombre
-    `);
+    `, buscar ? Array(3).fill(`%${buscar}%`) : []);
     const [perfilesAcceso] = await pool.query(`
       SELECT id, usuario, nombre, rol, sede
       FROM usuarios
@@ -121,6 +124,7 @@ router.get("/admin/carnets-trabajadores", requireAdmin, async (_req, res) => {
     })));
     res.render("carnets_trabajadores", {
       trabajadores,
+      buscar,
       perfilesAcceso,
       mensajeAcceso: _req.session.accesoCarnetMensaje || "",
       errorAcceso: _req.session.accesoCarnetError || ""
@@ -143,7 +147,7 @@ router.post("/admin/carnets-trabajadores", requireAdmin, async (req, res) => {
     .map(value => Number(value))
     .filter(value => Number.isSafeInteger(value) && value > 0))];
 
-  if (!nombre || nombre.length > 150 || !cedulaValida(cedulaRaw) || !/^\d{9,12}$/.test(cedula) || !/^\d{1,30}$/.test(codigo) || !usuarioIds.length) {
+  if (!cedulaValida(cedulaRaw) || !/^\d{9,12}$/.test(cedula)) {
     req.session.accesoCarnetError = "Complete nombre, cédula válida, código de trabajador y al menos un perfil de acceso.";
     return res.redirect("/admin/carnets-trabajadores");
   }
@@ -152,6 +156,19 @@ router.post("/admin/carnets-trabajadores", requireAdmin, async (req, res) => {
   try {
     connection = await pool.getConnection();
     await connection.beginTransaction();
+    const [accesos] = await connection.query(
+      'SELECT cedula,persona_nombre FROM usuario_cedulas WHERE cedula = ? FOR UPDATE',[cedula]
+    );
+    if(accesos.length){
+      const [[carnet]] = await connection.query('SELECT qr_token FROM carnets_trabajador WHERE cedula = ? FOR UPDATE',[cedula]);
+      if(!carnet)await connection.query('INSERT INTO carnets_trabajador (cedula, qr_token) VALUES (?, ?)',[cedula,crypto.randomBytes(32).toString('hex')]);
+      await connection.commit();
+      req.session.accesoCarnetMensaje=carnet?'El carnet ya está registrado. Puede buscarlo por nombre, cédula o código.':`Carnet creado para ${accesos[0].persona_nombre}. Su acceso y permisos se conservaron.`;
+      delete req.session.accesoCarnetError;
+      return res.redirect('/admin/carnets-trabajadores?buscar='+encodeURIComponent(cedula));
+    }
+    if(!nombre && !codigo && !usuarioIds.length)throw new Error('No hay un acceso registrado con esa cédula. Use el formulario «Crear acceso y carnet».');
+    if (!nombre || nombre.length > 150 || !/^\d{1,30}$/.test(codigo) || !usuarioIds.length)throw new Error('Complete nombre, cédula válida, código de trabajador y al menos un perfil de acceso.');
     const [perfiles] = await connection.query(`
       SELECT id, usuario, nombre, rol
       FROM usuarios
@@ -159,12 +176,6 @@ router.post("/admin/carnets-trabajadores", requireAdmin, async (req, res) => {
       FOR UPDATE
     `, [usuarioIds]);
     if (perfiles.length !== usuarioIds.length) throw new Error("Seleccione perfiles de acceso válidos.");
-
-    const [cedulasExistentes] = await connection.query(
-      "SELECT cedula FROM usuario_cedulas WHERE cedula = ? LIMIT 1 FOR UPDATE",
-      [cedula]
-    );
-    if (cedulasExistentes.length) throw new Error("Ya existe un acceso registrado con esa cédula.");
 
     const [cedulasLegacy] = await connection.query(
       "SELECT id FROM usuarios WHERE cedula = ? LIMIT 1 FOR UPDATE",

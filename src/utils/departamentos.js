@@ -5,7 +5,8 @@ const DEPARTAMENTOS = [
   { key: "SEGURIDAD_OCUPACIONAL", nombre: "Seguridad Ocupacional", icono: "bi-shield-check", descripcion: "Área lista para incorporar sus procesos." },
   { key: "LOGISTICA", nombre: "Logística", icono: "bi-diagram-3", descripcion: "Área lista para incorporar sus procesos." },
   { key: "PROVEEDURIA", nombre: "Proveeduría", icono: "bi-box-seam", descripcion: "Área en preparación; sus procesos se habilitarán en una versión posterior." },
-  { key: "RECURSOS_HUMANOS", nombre: "Recursos Humanos", icono: "bi-people", descripcion: "Área lista para incorporar sus procesos." }
+  { key: "RECURSOS_HUMANOS", nombre: "Recursos Humanos", icono: "bi-people", descripcion: "Área lista para incorporar sus procesos." },
+  { key: "CARBURACION", nombre: "Carburación", icono: "bi-fuel-pump", descripcion: "Área lista para incorporar sus procesos." }
 ];
 
 const DEPARTAMENTO_POR_CLAVE = new Map(DEPARTAMENTOS.map(departamento => [departamento.key, departamento]));
@@ -64,6 +65,7 @@ function puedeAbrirRutaPorDepartamento(departamento, pathname, rol = "") {
   if (!rutaPerteneceATaller(pathname)) return true;
 
   const area = String(departamento || "TALLER").toUpperCase();
+  if (area === "CARBURACION") return false;
   if (area === "TALLER" || String(rol || "").toUpperCase() === "PROVEEDURIA_TALLER") return true;
   return coincideRuta(pathname, RUTAS_COMPARTIDAS_POR_DEPARTAMENTO[area] || []);
 }
@@ -91,6 +93,7 @@ function departamentosInicialesPorRol(rol, usuario = "") {
     SUPERVISOR_PESADO: ["OPERACIONES"],
     CONTABILIDAD: ["CONTABILIDAD"],
     PROVEEDURIA: ["PROVEEDURIA"],
+    CARBURACION_GESTOR: ["CARBURACION"],
     PROVEEDURIA_TALLER: ["PROVEEDURIA", "TALLER"],
     BODEGA: ["PROVEEDURIA", "TALLER"],
     BODEGUERO: ["PROVEEDURIA", "TALLER"],

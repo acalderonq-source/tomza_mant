@@ -6,274 +6,7 @@
   <title>Dashboard - Gas Tomza</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-  <style>
-    :root {
-      --bg: #f3f6fa;
-      --card: #fff;
-      --ink: #111827;
-      --muted: #64748b;
-      --line: #dbe3ef;
-      --dark: #111827;
-      --red: #dc2626;
-      --blue: #2563eb;
-      --green: #16a34a;
-      --amber: #d97706;
-    }
-
-    body {
-      background: var(--bg);
-      color: var(--ink);
-      font-family: "Segoe UI", Roboto, Arial, sans-serif;
-      font-size: .92rem;
-    }
-
-    .topbar {
-      background: var(--dark);
-      border-bottom: 3px solid var(--red);
-    }
-
-    .brand-box {
-      align-items: center;
-      background: #fff;
-      border-radius: 8px;
-      color: var(--red);
-      display: inline-flex;
-      height: 32px;
-      justify-content: center;
-      margin-right: .45rem;
-      width: 32px;
-    }
-
-    .shell {
-      max-width: 1540px;
-    }
-
-    .simple-hero {
-      background: var(--card);
-      border: 1px solid var(--line);
-      border-radius: 10px;
-      padding: .7rem .85rem;
-    }
-
-    .page-title {
-      font-size: 1.2rem;
-      font-weight: 900;
-      margin: 0;
-    }
-
-    .page-subtitle,
-    .small-muted {
-      color: var(--muted);
-    }
-
-    .section-title {
-      font-size: .9rem;
-      font-weight: 900;
-      margin: 0 0 .45rem;
-    }
-
-    .sede-selector {
-      display: flex;
-      flex-wrap: wrap;
-      gap: .4rem;
-    }
-
-    .sede-selector .btn {
-      border-radius: 999px;
-      font-size: .8rem;
-      font-weight: 750;
-    }
-
-    .summary-grid {
-      display: grid;
-      gap: .55rem;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
-    }
-
-    .summary-card,
-    .module-card,
-    .plain-card {
-      background: var(--card);
-      border: 1px solid var(--line);
-      border-radius: 10px;
-    }
-
-    .summary-card {
-      padding: .65rem .75rem;
-    }
-
-    .summary-label {
-      color: var(--muted);
-      font-size: .68rem;
-      font-weight: 800;
-      text-transform: uppercase;
-    }
-
-    .summary-value {
-      font-size: 1.35rem;
-      font-weight: 900;
-      line-height: 1.1;
-      margin-top: .1rem;
-    }
-
-    .summary-foot {
-      color: var(--muted);
-      font-size: .74rem;
-      margin-top: .15rem;
-    }
-
-    .module-grid {
-      display: grid;
-      gap: .55rem;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
-    }
-
-    .module-card {
-      color: var(--ink);
-      display: flex;
-      gap: .55rem;
-      min-height: 66px;
-      padding: .65rem;
-      text-decoration: none;
-      transition: border-color .12s ease, transform .12s ease;
-    }
-
-    .module-card:hover {
-      border-color: #94a3b8;
-      color: var(--ink);
-      transform: translateY(-1px);
-    }
-
-    .module-icon {
-      align-items: center;
-      border-radius: 10px;
-      display: inline-flex;
-      flex: 0 0 34px;
-      font-size: 1rem;
-      height: 34px;
-      justify-content: center;
-      width: 34px;
-    }
-
-    .icon-blue { background: #dbeafe; color: #1d4ed8; }
-    .icon-green { background: #dcfce7; color: #166534; }
-    .icon-amber { background: #fef3c7; color: #92400e; }
-    .icon-red { background: #fee2e2; color: #991b1b; }
-    .icon-dark { background: #e5e7eb; color: #111827; }
-
-    .module-title {
-      font-size: .9rem;
-      font-weight: 900;
-    }
-
-    .module-copy {
-      color: var(--muted);
-      font-size: .74rem;
-      line-height: 1.2;
-      margin: .1rem 0 0;
-    }
-
-    .top-info-grid {
-      display: grid;
-      gap: .65rem;
-      grid-template-columns: 1fr;
-    }
-
-    .priority-panel {
-      background: var(--card);
-      border: 1px solid var(--line);
-      border-radius: 10px;
-      min-height: 100%;
-      padding: .75rem;
-    }
-
-    .priority-list {
-      display: grid;
-      gap: .45rem;
-      max-height: 245px;
-      overflow: auto;
-      padding-right: .15rem;
-    }
-
-    .priority-item {
-      align-items: start;
-      background: #fff7ed;
-      border: 1px solid #fed7aa;
-      border-left: 5px solid var(--red);
-      border-radius: 9px;
-      display: grid;
-      gap: .4rem;
-      grid-template-columns: 110px minmax(0, 1fr) auto;
-      padding: .5rem .6rem;
-    }
-
-    .priority-plate {
-      color: #111827;
-      font-size: .95rem;
-      font-weight: 900;
-      line-height: 1.1;
-    }
-
-    .priority-note {
-      color: #1f2937;
-      font-size: .82rem;
-      line-height: 1.25;
-    }
-
-    .priority-meta {
-      color: var(--muted);
-      font-size: .7rem;
-      white-space: nowrap;
-    }
-
-    .table thead th {
-      background: #f8fafc;
-      color: #475569;
-      font-size: .68rem;
-      font-weight: 900;
-      text-transform: uppercase;
-    }
-
-    .table-sm {
-      font-size: .82rem;
-    }
-
-    .empty-state {
-      color: var(--muted);
-      font-weight: 700;
-      padding: .8rem;
-      text-align: center;
-    }
-
-    @media (max-width: 1180px) {
-      .module-grid {
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-      }
-    }
-
-    @media (max-width: 960px) {
-      .summary-grid,
-      .module-grid {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-      }
-    }
-
-    @media (max-width: 620px) {
-      .summary-grid,
-      .module-grid,
-      .top-info-grid {
-        grid-template-columns: 1fr;
-      }
-      .priority-item {
-        grid-template-columns: 1fr;
-      }
-    }
-
-    .plan-red {
-      color: #dc2626;
-      font-weight: 900;
-    }
-  </style>
+  <%- include('partials/dashboard_styles') %>
 </head>
 <body>
 <%
@@ -370,7 +103,7 @@
       <form method="POST" action="/departamento/activo" class="d-flex align-items-center gap-2">
         <label for="departamento-activo" class="small">Área</label>
         <select id="departamento-activo" name="departamento" class="form-select form-select-sm" onchange="this.form.submit()">
-          <% user.departamentos.forEach(key => { const area = ['TALLER','OPERACIONES','CONTABILIDAD','SEGURIDAD_OCUPACIONAL','LOGISTICA','PROVEEDURIA','RECURSOS_HUMANOS'].find(item => item === key); const nombres = { TALLER: 'Taller', OPERACIONES: 'Operaciones', CONTABILIDAD: 'Contabilidad', SEGURIDAD_OCUPACIONAL: 'Seguridad Ocupacional', LOGISTICA: 'Logística', PROVEEDURIA: 'Proveeduría', RECURSOS_HUMANOS: 'Recursos Humanos' }; %>
+          <% user.departamentos.forEach(key => { const area = ['TALLER','OPERACIONES','CONTABILIDAD','SEGURIDAD_OCUPACIONAL','LOGISTICA','PROVEEDURIA','RECURSOS_HUMANOS','CARBURACION'].find(item => item === key); const nombres = { TALLER: 'Taller', OPERACIONES: 'Operaciones', CONTABILIDAD: 'Contabilidad', SEGURIDAD_OCUPACIONAL: 'Seguridad Ocupacional', LOGISTICA: 'Logística', PROVEEDURIA: 'Proveeduría', RECURSOS_HUMANOS: 'Recursos Humanos', CARBURACION: 'Carburación' }; %>
             <option value="<%= area %>" <%= area === departamentoActivo ? 'selected' : '' %>><%= nombres[area] || area %></option>
           <% }) %>
         </select>
@@ -387,7 +120,7 @@
     <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
       <div>
         <h1 class="page-title">Inicio</h1>
-        <div class="page-subtitle">Departamento: <strong><%= { TALLER: 'Taller', OPERACIONES: 'Operaciones', CONTABILIDAD: 'Contabilidad', SEGURIDAD_OCUPACIONAL: 'Seguridad Ocupacional', LOGISTICA: 'Logística', PROVEEDURIA: 'Proveeduría', RECURSOS_HUMANOS: 'Recursos Humanos' }[departamentoActivo] || departamentoActivo %></strong> · Sede: <strong><%= sedeActualVista %></strong> · <%= new Date().toLocaleDateString('es-CR') %></div>
+        <div class="page-subtitle">Departamento: <strong><%= { TALLER: 'Taller', OPERACIONES: 'Operaciones', CONTABILIDAD: 'Contabilidad', SEGURIDAD_OCUPACIONAL: 'Seguridad Ocupacional', LOGISTICA: 'Logística', PROVEEDURIA: 'Proveeduría', RECURSOS_HUMANOS: 'Recursos Humanos', CARBURACION: 'Carburación' }[departamentoActivo] || departamentoActivo %></strong> · Sede: <strong><%= sedeActualVista %></strong> · <%= new Date().toLocaleDateString('es-CR') %></div>
       </div>
       <% if (!esMecanicoLimitado && areaTaller && (areaContabilidad || areaProveeduria)) { %>
         <a href="/ia" class="btn btn-dark btn-sm rounded-pill px-3"><i class="bi bi-stars"></i> IA Tomza</a>
@@ -663,7 +396,7 @@
           </a>
         <% } %>
       <% } %>
-      <% if (['SEGURIDAD_OCUPACIONAL', 'LOGISTICA', 'RECURSOS_HUMANOS'].includes(departamentoActivo)) { %>
+      <% if (['SEGURIDAD_OCUPACIONAL', 'LOGISTICA', 'RECURSOS_HUMANOS', 'CARBURACION'].includes(departamentoActivo)) { %>
         <div class="module-card">
           <span class="module-icon icon-blue"><i class="bi bi-cone-striped"></i></span>
           <div><div class="module-title">Área en preparación</div><p class="module-copy">El acceso ya está organizado. Los módulos de este departamento se habilitarán conforme se incorporen sus procesos y permisos.</p></div>

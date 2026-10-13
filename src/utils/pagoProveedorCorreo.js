@@ -37,7 +37,8 @@ function agruparFacturasPorProveedor(facturas = []) {
   return [...grupos.values()];
 }
 
-function construirCorreoPago({ proveedor, facturas, reciboNumero, fechaPago, totalPagado, tipoPago, comprobanteNumero }) {
+function construirCorreoPago({ proveedor, facturas, reciboNumero, fechaPago, totalPagado, tipoPago, comprobanteNumero, moneda = "CRC" }) {
+  const simboloMoneda = moneda === "USD" ? "USD " : "₡";
   const asuntoTipo = tipoPago === "abono" ? "Abono" : "Pago";
   const proveedorAsunto = String(proveedor || "Proveedor").replace(/[\r\n]+/g, " ").trim();
   const escapeHtml = value => String(value || "").replace(/[&<>"']/g, caracter => ({
@@ -46,7 +47,7 @@ function construirCorreoPago({ proveedor, facturas, reciboNumero, fechaPago, tot
   const monto = Number(totalPagado || 0).toLocaleString("es-CR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const filas = facturas.map(factura => `
     <tr><td style="padding:8px;border-bottom:1px solid #e5e7eb">${escapeHtml(factura.factura || "-")}</td>
-    <td style="padding:8px;border-bottom:1px solid #e5e7eb;text-align:right">₡${Number(factura.monto_pago || factura.total || 0).toLocaleString("es-CR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td></tr>
+    <td style="padding:8px;border-bottom:1px solid #e5e7eb;text-align:right">${simboloMoneda}${Number(factura.monto_pago || factura.total || 0).toLocaleString("es-CR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td></tr>
   `).join("");
 
   return {
@@ -57,7 +58,7 @@ function construirCorreoPago({ proveedor, facturas, reciboNumero, fechaPago, tot
       <p>Adjuntamos la colilla y el comprobante disponible para el ${asuntoTipo.toLowerCase()} registrado.</p>
       <p><strong>Fecha:</strong> ${escapeHtml(fechaPago)}<br><strong>Colilla:</strong> ${escapeHtml(reciboNumero)}${comprobanteNumero ? `<br><strong>Comprobante:</strong> ${escapeHtml(comprobanteNumero)}` : ""}</p>
       <table style="border-collapse:collapse;width:100%"><thead><tr><th style="padding:8px;text-align:left">Factura</th><th style="padding:8px;text-align:right">Monto aplicado</th></tr></thead><tbody>${filas}</tbody>
-      <tfoot><tr><th style="padding:8px;text-align:left">Total pagado</th><th style="padding:8px;text-align:right">₡${monto}</th></tr></tfoot></table>
+      <tfoot><tr><th style="padding:8px;text-align:left">Total pagado</th><th style="padding:8px;text-align:right">${simboloMoneda}${monto}</th></tr></tfoot></table>
       <p>Saludos,<br>Gas Tomza</p></div>`
   };
 }

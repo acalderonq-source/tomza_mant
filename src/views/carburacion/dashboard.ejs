@@ -1,0 +1,48 @@
+<% const gestionarFinanzas=typeof puedeModificarFinanzas==='undefined' || puedeModificarFinanzas; %>
+<!DOCTYPE html>
+<html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no"><title>Dashboard - Gas Tomza</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+<%- include('../partials/dashboard_styles') %>
+</head><body>
+<nav class="navbar navbar-dark topbar px-3 py-2">
+<span class="navbar-brand fw-semibold"><span class="brand-box"><i class="bi bi-house"></i></span>Gas Tomza</span>
+<div class="text-white d-flex align-items-center gap-2 flex-wrap"><span class="small"><%= user.nombre || 'Carburación' %> · Carburación</span><a href="/logout" class="btn btn-warning btn-sm rounded-pill px-3">Salir</a></div>
+</nav>
+<main class="container-fluid shell py-3">
+
+<%
+  const money = (n, moneda) => Number(n || 0).toLocaleString('es-CR', { style: 'currency', currency: moneda });
+  const fecha = value => new Date(value).toLocaleDateString('es-CR', { timeZone: 'America/Costa_Rica' });
+%>
+<section class="simple-hero mb-2"><div class="d-flex justify-content-between align-items-start gap-3 flex-wrap"><div><h1 class="page-title">Inicio</h1><div class="page-subtitle">Departamento: <strong>Carburación</strong> · <%= hoy %></div></div><% if(gestionarFinanzas){ %><a class="btn btn-dark btn-sm rounded-pill px-3" href="/carburacion/ordenes/nueva"><i class="bi bi-plus-circle"></i> Nueva orden</a><% } %></div></section>
+<section class="summary-grid mb-2" aria-label="Resumen de Carburación">
+  <% [ ['Órdenes registradas', resumen.total, 'Historial de Carburación'], ['Órdenes del mes', resumen.mes, 'Desde el inicio del mes hasta hoy'], ['Borradores', resumen.borradores, 'Órdenes en estado borrador'], ['Proveedores', cantidadProveedores, 'Catálogo de Carburación'] ].forEach(item => { %>
+  <article class="summary-card"><div class="summary-label"><%= item[0] %></div><div class="summary-value"><%= item[1] %></div><div class="summary-foot"><%= item[2] %></div></article>
+  <% }) %>
+</section>
+<section class="mb-2">
+  <h2 class="section-title">Módulos</h2><div class="module-grid">
+<% if(user.rol==='ADMIN'){ %><a class="module-card" href="/admin/carnets-trabajadores"><span class="module-icon icon-blue"><i class="bi bi-person-vcard"></i></span><div><div class="module-title">Carnets de trabajadores</div><p class="module-copy">Buscar, consultar, descargar e imprimir carnets.</p></div></a><% } %>
+<a class="module-card" href="/carburacion/estaciones"><span class="module-icon icon-amber"><i class="bi bi-buildings"></i></span><div><div class="module-title">Estaciones</div><p class="module-copy">Seguimiento, permisos, mantenimientos y mejoras.</p></div></a>
+<a class="module-card" href="/carburacion/clientes"><span class="module-icon icon-blue"><i class="bi bi-people"></i></span><div><div class="module-title">Clientes</div><p class="module-copy">Estaciones de servicio de Carburación.</p></div></a>
+    <a class="module-card" href="/carburacion/ordenes"><span class="module-icon icon-blue"><i class="bi bi-receipt"></i></span><div><div class="module-title">Órdenes de compra</div><p class="module-copy"><%= gestionarFinanzas?"Consultar, editar y descargar órdenes en PDF.":"Consultar y descargar órdenes en PDF." %></p></div></a>
+    <a class="module-card" href="/carburacion/proveedores"><span class="module-icon icon-green"><i class="bi bi-building"></i></span><div><div class="module-title">Proveedores</div><p class="module-copy">Administrar los proveedores de Carburación.</p></div></a>
+    <a class="module-card" href="/carburacion/facturas"><span class="module-icon icon-amber"><i class="bi bi-receipt-cutoff"></i></span><div><div class="module-title">Facturas</div><p class="module-copy">Facturas por orden, saldos y abonos.</p></div></a>
+    <a class="module-card" href="/carburacion/facturas/historial-pagos"><span class="module-icon icon-blue"><i class="bi bi-clock-history"></i></span><div><div class="module-title">Historial de pagos</div><p class="module-copy">Colillas, comprobantes y correos.</p></div></a>
+    <a class="module-card" href="/carburacion/facturas/configuracion-correo"><span class="module-icon icon-dark"><i class="bi bi-envelope"></i></span><div><div class="module-title">Correos de pagos</div><p class="module-copy">Configurar copias internas y respuestas.</p></div></a>
+  </div>
+</section>
+<section class="plain-card p-3 mb-2">
+  <h2 class="section-title">Monto ordenado este mes</h2><p class="small-muted">Totales de las órdenes creadas desde el inicio del mes hasta hoy, incluidos los borradores.</p>
+  <div class="d-flex gap-4 flex-wrap"><% if (!montos.length) { %><p class="mb-0">Todavía no hay órdenes este mes.</p><% } %>
+  <% montos.forEach(m => { %><div><span class="summary-label"><%= m.moneda %></span><strong><%= money(m.total, m.moneda) %></strong></div><% }) %></div>
+</section>
+<section class="plain-card p-3 mb-2">
+  <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap mb-2"><h2 class="section-title">Órdenes recientes</h2><a href="/carburacion/ordenes">Ver todas →</a></div>
+  <div class="table-responsive"><table class="table table-sm align-middle mb-0"><thead><tr><th>N° PO</th><th>Fecha</th><th>Proveedor</th><th>Estado</th><th>Total</th><th>Acciones</th></tr></thead><tbody>
+  <% recientes.forEach(o => { %><tr><td><strong><%= o.po_numero %></strong></td><td><%= fecha(o.fecha) %></td><td><%= o.proveedor %></td><td><span class="badge bg-light text-dark border"><%= o.estado %></span></td><td class="text-nowrap"><%= money(o.total,o.moneda) %></td><td class="text-nowrap"><% if(gestionarFinanzas && o.estado !== "FACTURADA"){ %><a href="/carburacion/ordenes/<%= o.id %>/editar">Editar</a> · <% } %><a href="/carburacion/ordenes/<%= o.id %>/pdf">PDF</a></td></tr><% }) %>
+  <% if (!recientes.length) { %><tr><td colspan="6" class="empty-state">Todavía no hay órdenes de Carburación.<br><% if(gestionarFinanzas){ %><a href="/carburacion/ordenes/nueva">Crear la primera orden</a><% } %></td></tr><% } %>
+  </tbody></table></div>
+</section>
+</main></body></html>

@@ -51,6 +51,37 @@ async function withLoginServer(queryHandler, run, initialUser = null) {
   }
 }
 
+test("Carburación elige únicamente el perfil asignado y omite el selector de Taller", async () => {
+  const pin_hash = await bcrypt.hash("123", 4);
+  const candidates = [
+    { id: 2, nombre: "Encargado de Taller", rol: "TALLER", pin_hash },
+    { id: 34, nombre: "Proveeduría Taller", rol: "PROVEEDURIA_TALLER", pin_hash }
+  ];
+  await withLoginServer(async (sql, params) => {
+    if (sql.includes("FROM usuario_cedulas")) return [candidates];
+    return [params[0] === 34
+      ? [{ departamento: "TALLER" }, { departamento: "CARBURACION" }]
+      : [{ departamento: "TALLER" }]];
+  }, async base => {
+    const response = await fetch(`${base}/login`, {
+      method: "POST", redirect: "manual",
+      body: new URLSearchParams({ cedula: "123456789", pin: "123", departamento: "CARBURACION", next: "/taller/dashboard" })
+    });
+    assert.equal(response.status, 302);
+    assert.equal(response.headers.get("location"), "/dashboard");
+  });
+});
+
+test("una sesión iniciada en Carburación no permite cambiar a Taller", async () => {
+  await withLoginServer(async () => [[]], async base => {
+    const response = await fetch(`${base}/departamento/activo`, {
+      method: "POST", redirect: "manual",
+      body: new URLSearchParams({ departamento: "TALLER" })
+    });
+    assert.equal(response.status, 403);
+  }, { departamentoIngreso: "CARBURACION", departamentos: ["CARBURACION", "TALLER"] });
+});
+
 test("permite ingresar con cédula normalizada y PIN del código de trabajador", async () => {
   const pinHash = await bcrypt.hash("123", 4);
   const consultas = [];

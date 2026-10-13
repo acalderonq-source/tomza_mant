@@ -4,8 +4,9 @@ const transporters = new Map();
 
 function obtenerConfiguracion(perfil = "default") {
   const sufijo = String(perfil).toUpperCase();
-  const user = process.env[`EMAIL_USER_${sufijo}`] || (perfil !== "facturas" ? process.env.EMAIL_USER : "");
-  const pass = process.env[`EMAIL_PASS_${sufijo}`] || (perfil !== "facturas" ? process.env.EMAIL_PASS : "");
+  const usaRemitenteGeneral = !["facturas", "carburacion"].includes(perfil);
+  const user = process.env[`EMAIL_USER_${sufijo}`] || (usaRemitenteGeneral ? process.env.EMAIL_USER : "");
+  const pass = process.env[`EMAIL_PASS_${sufijo}`] || (usaRemitenteGeneral ? process.env.EMAIL_PASS : "");
   const port = Number(process.env[`EMAIL_PORT_${sufijo}`] || process.env.EMAIL_PORT || 587);
 
   return {
@@ -45,7 +46,9 @@ async function enviarCorreo(to, subject, html, opciones = {}) {
   const config = obtenerConfiguracion(perfil);
   const { perfil: _perfil, ...opcionesMensaje } = opciones;
   await obtenerTransporter(perfil).sendMail({
-    from: `"Sistema Taller Tomza" <${config.user}>`,
+    from: opcionesMensaje.nombreRemitente
+      ? { name: opcionesMensaje.nombreRemitente, address: config.user }
+      : `"Sistema Taller Tomza" <${config.user}>`,
     to,
     subject,
     html,

@@ -1,0 +1,4072 @@
+{
+  "archivo": "Detalle estaciones.xlsx",
+  "sha256": "a0ccb9d537bb3c5fe3890ce173985204eaae1769490ad8546c7a7039839d348b",
+  "registros": [
+    {
+      "categoria": "seguimiento",
+      "estacion": "Los Angeles de Mora",
+      "hoja": "Seguimiento",
+      "fila": 2,
+      "encabezados": [
+        "Estación",
+        "Ejecutivo",
+        "Prioridad",
+        "Estatus",
+        "Proveedor"
+      ],
+      "valores": [
+        "Los Angeles de Mora",
+        null,
+        "FINALIZADO",
+        "Respuesta de bomberos sobre ubicación del tanque, responder informe con todos los puntos subsanados .Consultar a Jorge cada dia hasta que nos indique novedad ",
+        "Ingnova"
+      ]
+    },
+    {
+      "categoria": "seguimiento",
+      "estacion": "Servicentro El Bosque",
+      "hoja": "Seguimiento",
+      "fila": 3,
+      "encabezados": [
+        "Estación",
+        "Ejecutivo",
+        "Prioridad",
+        "Estatus",
+        "Proveedor"
+      ],
+      "valores": [
+        "Servicentro El Bosque",
+        null,
+        "FINALIZADO",
+        "Pendiente mantenimiento a tuberia (pintura)/ tema electrico, pendiente respuesta de Jorge",
+        "TecnoAnalitica, Ingnova"
+      ]
+    },
+    {
+      "categoria": "seguimiento",
+      "estacion": "Tike Av 10 La Castellana",
+      "hoja": "Seguimiento",
+      "fila": 4,
+      "encabezados": [
+        "Estación",
+        "Ejecutivo",
+        "Prioridad",
+        "Estatus",
+        "Proveedor"
+      ],
+      "valores": [
+        "Tike Av 10 La Castellana",
+        null,
+        "FINALIZADO",
+        "Trabajos finalizados, pendiente certificado de pintura intumescente, ya fue solicitado por Jose Andres",
+        "Ingnova"
+      ]
+    },
+    {
+      "categoria": "seguimiento",
+      "estacion": "Via Flamingo",
+      "hoja": "Seguimiento",
+      "fila": 5,
+      "encabezados": [
+        "Estación",
+        "Ejecutivo",
+        "Prioridad",
+        "Estatus",
+        "Proveedor"
+      ],
+      "valores": [
+        "Via Flamingo",
+        null,
+        "FINALIZADO",
+        "Dar respuesta a tema de mangueras y tema de pintura en informe enviado por Minae Donde Jorge debe enviar respuesta preguntar diariamente",
+        "Ingnova"
+      ]
+    },
+    {
+      "categoria": "seguimiento",
+      "estacion": "Conoco Alajuela",
+      "hoja": "Seguimiento",
+      "fila": 6,
+      "encabezados": [
+        "Estación",
+        "Ejecutivo",
+        "Prioridad",
+        "Estatus",
+        "Proveedor"
+      ],
+      "valores": [
+        "Conoco Alajuela ",
+        "MONICA",
+        "BAJA",
+        "Solicitud de cambio de mangueras flexibles son 4 unidades  en total, a la esoera de informe de bomberos para atender la solicitud",
+        "Ingnova"
+      ]
+    },
+    {
+      "categoria": "seguimiento",
+      "estacion": "Copeagri",
+      "hoja": "Seguimiento",
+      "fila": 7,
+      "encabezados": [
+        "Estación",
+        "Ejecutivo",
+        "Prioridad",
+        "Estatus",
+        "Proveedor"
+      ],
+      "valores": [
+        "Copeagri",
+        "ADRIAN",
+        "FINALIZADO",
+        "Adecuar las mangueras de dispensado para que cumplan con los 5.5m\nAdicional la tubería se encuentra sin soporteria, Visita programada para miercoles 16**",
+        "TecnoAnalitica"
+      ]
+    },
+    {
+      "categoria": "seguimiento",
+      "estacion": "Servicentro Jaco",
+      "hoja": "Seguimiento",
+      "fila": 8,
+      "encabezados": [
+        "Estación",
+        "Ejecutivo",
+        "Prioridad",
+        "Estatus",
+        "Proveedor"
+      ],
+      "valores": [
+        "Servicentro Jaco",
+        "MONICA",
+        "ALTA",
+        "* Falta de rotulación en la tubería. (Tecno)\n* Al dispensador le fue retirado el botón de paro de emergencia, quedando el espacio abierto y sin sellar. (Tecno)\n* Las calcomanías del dispensador se encuentran en mal estado y requieren ser reemplazadas. (Tecnicos, rotulo de Tomza)\n* Falta instalar la conexión a tierra con el lagarto para realizar la descarga del camión dentro del recinto.(Jorge)\n* Falta de rotulación en el dispensador de no cargar gas con personas adentro del vehículo  ( ya se le solicitaron los rotulos a Jeison)\n\n",
+        "Ingnova, TecnoAnalitica"
+      ]
+    },
+    {
+      "categoria": "seguimiento",
+      "estacion": "Trova Alajuelita",
+      "hoja": "Seguimiento",
+      "fila": 9,
+      "encabezados": [
+        "Estación",
+        "Ejecutivo",
+        "Prioridad",
+        "Estatus",
+        "Proveedor"
+      ],
+      "valores": [
+        "Trova Alajuelita",
+        "ERICK",
+        "FINALIZADO",
+        "Revisar el paro de la maquina de GLP entre el 15 y 16 por favor, además de que las mangueras no cumplen el tamaño solicitado, se instala valvula de corte, inspección 17 de setiembre",
+        "TecnoAnalitica"
+      ]
+    },
+    {
+      "categoria": "seguimiento",
+      "estacion": "Servicentro Cañas",
+      "hoja": "Seguimiento",
+      "fila": 10,
+      "encabezados": [
+        "Estación",
+        "Ejecutivo",
+        "Prioridad",
+        "Estatus",
+        "Proveedor"
+      ],
+      "valores": [
+        "Servicentro Cañas",
+        "DANIEL",
+        "MEDIA",
+        "Mejoras solicitadas por bomberos, pendiente respuesta de proveedores para definir fecha, se solicita rotulación a Jeison, pendiente certificado de pintura intumescente, pendiente solicitar instalación de valvula de corte(esperar hasta qie finalicen todos los trabajos)",
+        "Ingnova"
+      ]
+    },
+    {
+      "categoria": "seguimiento",
+      "estacion": "San Juan de Heredia",
+      "hoja": "Seguimiento",
+      "fila": 11,
+      "encabezados": [
+        "Estación",
+        "Ejecutivo",
+        "Prioridad",
+        "Estatus",
+        "Proveedor"
+      ],
+      "valores": [
+        "San Juan de Heredia",
+        "MONICA",
+        "BAJA",
+        "Cambio de mangueras solicitado a Ingnova, valvula y sensor solicitado a Tecno",
+        "TecnoAnalitica, Ingnova"
+      ]
+    },
+    {
+      "categoria": "seguimiento",
+      "estacion": "El Carmen R&Y",
+      "hoja": "Seguimiento",
+      "fila": 12,
+      "encabezados": [
+        "Estación",
+        "Ejecutivo",
+        "Prioridad",
+        "Estatus",
+        "Proveedor"
+      ],
+      "valores": [
+        "El Carmen R&Y",
+        "JOSE ANDRES",
+        "FINALIZADO",
+        "Movilización de encierro para que cumpla con las distancias y sustitución de tanque pendiente, hay una excavación por parte del cliente, se solicita fecha de finalización para poder mover el tanque",
+        "Ingnova"
+      ]
+    },
+    {
+      "categoria": "seguimiento",
+      "estacion": "M&S Jimenez",
+      "hoja": "Seguimiento",
+      "fila": 13,
+      "encabezados": [
+        "Estación",
+        "Ejecutivo",
+        "Prioridad",
+        "Estatus",
+        "Proveedor"
+      ],
+      "valores": [
+        "M&S Jimenez",
+        "JUAN",
+        "ALTA",
+        "Solicitar conexión de dispensador con sistemas, solicitar certificado de pintura y certificados de Tecno, solicitar que coloque gas para pruebaas de hermeticidad, dar una fecha a Tecno",
+        "TecnoAnalitica"
+      ]
+    },
+    {
+      "categoria": "seguimiento",
+      "estacion": "Via Flamingo",
+      "hoja": "Seguimiento",
+      "fila": 14,
+      "encabezados": [
+        "Estación",
+        "Ejecutivo",
+        "Prioridad",
+        "Estatus",
+        "Proveedor"
+      ],
+      "valores": [
+        "Via Flamingo",
+        "DANIEL",
+        "MEDIA",
+        "Instalar prevista para conexión con proveedor de sistemas a dispensador, a la espera de la confirmación del proveedor",
+        "TecnoAnalitica"
+      ]
+    },
+    {
+      "categoria": "seguimiento",
+      "estacion": "Raul Molina",
+      "hoja": "Seguimiento",
+      "fila": 15,
+      "encabezados": [
+        "Estación",
+        "Ejecutivo",
+        "Prioridad",
+        "Estatus",
+        "Proveedor"
+      ],
+      "valores": [
+        "Raul Molina",
+        "MONICA",
+        "FINALIZADO",
+        "* Falta de rotulación en el recinto del tanque.\n* Falta del gancho para la conexión a tierra del camión durante la descarga de GLP.\n* No se observa la conexión a tierra para la descarga del gas dentro del recinto, la cual debería estar disponible en este punto.\n",
+        null
+      ]
+    },
+    {
+      "categoria": "seguimiento",
+      "estacion": "Trova Alajuelita",
+      "hoja": "Seguimiento",
+      "fila": 46,
+      "encabezados": [
+        "Estación",
+        "Ejecutivo",
+        "Prioridad",
+        "Estatus",
+        "Proveedor"
+      ],
+      "valores": [
+        "Trova Alajuelita",
+        "ERICK",
+        "ALTA",
+        "Cambio de mangueras de zona de tanques y dispensador",
+        "Ingnova"
+      ]
+    },
+    {
+      "categoria": "construccion",
+      "estacion": "Servicentro Jaco",
+      "hoja": "En Construcción",
+      "fila": 2,
+      "encabezados": [
+        "Estación",
+        "Estatus",
+        "Proveedor"
+      ],
+      "valores": [
+        "Servicentro Jaco",
+        "A la espera de certificado de pintura para enviar solicitud de inspección a Minae",
+        "Ingnova, TecnoAnalitica"
+      ]
+    },
+    {
+      "categoria": "construccion",
+      "estacion": "Santa Clara",
+      "hoja": "En Construcción",
+      "fila": 3,
+      "encabezados": [
+        "Estación",
+        "Estatus",
+        "Proveedor"
+      ],
+      "valores": [
+        "Santa Clara",
+        "Inicio 27 de abril, se solicita la instalación de 2 tanques, pendiente de confirmar por parte de Cristian",
+        "Ingnova"
+      ]
+    },
+    {
+      "categoria": "construccion",
+      "estacion": "M&S",
+      "hoja": "En Construcción",
+      "fila": 4,
+      "encabezados": [
+        "Estación",
+        "Estatus",
+        "Proveedor"
+      ],
+      "valores": [
+        "M&S",
+        "Obra mecanica en proceso, a la espera de certificaciones y detalles finales",
+        "Ingnova"
+      ]
+    },
+    {
+      "categoria": "minae",
+      "estacion": "Los Angeles",
+      "hoja": "Trámite MINAE ",
+      "fila": 2,
+      "encabezados": [
+        "Fecha",
+        "Estación",
+        "Estatus",
+        "OT",
+        "Se envia documentación",
+        "Fiscalización",
+        "Prevención",
+        "Prorroga",
+        "Respuesta prevencion",
+        "Nueva prevención",
+        "Proveedor"
+      ],
+      "valores": [
+        "2025-04-10",
+        "Los Angeles ",
+        "A la espera de respuesta de bomberos para enviar informe con puntos subsanados",
+        "OT-25-0686",
+        null,
+        "2025-07-08",
+        "2025-08-11",
+        "2025-08-27",
+        "2025-09-11",
+        null,
+        "Ingnova"
+      ]
+    },
+    {
+      "categoria": "minae",
+      "estacion": "TBM",
+      "hoja": "Trámite MINAE ",
+      "fila": 3,
+      "encabezados": [
+        "Fecha",
+        "Estación",
+        "Estatus",
+        "OT",
+        "Se envia documentación",
+        "Fiscalización",
+        "Prevención",
+        "Prorroga",
+        "Respuesta prevencion",
+        "Nueva prevención",
+        "Proveedor"
+      ],
+      "valores": [
+        "2025-08-05",
+        "TBM ",
+        "Es un tema ajeno a nosotros de permisos de la estación",
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        "Ingnova"
+      ]
+    },
+    {
+      "categoria": "minae",
+      "estacion": "El trapiche",
+      "hoja": "Trámite MINAE ",
+      "fila": 4,
+      "encabezados": [
+        "Fecha",
+        "Estación",
+        "Estatus",
+        "OT",
+        "Se envia documentación",
+        "Fiscalización",
+        "Prevención",
+        "Prorroga",
+        "Respuesta prevencion",
+        "Nueva prevención",
+        "Proveedor"
+      ],
+      "valores": [
+        "2026-01-23",
+        "El trapiche",
+        "Ya salio permiso de funcionamiento, se programa capacitación con Tecno sabado 9/5",
+        "OT-26-0211",
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        "TecnoAnalitica"
+      ]
+    },
+    {
+      "categoria": "minae",
+      "estacion": "Vía Flamingo",
+      "hoja": "Trámite MINAE ",
+      "fila": 5,
+      "encabezados": [
+        "Fecha",
+        "Estación",
+        "Estatus",
+        "OT",
+        "Se envia documentación",
+        "Fiscalización",
+        "Prevención",
+        "Prorroga",
+        "Respuesta prevencion",
+        "Nueva prevención",
+        "Proveedor"
+      ],
+      "valores": [
+        "2026-02-22",
+        "Vía Flamingo ",
+        "Recibimos informe de Minae con puntos a subsanar, a la espera de documentación de mangueras para dar respuesta",
+        "OT-26-0357",
+        "2026-02-22",
+        null,
+        null,
+        null,
+        "2026-04-21",
+        null,
+        "Ingnova"
+      ]
+    },
+    {
+      "categoria": "minae",
+      "estacion": "Vía tamarindo",
+      "hoja": "Trámite MINAE ",
+      "fila": 6,
+      "encabezados": [
+        "Fecha",
+        "Estación",
+        "Estatus",
+        "OT",
+        "Se envia documentación",
+        "Fiscalización",
+        "Prevención",
+        "Prorroga",
+        "Respuesta prevencion",
+        "Nueva prevención",
+        "Proveedor"
+      ],
+      "valores": [
+        "2026-02-26",
+        "Vía tamarindo ",
+        "Inspeccionada se presento  subsanación presentada, a la espera de Minae",
+        "OT-26-0385",
+        "2026-02-25",
+        null,
+        null,
+        null,
+        "2026-04-21",
+        null,
+        "Ingnova"
+      ]
+    },
+    {
+      "categoria": "minae",
+      "estacion": "Full Caldera",
+      "hoja": "Trámite MINAE ",
+      "fila": 7,
+      "encabezados": [
+        "Fecha",
+        "Estación",
+        "Estatus",
+        "OT",
+        "Se envia documentación",
+        "Fiscalización",
+        "Prevención",
+        "Prorroga",
+        "Respuesta prevencion",
+        "Nueva prevención",
+        "Proveedor"
+      ],
+      "valores": [
+        "2026-02-27",
+        "Full Caldera",
+        "Ya se realizo la inspección por parte de Minae, se envia documentación de subsanaciones el 8/7/2026",
+        "OT-26-0394",
+        "2026-02-27",
+        "2026-06-08",
+        null,
+        null,
+        null,
+        null,
+        "Ingnova"
+      ]
+    },
+    {
+      "categoria": "minae",
+      "estacion": "Raúl Molina",
+      "hoja": "Trámite MINAE ",
+      "fila": 8,
+      "encabezados": [
+        "Fecha",
+        "Estación",
+        "Estatus",
+        "OT",
+        "Se envia documentación",
+        "Fiscalización",
+        "Prevención",
+        "Prorroga",
+        "Respuesta prevencion",
+        "Nueva prevención",
+        "Proveedor"
+      ],
+      "valores": [
+        "2026-09-01",
+        "Raúl Molina",
+        "Se solicita la inspección a Minae",
+        "OT 26-1163",
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        "Ingnova"
+      ]
+    },
+    {
+      "categoria": "minae",
+      "estacion": "Trova Qurebradilla",
+      "hoja": "Trámite MINAE ",
+      "fila": 9,
+      "encabezados": [
+        "Fecha",
+        "Estación",
+        "Estatus",
+        "OT",
+        "Se envia documentación",
+        "Fiscalización",
+        "Prevención",
+        "Prorroga",
+        "Respuesta prevencion",
+        "Nueva prevención",
+        "Proveedor"
+      ],
+      "valores": [
+        "2026-07-30",
+        "Trova Qurebradilla",
+        "Se solicita la inspección a Minae",
+        "Ellos llevan su propio tramite, finalización de obra y envio de documentación 30 julio",
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null
+      ]
+    },
+    {
+      "categoria": "municipal",
+      "estacion": "Tacares",
+      "hoja": "Permiso Municipal ",
+      "fila": 2,
+      "encabezados": [
+        "Estación",
+        "Estatus",
+        "Proveedor"
+      ],
+      "valores": [
+        "Tacares",
+        "En  municipalidad, pendiente alineamiento de MOPT para poder sacar planos visados y seguidamente uso de suelo",
+        "Ingnova"
+      ]
+    },
+    {
+      "categoria": "municipal",
+      "estacion": "Florencia (La China dueña)",
+      "hoja": "Permiso Municipal ",
+      "fila": 3,
+      "encabezados": [
+        "Estación",
+        "Estatus",
+        "Proveedor"
+      ],
+      "valores": [
+        "Florencia (La China dueña)",
+        "En Municipalidad",
+        "Ingnova"
+      ]
+    },
+    {
+      "categoria": "municipal",
+      "estacion": "Upala (La China dueña)",
+      "hoja": "Permiso Municipal ",
+      "fila": 4,
+      "encabezados": [
+        "Estación",
+        "Estatus",
+        "Proveedor"
+      ],
+      "valores": [
+        "Upala (La China dueña)",
+        "En Municipalidad",
+        "Ingnova"
+      ]
+    },
+    {
+      "categoria": "municipal",
+      "estacion": "Guatuso La China",
+      "hoja": "Permiso Municipal ",
+      "fila": 5,
+      "encabezados": [
+        "Estación",
+        "Estatus",
+        "Proveedor"
+      ],
+      "valores": [
+        "Guatuso La China",
+        "En Municipalidad",
+        "Ingnova"
+      ]
+    },
+    {
+      "categoria": "municipal",
+      "estacion": "Zarcero, La China",
+      "hoja": "Permiso Municipal ",
+      "fila": 6,
+      "encabezados": [
+        "Estación",
+        "Estatus",
+        "Proveedor"
+      ],
+      "valores": [
+        "Zarcero, La China",
+        "En Municipalidad",
+        "Ingnova"
+      ]
+    },
+    {
+      "categoria": "municipal",
+      "estacion": "Los Chiles",
+      "hoja": "Permiso Municipal ",
+      "fila": 7,
+      "encabezados": [
+        "Estación",
+        "Estatus",
+        "Proveedor"
+      ],
+      "valores": [
+        "Los Chiles",
+        "En Municipalidad, correcciones pendientes de enviar por parte de Jorge",
+        "Ingnova"
+      ]
+    },
+    {
+      "categoria": "municipal",
+      "estacion": "Full Los Ángeles",
+      "hoja": "Permiso Municipal ",
+      "fila": 8,
+      "encabezados": [
+        "Estación",
+        "Estatus",
+        "Proveedor"
+      ],
+      "valores": [
+        "Full Los Ángeles",
+        "En municipalidad",
+        "Ingnova"
+      ]
+    },
+    {
+      "categoria": "municipal",
+      "estacion": "Full Sardinal",
+      "hoja": "Permiso Municipal ",
+      "fila": 9,
+      "encabezados": [
+        "Estación",
+        "Estatus",
+        "Proveedor"
+      ],
+      "valores": [
+        "Full Sardinal",
+        "En municipalidad",
+        "Ingnova"
+      ]
+    },
+    {
+      "categoria": "municipal",
+      "estacion": "Paso de La Vaca",
+      "hoja": "Permiso Municipal ",
+      "fila": 10,
+      "encabezados": [
+        "Estación",
+        "Estatus",
+        "Proveedor"
+      ],
+      "valores": [
+        "Paso de La Vaca",
+        "En municipalidad, se presenta apelación por No conformidad, a la espera de respuesta",
+        "Ingnova"
+      ]
+    },
+    {
+      "categoria": "municipal",
+      "estacion": "Lindora",
+      "hoja": "Permiso Municipal ",
+      "fila": 11,
+      "encabezados": [
+        "Estación",
+        "Estatus",
+        "Proveedor"
+      ],
+      "valores": [
+        "Lindora",
+        "Municipalidad pide zonas verdes en estación, pendiente enviar planos para apelación, pendiente Jorge",
+        "Ingnova"
+      ]
+    },
+    {
+      "categoria": "municipal",
+      "estacion": "Puesta del sol",
+      "hoja": "Permiso Municipal ",
+      "fila": 12,
+      "encabezados": [
+        "Estación",
+        "Estatus",
+        "Proveedor"
+      ],
+      "valores": [
+        "Puesta del sol ",
+        "Ya salio permiso de construcción",
+        "Ingnova"
+      ]
+    },
+    {
+      "categoria": "municipal",
+      "estacion": "Cristo Rey",
+      "hoja": "Permiso Municipal ",
+      "fila": 13,
+      "encabezados": [
+        "Estación",
+        "Estatus",
+        "Proveedor"
+      ],
+      "valores": [
+        "Cristo Rey",
+        "En Municipalidad",
+        "Ingnova"
+      ]
+    },
+    {
+      "categoria": "municipal",
+      "estacion": "Anatot Liberia",
+      "hoja": "Permiso Municipal ",
+      "fila": 14,
+      "encabezados": [
+        "Estación",
+        "Estatus",
+        "Proveedor"
+      ],
+      "valores": [
+        "Anatot Liberia",
+        "En municipalidad",
+        "Ingnova"
+      ]
+    },
+    {
+      "categoria": "municipal",
+      "estacion": "Gasolinera Santa Cruz",
+      "hoja": "Permiso Municipal ",
+      "fila": 15,
+      "encabezados": [
+        "Estación",
+        "Estatus",
+        "Proveedor"
+      ],
+      "valores": [
+        "Gasolinera Santa Cruz",
+        "En municipalidad",
+        "Ingnova"
+      ]
+    },
+    {
+      "categoria": "municipal",
+      "estacion": "Alfa y Alfa",
+      "hoja": "Permiso Municipal ",
+      "fila": 16,
+      "encabezados": [
+        "Estación",
+        "Estatus",
+        "Proveedor"
+      ],
+      "valores": [
+        "Alfa y Alfa",
+        "En APC",
+        "Ingnova"
+      ]
+    },
+    {
+      "categoria": "municipal",
+      "estacion": "Full Pital Sahíno",
+      "hoja": "Permiso Municipal ",
+      "fila": 17,
+      "encabezados": [
+        "Estación",
+        "Estatus",
+        "Proveedor"
+      ],
+      "valores": [
+        "Full Pital Sahíno",
+        "Se enviaron planos, pendiente de confirmación por parte del cliente (ventas)",
+        "Ingnova"
+      ]
+    },
+    {
+      "categoria": "municipal",
+      "estacion": "Full Cabo Blanco",
+      "hoja": "Permiso Municipal ",
+      "fila": 18,
+      "encabezados": [
+        "Estación",
+        "Estatus",
+        "Proveedor"
+      ],
+      "valores": [
+        "Full Cabo Blanco",
+        "Se enviaron planos, pendiente de confirmación por parte del cliente (ventas)",
+        "Ingnova"
+      ]
+    },
+    {
+      "categoria": "municipal",
+      "estacion": "Full Puntarenas Centro",
+      "hoja": "Permiso Municipal ",
+      "fila": 19,
+      "encabezados": [
+        "Estación",
+        "Estatus",
+        "Proveedor"
+      ],
+      "valores": [
+        "Full Puntarenas Centro",
+        "Se enviaron planos, pendiente de confirmación por parte del cliente (ventas)",
+        "Ingnova"
+      ]
+    },
+    {
+      "categoria": "municipal",
+      "estacion": "Full Puntarenas",
+      "hoja": "Permiso Municipal ",
+      "fila": 20,
+      "encabezados": [
+        "Estación",
+        "Estatus",
+        "Proveedor"
+      ],
+      "valores": [
+        "Full Puntarenas",
+        "Se enviaron planos, pendiente de confirmación por parte del cliente (ventas)",
+        "Ingnova"
+      ]
+    },
+    {
+      "categoria": "municipal",
+      "estacion": "Full Playa Naranjo",
+      "hoja": "Permiso Municipal ",
+      "fila": 21,
+      "encabezados": [
+        "Estación",
+        "Estatus",
+        "Proveedor"
+      ],
+      "valores": [
+        "Full Playa Naranjo",
+        "Se enviaron planos, pendiente de confirmación por parte del cliente (ventas)",
+        "Ingnova"
+      ]
+    },
+    {
+      "categoria": "municipal",
+      "estacion": "Full Quebrada Honda",
+      "hoja": "Permiso Municipal ",
+      "fila": 22,
+      "encabezados": [
+        "Estación",
+        "Estatus",
+        "Proveedor"
+      ],
+      "valores": [
+        "Full Quebrada Honda",
+        "Se enviaron planos, pendiente de confirmación por parte del cliente (ventas)",
+        "Ingnova"
+      ]
+    },
+    {
+      "categoria": "municipal",
+      "estacion": "Full Pacayas",
+      "hoja": "Permiso Municipal ",
+      "fila": 23,
+      "encabezados": [
+        "Estación",
+        "Estatus",
+        "Proveedor"
+      ],
+      "valores": [
+        "Full Pacayas",
+        "Se enviaron planos, pendiente de confirmación por parte del cliente (ventas)",
+        "Ingnova"
+      ]
+    },
+    {
+      "categoria": "municipal",
+      "estacion": "Puerto Jiménez, La China",
+      "hoja": "Permiso Municipal ",
+      "fila": 24,
+      "encabezados": [
+        "Estación",
+        "Estatus",
+        "Proveedor"
+      ],
+      "valores": [
+        "Puerto Jiménez, La China",
+        "Se enviaron planos, pendiente de confirmación por parte del cliente (ventas)",
+        "Ingnova"
+      ]
+    },
+    {
+      "categoria": "municipal",
+      "estacion": "Nandayure, La China",
+      "hoja": "Permiso Municipal ",
+      "fila": 25,
+      "encabezados": [
+        "Estación",
+        "Estatus",
+        "Proveedor"
+      ],
+      "valores": [
+        "Nandayure, La China",
+        "Pendiente de visita",
+        "Ingnova"
+      ]
+    },
+    {
+      "categoria": "municipal",
+      "estacion": "Carrillo, La China",
+      "hoja": "Permiso Municipal ",
+      "fila": 26,
+      "encabezados": [
+        "Estación",
+        "Estatus",
+        "Proveedor"
+      ],
+      "valores": [
+        "Carrillo, La China",
+        "Pendiente de visita",
+        "Ingnova"
+      ]
+    },
+    {
+      "categoria": "municipal",
+      "estacion": "Gasolinera Nicoa Nicoya",
+      "hoja": "Permiso Municipal ",
+      "fila": 27,
+      "encabezados": [
+        "Estación",
+        "Estatus",
+        "Proveedor"
+      ],
+      "valores": [
+        "Gasolinera Nicoa Nicoya",
+        "Se enviaron planos, pendiente de confirmación por parte del cliente (ventas)",
+        "Ingnova"
+      ]
+    },
+    {
+      "categoria": "municipal",
+      "estacion": "Santa Barbara",
+      "hoja": "Permiso Municipal ",
+      "fila": 28,
+      "encabezados": [
+        "Estación",
+        "Estatus",
+        "Proveedor"
+      ],
+      "valores": [
+        "Santa Barbara",
+        "Pendiente de planos",
+        "Ingnova"
+      ]
+    },
+    {
+      "categoria": "municipal",
+      "estacion": "Full Quepos",
+      "hoja": "Permiso Municipal ",
+      "fila": 29,
+      "encabezados": [
+        "Estación",
+        "Estatus",
+        "Proveedor"
+      ],
+      "valores": [
+        "Full Quepos",
+        "Se enviaron planos, pendiente de confirmación por parte del cliente (ventas)",
+        "Ingnova"
+      ]
+    },
+    {
+      "categoria": "municipal",
+      "estacion": "Delta Quepos",
+      "hoja": "Permiso Municipal ",
+      "fila": 30,
+      "encabezados": [
+        "Estación",
+        "Estatus",
+        "Proveedor"
+      ],
+      "valores": [
+        "Delta Quepos",
+        "Ingnova no ha pasado el diseño ",
+        "Ingnova"
+      ]
+    },
+    {
+      "categoria": "municipal",
+      "estacion": "GasoTica Perez Zeledón",
+      "hoja": "Permiso Municipal ",
+      "fila": 31,
+      "encabezados": [
+        "Estación",
+        "Estatus",
+        "Proveedor"
+      ],
+      "valores": [
+        "GasoTica Perez Zeledón",
+        "Pendiente de visita",
+        "Ingnova"
+      ]
+    },
+    {
+      "categoria": "municipal",
+      "estacion": "Santo Domingo, Heredia",
+      "hoja": "Permiso Municipal ",
+      "fila": 32,
+      "encabezados": [
+        "Estación",
+        "Estatus",
+        "Proveedor"
+      ],
+      "valores": [
+        "Santo Domingo, Heredia",
+        "Se realiza visita, pendiente planos",
+        "Ingnova"
+      ]
+    },
+    {
+      "categoria": "municipal",
+      "estacion": "Casaque",
+      "hoja": "Permiso Municipal ",
+      "fila": 33,
+      "encabezados": [
+        "Estación",
+        "Estatus",
+        "Proveedor"
+      ],
+      "valores": [
+        "Casaque",
+        "Se realiza visita, pendiente planos",
+        "Ingnova"
+      ]
+    },
+    {
+      "categoria": "pendiente",
+      "estacion": "Santa Teresa",
+      "hoja": "Pendiente iniciar",
+      "fila": 2,
+      "encabezados": [
+        "Estación",
+        "Estatus",
+        "Proveedor"
+      ],
+      "valores": [
+        "Santa Teresa",
+        "Ya salio el permiso de construcción y se envian planos a Jorge, pendiente que envie cotización",
+        "Ingnova"
+      ]
+    },
+    {
+      "categoria": "pendiente",
+      "estacion": "Emesa Liberia",
+      "hoja": "Pendiente iniciar",
+      "fila": 3,
+      "encabezados": [
+        "Estación",
+        "Estatus",
+        "Proveedor"
+      ],
+      "valores": [
+        "Emesa Liberia",
+        "No hay VB para iniciar por parte del cliente",
+        null
+      ]
+    },
+    {
+      "categoria": "pendiente",
+      "estacion": "Bijagua",
+      "hoja": "Pendiente iniciar",
+      "fila": 4,
+      "encabezados": [
+        "Estación",
+        "Estatus",
+        "Proveedor"
+      ],
+      "valores": [
+        "Bijagua",
+        "Con permiso/sin cotizar aún ya se había avisado, pero no han solicitado ir a cotizar",
+        "Ingnova"
+      ]
+    },
+    {
+      "categoria": "pendiente",
+      "estacion": "ECH Tilarán",
+      "hoja": "Pendiente iniciar",
+      "fila": 5,
+      "encabezados": [
+        "Estación",
+        "Estatus",
+        "Proveedor"
+      ],
+      "valores": [
+        " ECH Tilarán",
+        "Ya salio y es el proximo proyecto a iniciar, Cristian lo pospuso de momento",
+        "Ingnova"
+      ]
+    },
+    {
+      "categoria": "pendiente",
+      "estacion": "Cariari",
+      "hoja": "Pendiente iniciar",
+      "fila": 6,
+      "encabezados": [
+        "Estación",
+        "Estatus",
+        "Proveedor"
+      ],
+      "valores": [
+        "Cariari",
+        "Ya salio el permiso de construcción, pendiente cotizar ",
+        "Ingnova"
+      ]
+    },
+    {
+      "categoria": "mantenimientos",
+      "estacion": "Tike Tibás",
+      "hoja": "Mantenimientos",
+      "fila": 2,
+      "encabezados": [
+        "Estación de Servicio",
+        "Fecha de último mantenimiento",
+        "Proximo mantenimiento"
+      ],
+      "valores": [
+        "Tike Tibás",
+        "2026-09-02",
+        "=B2+90"
+      ]
+    },
+    {
+      "categoria": "mantenimientos",
+      "estacion": "Trova Alajuelita",
+      "hoja": "Mantenimientos",
+      "fila": 3,
+      "encabezados": [
+        "Estación de Servicio",
+        "Fecha de último mantenimiento",
+        "Proximo mantenimiento"
+      ],
+      "valores": [
+        "Trova Alajuelita",
+        "2026-04-21",
+        "=B3+90"
+      ]
+    },
+    {
+      "categoria": "mantenimientos",
+      "estacion": "Eusse Guápiles",
+      "hoja": "Mantenimientos",
+      "fila": 4,
+      "encabezados": [
+        "Estación de Servicio",
+        "Fecha de último mantenimiento",
+        "Proximo mantenimiento"
+      ],
+      "valores": [
+        "Eusse Guápiles",
+        "2026-08-10",
+        "=B4+90"
+      ]
+    },
+    {
+      "categoria": "mantenimientos",
+      "estacion": "Servicentro Guápiles S.A.",
+      "hoja": "Mantenimientos",
+      "fila": 5,
+      "encabezados": [
+        "Estación de Servicio",
+        "Fecha de último mantenimiento",
+        "Proximo mantenimiento"
+      ],
+      "valores": [
+        "Servicentro Guápiles S.A.",
+        "2026-08-10",
+        "=B5+90"
+      ]
+    },
+    {
+      "categoria": "mantenimientos",
+      "estacion": "Estación de Servicio Acón",
+      "hoja": "Mantenimientos",
+      "fila": 6,
+      "encabezados": [
+        "Estación de Servicio",
+        "Fecha de último mantenimiento",
+        "Proximo mantenimiento"
+      ],
+      "valores": [
+        "Estación de Servicio Acón",
+        "2026-08-10",
+        "=B6+90"
+      ]
+    },
+    {
+      "categoria": "mantenimientos",
+      "estacion": "Servicentro del Oeste",
+      "hoja": "Mantenimientos",
+      "fila": 7,
+      "encabezados": [
+        "Estación de Servicio",
+        "Fecha de último mantenimiento",
+        "Proximo mantenimiento"
+      ],
+      "valores": [
+        "Servicentro del Oeste",
+        "2026-09-10",
+        "=B7+90"
+      ]
+    },
+    {
+      "categoria": "mantenimientos",
+      "estacion": "Estación El Trapiche",
+      "hoja": "Mantenimientos",
+      "fila": 8,
+      "encabezados": [
+        "Estación de Servicio",
+        "Fecha de último mantenimiento",
+        "Proximo mantenimiento"
+      ],
+      "valores": [
+        "Estación El Trapiche",
+        "2026-05-09",
+        "=B8+90"
+      ]
+    },
+    {
+      "categoria": "mantenimientos",
+      "estacion": "Conoco",
+      "hoja": "Mantenimientos",
+      "fila": 9,
+      "encabezados": [
+        "Estación de Servicio",
+        "Fecha de último mantenimiento",
+        "Proximo mantenimiento"
+      ],
+      "valores": [
+        "Conoco",
+        "2026-05-15",
+        "=B9+90"
+      ]
+    },
+    {
+      "categoria": "mantenimientos",
+      "estacion": "Servicentro Chamú",
+      "hoja": "Mantenimientos",
+      "fila": 10,
+      "encabezados": [
+        "Estación de Servicio",
+        "Fecha de último mantenimiento",
+        "Proximo mantenimiento"
+      ],
+      "valores": [
+        "Servicentro Chamú",
+        "2026-08-06",
+        "2026-11-06"
+      ]
+    },
+    {
+      "categoria": "mantenimientos",
+      "estacion": "Coopetarrazú",
+      "hoja": "Mantenimientos",
+      "fila": 11,
+      "encabezados": [
+        "Estación de Servicio",
+        "Fecha de último mantenimiento",
+        "Proximo mantenimiento"
+      ],
+      "valores": [
+        "Coopetarrazú",
+        "2026-05-18",
+        "=B11+90"
+      ]
+    },
+    {
+      "categoria": "mantenimientos",
+      "estacion": "Combustibles Coronado",
+      "hoja": "Mantenimientos",
+      "fila": 12,
+      "encabezados": [
+        "Estación de Servicio",
+        "Fecha de último mantenimiento",
+        "Proximo mantenimiento"
+      ],
+      "valores": [
+        "Combustibles Coronado",
+        "2026-05-19",
+        "=B12+90"
+      ]
+    },
+    {
+      "categoria": "mantenimientos",
+      "estacion": "Promotora Agroindustrial Samayco",
+      "hoja": "Mantenimientos",
+      "fila": 13,
+      "encabezados": [
+        "Estación de Servicio",
+        "Fecha de último mantenimiento",
+        "Proximo mantenimiento"
+      ],
+      "valores": [
+        "Promotora Agroindustrial Samayco",
+        "2026-08-12",
+        "=B13+90"
+      ]
+    },
+    {
+      "categoria": "mantenimientos",
+      "estacion": "Estación de Servicio Tucurrique S.A.",
+      "hoja": "Mantenimientos",
+      "fila": 14,
+      "encabezados": [
+        "Estación de Servicio",
+        "Fecha de último mantenimiento",
+        "Proximo mantenimiento"
+      ],
+      "valores": [
+        "Estación de Servicio Tucurrique S.A.",
+        "2026-08-12",
+        "=B14+90"
+      ]
+    },
+    {
+      "categoria": "mantenimientos",
+      "estacion": "ECH Isla Grande Enríquez Chacón",
+      "hoja": "Mantenimientos",
+      "fila": 15,
+      "encabezados": [
+        "Estación de Servicio",
+        "Fecha de último mantenimiento",
+        "Proximo mantenimiento"
+      ],
+      "valores": [
+        "ECH Isla Grande Enríquez Chacón",
+        "2026-08-18",
+        "=B15+90"
+      ]
+    },
+    {
+      "categoria": "mantenimientos",
+      "estacion": "Tike Avenida 10 - La Castellana",
+      "hoja": "Mantenimientos",
+      "fila": 16,
+      "encabezados": [
+        "Estación de Servicio",
+        "Fecha de último mantenimiento",
+        "Proximo mantenimiento"
+      ],
+      "valores": [
+        "Tike Avenida 10 - La Castellana",
+        "2026-08-06",
+        "2026-11-06"
+      ]
+    },
+    {
+      "categoria": "mantenimientos",
+      "estacion": "Trova Aserri",
+      "hoja": "Mantenimientos",
+      "fila": 17,
+      "encabezados": [
+        "Estación de Servicio",
+        "Fecha de último mantenimiento",
+        "Proximo mantenimiento"
+      ],
+      "valores": [
+        "Trova Aserri",
+        "2026-05-21",
+        "=B17+90"
+      ]
+    },
+    {
+      "categoria": "mantenimientos",
+      "estacion": "Estación de Servicio La Lima - Zavillana",
+      "hoja": "Mantenimientos",
+      "fila": 18,
+      "encabezados": [
+        "Estación de Servicio",
+        "Fecha de último mantenimiento",
+        "Proximo mantenimiento"
+      ],
+      "valores": [
+        "Estación de Servicio La Lima - Zavillana",
+        "2026-08-24",
+        "=B18+90"
+      ]
+    },
+    {
+      "categoria": "mantenimientos",
+      "estacion": "Servicentro G24 Coyol",
+      "hoja": "Mantenimientos",
+      "fila": 19,
+      "encabezados": [
+        "Estación de Servicio",
+        "Fecha de último mantenimiento",
+        "Proximo mantenimiento"
+      ],
+      "valores": [
+        "Servicentro G24 Coyol",
+        "2026-08-24",
+        "=B19+90"
+      ]
+    },
+    {
+      "categoria": "mantenimientos",
+      "estacion": "Servicentro El Bosque",
+      "hoja": "Mantenimientos",
+      "fila": 20,
+      "encabezados": [
+        "Estación de Servicio",
+        "Fecha de último mantenimiento",
+        "Proximo mantenimiento"
+      ],
+      "valores": [
+        "Servicentro El Bosque",
+        "2026-08-18",
+        "=B20+90"
+      ]
+    },
+    {
+      "categoria": "mantenimientos",
+      "estacion": "Servicentro Cerro Cortes",
+      "hoja": "Mantenimientos",
+      "fila": 21,
+      "encabezados": [
+        "Estación de Servicio",
+        "Fecha de último mantenimiento",
+        "Proximo mantenimiento"
+      ],
+      "valores": [
+        "Servicentro Cerro Cortes",
+        "2026-08-18",
+        "=B21+90"
+      ]
+    },
+    {
+      "categoria": "mantenimientos",
+      "estacion": "Gasolinera La Cristalina",
+      "hoja": "Mantenimientos",
+      "fila": 22,
+      "encabezados": [
+        "Estación de Servicio",
+        "Fecha de último mantenimiento",
+        "Proximo mantenimiento"
+      ],
+      "valores": [
+        "Gasolinera La Cristalina",
+        "2026-08-18",
+        "=B22+90"
+      ]
+    },
+    {
+      "categoria": "mantenimientos",
+      "estacion": "GSC Florencia",
+      "hoja": "Mantenimientos",
+      "fila": 23,
+      "encabezados": [
+        "Estación de Servicio",
+        "Fecha de último mantenimiento",
+        "Proximo mantenimiento"
+      ],
+      "valores": [
+        "GSC Florencia",
+        "2026-08-18",
+        "=B23+90"
+      ]
+    },
+    {
+      "categoria": "mantenimientos",
+      "estacion": "Bomba Orotina",
+      "hoja": "Mantenimientos",
+      "fila": 24,
+      "encabezados": [
+        "Estación de Servicio",
+        "Fecha de último mantenimiento",
+        "Proximo mantenimiento"
+      ],
+      "valores": [
+        "Bomba Orotina",
+        "2026-09-07",
+        "=B24+90"
+      ]
+    },
+    {
+      "categoria": "mantenimientos",
+      "estacion": "Estación de Servicio Costanera 27",
+      "hoja": "Mantenimientos",
+      "fila": 25,
+      "encabezados": [
+        "Estación de Servicio",
+        "Fecha de último mantenimiento",
+        "Proximo mantenimiento"
+      ],
+      "valores": [
+        "Estación de Servicio Costanera 27",
+        "2026-09-07",
+        "=B25+90"
+      ]
+    },
+    {
+      "categoria": "mantenimientos",
+      "estacion": "Servicentro Parrita Zavillana",
+      "hoja": "Mantenimientos",
+      "fila": 26,
+      "encabezados": [
+        "Estación de Servicio",
+        "Fecha de último mantenimiento",
+        "Proximo mantenimiento"
+      ],
+      "valores": [
+        "Servicentro Parrita Zavillana",
+        "2026-09-07",
+        "=B26+90"
+      ]
+    },
+    {
+      "categoria": "mantenimientos",
+      "estacion": "Servicentro Santa María San Juan",
+      "hoja": "Mantenimientos",
+      "fila": 27,
+      "encabezados": [
+        "Estación de Servicio",
+        "Fecha de último mantenimiento",
+        "Proximo mantenimiento"
+      ],
+      "valores": [
+        "Servicentro Santa María San Juan",
+        "2026-06-12",
+        "=B27+90"
+      ]
+    },
+    {
+      "categoria": "mantenimientos",
+      "estacion": "Servicentro Alvarado y Molina",
+      "hoja": "Mantenimientos",
+      "fila": 28,
+      "encabezados": [
+        "Estación de Servicio",
+        "Fecha de último mantenimiento",
+        "Proximo mantenimiento"
+      ],
+      "valores": [
+        "Servicentro Alvarado y Molina",
+        "2026-06-15",
+        "=B28+90"
+      ]
+    },
+    {
+      "categoria": "mantenimientos",
+      "estacion": "Coopevictoria",
+      "hoja": "Mantenimientos",
+      "fila": 29,
+      "encabezados": [
+        "Estación de Servicio",
+        "Fecha de último mantenimiento",
+        "Proximo mantenimiento"
+      ],
+      "valores": [
+        "Coopevictoria",
+        "2026-06-15",
+        "=B29+90"
+      ]
+    },
+    {
+      "categoria": "mantenimientos",
+      "estacion": "Trova Taras",
+      "hoja": "Mantenimientos",
+      "fila": 30,
+      "encabezados": [
+        "Estación de Servicio",
+        "Fecha de último mantenimiento",
+        "Proximo mantenimiento"
+      ],
+      "valores": [
+        "Trova Taras",
+        "2026-09-10",
+        "=B30+90"
+      ]
+    },
+    {
+      "categoria": "mantenimientos",
+      "estacion": "Trova El Guarco",
+      "hoja": "Mantenimientos",
+      "fila": 31,
+      "encabezados": [
+        "Estación de Servicio",
+        "Fecha de último mantenimiento",
+        "Proximo mantenimiento"
+      ],
+      "valores": [
+        "Trova El Guarco",
+        "2026-06-22",
+        "=B31+90"
+      ]
+    },
+    {
+      "categoria": "mantenimientos",
+      "estacion": "Trova Ipís",
+      "hoja": "Mantenimientos",
+      "fila": 32,
+      "encabezados": [
+        "Estación de Servicio",
+        "Fecha de último mantenimiento",
+        "Proximo mantenimiento"
+      ],
+      "valores": [
+        "Trova Ipís",
+        "2026-09-03",
+        "=B32+90"
+      ]
+    },
+    {
+      "categoria": "mantenimientos",
+      "estacion": "Eusse Tárcoles 20-ene",
+      "hoja": "Mantenimientos",
+      "fila": 33,
+      "encabezados": [
+        "Estación de Servicio",
+        "Fecha de último mantenimiento",
+        "Proximo mantenimiento"
+      ],
+      "valores": [
+        "Eusse Tárcoles 20-ene",
+        "2026-09-07",
+        "=B33+90"
+      ]
+    },
+    {
+      "categoria": "mantenimientos",
+      "estacion": "Servicentro CoopeAgri",
+      "hoja": "Mantenimientos",
+      "fila": 34,
+      "encabezados": [
+        "Estación de Servicio",
+        "Fecha de último mantenimiento",
+        "Proximo mantenimiento"
+      ],
+      "valores": [
+        "Servicentro CoopeAgri",
+        "2026-06-27",
+        "=B34+90"
+      ]
+    },
+    {
+      "categoria": "mantenimientos",
+      "estacion": "Trova Cajón",
+      "hoja": "Mantenimientos",
+      "fila": 35,
+      "encabezados": [
+        "Estación de Servicio",
+        "Fecha de último mantenimiento",
+        "Proximo mantenimiento"
+      ],
+      "valores": [
+        "Trova Cajón",
+        "2026-06-27",
+        "=B35+90"
+      ]
+    },
+    {
+      "categoria": "mantenimientos",
+      "estacion": "Trova Pérez",
+      "hoja": "Mantenimientos",
+      "fila": 36,
+      "encabezados": [
+        "Estación de Servicio",
+        "Fecha de último mantenimiento",
+        "Proximo mantenimiento"
+      ],
+      "valores": [
+        "Trova Pérez",
+        "2026-06-27",
+        "=B36+90"
+      ]
+    },
+    {
+      "categoria": "mantenimientos",
+      "estacion": "Eusse Naranjo",
+      "hoja": "Mantenimientos",
+      "fila": 37,
+      "encabezados": [
+        "Estación de Servicio",
+        "Fecha de último mantenimiento",
+        "Proximo mantenimiento"
+      ],
+      "valores": [
+        "Eusse Naranjo",
+        "2026-06-29",
+        "=B37+90"
+      ]
+    },
+    {
+      "categoria": "mantenimientos",
+      "estacion": "Servicentro Santa María 1",
+      "hoja": "Mantenimientos",
+      "fila": 38,
+      "encabezados": [
+        "Estación de Servicio",
+        "Fecha de último mantenimiento",
+        "Proximo mantenimiento"
+      ],
+      "valores": [
+        "Servicentro Santa María 1",
+        "2026-06-29",
+        "=B38+90"
+      ]
+    },
+    {
+      "categoria": "mantenimientos",
+      "estacion": "Gasotica Buenos Aires Fonseca Hermanos",
+      "hoja": "Mantenimientos",
+      "fila": 39,
+      "encabezados": [
+        "Estación de Servicio",
+        "Fecha de último mantenimiento",
+        "Proximo mantenimiento"
+      ],
+      "valores": [
+        "Gasotica Buenos Aires Fonseca Hermanos",
+        "2026-07-08",
+        "=B39+90"
+      ]
+    },
+    {
+      "categoria": "mantenimientos",
+      "estacion": "Trova Sabalito",
+      "hoja": "Mantenimientos",
+      "fila": 40,
+      "encabezados": [
+        "Estación de Servicio",
+        "Fecha de último mantenimiento",
+        "Proximo mantenimiento"
+      ],
+      "valores": [
+        "Trova Sabalito",
+        "2026-07-08",
+        "=B40+90"
+      ]
+    },
+    {
+      "categoria": "mantenimientos",
+      "estacion": "Trova San Vito",
+      "hoja": "Mantenimientos",
+      "fila": 41,
+      "encabezados": [
+        "Estación de Servicio",
+        "Fecha de último mantenimiento",
+        "Proximo mantenimiento"
+      ],
+      "valores": [
+        "Trova San Vito",
+        "2026-07-08",
+        "=B41+90"
+      ]
+    },
+    {
+      "categoria": "mantenimientos",
+      "estacion": "Servicentro Río Claro",
+      "hoja": "Mantenimientos",
+      "fila": 42,
+      "encabezados": [
+        "Estación de Servicio",
+        "Fecha de último mantenimiento",
+        "Proximo mantenimiento"
+      ],
+      "valores": [
+        "Servicentro Río Claro",
+        "2026-07-08",
+        "=B42+90"
+      ]
+    },
+    {
+      "categoria": "mantenimientos",
+      "estacion": "Gasolinera Río Tempisque",
+      "hoja": "Mantenimientos",
+      "fila": 43,
+      "encabezados": [
+        "Estación de Servicio",
+        "Fecha de último mantenimiento",
+        "Proximo mantenimiento"
+      ],
+      "valores": [
+        "Gasolinera Río Tempisque",
+        "2026-10-07",
+        "=B43+90"
+      ]
+    },
+    {
+      "categoria": "mantenimientos",
+      "estacion": "Estación de Servicio Pacífico Esparza",
+      "hoja": "Mantenimientos",
+      "fila": 44,
+      "encabezados": [
+        "Estación de Servicio",
+        "Fecha de último mantenimiento",
+        "Proximo mantenimiento"
+      ],
+      "valores": [
+        "Estación de Servicio Pacífico Esparza",
+        "2026-10-09",
+        "=B44+90"
+      ]
+    },
+    {
+      "categoria": "mantenimientos",
+      "estacion": "Estación de Servicio Reina del Campo",
+      "hoja": "Mantenimientos",
+      "fila": 45,
+      "encabezados": [
+        "Estación de Servicio",
+        "Fecha de último mantenimiento",
+        "Proximo mantenimiento"
+      ],
+      "valores": [
+        "Estación de Servicio Reina del Campo",
+        "2026-10-07",
+        "=B45+90"
+      ]
+    },
+    {
+      "categoria": "mantenimientos",
+      "estacion": "Gasolinera La Alianza S.A.",
+      "hoja": "Mantenimientos",
+      "fila": 46,
+      "encabezados": [
+        "Estación de Servicio",
+        "Fecha de último mantenimiento",
+        "Proximo mantenimiento"
+      ],
+      "valores": [
+        "Gasolinera La Alianza S.A.",
+        "2026-10-07",
+        "=B46+90"
+      ]
+    },
+    {
+      "categoria": "mantenimientos",
+      "estacion": "Servicentro Cañas",
+      "hoja": "Mantenimientos",
+      "fila": 47,
+      "encabezados": [
+        "Estación de Servicio",
+        "Fecha de último mantenimiento",
+        "Proximo mantenimiento"
+      ],
+      "valores": [
+        "Servicentro Cañas",
+        "2026-10-07",
+        "=B47+90"
+      ]
+    },
+    {
+      "categoria": "mantenimientos",
+      "estacion": "Servicentro El Roble",
+      "hoja": "Mantenimientos",
+      "fila": 48,
+      "encabezados": [
+        "Estación de Servicio",
+        "Fecha de último mantenimiento",
+        "Proximo mantenimiento"
+      ],
+      "valores": [
+        "Servicentro El Roble",
+        "2026-10-09",
+        "=B48+90"
+      ]
+    },
+    {
+      "categoria": "mantenimientos",
+      "estacion": "Corporacíon Inmobiliaria RyY Bomba El Carmen",
+      "hoja": "Mantenimientos",
+      "fila": 49,
+      "encabezados": [
+        "Estación de Servicio",
+        "Fecha de último mantenimiento",
+        "Proximo mantenimiento"
+      ],
+      "valores": [
+        "Corporacíon Inmobiliaria RyY Bomba El Carmen",
+        "2026-07-16",
+        "=B49+90"
+      ]
+    },
+    {
+      "categoria": "mantenimientos",
+      "estacion": "Servicentro El Higuerón",
+      "hoja": "Mantenimientos",
+      "fila": 50,
+      "encabezados": [
+        "Estación de Servicio",
+        "Fecha de último mantenimiento",
+        "Proximo mantenimiento"
+      ],
+      "valores": [
+        "Servicentro El Higuerón",
+        "2026-07-16",
+        "=B50+90"
+      ]
+    },
+    {
+      "categoria": "mantenimientos",
+      "estacion": "Gasolinera Anatot",
+      "hoja": "Mantenimientos",
+      "fila": 51,
+      "encabezados": [
+        "Estación de Servicio",
+        "Fecha de último mantenimiento",
+        "Proximo mantenimiento"
+      ],
+      "valores": [
+        "Gasolinera Anatot",
+        "2026-07-16",
+        "=B51+90"
+      ]
+    },
+    {
+      "categoria": "mantenimientos",
+      "estacion": "Estación de Servicio Global Fuel La Paz",
+      "hoja": "Mantenimientos",
+      "fila": 52,
+      "encabezados": [
+        "Estación de Servicio",
+        "Fecha de último mantenimiento",
+        "Proximo mantenimiento"
+      ],
+      "valores": [
+        "Estación de Servicio Global Fuel La Paz",
+        "2026-07-16",
+        "=B52+90"
+      ]
+    },
+    {
+      "categoria": "mantenimientos",
+      "estacion": "Servi Indoor Curridabat",
+      "hoja": "Mantenimientos",
+      "fila": 53,
+      "encabezados": [
+        "Estación de Servicio",
+        "Fecha de último mantenimiento",
+        "Proximo mantenimiento"
+      ],
+      "valores": [
+        "Servi Indoor Curridabat",
+        "2026-10-05",
+        "=B53+90"
+      ]
+    },
+    {
+      "categoria": "mantenimientos",
+      "estacion": "Servi Indoor Tres Ríos",
+      "hoja": "Mantenimientos",
+      "fila": 54,
+      "encabezados": [
+        "Estación de Servicio",
+        "Fecha de último mantenimiento",
+        "Proximo mantenimiento"
+      ],
+      "valores": [
+        "Servi Indoor Tres Ríos",
+        "2026-10-05",
+        "=B54+90"
+      ]
+    },
+    {
+      "categoria": "mantenimientos",
+      "estacion": "Coope Heredia",
+      "hoja": "Mantenimientos",
+      "fila": 55,
+      "encabezados": [
+        "Estación de Servicio",
+        "Fecha de último mantenimiento",
+        "Proximo mantenimiento"
+      ],
+      "valores": [
+        "Coope Heredia",
+        "2026-10-01",
+        "=B55+90"
+      ]
+    },
+    {
+      "categoria": "mantenimientos",
+      "estacion": "Servicentro San Juan - Heredia",
+      "hoja": "Mantenimientos",
+      "fila": 56,
+      "encabezados": [
+        "Estación de Servicio",
+        "Fecha de último mantenimiento",
+        "Proximo mantenimiento"
+      ],
+      "valores": [
+        "Servicentro San Juan - Heredia",
+        "2026-07-20",
+        "=B56+90"
+      ]
+    },
+    {
+      "categoria": "mantenimientos",
+      "estacion": "Servicentro San Pablo de Heredia",
+      "hoja": "Mantenimientos",
+      "fila": 57,
+      "encabezados": [
+        "Estación de Servicio",
+        "Fecha de último mantenimiento",
+        "Proximo mantenimiento"
+      ],
+      "valores": [
+        "Servicentro San Pablo de Heredia",
+        "2026-07-20",
+        "=B57+90"
+      ]
+    },
+    {
+      "categoria": "mantenimientos",
+      "estacion": "GS La Colonia No se ha hecho el mantenimiento a petición de Tomza",
+      "hoja": "Mantenimientos",
+      "fila": 58,
+      "encabezados": [
+        "Estación de Servicio",
+        "Fecha de último mantenimiento",
+        "Proximo mantenimiento"
+      ],
+      "valores": [
+        "GS La Colonia No se ha hecho el mantenimiento a petición de Tomza",
+        null,
+        null
+      ]
+    },
+    {
+      "categoria": "mantenimientos",
+      "estacion": "Trova Zapote estación cerrada por remodelación",
+      "hoja": "Mantenimientos",
+      "fila": 59,
+      "encabezados": [
+        "Estación de Servicio",
+        "Fecha de último mantenimiento",
+        "Proximo mantenimiento"
+      ],
+      "valores": [
+        "Trova Zapote estación cerrada por remodelación",
+        null,
+        null
+      ]
+    },
+    {
+      "categoria": "mantenimientos",
+      "estacion": "Mayecasi",
+      "hoja": "Mantenimientos",
+      "fila": 60,
+      "encabezados": [
+        "Estación de Servicio",
+        "Fecha de último mantenimiento",
+        "Proximo mantenimiento"
+      ],
+      "valores": [
+        "Mayecasi",
+        "2026-07-31",
+        "2026-10-31"
+      ]
+    },
+    {
+      "categoria": "mantenimientos",
+      "estacion": "Servi Plaza Don Pancho (La Hibrida)",
+      "hoja": "Mantenimientos",
+      "fila": 61,
+      "encabezados": [
+        "Estación de Servicio",
+        "Fecha de último mantenimiento",
+        "Proximo mantenimiento"
+      ],
+      "valores": [
+        "Servi Plaza Don Pancho (La Hibrida)",
+        "2026-09-03",
+        "2026-12-03"
+      ]
+    },
+    {
+      "categoria": "mantenimientos",
+      "estacion": "M&S Jimenez",
+      "hoja": "Mantenimientos",
+      "fila": 63,
+      "encabezados": [
+        "Estación de Servicio",
+        "Fecha de último mantenimiento",
+        "Proximo mantenimiento"
+      ],
+      "valores": [
+        "M&S Jimenez",
+        "Ingnova",
+        null
+      ]
+    },
+    {
+      "categoria": "mantenimientos",
+      "estacion": "Jaco",
+      "hoja": "Mantenimientos",
+      "fila": 64,
+      "encabezados": [
+        "Estación de Servicio",
+        "Fecha de último mantenimiento",
+        "Proximo mantenimiento"
+      ],
+      "valores": [
+        "Jaco",
+        "Ingnova",
+        null
+      ]
+    },
+    {
+      "categoria": "mantenimientos",
+      "estacion": "El Ceibo",
+      "hoja": "Mantenimientos",
+      "fila": 65,
+      "encabezados": [
+        "Estación de Servicio",
+        "Fecha de último mantenimiento",
+        "Proximo mantenimiento"
+      ],
+      "valores": [
+        "El Ceibo",
+        "Ingnova con mantenimientos",
+        null
+      ]
+    },
+    {
+      "categoria": "mantenimientos",
+      "estacion": "Santa Clara",
+      "hoja": "Mantenimientos",
+      "fila": 66,
+      "encabezados": [
+        "Estación de Servicio",
+        "Fecha de último mantenimiento",
+        "Proximo mantenimiento"
+      ],
+      "valores": [
+        "Santa Clara",
+        "Ingnova con mantenimientos",
+        null
+      ]
+    },
+    {
+      "categoria": "mantenimientos",
+      "estacion": "Raúl Molina",
+      "hoja": "Mantenimientos",
+      "fila": 67,
+      "encabezados": [
+        "Estación de Servicio",
+        "Fecha de último mantenimiento",
+        "Proximo mantenimiento"
+      ],
+      "valores": [
+        "Raúl Molina",
+        "Ingnova con mantenimientos",
+        null
+      ]
+    },
+    {
+      "categoria": "mantenimientos",
+      "estacion": "Barranca",
+      "hoja": "Mantenimientos",
+      "fila": 68,
+      "encabezados": [
+        "Estación de Servicio",
+        "Fecha de último mantenimiento",
+        "Proximo mantenimiento"
+      ],
+      "valores": [
+        "Barranca",
+        "Ingnova con mantenimientos",
+        null
+      ]
+    },
+    {
+      "categoria": "mejoras",
+      "estacion": "Gasolinera Río Tempisque",
+      "hoja": "Mejoras",
+      "fila": 2,
+      "encabezados": [
+        "Estación de Servicio",
+        "Válvula",
+        "Cantidad",
+        "Mangueras",
+        "Material",
+        "Unidades"
+      ],
+      "valores": [
+        "Gasolinera Río Tempisque",
+        "no ",
+        "se requiere 1 ",
+        "si",
+        "Hule",
+        1.0
+      ]
+    },
+    {
+      "categoria": "mejoras",
+      "estacion": "Estación de Servicio Costanera 27",
+      "hoja": "Mejoras",
+      "fila": 3,
+      "encabezados": [
+        "Estación de Servicio",
+        "Válvula",
+        "Cantidad",
+        "Mangueras",
+        "Material",
+        "Unidades"
+      ],
+      "valores": [
+        "Estación de Servicio Costanera 27",
+        "no ",
+        "se requiere 1 ",
+        "si",
+        "Metallica",
+        4.0
+      ]
+    },
+    {
+      "categoria": "mejoras",
+      "estacion": "Gasotica Buenos Aires Fonseca Hermanos",
+      "hoja": "Mejoras",
+      "fila": 4,
+      "encabezados": [
+        "Estación de Servicio",
+        "Válvula",
+        "Cantidad",
+        "Mangueras",
+        "Material",
+        "Unidades"
+      ],
+      "valores": [
+        "Gasotica Buenos Aires Fonseca Hermanos",
+        null,
+        null,
+        null,
+        null,
+        null
+      ]
+    },
+    {
+      "categoria": "mejoras",
+      "estacion": "Servicentro CoopeAgri",
+      "hoja": "Mejoras",
+      "fila": 5,
+      "encabezados": [
+        "Estación de Servicio",
+        "Válvula",
+        "Cantidad",
+        "Mangueras",
+        "Material",
+        "Unidades"
+      ],
+      "valores": [
+        "Servicentro CoopeAgri",
+        null,
+        null,
+        null,
+        null,
+        null
+      ]
+    },
+    {
+      "categoria": "mejoras",
+      "estacion": "Bomba Orotina",
+      "hoja": "Mejoras",
+      "fila": 6,
+      "encabezados": [
+        "Estación de Servicio",
+        "Válvula",
+        "Cantidad",
+        "Mangueras",
+        "Material",
+        "Unidades"
+      ],
+      "valores": [
+        "Bomba Orotina",
+        "si",
+        "se requiere 1 ",
+        "si",
+        "Metalica",
+        2.0
+      ]
+    },
+    {
+      "categoria": "mejoras",
+      "estacion": "Bomba Orotina",
+      "hoja": "Mejoras",
+      "fila": 7,
+      "encabezados": [
+        "Estación de Servicio",
+        "Válvula",
+        "Cantidad",
+        "Mangueras",
+        "Material",
+        "Unidades"
+      ],
+      "valores": [
+        "Bomba Orotina",
+        "no",
+        null,
+        "si",
+        "Hule",
+        2.0
+      ]
+    },
+    {
+      "categoria": "mejoras",
+      "estacion": "Trova El Guarco",
+      "hoja": "Mejoras",
+      "fila": 8,
+      "encabezados": [
+        "Estación de Servicio",
+        "Válvula",
+        "Cantidad",
+        "Mangueras",
+        "Material",
+        "Unidades"
+      ],
+      "valores": [
+        "Trova El Guarco",
+        "no",
+        null,
+        "si",
+        "Metalica",
+        5.0
+      ]
+    },
+    {
+      "categoria": "mejoras",
+      "estacion": "Servicentro Alvarado y Molina",
+      "hoja": "Mejoras",
+      "fila": 9,
+      "encabezados": [
+        "Estación de Servicio",
+        "Válvula",
+        "Cantidad",
+        "Mangueras",
+        "Material",
+        "Unidades"
+      ],
+      "valores": [
+        "Servicentro Alvarado y Molina",
+        "no",
+        "se requiere 1 ",
+        "si",
+        "Metalica",
+        5.0
+      ]
+    },
+    {
+      "categoria": "mejoras",
+      "estacion": "Coopevictoria",
+      "hoja": "Mejoras",
+      "fila": 10,
+      "encabezados": [
+        "Estación de Servicio",
+        "Válvula",
+        "Cantidad",
+        "Mangueras",
+        "Material",
+        "Unidades"
+      ],
+      "valores": [
+        "Coopevictoria",
+        "si",
+        1.0,
+        "si",
+        "Metalica",
+        6.0
+      ]
+    },
+    {
+      "categoria": "mejoras",
+      "estacion": "Eusse Naranjo",
+      "hoja": "Mejoras",
+      "fila": 11,
+      "encabezados": [
+        "Estación de Servicio",
+        "Válvula",
+        "Cantidad",
+        "Mangueras",
+        "Material",
+        "Unidades"
+      ],
+      "valores": [
+        "Eusse Naranjo",
+        "no",
+        "se requiere 1 ",
+        "si",
+        "Metalica",
+        7.0
+      ]
+    },
+    {
+      "categoria": "mejoras",
+      "estacion": "Trova Ipís",
+      "hoja": "Mejoras",
+      "fila": 12,
+      "encabezados": [
+        "Estación de Servicio",
+        "Válvula",
+        "Cantidad",
+        "Mangueras",
+        "Material",
+        "Unidades"
+      ],
+      "valores": [
+        "Trova Ipís",
+        "no",
+        "se requiere 1 ",
+        "si",
+        "Hule",
+        9.0
+      ]
+    },
+    {
+      "categoria": "mejoras",
+      "estacion": "Estación de Servicio Pacífico Esparza",
+      "hoja": "Mejoras",
+      "fila": 13,
+      "encabezados": [
+        "Estación de Servicio",
+        "Válvula",
+        "Cantidad",
+        "Mangueras",
+        "Material",
+        "Unidades"
+      ],
+      "valores": [
+        "Estación de Servicio Pacífico Esparza",
+        "no",
+        "se requiere 1 ",
+        "si",
+        "Metalica/Hule",
+        "4 de Hule, 2 Metalicas"
+      ]
+    },
+    {
+      "categoria": "mejoras",
+      "estacion": "Estación de Servicio Reina del Campo",
+      "hoja": "Mejoras",
+      "fila": 14,
+      "encabezados": [
+        "Estación de Servicio",
+        "Válvula",
+        "Cantidad",
+        "Mangueras",
+        "Material",
+        "Unidades"
+      ],
+      "valores": [
+        "Estación de Servicio Reina del Campo",
+        "si",
+        1.0,
+        "si",
+        "Metalica",
+        6.0
+      ]
+    },
+    {
+      "categoria": "mejoras",
+      "estacion": "Gasolinera La Alianza S.A.",
+      "hoja": "Mejoras",
+      "fila": 15,
+      "encabezados": [
+        "Estación de Servicio",
+        "Válvula",
+        "Cantidad",
+        "Mangueras",
+        "Material",
+        "Unidades"
+      ],
+      "valores": [
+        "Gasolinera La Alianza S.A.",
+        "si",
+        1.0,
+        "si",
+        "Metalica",
+        6.0
+      ]
+    },
+    {
+      "categoria": "mejoras",
+      "estacion": "Servicentro Cañas",
+      "hoja": "Mejoras",
+      "fila": 16,
+      "encabezados": [
+        "Estación de Servicio",
+        "Válvula",
+        "Cantidad",
+        "Mangueras",
+        "Material",
+        "Unidades"
+      ],
+      "valores": [
+        "Servicentro Cañas",
+        "no",
+        "se quiere 1 ",
+        "si",
+        "Hule",
+        6.0
+      ]
+    },
+    {
+      "categoria": "mejoras",
+      "estacion": "Servicentro Santa María San Ramon",
+      "hoja": "Mejoras",
+      "fila": 17,
+      "encabezados": [
+        "Estación de Servicio",
+        "Válvula",
+        "Cantidad",
+        "Mangueras",
+        "Material",
+        "Unidades"
+      ],
+      "valores": [
+        "Servicentro Santa María San Ramon",
+        "si",
+        1.0,
+        "si",
+        "Metalica",
+        3.0
+      ]
+    },
+    {
+      "categoria": "mejoras",
+      "estacion": "Coope Heredia",
+      "hoja": "Mejoras",
+      "fila": 18,
+      "encabezados": [
+        "Estación de Servicio",
+        "Válvula",
+        "Cantidad",
+        "Mangueras",
+        "Material",
+        "Unidades"
+      ],
+      "valores": [
+        "Coope Heredia",
+        "SI",
+        null,
+        "Si",
+        "Metalica",
+        5.0
+      ]
+    },
+    {
+      "categoria": "mejoras",
+      "estacion": "Corporacíon Inmobiliaria RyY Bomba El Carmen",
+      "hoja": "Mejoras",
+      "fila": 19,
+      "encabezados": [
+        "Estación de Servicio",
+        "Válvula",
+        "Cantidad",
+        "Mangueras",
+        "Material",
+        "Unidades"
+      ],
+      "valores": [
+        "Corporacíon Inmobiliaria RyY Bomba El Carmen",
+        "no",
+        "se requiere 1 ",
+        "si",
+        "hule",
+        null
+      ]
+    },
+    {
+      "categoria": "mejoras",
+      "estacion": "Servicentro El Higuerón",
+      "hoja": "Mejoras",
+      "fila": 20,
+      "encabezados": [
+        "Estación de Servicio",
+        "Válvula",
+        "Cantidad",
+        "Mangueras",
+        "Material",
+        "Unidades"
+      ],
+      "valores": [
+        "Servicentro El Higuerón",
+        "si",
+        null,
+        "si",
+        "metalica",
+        null
+      ]
+    },
+    {
+      "categoria": "mejoras",
+      "estacion": "Trova Sabalito",
+      "hoja": "Mejoras",
+      "fila": 21,
+      "encabezados": [
+        "Estación de Servicio",
+        "Válvula",
+        "Cantidad",
+        "Mangueras",
+        "Material",
+        "Unidades"
+      ],
+      "valores": [
+        "Trova Sabalito",
+        null,
+        null,
+        null,
+        null,
+        null
+      ]
+    },
+    {
+      "categoria": "mejoras",
+      "estacion": "Trova San Vito",
+      "hoja": "Mejoras",
+      "fila": 22,
+      "encabezados": [
+        "Estación de Servicio",
+        "Válvula",
+        "Cantidad",
+        "Mangueras",
+        "Material",
+        "Unidades"
+      ],
+      "valores": [
+        "Trova San Vito",
+        null,
+        null,
+        null,
+        null,
+        null
+      ]
+    },
+    {
+      "categoria": "mejoras",
+      "estacion": "Servicentro Río Claro",
+      "hoja": "Mejoras",
+      "fila": 23,
+      "encabezados": [
+        "Estación de Servicio",
+        "Válvula",
+        "Cantidad",
+        "Mangueras",
+        "Material",
+        "Unidades"
+      ],
+      "valores": [
+        "Servicentro Río Claro",
+        null,
+        null,
+        null,
+        null,
+        null
+      ]
+    },
+    {
+      "categoria": "mejoras",
+      "estacion": "Servicentro Parrita Zavillana",
+      "hoja": "Mejoras",
+      "fila": 24,
+      "encabezados": [
+        "Estación de Servicio",
+        "Válvula",
+        "Cantidad",
+        "Mangueras",
+        "Material",
+        "Unidades"
+      ],
+      "valores": [
+        "Servicentro Parrita Zavillana",
+        null,
+        null,
+        null,
+        null,
+        null
+      ]
+    },
+    {
+      "categoria": "mejoras",
+      "estacion": "Servicentro Santa María San Juan",
+      "hoja": "Mejoras",
+      "fila": 25,
+      "encabezados": [
+        "Estación de Servicio",
+        "Válvula",
+        "Cantidad",
+        "Mangueras",
+        "Material",
+        "Unidades"
+      ],
+      "valores": [
+        "Servicentro Santa María San Juan",
+        "si",
+        1.0,
+        "si",
+        "metallica",
+        6.0
+      ]
+    },
+    {
+      "categoria": "mejoras",
+      "estacion": "Tike San Juan Tibás",
+      "hoja": "Mejoras",
+      "fila": 26,
+      "encabezados": [
+        "Estación de Servicio",
+        "Válvula",
+        "Cantidad",
+        "Mangueras",
+        "Material",
+        "Unidades"
+      ],
+      "valores": [
+        "Tike San Juan Tibás",
+        "no",
+        "se requiere 1 ",
+        "si",
+        "Hule",
+        null
+      ]
+    },
+    {
+      "categoria": "mejoras",
+      "estacion": "Gasolinera Anatot",
+      "hoja": "Mejoras",
+      "fila": 27,
+      "encabezados": [
+        "Estación de Servicio",
+        "Válvula",
+        "Cantidad",
+        "Mangueras",
+        "Material",
+        "Unidades"
+      ],
+      "valores": [
+        "Gasolinera Anatot",
+        "no",
+        "se requiere1 ",
+        "si",
+        "metalica/hule",
+        null
+      ]
+    },
+    {
+      "categoria": "mejoras",
+      "estacion": "Servi Indoor Curridabat",
+      "hoja": "Mejoras",
+      "fila": 28,
+      "encabezados": [
+        "Estación de Servicio",
+        "Válvula",
+        "Cantidad",
+        "Mangueras",
+        "Material",
+        "Unidades"
+      ],
+      "valores": [
+        "Servi Indoor Curridabat",
+        "no",
+        "se requiere 1 ",
+        "si",
+        "metalica/hule",
+        null
+      ]
+    },
+    {
+      "categoria": "mejoras",
+      "estacion": "Trova Alajuelita",
+      "hoja": "Mejoras",
+      "fila": 29,
+      "encabezados": [
+        "Estación de Servicio",
+        "Válvula",
+        "Cantidad",
+        "Mangueras",
+        "Material",
+        "Unidades"
+      ],
+      "valores": [
+        "Trova Alajuelita",
+        "no",
+        "se requiere 1 ",
+        "si",
+        "Hule",
+        7.0
+      ]
+    },
+    {
+      "categoria": "mejoras",
+      "estacion": "Eusse Guápiles",
+      "hoja": "Mejoras",
+      "fila": 30,
+      "encabezados": [
+        "Estación de Servicio",
+        "Válvula",
+        "Cantidad",
+        "Mangueras",
+        "Material",
+        "Unidades"
+      ],
+      "valores": [
+        "Eusse Guápiles",
+        "no",
+        "se requiere 1 ",
+        "si",
+        "Metalica",
+        6.0
+      ]
+    },
+    {
+      "categoria": "mejoras",
+      "estacion": "Servicentro Guápiles S.A.",
+      "hoja": "Mejoras",
+      "fila": 31,
+      "encabezados": [
+        "Estación de Servicio",
+        "Válvula",
+        "Cantidad",
+        "Mangueras",
+        "Material",
+        "Unidades"
+      ],
+      "valores": [
+        "Servicentro Guápiles S.A.",
+        "si",
+        1.0,
+        "si",
+        "Metalica",
+        4.0
+      ]
+    },
+    {
+      "categoria": "mejoras",
+      "estacion": "Estación de Servicio Acón",
+      "hoja": "Mejoras",
+      "fila": 32,
+      "encabezados": [
+        "Estación de Servicio",
+        "Válvula",
+        "Cantidad",
+        "Mangueras",
+        "Material",
+        "Unidades"
+      ],
+      "valores": [
+        "Estación de Servicio Acón",
+        null,
+        null,
+        null,
+        null,
+        null
+      ]
+    },
+    {
+      "categoria": "mejoras",
+      "estacion": "Servi Indoor Tres Ríos",
+      "hoja": "Mejoras",
+      "fila": 33,
+      "encabezados": [
+        "Estación de Servicio",
+        "Válvula",
+        "Cantidad",
+        "Mangueras",
+        "Material",
+        "Unidades"
+      ],
+      "valores": [
+        "Servi Indoor Tres Ríos",
+        "no",
+        "se requiere 1 ",
+        "si",
+        "Metalica/ Hule",
+        null
+      ]
+    },
+    {
+      "categoria": "mejoras",
+      "estacion": "Servicentro del Oeste",
+      "hoja": "Mejoras",
+      "fila": 34,
+      "encabezados": [
+        "Estación de Servicio",
+        "Válvula",
+        "Cantidad",
+        "Mangueras",
+        "Material",
+        "Unidades"
+      ],
+      "valores": [
+        "Servicentro del Oeste",
+        "si",
+        null,
+        "si",
+        "metallica",
+        null
+      ]
+    },
+    {
+      "categoria": "mejoras",
+      "estacion": "Servicentro El Roble",
+      "hoja": "Mejoras",
+      "fila": 35,
+      "encabezados": [
+        "Estación de Servicio",
+        "Válvula",
+        "Cantidad",
+        "Mangueras",
+        "Material",
+        "Unidades"
+      ],
+      "valores": [
+        "Servicentro El Roble",
+        "si",
+        "se requiere 1 ",
+        "si",
+        "Hule",
+        7.0
+      ]
+    },
+    {
+      "categoria": "mejoras",
+      "estacion": "Estación de Servicio Global Fuel La Paz",
+      "hoja": "Mejoras",
+      "fila": 36,
+      "encabezados": [
+        "Estación de Servicio",
+        "Válvula",
+        "Cantidad",
+        "Mangueras",
+        "Material",
+        "Unidades"
+      ],
+      "valores": [
+        "Estación de Servicio Global Fuel La Paz",
+        "no",
+        "se requieere 1 ",
+        "si",
+        "hule",
+        null
+      ]
+    },
+    {
+      "categoria": "mejoras",
+      "estacion": "Servicentro San Juan - Heredia",
+      "hoja": "Mejoras",
+      "fila": 37,
+      "encabezados": [
+        "Estación de Servicio",
+        "Válvula",
+        "Cantidad",
+        "Mangueras",
+        "Material",
+        "Unidades"
+      ],
+      "valores": [
+        "Servicentro San Juan - Heredia",
+        "no",
+        "se requiere 1 ",
+        "si",
+        "Hule",
+        8.0
+      ]
+    },
+    {
+      "categoria": "mejoras",
+      "estacion": "Servicentro San Pablo de Heredia",
+      "hoja": "Mejoras",
+      "fila": 38,
+      "encabezados": [
+        "Estación de Servicio",
+        "Válvula",
+        "Cantidad",
+        "Mangueras",
+        "Material",
+        "Unidades"
+      ],
+      "valores": [
+        "Servicentro San Pablo de Heredia",
+        null,
+        null,
+        null,
+        null,
+        null
+      ]
+    },
+    {
+      "categoria": "mejoras",
+      "estacion": "Estación El Trapiche",
+      "hoja": "Mejoras",
+      "fila": 39,
+      "encabezados": [
+        "Estación de Servicio",
+        "Válvula",
+        "Cantidad",
+        "Mangueras",
+        "Material",
+        "Unidades"
+      ],
+      "valores": [
+        "Estación El Trapiche",
+        "si",
+        null,
+        "si",
+        "metalica",
+        null
+      ]
+    },
+    {
+      "categoria": "mejoras",
+      "estacion": "Trova Cajón",
+      "hoja": "Mejoras",
+      "fila": 40,
+      "encabezados": [
+        "Estación de Servicio",
+        "Válvula",
+        "Cantidad",
+        "Mangueras",
+        "Material",
+        "Unidades"
+      ],
+      "valores": [
+        "Trova Cajón",
+        null,
+        null,
+        null,
+        null,
+        null
+      ]
+    },
+    {
+      "categoria": "mejoras",
+      "estacion": "Trova Pérez",
+      "hoja": "Mejoras",
+      "fila": 41,
+      "encabezados": [
+        "Estación de Servicio",
+        "Válvula",
+        "Cantidad",
+        "Mangueras",
+        "Material",
+        "Unidades"
+      ],
+      "valores": [
+        "Trova Pérez",
+        null,
+        null,
+        null,
+        null,
+        null
+      ]
+    },
+    {
+      "categoria": "mejoras",
+      "estacion": "Conoco",
+      "hoja": "Mejoras",
+      "fila": 42,
+      "encabezados": [
+        "Estación de Servicio",
+        "Válvula",
+        "Cantidad",
+        "Mangueras",
+        "Material",
+        "Unidades"
+      ],
+      "valores": [
+        "Conoco",
+        "no",
+        "se requiere 1 ",
+        "si",
+        "Hule",
+        4.0
+      ]
+    },
+    {
+      "categoria": "mejoras",
+      "estacion": "Servicentro Chamú",
+      "hoja": "Mejoras",
+      "fila": 43,
+      "encabezados": [
+        "Estación de Servicio",
+        "Válvula",
+        "Cantidad",
+        "Mangueras",
+        "Material",
+        "Unidades"
+      ],
+      "valores": [
+        "Servicentro Chamú",
+        "no",
+        "se requiere 1 ",
+        "si",
+        "Metalica",
+        7.0
+      ]
+    },
+    {
+      "categoria": "mejoras",
+      "estacion": "Coopetarrazú",
+      "hoja": "Mejoras",
+      "fila": 44,
+      "encabezados": [
+        "Estación de Servicio",
+        "Válvula",
+        "Cantidad",
+        "Mangueras",
+        "Material",
+        "Unidades"
+      ],
+      "valores": [
+        "Coopetarrazú",
+        "no",
+        "se requiere 1 ",
+        "si",
+        "hule",
+        null
+      ]
+    },
+    {
+      "categoria": "mejoras",
+      "estacion": "Combustibles Coronado",
+      "hoja": "Mejoras",
+      "fila": 45,
+      "encabezados": [
+        "Estación de Servicio",
+        "Válvula",
+        "Cantidad",
+        "Mangueras",
+        "Material",
+        "Unidades"
+      ],
+      "valores": [
+        "Combustibles Coronado",
+        "no",
+        "se requiere 1 ",
+        "si",
+        "hule",
+        null
+      ]
+    },
+    {
+      "categoria": "mejoras",
+      "estacion": "Promotora Agroindustrial Samayco",
+      "hoja": "Mejoras",
+      "fila": 46,
+      "encabezados": [
+        "Estación de Servicio",
+        "Válvula",
+        "Cantidad",
+        "Mangueras",
+        "Material",
+        "Unidades"
+      ],
+      "valores": [
+        "Promotora Agroindustrial Samayco",
+        null,
+        null,
+        null,
+        null,
+        null
+      ]
+    },
+    {
+      "categoria": "mejoras",
+      "estacion": "Estación de Servicio Tucurrique S.A.",
+      "hoja": "Mejoras",
+      "fila": 47,
+      "encabezados": [
+        "Estación de Servicio",
+        "Válvula",
+        "Cantidad",
+        "Mangueras",
+        "Material",
+        "Unidades"
+      ],
+      "valores": [
+        "Estación de Servicio Tucurrique S.A.",
+        "si",
+        null,
+        "si",
+        "metalica",
+        null
+      ]
+    },
+    {
+      "categoria": "mejoras",
+      "estacion": "ECH Isla Grande Enríquez Chacón",
+      "hoja": "Mejoras",
+      "fila": 48,
+      "encabezados": [
+        "Estación de Servicio",
+        "Válvula",
+        "Cantidad",
+        "Mangueras",
+        "Material",
+        "Unidades"
+      ],
+      "valores": [
+        "ECH Isla Grande Enríquez Chacón",
+        "no",
+        "se requiere  1",
+        "si",
+        "hule",
+        10.0
+      ]
+    },
+    {
+      "categoria": "mejoras",
+      "estacion": "Eusse Tárcoles 20-ene",
+      "hoja": "Mejoras",
+      "fila": 49,
+      "encabezados": [
+        "Estación de Servicio",
+        "Válvula",
+        "Cantidad",
+        "Mangueras",
+        "Material",
+        "Unidades"
+      ],
+      "valores": [
+        "Eusse Tárcoles 20-ene",
+        null,
+        null,
+        null,
+        null,
+        null
+      ]
+    },
+    {
+      "categoria": "mejoras",
+      "estacion": "Tike Avenida 10 - La Castellana",
+      "hoja": "Mejoras",
+      "fila": 50,
+      "encabezados": [
+        "Estación de Servicio",
+        "Válvula",
+        "Cantidad",
+        "Mangueras",
+        "Material",
+        "Unidades"
+      ],
+      "valores": [
+        "Tike Avenida 10 - La Castellana",
+        "si",
+        null,
+        "si",
+        "metalica",
+        null
+      ]
+    },
+    {
+      "categoria": "mejoras",
+      "estacion": "Trova Aserri",
+      "hoja": "Mejoras",
+      "fila": 51,
+      "encabezados": [
+        "Estación de Servicio",
+        "Válvula",
+        "Cantidad",
+        "Mangueras",
+        "Material",
+        "Unidades"
+      ],
+      "valores": [
+        "Trova Aserri",
+        null,
+        null,
+        null,
+        null,
+        null
+      ]
+    },
+    {
+      "categoria": "mejoras",
+      "estacion": "Estación de Servicio La Lima - Zavillana",
+      "hoja": "Mejoras",
+      "fila": 52,
+      "encabezados": [
+        "Estación de Servicio",
+        "Válvula",
+        "Cantidad",
+        "Mangueras",
+        "Material",
+        "Unidades"
+      ],
+      "valores": [
+        "Estación de Servicio La Lima - Zavillana",
+        "no",
+        "se requiere 1 ",
+        "si",
+        "hule",
+        null
+      ]
+    },
+    {
+      "categoria": "mejoras",
+      "estacion": "Servicentro G24 Coyol",
+      "hoja": "Mejoras",
+      "fila": 53,
+      "encabezados": [
+        "Estación de Servicio",
+        "Válvula",
+        "Cantidad",
+        "Mangueras",
+        "Material",
+        "Unidades"
+      ],
+      "valores": [
+        "Servicentro G24 Coyol",
+        "si",
+        1.0,
+        "si",
+        "Metallica",
+        3.0
+      ]
+    },
+    {
+      "categoria": "mejoras",
+      "estacion": "Servicentro El Bosque",
+      "hoja": "Mejoras",
+      "fila": 54,
+      "encabezados": [
+        "Estación de Servicio",
+        "Válvula",
+        "Cantidad",
+        "Mangueras",
+        "Material",
+        "Unidades"
+      ],
+      "valores": [
+        "Servicentro El Bosque",
+        "si",
+        1.0,
+        "si",
+        "Metallica",
+        6.0
+      ]
+    },
+    {
+      "categoria": "mejoras",
+      "estacion": "Servicentro Cerro Cortes",
+      "hoja": "Mejoras",
+      "fila": 55,
+      "encabezados": [
+        "Estación de Servicio",
+        "Válvula",
+        "Cantidad",
+        "Mangueras",
+        "Material",
+        "Unidades"
+      ],
+      "valores": [
+        "Servicentro Cerro Cortes",
+        "no",
+        "se requiere 1 ",
+        "si",
+        "Metalica",
+        4.0
+      ]
+    },
+    {
+      "categoria": "mejoras",
+      "estacion": "Gasolinera La Cristalina",
+      "hoja": "Mejoras",
+      "fila": 56,
+      "encabezados": [
+        "Estación de Servicio",
+        "Válvula",
+        "Cantidad",
+        "Mangueras",
+        "Material",
+        "Unidades"
+      ],
+      "valores": [
+        "Gasolinera La Cristalina",
+        "no",
+        "se requiere 1 ",
+        "si",
+        "Metalica",
+        4.0
+      ]
+    },
+    {
+      "categoria": "mejoras",
+      "estacion": "GSC Florencia",
+      "hoja": "Mejoras",
+      "fila": 57,
+      "encabezados": [
+        "Estación de Servicio",
+        "Válvula",
+        "Cantidad",
+        "Mangueras",
+        "Material",
+        "Unidades"
+      ],
+      "valores": [
+        "GSC Florencia",
+        "no",
+        "se requiere 1 ",
+        "si",
+        "Hule",
+        8.0
+      ]
+    },
+    {
+      "categoria": "mejoras",
+      "estacion": "Servicentro G24 Guachipelín",
+      "hoja": "Mejoras",
+      "fila": 58,
+      "encabezados": [
+        "Estación de Servicio",
+        "Válvula",
+        "Cantidad",
+        "Mangueras",
+        "Material",
+        "Unidades"
+      ],
+      "valores": [
+        "Servicentro G24 Guachipelín",
+        null,
+        null,
+        null,
+        null,
+        null
+      ]
+    },
+    {
+      "categoria": "mejoras",
+      "estacion": "GS La Colonia No se ha hecho el mantenimiento a petición de Tomza",
+      "hoja": "Mejoras",
+      "fila": 59,
+      "encabezados": [
+        "Estación de Servicio",
+        "Válvula",
+        "Cantidad",
+        "Mangueras",
+        "Material",
+        "Unidades"
+      ],
+      "valores": [
+        "GS La Colonia No se ha hecho el mantenimiento a petición de Tomza",
+        null,
+        null,
+        null,
+        null,
+        null
+      ]
+    },
+    {
+      "categoria": "mejoras",
+      "estacion": "Trova Zapote estación cerrada por remodelación",
+      "hoja": "Mejoras",
+      "fila": 60,
+      "encabezados": [
+        "Estación de Servicio",
+        "Válvula",
+        "Cantidad",
+        "Mangueras",
+        "Material",
+        "Unidades"
+      ],
+      "valores": [
+        "Trova Zapote estación cerrada por remodelación",
+        null,
+        null,
+        null,
+        null,
+        null
+      ]
+    },
+    {
+      "categoria": "mejoras",
+      "estacion": "Eusse  Barranca",
+      "hoja": "Mejoras",
+      "fila": 61,
+      "encabezados": [
+        "Estación de Servicio",
+        "Válvula",
+        "Cantidad",
+        "Mangueras",
+        "Material",
+        "Unidades"
+      ],
+      "valores": [
+        "Eusse  Barranca",
+        "no",
+        "se requiere 1 ",
+        "si",
+        "Hule",
+        2.0
+      ]
+    },
+    {
+      "categoria": "mejoras",
+      "estacion": "M&S Guapiles",
+      "hoja": "Mejoras",
+      "fila": 62,
+      "encabezados": [
+        "Estación de Servicio",
+        "Válvula",
+        "Cantidad",
+        "Mangueras",
+        "Material",
+        "Unidades"
+      ],
+      "valores": [
+        "M&S Guapiles",
+        "Ingnova",
+        null,
+        null,
+        null,
+        null
+      ]
+    },
+    {
+      "categoria": "mejoras",
+      "estacion": "Jaco",
+      "hoja": "Mejoras",
+      "fila": 63,
+      "encabezados": [
+        "Estación de Servicio",
+        "Válvula",
+        "Cantidad",
+        "Mangueras",
+        "Material",
+        "Unidades"
+      ],
+      "valores": [
+        "Jaco",
+        "Ingnova",
+        null,
+        null,
+        null,
+        null
+      ]
+    },
+    {
+      "categoria": "mejoras",
+      "estacion": "El Ceibo",
+      "hoja": "Mejoras",
+      "fila": 64,
+      "encabezados": [
+        "Estación de Servicio",
+        "Válvula",
+        "Cantidad",
+        "Mangueras",
+        "Material",
+        "Unidades"
+      ],
+      "valores": [
+        "El Ceibo",
+        "Ingnova",
+        null,
+        null,
+        null,
+        null
+      ]
+    },
+    {
+      "categoria": "mejoras",
+      "estacion": "Santa Clara",
+      "hoja": "Mejoras",
+      "fila": 65,
+      "encabezados": [
+        "Estación de Servicio",
+        "Válvula",
+        "Cantidad",
+        "Mangueras",
+        "Material",
+        "Unidades"
+      ],
+      "valores": [
+        "Santa Clara",
+        "Ingnova",
+        null,
+        null,
+        null,
+        null
+      ]
+    },
+    {
+      "categoria": "mejoras",
+      "estacion": "Raúl Molina",
+      "hoja": "Mejoras",
+      "fila": 66,
+      "encabezados": [
+        "Estación de Servicio",
+        "Válvula",
+        "Cantidad",
+        "Mangueras",
+        "Material",
+        "Unidades"
+      ],
+      "valores": [
+        "Raúl Molina",
+        "Ingnova",
+        null,
+        null,
+        null,
+        null
+      ]
+    },
+    {
+      "categoria": "mejoras",
+      "estacion": "Mayecasi",
+      "hoja": "Mejoras",
+      "fila": 67,
+      "encabezados": [
+        "Estación de Servicio",
+        "Válvula",
+        "Cantidad",
+        "Mangueras",
+        "Material",
+        "Unidades"
+      ],
+      "valores": [
+        "Mayecasi",
+        "si",
+        1.0,
+        "si",
+        "Metallica/Hule",
+        "2 Metallicas/1 de Hule"
+      ]
+    }
+  ],
+  "omitidas": [
+    {
+      "hoja": "Seguimiento",
+      "fila": 16,
+      "motivo": "Sin estación",
+      "valores": [
+        null,
+        null,
+        "FINALIZADO",
+        null,
+        null
+      ]
+    },
+    {
+      "hoja": "Seguimiento",
+      "fila": 17,
+      "motivo": "Sin estación",
+      "valores": [
+        null,
+        null,
+        "FINALIZADO",
+        null,
+        null
+      ]
+    },
+    {
+      "hoja": "Seguimiento",
+      "fila": 18,
+      "motivo": "Sin estación",
+      "valores": [
+        null,
+        null,
+        "FINALIZADO",
+        null,
+        null
+      ]
+    },
+    {
+      "hoja": "Seguimiento",
+      "fila": 19,
+      "motivo": "Sin estación",
+      "valores": [
+        null,
+        null,
+        "FINALIZADO",
+        null,
+        null
+      ]
+    },
+    {
+      "hoja": "Seguimiento",
+      "fila": 20,
+      "motivo": "Sin estación",
+      "valores": [
+        null,
+        null,
+        "FINALIZADO",
+        null,
+        null
+      ]
+    },
+    {
+      "hoja": "Seguimiento",
+      "fila": 21,
+      "motivo": "Sin estación",
+      "valores": [
+        null,
+        null,
+        "FINALIZADO",
+        null,
+        null
+      ]
+    },
+    {
+      "hoja": "Seguimiento",
+      "fila": 22,
+      "motivo": "Sin estación",
+      "valores": [
+        null,
+        null,
+        "FINALIZADO",
+        null,
+        null
+      ]
+    },
+    {
+      "hoja": "Seguimiento",
+      "fila": 23,
+      "motivo": "Sin estación",
+      "valores": [
+        null,
+        null,
+        "FINALIZADO",
+        null,
+        null
+      ]
+    },
+    {
+      "hoja": "Seguimiento",
+      "fila": 24,
+      "motivo": "Sin estación",
+      "valores": [
+        null,
+        null,
+        "FINALIZADO",
+        null,
+        null
+      ]
+    },
+    {
+      "hoja": "Seguimiento",
+      "fila": 25,
+      "motivo": "Sin estación",
+      "valores": [
+        null,
+        null,
+        "FINALIZADO",
+        null,
+        null
+      ]
+    },
+    {
+      "hoja": "Seguimiento",
+      "fila": 26,
+      "motivo": "Sin estación",
+      "valores": [
+        null,
+        null,
+        "FINALIZADO",
+        null,
+        null
+      ]
+    },
+    {
+      "hoja": "Seguimiento",
+      "fila": 27,
+      "motivo": "Sin estación",
+      "valores": [
+        null,
+        null,
+        "FINALIZADO",
+        null,
+        null
+      ]
+    },
+    {
+      "hoja": "Seguimiento",
+      "fila": 28,
+      "motivo": "Sin estación",
+      "valores": [
+        null,
+        null,
+        "FINALIZADO",
+        null,
+        null
+      ]
+    },
+    {
+      "hoja": "Seguimiento",
+      "fila": 29,
+      "motivo": "Sin estación",
+      "valores": [
+        null,
+        null,
+        "FINALIZADO",
+        null,
+        null
+      ]
+    },
+    {
+      "hoja": "Seguimiento",
+      "fila": 30,
+      "motivo": "Sin estación",
+      "valores": [
+        null,
+        null,
+        "FINALIZADO",
+        null,
+        null
+      ]
+    },
+    {
+      "hoja": "Seguimiento",
+      "fila": 31,
+      "motivo": "Sin estación",
+      "valores": [
+        null,
+        null,
+        "FINALIZADO",
+        null,
+        null
+      ]
+    },
+    {
+      "hoja": "Seguimiento",
+      "fila": 32,
+      "motivo": "Sin estación",
+      "valores": [
+        null,
+        null,
+        "FINALIZADO",
+        null,
+        null
+      ]
+    },
+    {
+      "hoja": "Seguimiento",
+      "fila": 33,
+      "motivo": "Sin estación",
+      "valores": [
+        null,
+        null,
+        "FINALIZADO",
+        null,
+        null
+      ]
+    },
+    {
+      "hoja": "Seguimiento",
+      "fila": 34,
+      "motivo": "Sin estación",
+      "valores": [
+        null,
+        null,
+        "FINALIZADO",
+        null,
+        null
+      ]
+    },
+    {
+      "hoja": "Seguimiento",
+      "fila": 35,
+      "motivo": "Sin estación",
+      "valores": [
+        null,
+        null,
+        "FINALIZADO",
+        null,
+        null
+      ]
+    },
+    {
+      "hoja": "Seguimiento",
+      "fila": 36,
+      "motivo": "Sin estación",
+      "valores": [
+        null,
+        null,
+        "FINALIZADO",
+        null,
+        null
+      ]
+    },
+    {
+      "hoja": "Seguimiento",
+      "fila": 37,
+      "motivo": "Sin estación",
+      "valores": [
+        null,
+        null,
+        "FINALIZADO",
+        null,
+        null
+      ]
+    },
+    {
+      "hoja": "Seguimiento",
+      "fila": 38,
+      "motivo": "Sin estación",
+      "valores": [
+        null,
+        null,
+        "FINALIZADO",
+        null,
+        null
+      ]
+    },
+    {
+      "hoja": "Seguimiento",
+      "fila": 39,
+      "motivo": "Sin estación",
+      "valores": [
+        null,
+        null,
+        "FINALIZADO",
+        null,
+        null
+      ]
+    },
+    {
+      "hoja": "Seguimiento",
+      "fila": 40,
+      "motivo": "Sin estación",
+      "valores": [
+        null,
+        null,
+        "FINALIZADO",
+        null,
+        null
+      ]
+    },
+    {
+      "hoja": "Seguimiento",
+      "fila": 41,
+      "motivo": "Sin estación",
+      "valores": [
+        null,
+        null,
+        "FINALIZADO",
+        null,
+        null
+      ]
+    },
+    {
+      "hoja": "Seguimiento",
+      "fila": 42,
+      "motivo": "Sin estación",
+      "valores": [
+        null,
+        null,
+        "FINALIZADO",
+        null,
+        null
+      ]
+    },
+    {
+      "hoja": "Seguimiento",
+      "fila": 43,
+      "motivo": "Sin estación",
+      "valores": [
+        null,
+        null,
+        "FINALIZADO",
+        null,
+        null
+      ]
+    },
+    {
+      "hoja": "Seguimiento",
+      "fila": 44,
+      "motivo": "Sin estación",
+      "valores": [
+        null,
+        null,
+        "FINALIZADO",
+        null,
+        null
+      ]
+    },
+    {
+      "hoja": "Seguimiento",
+      "fila": 45,
+      "motivo": "Sin estación",
+      "valores": [
+        null,
+        null,
+        "FINALIZADO",
+        null,
+        null
+      ]
+    }
+  ]
+}

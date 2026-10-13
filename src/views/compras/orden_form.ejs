@@ -152,6 +152,8 @@
 <body>
 <%
   const esEdicion = !!orden;
+  const carburacion = typeof esCarburacion !== 'undefined' && esCarburacion;
+  const clientesOrden = carburacion && typeof clientes !== 'undefined' ? clientes : [];
   const safeOrden = orden || {};
   const lineasIniciales = Array.isArray(lineas) ? lineas : [];
   const fechaOrden = safeOrden.fecha ? new Date(safeOrden.fecha).toLocaleDateString('es-CR') : new Date().toLocaleDateString('es-CR');
@@ -192,6 +194,10 @@
           </select>
         </div>
         <div class="col-md-3">
+          <% if (typeof esCarburacion !== 'undefined' && esCarburacion) { %>
+          <label for="numero_cotizacion">Número de cotización</label>
+          <input id="numero_cotizacion" type="text" name="numero_cotizacion" maxlength="100" class="form-control mb-2" value="<%= safeOrden.numero_cotizacion || '' %>">
+          <% } %>
           <label>Forma de pago</label>
           <input type="text" name="forma_pago" class="form-control" placeholder="crédito, contado, etc." value="<%= safeOrden.forma_pago || '' %>">
         </div>
@@ -213,31 +219,39 @@
           </select>
         </div>
         <div class="col-md-3">
-          <label>Placa / general de orden</label>
+          <label><%= carburacion ? 'Cliente' : 'Placa / general de orden' %></label>
+          <% if (carburacion) { %>
+          <select name="cliente_id" id="clienteOrden" class="form-select">
+            <option value="">Seleccione un cliente</option>
+            <% clientesOrden.forEach(c => { %><option value="<%= c.id %>" <%= Number(safeOrden.cliente_id) === Number(c.id) || safeOrden.placa_unidad === c.nombre ? 'selected' : '' %>><%= c.nombre %></option><% }) %>
+          </select>
+          <% } else { %>
           <input
             type="text"
             name="placa_unidad"
             class="form-control text-uppercase"
-            placeholder="Placa, GENERAL o ACEITES"
+            placeholder="<%= carburacion ? 'Nombre del cliente' : 'Placa, GENERAL o ACEITES' %>"
             value="<%= safeOrden.placa_unidad || '' %>"
             data-placa-autocomplete
             data-placa-mode="placa"
             data-placa-allow-free="true"
             data-placa-allow-general="true"
           >
+          <% } %>
         </div>
         <div class="col-md-2">
-          <label>Tipo mantenimiento</label>
+          <label><%= carburacion ? 'Área' : 'Tipo mantenimiento' %></label>
+          <% if (carburacion) { %><div class="form-control-plaintext">Carburación</div><% } else { %>
           <select name="tipo_mantenimiento" class="form-select">
             <option value="CORRECTIVO" <%= (safeOrden.tipo_mantenimiento || 'CORRECTIVO') === 'CORRECTIVO' ? 'selected' : '' %>>Correctivo</option>
             <option value="PREVENTIVO" <%= safeOrden.tipo_mantenimiento === 'PREVENTIVO' ? 'selected' : '' %>>Preventivo</option>
             <option value="SUMINISTROS" <%= safeOrden.tipo_mantenimiento === 'SUMINISTROS' ? 'selected' : '' %>>Suministros</option>
           </select>
-          <div class="form-text" data-tipo-mantenimiento-detectado>Se detecta por descripción/observación.</div>
+          <div class="form-text" data-tipo-mantenimiento-detectado>Se detecta por descripción/observación.</div><% } %>
         </div>
         <div class="col-md-2 d-flex align-items-end">
           <div class="small text-muted">
-            Use una placa para compras de unidad, <strong>GENERAL TALLER</strong> para taller, <strong>GENERAL GASTOS</strong> para gastos generales o <strong>ACEITES</strong> para compras de aceites.
+            <% if (carburacion) { %>Indique la referencia de la compra de Carburación.<% } else { %>Use una placa para compras de unidad, <strong>GENERAL TALLER</strong> para taller, <strong>GENERAL GASTOS</strong> para gastos generales o <strong>ACEITES</strong> para compras de aceites.<% } %>
           </div>
         </div>
       </div>
@@ -256,7 +270,7 @@
             <col class="col-accion">
           </colgroup>
           <thead>
-            <tr><th>Placa</th><th>Código</th><th>Descripción</th><th>Cantidad</th><th>Precio unitario</th><th>Subtotal</th><th></th></tr>
+            <tr><th><%= carburacion ? 'Cliente' : 'Placa' %></th><th>Código</th><th>Descripción</th><th>Cantidad</th><th>Precio unitario</th><th>Subtotal</th><th></th></tr>
           </thead>
           <tbody>
             <!-- Las filas se agregarán dinámicamente -->
@@ -292,6 +306,7 @@
         <textarea name="observaciones" class="form-control" rows="2"><%= safeOrden.observaciones || '' %></textarea>
       </div>
 
+      <% if (!carburacion) { %>
       <div class="mb-3 quote-box">
         <label class="form-label fw-semibold">Cotización adjunta</label>
         <% if (safeOrden.cotizacion_archivo) { %>
@@ -316,6 +331,7 @@
         </div>
       </div>
 
+      <% } %>
       <div class="order-actions">
         <button type="button" class="btn btn-secondary" id="addRowBtn"><i class="bi bi-plus-circle"></i> Agregar línea</button>
         <button type="submit" class="btn btn-primary"><%= textoBotonGuardar %></button>
@@ -325,16 +341,23 @@
   </div>
 </div>
 
-<script src="/js/placa-search.js?v=20260811-3"></script>
+<% if (!carburacion) { %><script src="/js/placa-search.js?v=20260811-3"></script><% } %>
 <script>
   let rowIndex = 0;
   const lineasIniciales = <%- JSON.stringify(lineasIniciales) %>;
+  const clientesOrden = <%- JSON.stringify(clientesOrden).replace(/</g, '\\u003c') %>;
+  document.getElementById('clienteOrden')?.addEventListener('change', event => {
+    const cliente = clientesOrden.find(c => String(c.id) === event.target.value);
+    if (cliente) document.querySelectorAll('[data-cliente-linea]').forEach(select => {
+      if (!select.value) select.value = cliente.nombre;
+    });
+  });
 
   function addRow(linea = {}) {
     const tbody = document.querySelector("#itemsTable tbody");
     const newRow = document.createElement("tr");
     newRow.innerHTML = `
-      <td data-label="Placa"><input type="text" name="lineas[${rowIndex}][codigo]" class="form-control text-uppercase" placeholder="Placa, GENERAL o ACEITES" data-placa-autocomplete data-placa-mode="placa" data-placa-allow-free="true" data-placa-allow-general="true"></td>
+      <td data-label="<%= carburacion ? 'Cliente' : 'Placa' %>"><% if(carburacion){ %><select name="lineas[${rowIndex}][codigo]" class="form-select" data-cliente-linea><option value="">Seleccione un cliente</option></select><% } else { %><input type="text" name="lineas[${rowIndex}][codigo]" class="form-control text-uppercase" placeholder="Placa, GENERAL o ACEITES" data-placa-autocomplete data-placa-mode="placa" data-placa-allow-free="true" data-placa-allow-general="true"><% } %></td>
       <td data-label="Código"><input type="text" name="lineas[${rowIndex}][codigo_producto]" class="form-control text-uppercase" placeholder="Código"></td>
       <td data-label="Descripción"><textarea name="lineas[${rowIndex}][descripcion]" class="form-control" rows="3" required></textarea></td>
       <td data-label="Cantidad"><input type="number" name="lineas[${rowIndex}][cantidad]" class="form-control cantidad" value="1" step="0.01"></td>
@@ -343,6 +366,12 @@
       <td data-label="Quitar"><button type="button" class="btn btn-danger btn-sm removeRow" title="Quitar línea"><i class="bi bi-x-lg"></i></button></td>
     `;
     tbody.appendChild(newRow);
+    const selectorCliente = newRow.querySelector('[data-cliente-linea]');
+    if (selectorCliente) {
+      clientesOrden.forEach(c => selectorCliente.add(new Option(c.nombre,c.nombre)));
+      const cliente = clientesOrden.find(c => String(c.id) === document.getElementById('clienteOrden').value);
+      if (!linea.codigo && cliente) linea = {...linea,codigo:cliente.nombre};
+    }
     newRow.querySelector(`[name="lineas[${rowIndex}][codigo]"]`).value = linea.codigo || '';
     newRow.querySelector(`[name="lineas[${rowIndex}][codigo_producto]"]`).value = linea.codigo_producto || '';
     newRow.querySelector(`[name="lineas[${rowIndex}][descripcion]"]`).value = linea.descripcion || '';
@@ -539,11 +568,13 @@
   } else {
     addRow();
   }
+  <% if (!carburacion) { %>
   document.addEventListener("DOMContentLoaded", () => {
     const script = document.createElement("script");
     script.src = "/js/tipo-mantenimiento.js";
     document.body.appendChild(script);
   });
+<% } %>
 </script>
 </body>
 </html>

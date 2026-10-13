@@ -46,9 +46,28 @@ test("administra carnets y no expone el hash del PIN", async () => {
     assert.match(html, /data:image\/png;base64,/);
     assert.match(html, new RegExp(`data-token="${token}"`));
     assert.match(html, /Crear acceso y carnet/);
+    assert.match(html, /Ver carnet/);
+    assert.match(html, /Buscar por nombre, cédula o código de trabajador/);
     assert.match(html, /Jefatura de Taller/);
     assert.doesNotMatch(html, /pin_hash/i);
   });
+});
+
+test('ADMIN busca carnets por nombre, cédula o código con parámetros',async()=>{
+  let consultado=false;
+  await withServer(async(sql,args)=>{
+    if(sql.includes('FROM carnets_trabajador')){consultado=true;assert.match(sql,/persona_nombre LIKE \? OR uc.cedula LIKE \? OR uc.codigo_trabajador LIKE \?/);assert.deepEqual(args,['%Zamora%','%Zamora%','%Zamora%']);return [[]];}
+    return [[]];
+  },'ADMIN',async base=>{
+    const response=await fetch(base+'/admin/carnets-trabajadores?buscar=Zamora');assert.equal(response.status,200);assert.match(await response.text(),/No hay carnets para mostrar con esa búsqueda/);assert.ok(consultado);
+  });
+});
+
+test('el acceso a carnets desde Carburación aparece únicamente al administrador',async()=>{
+ const ejs=require('ejs');const template=path.join(__dirname,'../src/views/carburacion/header.ejs');
+ const admin=await ejs.renderFile(template,{user:{rol:'ADMIN'},carburacionPath:'/carburacion/dashboard'});
+ assert.match(admin,/href="\/admin\/carnets-trabajadores"/);
+ for(const rol of ['CARBURACION_GESTOR','PROVEEDURIA_TALLER'])assert.doesNotMatch(await ejs.renderFile(template,{user:{rol},carburacionPath:'/carburacion/dashboard'}),/\/admin\/carnets-trabajadores/);
 });
 
 test("ADMIN crea acceso con código-PIN, perfiles y carnet QR en una transacción", async () => {
@@ -140,6 +159,21 @@ test("rechaza el panel de carnets para perfiles que no son admin", async () => {
     const response = await fetch(`${base}/admin/carnets-trabajadores`);
     assert.equal(response.status, 403);
   });
+});
+
+test('crea solo el carnet cuando existe acceso y reutiliza el carnet existente',async()=>{
+ const original=pool.getConnection;let existe=false,inserts=0;const session={user:{id:1,rol:'ADMIN'}};
+ pool.getConnection=async()=>({beginTransaction:async()=>{},commit:async()=>{},rollback:async()=>{},release(){},query:async(sql,args)=>{
+  if(sql.includes('FROM usuario_cedulas WHERE cedula'))return [[{cedula:'206770080',persona_nombre:'José Luis'}]];
+  if(sql.includes('SELECT qr_token FROM carnets_trabajador'))return [existe?[{qr_token:'a'.repeat(64)}]:[]];
+  assert.match(sql,/^INSERT INTO carnets_trabajador/);assert.equal(args[0],'206770080');assert.match(args[1],/^[a-f0-9]{64}$/);inserts++;existe=true;return [{affectedRows:1}];
+ }});
+ const app=express();app.use(express.urlencoded({extended:true}));app.use((req,res,next)=>{req.session=session;next();});app.use(carnetsRoutes);const listener=app.listen(0,'127.0.0.1');await new Promise(r=>listener.once('listening',r));
+ try{
+  const url=`http://127.0.0.1:${listener.address().port}/admin/carnets-trabajadores`;
+  for(let i=0;i<2;i++){const response=await fetch(url,{method:'POST',redirect:'manual',body:new URLSearchParams({cedula:'2-0677-0080'})});assert.equal(response.status,302);assert.equal(response.headers.get('location'),'/admin/carnets-trabajadores?buscar=206770080');assert.equal(session.accesoCarnetError,undefined);}
+  assert.equal(inserts,1);assert.match(session.accesoCarnetMensaje,/ya está registrado/);
+ }finally{pool.getConnection=original;await new Promise(r=>listener.close(r));}
 });
 
 test("descarga un carnet individual como PDF y adjunto", async () => {

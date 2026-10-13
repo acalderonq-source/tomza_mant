@@ -2,7 +2,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const { DEPARTAMENTOS, departamentosInicialesPorRol, departamentosPermitidosPorRol, esDepartamentoValido, rutaPerteneceATaller, puedeAbrirRutaPorDepartamento, ensurePortalDepartmentSchema } = require("../src/utils/departamentos");
 
-test("el portal ofrece los siete departamentos previstos", () => {
+test("el portal ofrece los ocho departamentos previstos", () => {
   assert.deepEqual(DEPARTAMENTOS.map(item => item.key), [
     "TALLER",
     "OPERACIONES",
@@ -10,7 +10,8 @@ test("el portal ofrece los siete departamentos previstos", () => {
     "SEGURIDAD_OCUPACIONAL",
     "LOGISTICA",
     "PROVEEDURIA",
-    "RECURSOS_HUMANOS"
+    "RECURSOS_HUMANOS",
+    "CARBURACION"
   ]);
 });
 
@@ -72,6 +73,8 @@ test("los módulos de Taller se identifican por ruta sin confundir rutas similar
   assert.equal(puedeAbrirRutaPorDepartamento("PROVEEDURIA", "/mantenimientos"), false);
   assert.equal(puedeAbrirRutaPorDepartamento("OPERACIONES", "/dashboard"), true);
   assert.equal(puedeAbrirRutaPorDepartamento("TALLER", "/mantenimientos"), true);
+  assert.equal(puedeAbrirRutaPorDepartamento("CARBURACION", "/taller/dashboard", "PROVEEDURIA_TALLER"), false);
+  assert.equal(puedeAbrirRutaPorDepartamento("CARBURACION", "/compras/facturas", "ADMIN"), false);
 });
 
 test("el primer arranque deja todos los usuarios actuales en Taller y no repite la normalización", async () => {

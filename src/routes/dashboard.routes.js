@@ -2353,6 +2353,10 @@ router.get("/", async (req, res) => {
       return res.redirect("/login");
     }
 
+    if (req.session.user.departamentoActivo === "CARBURACION") {
+      return res.redirect("/carburacion/dashboard");
+    }
+
     // =========================
     // FECHA HOY
     // =========================

@@ -199,6 +199,11 @@ app.use(ensureCsrfToken);
 app.use(async (req, _res, next) => {
   const user = req.session.user;
   if (!user) return next();
+  if (user.departamentoIngreso === "CARBURACION") {
+    user.departamentos = ["CARBURACION"];
+    user.departamentoActivo = "CARBURACION";
+    return next();
+  }
   if (String(user.rol || "").toUpperCase() === "ADMIN") {
     user.departamentos = departamentosPermitidosPorRol(user.rol);
     user.departamentoActivo = user.departamentos.includes(user.departamentoActivo)
@@ -386,6 +391,7 @@ app.use("/minae", minaeRoutes);
 app.use("/aresep", aresepRoutes);
 app.use("/compras/facturas/correo", facturasCorreoRoutes);
 app.use("/compras", comprasRoutes);
+app.use("/carburacion", require("./routes/carburacion.routes"));
 app.use("/llantas", llantasRoutes);
 app.use("/notificaciones", notificacionesRoutes);
 app.use("/ia", iaRoutes);

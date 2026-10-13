@@ -1,0 +1,85 @@
+<% const gestionarFinanzas=typeof puedeModificarFinanzas==='undefined' || puedeModificarFinanzas; %>
+<%
+const listaParams=new URLSearchParams();Object.entries(filtros).forEach(([k,v])=>{if(v!=='' && v!=null)listaParams.set(k,String(v));});listaParams.set('pagina',String(paginacion.pagina));
+const returnToFacturas='/carburacion/facturas?'+listaParams.toString();
+const paginaUrl=page=>{const params=new URLSearchParams(listaParams);params.set('pagina',page);return '/carburacion/facturas?'+params.toString();};
+%>
+<%- include('finanzas_header',{titulo:'Gestión de facturas',agregarUrl:'/carburacion/facturas/nueva?return_to='+encodeURIComponent(returnToFacturas)}) %>
+<!-- Filtros -->
+  <div class="filtros-card">
+    <h5 class="mb-3 fw-semibold"><i class="bi bi-funnel me-2"></i>Filtrar facturas</h5>
+    <form method="GET" action="/carburacion/facturas" class="row g-3">
+      <div class="col-md-2">
+        <label class="form-label small fw-semibold">Proveedor</label>
+        <input type="text" class="form-control form-control-sm provider-search mb-1" data-provider-target="proveedorFiltroSelect" placeholder="Buscar por letra, ej: L">
+        <select name="proveedor_id" id="proveedorFiltroSelect" class="form-select form-select-sm">
+          <option value="">Todos</option>
+          <% proveedores.forEach(p => { %>
+            <option value="<%= p.id %>" data-provider-name="<%= p.nombre %>" <%= filtros.proveedor_id == p.id ? 'selected' : '' %>><%= p.nombre %></option>
+          <% }) %>
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label small fw-semibold">Fecha desde</label>
+        <input type="date" name="fecha_desde" class="form-control form-control-sm" value="<%= filtros.fecha_desde || '' %>">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label small fw-semibold">Fecha hasta</label>
+        <input type="date" name="fecha_hasta" class="form-control form-control-sm" value="<%= filtros.fecha_hasta || '' %>">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label small fw-semibold">Estado de pago</label>
+        <select name="pagada" class="form-select form-select-sm">
+          <option value="">Todos</option>
+          <option value="1" <%= filtros.pagada == '1' ? 'selected' : '' %>>Pagadas</option>
+          <option value="0" <%= filtros.pagada == '0' ? 'selected' : '' %>>Pendientes</option>
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label small fw-semibold">Periodo cierre</label>
+        <input type="month" name="periodo_cierre" class="form-control form-control-sm" value="<%= filtros.periodo_cierre || '' %>">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label small fw-semibold">Solo vencidas</label>
+        <select name="vencida" class="form-select form-select-sm">
+          <option value="">No</option>
+          <option value="1" <%= filtros.vencida == '1' ? 'selected' : '' %>>Sí</option>
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label small fw-semibold">Orden</label>
+        <select name="orden" class="form-select form-select-sm">
+          <option value="asc" <%= filtros.orden === 'asc' ? 'selected' : '' %>>Más antigua primero</option>
+          <option value="desc" <%= filtros.orden === 'desc' || !filtros.orden ? 'selected' : '' %>>Más reciente primero</option>
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label small fw-semibold">Por página</label>
+        <select name="por_pagina" class="form-select form-select-sm">
+          <% [50, 100, 150, 300].forEach(size => { %>
+            <option value="<%= size %>" <%= Number(paginacion.porPagina) === size ? 'selected' : '' %>><%= size %> registros</option>
+          <% }) %>
+        </select>
+      </div>
+      <div class="col-md-3"><label class="form-label small fw-semibold" for="buscar">Factura, orden o cliente</label><input name="buscar" id="buscar" class="form-control form-control-sm" value="<%= filtros.buscar %>"></div>
+<div class="col-md-3"><label class="form-label small fw-semibold" for="origen">Origen</label><select name="origen" id="origen" class="form-select form-select-sm"><option value="">Todas</option><option value="orden" <%= filtros.origen==='orden'?'selected':'' %>>Con orden</option><option value="independiente" <%= filtros.origen==='independiente'?'selected':'' %>>Sin orden</option></select></div>
+<div class="col-md-1 d-flex align-items-end">
+        <button type="submit" class="btn btn-primary btn-sm w-100">Filtrar</button>
+      </div>
+      <div class="col-md-1 d-flex align-items-end">
+        <a href="/carburacion/facturas" class="btn btn-secondary btn-sm w-100">Limpiar</a>
+      </div>
+    </form>
+  </div>
+
+
+<div class="summary-grid"><div class="summary-card"><div class="summary-label">Mostrando</div><div class="summary-value"><%= paginacion.desde %>-<%= paginacion.hasta %></div><div class="small text-muted">de <%= paginacion.total %> factura(s)</div></div>
+<% resumen.forEach(r=>{ %><% [['Monto original',r.total],['Pagado',r.pagado],['Saldo pendiente',r.saldo]].forEach(item=>{ %><div class="summary-card"><div class="summary-label"><%= item[0] %> · <%= r.moneda %></div><div class="summary-value"><%= money(item[1],r.moneda) %></div></div><% }); }); %></div>
+
+<section class="card p-3 facturas-list-card"><form method="GET" action="/carburacion/facturas/pago"><input type="hidden" name="return_to" value="<%= returnToFacturas %>">
+<div class="facturas-list-toolbar d-flex justify-content-between align-items-center gap-2 flex-wrap"><div><strong>Facturas registradas</strong><div class="small text-secondary"><%= gestionarFinanzas?"Seleccione facturas del mismo proveedor y moneda para pagar o abonar.":"Acceso de consulta: puede filtrar y descargar documentos." %></div></div><div class="d-flex gap-2 flex-wrap"><a href="/carburacion/facturas/historial-pagos?return_to=<%= encodeURIComponent(returnToFacturas) %>" class="btn btn-outline-success btn-sm"><i class="bi bi-clock-history"></i> Historial de pagos</a><a href="/carburacion/facturas/configuracion-correo?return_to=<%= encodeURIComponent(returnToFacturas) %>" class="btn btn-outline-secondary btn-sm"><i class="bi bi-envelope"></i> Correos de pagos</a><% if(gestionarFinanzas){ %><button class="btn btn-success btn-sm" type="submit"><i class="bi bi-cash-stack"></i> Pagar seleccionadas</button><% } %></div></div>
+<div class="table-scroll"><table class="table table-hover table-facturas mb-0"><thead><tr><th>Seleccionar</th><th>Orden</th><th>Factura</th><th>Proveedor</th><th>Cliente</th><th>Fecha</th><th>Vence</th><th>Periodo cierre</th><th>Total</th><th>Pagado</th><th>Saldo</th><th>Estado</th><th>Archivo</th></tr></thead><tbody>
+<% facturas.forEach(f => { const pagada=Number(f.pagado)>=Number(f.total); const vencida=!pagada && fecha(f.vencimiento)<hoy; %><tr><td><% if (gestionarFinanzas && !pagada) { %><input type="checkbox" class="form-check-input" name="facturas_ids" value="<%= f.id %>" aria-label="Seleccionar factura <%= f.numero %>"><% } %></td><td><%= f.po_numero || 'Sin orden' %></td><td><strong><%= f.numero %></strong></td><td><%= f.proveedor_nombre %></td><td><%= f.cliente || '—' %></td><td class="text-nowrap"><%= fecha(f.fecha) %></td><td class="text-nowrap"><%= fecha(f.vencimiento) %></td><td><%= f.periodo_cierre || '—' %></td><td class="text-nowrap"><%= money(f.total,f.moneda) %></td><td class="text-nowrap"><%= money(f.pagado,f.moneda) %></td><td class="text-nowrap fw-bold"><%= money(Number(f.total)-Number(f.pagado),f.moneda) %></td><td><span class="badge <%= pagada?'badge-pagada':vencida?'badge-vencida':'badge-pendiente' %>"><%= pagada?'Pagada':vencida?'Vencida':'Pendiente' %></span></td><td><% if(f.archivo_nombre){ %><a href="/carburacion/facturas/<%= f.id %>/archivo">Descargar</a><% } else { %>—<% } %></td></tr><% }) %>
+<% if(!facturas.length){ %><tr><td colspan="13" class="text-center text-secondary py-5">No hay facturas para estos filtros.</td></tr><% } %>
+</tbody></table></div></form>
+<div class="facturas-pagination d-flex justify-content-between align-items-center gap-2 mt-3"><span class="small text-secondary">Página <%= paginacion.pagina %> de <%= paginacion.totalPaginas %></span><div class="btn-group"><a class="btn btn-outline-secondary btn-sm <%= paginacion.pagina<=1?'disabled':'' %>" href="<%= paginaUrl(Math.max(1,paginacion.pagina-1)) %>">Anterior</a><a class="btn btn-outline-secondary btn-sm <%= paginacion.pagina>=paginacion.totalPaginas?'disabled':'' %>" href="<%= paginaUrl(Math.min(paginacion.totalPaginas,paginacion.pagina+1)) %>">Siguiente</a></div></div></section></main></body></html>

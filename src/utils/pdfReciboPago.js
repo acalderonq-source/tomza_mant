@@ -87,7 +87,7 @@ function observacionFactura(factura) {
   );
 }
 
-function generarFilasDetalle(facturas) {
+function generarFilasDetalle(facturas, moneda = "CRC") {
   if (!facturas.length) {
     return [[
       { text: "-", colSpan: 6, alignment: "center", color: "#64748b", margin: [0, 6, 0, 6] },
@@ -112,12 +112,12 @@ function generarFilasDetalle(facturas) {
       { text: formatDate(factura.fecha_vencimiento_factura), style: "bodyCell" },
       {
         stack: [
-          { text: `NC: CRC ${formatMoney(notaCredito)}`, style: "smallMuted", alignment: "right" },
-          { text: `Abono previo: CRC ${formatMoney(factura.abonos_previos ?? factura.abono_monto)}`, style: "smallMuted", alignment: "right" },
-          { text: `Monto en colilla: CRC ${formatMoney(montoEnColilla)}`, style: "smallMuted", alignment: "right" }
+          { text: `NC: ${moneda} ${formatMoney(notaCredito)}`, style: "smallMuted", alignment: "right" },
+          { text: `Abono previo: ${moneda} ${formatMoney(factura.abonos_previos ?? factura.abono_monto)}`, style: "smallMuted", alignment: "right" },
+          { text: `Monto en colilla: ${moneda} ${formatMoney(montoEnColilla)}`, style: "smallMuted", alignment: "right" }
         ]
       },
-      { text: `CRC ${formatMoney(factura.total)}`, style: "bodyStrong", alignment: "right" }
+      { text: `${moneda} ${formatMoney(factura.total)}`, style: "bodyStrong", alignment: "right" }
     ];
   });
 }
@@ -129,7 +129,9 @@ async function generarPDFReciboPago({
   logoDataUri = "",
   reciboNumero = "-",
   comprobanteNumero = "-",
-  generadoPor = "Sistema"
+  generadoPor = "Sistema",
+  moneda = "CRC",
+  departamento = "Departamento de compras / proveeduria"
 } = {}) {
   const safeFacturas = Array.isArray(facturas) ? facturas : [];
   const proveedores = resumenPorProveedor(safeFacturas);
@@ -166,7 +168,7 @@ async function generarPDFReciboPago({
               stack: [
                 { text: "COLILLA DE PAGO A PROVEEDORES", style: "title" },
                 { text: "Control de facturas pagadas", style: "subtitle" },
-                { text: "Departamento de compras / proveeduria", style: "subtitle" }
+                { text: departamento, style: "subtitle" }
               ],
               margin: [0, 13, 0, 10]
             },
@@ -228,7 +230,7 @@ async function generarPDFReciboPago({
               widths: ["*"],
               body: [
                 [{ text: "TOTAL PAGADO", style: "metricLabel" }],
-                [{ text: `CRC ${formatMoney(totalPagado)}`, style: "metricValue" }]
+                [{ text: `${moneda} ${formatMoney(totalPagado)}`, style: "metricValue" }]
               ]
             },
             layout: "noBorders"
@@ -239,7 +241,7 @@ async function generarPDFReciboPago({
               widths: ["*"],
               body: [
                 [{ text: "AJUSTES APLICADOS", style: "metricLabel" }],
-                [{ text: `CRC ${formatMoney(totalNotasCredito + totalAbonos)}`, style: "metricValue" }]
+                [{ text: `${moneda} ${formatMoney(totalNotasCredito + totalAbonos)}`, style: "metricValue" }]
               ]
             },
             layout: "noBorders"
@@ -280,7 +282,7 @@ async function generarPDFReciboPago({
             ...(proveedores.length ? proveedores.map(item => [
               { text: item.proveedor, style: "bodyStrong" },
               { text: String(item.facturas), style: "bodyCell", alignment: "center" },
-              { text: `CRC ${formatMoney(item.total)}`, style: "bodyStrong", alignment: "right" }
+              { text: `${moneda} ${formatMoney(item.total)}`, style: "bodyStrong", alignment: "right" }
             ]) : [[
               { text: "No hay proveedores en esta colilla.", colSpan: 3, alignment: "center", color: "#64748b" },
               {}, {}
@@ -318,7 +320,7 @@ async function generarPDFReciboPago({
               { text: "Ajustes", style: "tableHeader", alignment: "right" },
               { text: "Monto colilla", style: "tableHeader", alignment: "right" }
             ],
-            ...generarFilasDetalle(safeFacturas)
+            ...generarFilasDetalle(safeFacturas, moneda)
           ]
         },
         layout: {
@@ -339,7 +341,7 @@ async function generarPDFReciboPago({
             style: "noteText"
           },
           {
-            text: `Notas de credito: CRC ${formatMoney(totalNotasCredito)}    |    Abonos previos: CRC ${formatMoney(totalAbonos)}`,
+            text: `Notas de credito: ${moneda} ${formatMoney(totalNotasCredito)}    |    Abonos previos: ${moneda} ${formatMoney(totalAbonos)}`,
             style: "noteText",
             bold: true,
             margin: [0, 5, 0, 0]

@@ -1,0 +1,8 @@
+<%- include('header') %>
+<div class="carb-client-breadcrumb"><a href="/carburacion/clientes">← Volver a clientes</a></div>
+<section class="carb-client-heading"><div><div class="carb-client-eyebrow">FICHA DEL CLIENTE</div><h1><%= cliente.nombre %></h1><p>Información de la gasolinera y datos para notificaciones.</p></div><% if(puedeEditarClientes){ %><a class="carb-client-button is-primary" href="/carburacion/clientes/<%= cliente.id %>/editar">Editar información</a><% } %></section>
+<% if(success){ %><div class="alert alert-success" role="status"><%= success %></div><% } %>
+<% [['identificacion','Identificación y actividad'],['ubicacion','Ubicación de la gasolinera'],['contacto','Datos para notificar']].forEach(([grupo,titulo])=>{ %>
+<section class="carb-profile-card"><h2><%= titulo %></h2><dl class="carb-profile-grid"><% camposCliente.filter(c=>c.grupo===grupo).forEach(c=>{ %><div class="<%= c.type==='textarea'?'is-wide':'' %>"><dt><%= c.label %></dt><dd class="<%= cliente[c.key]?'':'is-missing' %>"><%= cliente[c.key] || 'Sin registrar' %></dd></div><% }) %></dl></section><% }) %>
+<% if(cliente.actualizado_en){ %><p class="carb-profile-meta">Última actualización: <%= new Date(cliente.actualizado_en).toLocaleString('es-CR',{timeZone:'America/Costa_Rica'}) %></p><% } %>
+</main></body></html>

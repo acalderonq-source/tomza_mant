@@ -1,0 +1,9 @@
+<%- include('header') %>
+<div class="carb-client-breadcrumb"><a href="<%= cliente.id?'/carburacion/clientes/'+cliente.id:'/carburacion/clientes' %>">← <%= cliente.id?'Volver a la ficha':'Volver a clientes' %></a></div>
+<section class="carb-client-heading"><div><div class="carb-client-eyebrow">CATÁLOGO DE CARBURACIÓN</div><h1><%= cliente.id?'Editar información':'Agregar cliente' %></h1><p>Complete la información disponible. El nombre de la gasolinera es obligatorio.</p></div></section>
+<% if(error){ %><div class="alert alert-danger" role="alert"><%= error %></div><% } %>
+<form method="POST" action="<%= cliente.id?'/carburacion/clientes/'+cliente.id+'/editar':'/carburacion/clientes' %>">
+<% if(cliente.id){ %><input type="hidden" name="version" value="<%= cliente.version %>"><% } %>
+<% [['identificacion','Identificación y actividad'],['ubicacion','Ubicación de la gasolinera'],['contacto','Datos para notificar']].forEach(([grupo,titulo])=>{ %><section class="carb-profile-card"><h2><%= titulo %></h2><div class="carb-profile-grid"><% camposCliente.filter(c=>c.grupo===grupo).forEach(c=>{ %><div class="<%= c.type==='textarea'?'is-wide':'' %>"><label for="<%= c.key %>"><%= c.label %><%= c.required?' *':'' %></label><% if(c.type==='textarea'){ %><textarea id="<%= c.key %>" name="<%= c.key %>" maxlength="<%= c.max %>" rows="3"><%= cliente[c.key] || '' %></textarea><% }else{ %><input type="<%= c.type || 'text' %>" id="<%= c.key %>" name="<%= c.key %>" maxlength="<%= c.max %>" value="<%= cliente[c.key] || '' %>" <%= c.required?'required':'' %>><% } %></div><% }) %></div></section><% }) %>
+<div class="carb-client-actions"><button class="carb-client-button is-primary" type="submit">Guardar información</button><a class="carb-client-button" href="<%= cliente.id?'/carburacion/clientes/'+cliente.id:'/carburacion/clientes' %>">Cancelar</a></div>
+</form></main></body></html>
