@@ -47,10 +47,33 @@ function estadoProgramacion(fechaProximoCambio, hoy = fechaActualCostaRica()) {
   return { clave: "programado", etiqueta: `En ${dias} día(s)`, dias };
 }
 
+async function asegurarTablaProgramaciones() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS control_cambios_aceite_programaciones (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      unidad_id INT NOT NULL,
+      kilometros_mes DECIMAL(10,2) NOT NULL,
+      intervalo_km INT NOT NULL,
+      fecha_ultimo_cambio DATE NOT NULL,
+      fecha_proximo_cambio DATE NOT NULL,
+      observaciones VARCHAR(500) NULL,
+      activo TINYINT(1) NOT NULL DEFAULT 1,
+      creado_por INT NULL,
+      actualizado_por INT NULL,
+      creado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      actualizado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      UNIQUE KEY uq_control_cambios_aceite_unidad (unidad_id),
+      INDEX idx_control_cambios_aceite_proximo (fecha_proximo_cambio, activo),
+      INDEX idx_control_cambios_aceite_actualizado (actualizado_en)
+    )
+  `);
+}
+
 router.use(autorizado);
 
 router.get("/", async (req, res) => {
   try {
+    await asegurarTablaProgramaciones();
     const [unidades] = await pool.query(
       `SELECT u.id, u.placa, u.sede,
               p.kilometros_mes, p.intervalo_km,
@@ -106,6 +129,7 @@ router.post("/:unidadId", async (req, res) => {
   }
 
   try {
+    await asegurarTablaProgramaciones();
     const [[unidad]] = await pool.query(
       "SELECT id FROM unidades WHERE id = ? AND COALESCE(activa, 1) = 1 AND sede IN (?) LIMIT 1",
       [unidadId, SEDES_TRANSPORTADORA]
@@ -139,3 +163,4 @@ module.exports = router;
 module.exports.calcularFechaProximoCambio = calcularFechaProximoCambio;
 module.exports.estadoProgramacion = estadoProgramacion;
 module.exports.fechaValida = fechaValida;
+module.exports.asegurarTablaProgramaciones = asegurarTablaProgramaciones;

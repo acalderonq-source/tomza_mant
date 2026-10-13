@@ -1,6 +1,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const router = require("../src/routes/controlCambiosAceite.routes");
+const pool = require("../src/db");
 
 test("proyecta próxima fecha con intervalo y kilometraje mensual", () => {
   assert.equal(router.calcularFechaProximoCambio("2026-01-01", 5000, 10000), "2026-03-03");
@@ -17,4 +18,17 @@ test("acepta fechas reales en formato ISO y rechaza fechas imposibles", () => {
   assert.equal(router.fechaValida("2026-02-28"), true);
   assert.equal(router.fechaValida("2026-02-30"), false);
   assert.equal(router.fechaValida("28/02/2026"), false);
+});
+
+test("inicializa solo la tabla independiente del nuevo control", async () => {
+  const queryOriginal = pool.query;
+  let sqlEjecutado = "";
+  pool.query = async sql => { sqlEjecutado = sql; };
+  try {
+    await router.asegurarTablaProgramaciones();
+  } finally {
+    pool.query = queryOriginal;
+  }
+  assert.match(sqlEjecutado, /CREATE TABLE IF NOT EXISTS control_cambios_aceite_programaciones/);
+  assert.doesNotMatch(sqlEjecutado, /cambios_aceite_historial|aceite_estanones|aceite_movimientos/);
 });
