@@ -342,6 +342,9 @@ const adminRoutes = require("./routes/admin.routes");
 const dashboardRoutes = require("./routes/dashboard.routes");
 const agendaRoutes = require("./routes/agenda.routes");
 const mantenimientosRoutes = require("./routes/mantenimientos.routes");
+const preventivosSemanalesRoutes = require("./routes/preventivosSemanales.routes");
+const { generarPreventivos, asegurarProgramacionSemanal } = require("./utils/preventivosSemanales");
+const { ensureNumeroMantenimientoColumn } = require("./utils/mantenimientosNumero");
 const unidadesRoutes = require("./routes/unidades.routes");
 const sedeRoutes = require("./routes/sede.routes");
 const kpisRoutes = require("./routes/kpis.routes");
@@ -383,6 +386,7 @@ app.use("/", adminRoutes);
 app.use("/", carnetsRoutes);
 app.use("/dashboard", dashboardRoutes);
 app.use("/agenda", agendaRoutes);
+app.use("/mantenimientos/semana", preventivosSemanalesRoutes);
 app.use("/mantenimientos", mantenimientosRoutes);
 app.use("/unidades", unidadesRoutes);
 app.use("/kpis", kpisRoutes);
@@ -413,6 +417,23 @@ app.use("/lavado-unidades", lavadoUnidadesRoutes);
 app.use("/api", apiRoutes);
 
 // ===================== CRON JOBS =====================
+let generandoPreventivos = false;
+async function actualizarPreventivosSemanales() {
+  if (generandoPreventivos) return;
+  generandoPreventivos = true;
+  try {
+    await asegurarProgramacionSemanal(pool);
+    await ensureNumeroMantenimientoColumn(pool);
+    const cantidad = await generarPreventivos(pool);
+    if (cantidad) console.log(`Preventivos semanales generados: ${cantidad}`);
+  } catch (error) {
+    console.error("Error generando preventivos semanales:", error.code || error.message);
+  } finally {
+    generandoPreventivos = false;
+  }
+}
+cron.schedule("*/15 * * * *", actualizarPreventivosSemanales, { timezone: "America/Costa_Rica" });
+
 ensurePushTables().catch(error => {
   console.warn("No se pudo preparar tabla de notificaciones:", error.code || error.message);
 });
@@ -467,6 +488,7 @@ const PORT = process.env.PORT || 3000;
 async function startServer() {
   await ensurePortalDepartmentSchema(pool);
   app.listen(PORT, '0.0.0.0', () => {
+    actualizarPreventivosSemanales();
     console.log(`🚀 Servidor corriendo en puerto ${PORT}`);
     console.log("ENTORNO:", process.env.NODE_ENV || "development");
     console.log("DB:", process.env.DB_NAME || "no definida");

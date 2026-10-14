@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Preventivos por semana | Gas Tomza</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+  <style>
+    body { background:#f4f6f9;color:#17243b;font-family:"Segoe UI",Arial,sans-serif; }
+    nav { background:#123b65;color:white; }
+    main {max-width:1500px;margin:auto;}
+    h1 {font-size:1.6rem;font-weight:750;}
+    .metric {background:white;border:1px solid #dce3ea;border-radius:8px;padding:1rem;height:100%;}
+    .metric strong {display:block;font-size:1.5rem;}
+    .metric span {font-size:.8rem;color:#58697a;}
+    .table-shell {background:white;border:1px solid #dce3ea;border-radius:8px;overflow:auto;}
+    table {min-width:1000px;}
+    th {background:#edf2f7!important;color:#405169!important;font-size:.8rem;white-space:nowrap;}
+    .controls {display:flex;gap:.75rem;align-items:end;flex-wrap:wrap;}
+    .controls label {font-size:.8rem;font-weight:600;}
+    .future {color:#166534;background:#e8f5eb;border-radius:5px;padding:.25rem .5rem;display:inline-block;}
+    .plan {max-width:280px;white-space:pre-wrap;overflow-wrap:anywhere;}
+  </style>
+</head>
+<body>
+<% const mostrarFecha = fecha => new Intl.DateTimeFormat('es-CR', {day:'2-digit',month:'2-digit',year:'numeric',timeZone:'UTC'}).format(new Date(fecha + 'T00:00:00Z'));
+   const enlaceSemana = fecha => '/mantenimientos/semana?' + new URLSearchParams({semana:fecha,sede}); %>
+<nav class="p-3 d-flex justify-content-between gap-2 flex-wrap align-items-center">
+  <strong><i class="bi bi-calendar-week me-2"></i>Preventivos por semana</strong>
+  <div class="d-flex gap-2"><a class="btn btn-sm btn-outline-light" href="/mantenimientos">Mantenimientos</a><a class="btn btn-sm btn-outline-light" href="/dashboard">Inicio</a></div>
+</nav>
+<main class="p-3 p-md-4">
+  <% if (success) { %><div class="alert alert-success"><%= success %></div><% } %>
+  <% if (error) { %><div class="alert alert-warning"><%= error %></div><% } %>
+  <div class="mb-3"><h1>Preventivos del <%= mostrarFecha(semana) %> al <%= mostrarFecha(fin) %></h1><p class="text-secondary mb-0">Las fechas previstas generan el preventivo al llegar el día programado.</p></div>
+  <form method="GET" class="controls mb-3" action="/mantenimientos/semana">
+    <div><label for="semana">Semana que contiene</label><input id="semana" class="form-control" type="date" name="semana" value="<%= semana %>" required></div>
+    <div><label for="sede">Sede</label><select id="sede" class="form-select" name="sede"><option value="">Todas las sedes</option><% sedes.forEach(valor => { %><option value="<%= valor %>" <%= valor === sede ? 'selected' : '' %>><%= etiquetaSede(valor) %></option><% }) %></select></div>
+    <button class="btn btn-primary" type="submit">Consultar</button>
+    <div class="btn-group"><a class="btn btn-outline-secondary" href="<%= enlaceSemana(anterior) %>" aria-label="Semana anterior" title="Semana anterior"><i class="bi bi-chevron-left"></i></a><a class="btn btn-outline-secondary" href="<%= enlaceSemana(siguiente) %>" aria-label="Semana siguiente" title="Semana siguiente"><i class="bi bi-chevron-right"></i></a></div>
+    <div><label for="buscar">Buscar unidad</label><input class="form-control" id="buscar" type="search" placeholder="Placa o sede"></div>
+  </form>
+  <div class="row g-3 mb-3">
+    <% [['Unidades',resumen.unidades],['Con frecuencia automática',resumen.conFrecuencia],['Con preventivo esta semana',resumen.estaSemana],['Preventivos cerrados',resumen.cerrados]].forEach(([label,valor]) => { %>
+    <div class="col-6 col-lg-3"><div class="metric"><span><%= label %></span><strong><%= valor %></strong></div></div><% }) %>
+  </div>
+  <div class="table-shell"><table class="table align-middle mb-0"><thead><tr><th>Placa</th><th>Sede</th><th>Frecuencia automática</th><th>Preventivos de la semana</th><th>Plan</th><% if (puedeProgramar) { %><th>Programación</th><% } %></tr></thead>
+    <tbody>
+    <% filas.forEach(unidad => { %>
+      <tr data-buscar="<%= (unidad.placa + ' ' + unidad.sede).toLowerCase() %>">
+        <td class="fw-bold"><%= unidad.placa %></td><td><%= etiquetaSede(unidad.sede) %></td>
+        <td><% if (unidad.programacion_id) { %>Cada <%= unidad.intervalo_semanas %> semana(s)<div class="small text-secondary">Desde <%= mostrarFecha(unidad.fecha_inicio) %> · <%= unidad.programacion_activa ? 'Activa' : 'Pausada' %></div><% } else { %><span class="text-secondary">Sin frecuencia</span><% } %></td>
+        <td>
+          <% unidad.trabajos.forEach(trabajo => { %><div class="mb-1"><a href="/mantenimientos/<%= trabajo.id %>"><%= mostrarFecha(trabajo.fecha) %></a> <span class="badge <%= trabajo.estado === 'CERRADO' ? 'text-bg-success' : 'text-bg-warning' %>"><%= trabajo.estado %></span></div><% }) %>
+          <% unidad.previstas.forEach(fecha => { %><div class="mb-1"><span class="future"><%= mostrarFecha(fecha) %> · Previsto</span></div><% }) %>
+          <% if (!unidad.trabajos.length && !unidad.previstas.length) { %><span class="text-secondary">Sin preventivo esta semana</span><% } %>
+        </td>
+        <td class="plan small"><%= unidad.plan || '—' %></td>
+        <% if (puedeProgramar) { %><td><button type="button" class="btn btn-sm btn-outline-primary programar" data-bs-toggle="modal" data-bs-target="#programacion"
+          data-id="<%= unidad.id %>" data-placa="<%= unidad.placa %>" data-version="<%= unidad.version || 0 %>"
+          data-inicio="<%= unidad.fecha_inicio || (semana > hoy ? semana : hoy) %>" data-intervalo="<%= unidad.intervalo_semanas || 4 %>" data-plan="<%= unidad.plan || '' %>"
+          data-activa="<%= unidad.programacion_id ? (unidad.programacion_activa ? '1' : '0') : '1' %>"><i class="bi bi-calendar-plus me-1"></i><%= unidad.programacion_id ? 'Editar frecuencia' : 'Programar' %></button></td><% } %>
+      </tr>
+    <% }) %>
+    <% if (!filas.length) { %><tr><td colspan="6" class="text-center text-secondary p-4">No hay unidades activas para esta sede.</td></tr><% } %>
+    </tbody>
+  </table></div>
+</main>
+<% if (puedeProgramar) { %>
+<div class="modal fade" id="programacion" tabindex="-1" aria-labelledby="tituloProgramacion" aria-hidden="true"><div class="modal-dialog"><div class="modal-content">
+  <form method="POST" action="/mantenimientos/semana/programacion">
+    <div class="modal-header"><h2 id="tituloProgramacion" class="modal-title fs-5">Programación de preventivos</h2><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button></div>
+    <div class="modal-body">
+      <input type="hidden" name="unidad_id" id="unidadId"><input type="hidden" name="version" id="version"><input type="hidden" name="semana" value="<%= semana %>"><input type="hidden" name="sede" value="<%= sede %>">
+      <div class="mb-3"><label for="inicio" class="form-label">Fecha base del preventivo</label><input id="inicio" type="date" class="form-control" name="fecha_inicio" required></div>
+      <div class="mb-3"><label for="intervalo" class="form-label">Repetir cada cuántas semanas</label><input id="intervalo" type="number" class="form-control" name="intervalo_semanas" min="1" max="52" step="1" required></div>
+      <div class="mb-3"><label for="plan" class="form-label">Plan de trabajo</label><textarea id="plan" class="form-control" name="plan" rows="3" maxlength="5000"></textarea></div>
+      <div><label for="activa" class="form-label">Programación automática</label><select id="activa" class="form-select" name="activa"><option value="1">Activa</option><option value="0">Pausada</option></select></div>
+    </div>
+    <div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button><button type="submit" class="btn btn-primary">Guardar frecuencia</button></div>
+  </form>
+</div></div></div>
+<% } %>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+  document.getElementById('buscar').addEventListener('input', event => {
+    const value = event.target.value.trim().toLowerCase();
+    document.querySelectorAll('tr[data-buscar]').forEach(row => { row.hidden = !row.dataset.buscar.includes(value); });
+  });
+  document.querySelectorAll('.programar').forEach(button => button.addEventListener('click', () => {
+    document.getElementById('tituloProgramacion').textContent = 'Preventivos · ' + button.dataset.placa;
+    for (const [id,key] of Object.entries({unidadId:'id',version:'version',inicio:'inicio',intervalo:'intervalo',plan:'plan',activa:'activa'})) {
+      document.getElementById(id).value = button.dataset[key];
+    }
+  }));
+</script>
+</body>
+</html>

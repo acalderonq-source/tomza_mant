@@ -226,6 +226,12 @@
           <span class="module-icon icon-amber"><i class="bi bi-tools"></i></span>
           <div><div class="module-title">Mantenimientos</div><p class="module-copy">Pendientes, correctivos y cierres.</p></div>
         </a><% } %>
+        <% if (areaTaller && ['ADMIN','TALLER','PROVEEDURIA_TALLER'].includes(user.rol)) { %>
+          <a href="/mantenimientos/semana" class="module-card">
+            <span class="module-icon icon-green"><i class="bi bi-calendar-week"></i></span>
+            <div><div class="module-title">Preventivos por semana</div><p class="module-copy">Frecuencias automáticas y programación por unidad.</p></div>
+          </a>
+        <% } %>
         <% if (puedeVerKpisMecanicos) { %>
           <a href="/kpis/mecanicos" class="module-card">
             <span class="module-icon icon-blue"><i class="bi bi-speedometer2"></i></span>
