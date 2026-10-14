@@ -27,7 +27,7 @@ const { agregarFiltroPlacaSql } = require("../utils/placas");
 
 const ROLES_PROVEEDURIA = ["PROVEEDURIA_TALLER", "PROVEEDURIA"];
 const ROLES_MENSAJERO_REPUESTOS = ["MENSAJERO", "MENSAJERIA", "MENSAJERO_FACTURAS"];
-const ROLES_VER_REPUESTOS = ["ADMIN", "TALLER", "SUPERVISOR_PESADO", ...ROLES_PROVEEDURIA, ...ROLES_MENSAJERO_REPUESTOS];
+const ROLES_VER_REPUESTOS = ["ADMIN", "TALLER", "SUPERVISOR_PESADO", "BODEGUERO", "BODEGA", ...ROLES_PROVEEDURIA, ...ROLES_MENSAJERO_REPUESTOS];
 const ROLES_GESTION_REPUESTOS = ["ADMIN", ...ROLES_PROVEEDURIA];
 
 function requireAuth(req, res, next) {
@@ -111,7 +111,7 @@ function redirectConFiltros(req, res) {
 }
 
 async function sedesDisponibles(req) {
-  if (req.session.user.rol === "ADMIN" || ROLES_PROVEEDURIA.includes(req.session.user.rol) || esMensajeroRepuestos(req.session.user)) {
+  if (["ADMIN", "BODEGUERO", "BODEGA"].includes(req.session.user.rol) || ROLES_PROVEEDURIA.includes(req.session.user.rol) || esMensajeroRepuestos(req.session.user)) {
     return expandirSedesOperativasRepuestosAceites(expandirSedesEquivalentes(await obtenerTodasSedes(pool)));
   }
 
