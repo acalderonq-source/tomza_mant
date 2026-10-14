@@ -6,6 +6,10 @@ const { DEPARTAMENTOS, departamentosPermitidosPorRol, esDepartamentoValido } = r
 const { normalizarCedula } = require("../utils/cedula");
 
 const { esPropietarioAdministracion } = require('../utils/administracionPrivada');
+const {limitarCuenta}=require('../middleware/accountLoginLimit');
+const {selloUsuario,leerSello}=require('../middleware/sessionSecurity');
+const {sessionSecret}=require('../utils/sessionConfig');
+const limiteCuenta=limitarCuenta(req=>{const id=String(req.body.cedula||req.body.usuario||'').trim();const digits=normalizarCedula(id);return /^\d{9,12}$/.test(digits)?digits:id;});
 const router = express.Router();
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -48,7 +52,7 @@ router.get("/login", (req, res) => {
 /**
  * PROCESAR LOGIN
  */
-router.post("/login", loginLimiter, async (req, res) => {
+router.post("/login", loginLimiter, limiteCuenta, async (req, res) => {
   try {
     const identificador = String(req.body.cedula || req.body.usuario || "").trim();
     const cedula = normalizarCedula(identificador);
@@ -62,7 +66,7 @@ router.post("/login", loginLimiter, async (req, res) => {
     }
 
     // Validación básica
-    if (!identificador || !password) {
+    if (!identificador || !password || identificador.length>254 || password.length>128) {
       return res.render("login", {
         error: esCedula ? "Ingrese la cédula y el PIN del código de trabajador." : "Debe ingresar usuario y contraseña",
         next: nextUrl,
@@ -93,6 +97,7 @@ router.post("/login", loginLimiter, async (req, res) => {
 
     // Usuario no existe
     if (rows.length === 0) {
+      await bcrypt.compare(password,'$2a$12$R9h/cIPz0gi.URNNX3kh2OPST9/PgBkqquzi.Ss7KIUgO2t0jWMUW');
       return res.render("login", {
         error: esCedula ? "Cédula o PIN incorrecto. Verifique sus datos o consulte al administrador." : "Usuario o contraseña incorrecta",
         next: nextUrl,
@@ -116,6 +121,7 @@ router.post("/login", loginLimiter, async (req, res) => {
       });
     }
 
+    req.loginVerificado=true;
     let uniqueCandidates = [...new Map(usersWithValidPassword.map(user => [user.id, user])).values()];
     if (departamento === "CARBURACION") {
       const permitidos = [];
@@ -131,6 +137,8 @@ router.post("/login", loginLimiter, async (req, res) => {
     }
     if (uniqueCandidates.length > 1) {
       req.session.pendingCedulaLogin = {
+        creadoEn:Date.now(),
+        sellos:Object.fromEntries(uniqueCandidates.map(u=>[u.id,selloUsuario(u,[],sessionSecret)])),
         usuarioIds: uniqueCandidates.map(user => user.id),
         cedula,
         departamento,
@@ -155,17 +163,17 @@ router.post("/login", loginLimiter, async (req, res) => {
 router.post("/login/perfil", async (req, res) => {
   const pending = req.session.pendingCedulaLogin;
   const usuarioId = Number(req.body.usuarioId);
-  if (!pending || !pending.usuarioIds.includes(usuarioId)) return res.status(401).redirect("/login?departamento=TALLER");
+  if (!pending || !pending.creadoEn || Date.now()-pending.creadoEn>5*60*1000 || !pending.usuarioIds.includes(usuarioId)) return res.status(401).redirect("/login?departamento=TALLER");
 
   try {
     const [[user]] = await pool.query(`
-      SELECT u.*, uc.cedula AS cedula_persona, uc.persona_nombre, uc.perfil_excel
+      SELECT u.*, uc.cedula AS cedula_persona, uc.persona_nombre, uc.perfil_excel, uc.pin_hash
       FROM usuarios u
       LEFT JOIN usuario_cedulas uc ON uc.usuario_id = u.id AND uc.cedula = ?
       WHERE u.id = ?
       LIMIT 1
     `, [pending.cedula, usuarioId]);
-    if (!user) {
+    if (!user || pending.sellos?.[user.id]!==selloUsuario(user,[],sessionSecret)) {
       delete req.session.pendingCedulaLogin;
       return res.status(401).redirect("/login?departamento=TALLER");
     }
@@ -188,13 +196,14 @@ router.post("/cambiar-clave", async (req, res) => {
   if (!user?.requiereCambioPassword) return res.redirect("/dashboard");
   const password = String(req.body.password || "");
   const confirmar = String(req.body.confirmar || "");
-  if (password.length < 12) return res.status(400).render("cambiar_clave", { error: "La contraseña debe tener al menos 12 caracteres." });
+  if (password.length < 12 || password.length>128) return res.status(400).render("cambiar_clave", { error: "La contraseña debe tener al menos 12 caracteres." });
   if (password !== confirmar) return res.status(400).render("cambiar_clave", { error: "Las contraseñas no coinciden." });
 
   try {
     const hash = await bcrypt.hash(password, 12);
     await pool.query("UPDATE usuarios SET password = ?, requiere_cambio_password = 0 WHERE id = ?", [hash, user.id]);
     user.requiereCambioPassword = false;
+    user.authStamp=await leerSello(user,pool,sessionSecret);
     return res.redirect("/dashboard");
   } catch (error) {
     console.error("Error cambiando contraseña inicial:", error.code || error.message);
@@ -223,6 +232,7 @@ async function iniciarSesion(req, res, user, departamento, nextUrl) {
 
     // Login correcto -> guardar sesión
     const sessionUser = {
+      authStamp:selloUsuario(user,departmentRows,sessionSecret),
       id: user.id,
       nombre: user.persona_nombre || user.nombre || user.usuario,
       usuario: user.usuario,
@@ -243,6 +253,8 @@ async function iniciarSesion(req, res, user, departamento, nextUrl) {
       }
 
       req.session.user = sessionUser;
+      req.session.authenticatedAt=Date.now();
+      req.session.lastActivity=Date.now();
       const esCuentaPantalla = ["PANTALLA_MECANICOS", "PANTALLA_PESADOS"].includes(String(user.rol || "").toUpperCase());
       const destino = esCuentaPantalla
         ? "/taller/dashboard"
@@ -266,7 +278,7 @@ router.post("/departamento/activo", (req, res) => {
 
 function getSafeNextUrl(value) {
   const nextUrl = String(value || "").trim();
-  if (!nextUrl || !nextUrl.startsWith("/") || nextUrl.startsWith("//")) return "";
+  if (!nextUrl || !nextUrl.startsWith("/") || nextUrl.startsWith("//") || /[\\\u0000-\u001f]/.test(nextUrl)) return "";
   return nextUrl;
 }
 
@@ -286,3 +298,4 @@ router.get("/logout", (req, res) => {
 });
 
 module.exports = router;
+module.exports.getSafeNextUrl=getSafeNextUrl;

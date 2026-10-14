@@ -672,11 +672,11 @@
   </section>
 </main>
 
-<script type="application/json" id="data-estados"><%- JSON.stringify(safePorEstado) %></script>
-<script type="application/json" id="data-mes"><%- JSON.stringify(safePorMes) %></script>
-<script type="application/json" id="data-proveedor"><%- JSON.stringify(safePorProveedor) %></script>
-<script type="application/json" id="data-fin-tipo"><%- JSON.stringify(safeFinPorTipo) %></script>
-<script type="application/json" id="data-fin-mes"><%- JSON.stringify(safeFinPorMes) %></script>
+<script type="application/json" id="data-estados"><%- JSON.stringify(safePorEstado).replace(/</g, '\\u003c') %></script>
+<script type="application/json" id="data-mes"><%- JSON.stringify(safePorMes).replace(/</g, '\\u003c') %></script>
+<script type="application/json" id="data-proveedor"><%- JSON.stringify(safePorProveedor).replace(/</g, '\\u003c') %></script>
+<script type="application/json" id="data-fin-tipo"><%- JSON.stringify(safeFinPorTipo).replace(/</g, '\\u003c') %></script>
+<script type="application/json" id="data-fin-mes"><%- JSON.stringify(safeFinPorMes).replace(/</g, '\\u003c') %></script>
 <script>
   const leerJSON = id => {
     try { return JSON.parse(document.getElementById(id)?.textContent || '[]'); }

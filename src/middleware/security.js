@@ -1,7 +1,6 @@
 const crypto = require("crypto");
 
 const UNSAFE_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
-const CSRF_EXEMPT_PATHS = new Set(["POST /login"]);
 
 function escapeHtml(value) {
   return String(value || "")
@@ -22,11 +21,9 @@ function ensureCsrfToken(req, res, next) {
     return next();
   }
 
-  if (CSRF_EXEMPT_PATHS.has(`${req.method} ${req.path}`)) {
-    return next();
-  }
+  if (req.get('sec-fetch-site')==='cross-site' || !hasAllowedOrigin(req)) return res.status(403).send('Solicitud no autorizada.');
 
-  const token = req.body?._csrf || req.get("x-csrf-token") || req.query?._csrf;
+  const token = req.body?._csrf || req.get("x-csrf-token");
   const tokenBuffer = Buffer.from(String(token || ""));
   const sessionBuffer = Buffer.from(req.session.csrfToken);
 
@@ -45,7 +42,7 @@ function ensureCsrfToken(req, res, next) {
 }
 
 function isSameOriginRequest(req) {
-  const host = String(req.get("host") || "").toLowerCase();
+  const expected = `${req.protocol||'http'}://${req.get('host')}`;
   const origin = req.get("origin");
   const referer = req.get("referer");
 
@@ -53,13 +50,34 @@ function isSameOriginRequest(req) {
     if (!value) continue;
     try {
       const url = new URL(value);
-      if (url.host.toLowerCase() === host) return true;
+      if (url.origin === expected) return true;
     } catch (_) {
       // Ignorar cabeceras mal formadas.
     }
   }
 
   return false;
+}
+
+function hasAllowedOrigin(req){
+  const value=req.get('origin');if(!value)return true;
+  try{return new URL(value).origin===`${req.protocol||'http'}://${req.get('host')}`;}catch(_){return false;}
+}
+
+function securityHeaders(req,res,next){
+  res.setHeader('X-Content-Type-Options','nosniff');
+  res.setHeader('X-Frame-Options','SAMEORIGIN');
+  res.setHeader('Referrer-Policy','same-origin');
+  res.setHeader('Content-Security-Policy',"frame-ancestors 'self'; base-uri 'self'; object-src 'none'");
+  if(req.secure)res.setHeader('Strict-Transport-Security','max-age=15552000');
+  next();
+}
+
+function bloquearRutaEstaticaPrivada(req,res,next){
+  let ruta;try{ruta=decodeURIComponent(req.path);}catch(_){return res.sendStatus(400);}
+  const segmentos=ruta.replace(/\\/g,'/').split('/');
+  if(segmentos.includes('..')||segmentos.filter(Boolean)[0]?.toLowerCase()==='uploads')return res.sendStatus(404);
+  return next();
 }
 
 function injectSecurityAssets(html, csrfToken) {
@@ -77,7 +95,8 @@ function injectSecurityAssets(html, csrfToken) {
   const originalFetch = window.fetch;
   window.fetch = function(input, init = {}) {
     const method = String(init.method || input?.method || 'GET').toUpperCase();
-    if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
+    const target = new URL(typeof input === 'string' || input instanceof URL ? input : input.url, window.location.href);
+    if (target.origin === window.location.origin && ['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
       const headers = new Headers(init.headers || input?.headers || {});
       if (!headers.has('x-csrf-token')) headers.set('x-csrf-token', token);
       init = { ...init, headers };
@@ -105,5 +124,7 @@ function injectSecurityAssets(html, csrfToken) {
 
 module.exports = {
   ensureCsrfToken,
-  injectSecurityAssets
+  injectSecurityAssets,
+  securityHeaders,
+  bloquearRutaEstaticaPrivada
 };

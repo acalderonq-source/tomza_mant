@@ -741,13 +741,13 @@
   </div>
 </div>
 
-<script type="application/json" id="data-top-proveedores"><%- JSON.stringify(safeTopProveedores) %></script>
-<script type="application/json" id="data-gasto-mensual"><%- JSON.stringify(safeGastoMensual) %></script>
-<script type="application/json" id="data-top-productos"><%- JSON.stringify(safeTopProductos) %></script>
-<script type="application/json" id="data-ordenes-estado"><%- JSON.stringify(safeOrdenesPorEstado) %></script>
-<script type="application/json" id="data-todos-proveedores"><%- JSON.stringify(safeTodosProveedores) %></script>
-<script type="application/json" id="data-gastos-placa"><%- JSON.stringify(safeGastosPorPlaca) %></script>
-<script type="application/json" id="data-compras-placa"><%- JSON.stringify(safeComprasPorPlaca) %></script>
+<script type="application/json" id="data-top-proveedores"><%- JSON.stringify(safeTopProveedores).replace(/</g, '\\u003c') %></script>
+<script type="application/json" id="data-gasto-mensual"><%- JSON.stringify(safeGastoMensual).replace(/</g, '\\u003c') %></script>
+<script type="application/json" id="data-top-productos"><%- JSON.stringify(safeTopProductos).replace(/</g, '\\u003c') %></script>
+<script type="application/json" id="data-ordenes-estado"><%- JSON.stringify(safeOrdenesPorEstado).replace(/</g, '\\u003c') %></script>
+<script type="application/json" id="data-todos-proveedores"><%- JSON.stringify(safeTodosProveedores).replace(/</g, '\\u003c') %></script>
+<script type="application/json" id="data-gastos-placa"><%- JSON.stringify(safeGastosPorPlaca).replace(/</g, '\\u003c') %></script>
+<script type="application/json" id="data-compras-placa"><%- JSON.stringify(safeComprasPorPlaca).replace(/</g, '\\u003c') %></script>
 
 <script>
   const leerJSON = (id) => {

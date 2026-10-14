@@ -1096,7 +1096,7 @@
   </div>
 </div>
 
-<script type="application/json" id="data-negocios"><%- JSON.stringify(negociosData) %></script>
+<script type="application/json" id="data-negocios"><%- JSON.stringify(negociosData).replace(/</g, '\\u003c') %></script>
 <script>
   const readJson = (id, fallback) => {
     const el = document.getElementById(id);

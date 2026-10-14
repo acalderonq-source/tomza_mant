@@ -10,7 +10,7 @@ const {esPropietarioAdministracion}=require("./utils/administracionPrivada");
 const enviarAlertasDekra = require("./utils/dekraMail");
 const { enviarRecordatoriosCitasDekra } = require("./utils/dekraMail");
 const { enviarRecordatoriosMantenimientos, ensurePushTables } = require("./utils/notificacionesPush");
-const { ensureCsrfToken, injectSecurityAssets } = require("./middleware/security");
+const { ensureCsrfToken, injectSecurityAssets, securityHeaders, bloquearRutaEstaticaPrivada } = require("./middleware/security");
 const { seedBundledUploads, verificarAlmacenamientoUploads } = require("./utils/uploadStorage");
 const { DEPARTAMENTOS, departamentosPermitidosPorRol, controlarAccesoPorDepartamento, ensurePortalDepartmentSchema } = require("./utils/departamentos");
 const { preventAuthenticatedHtmlCaching } = require("./utils/httpCache");
@@ -18,9 +18,12 @@ const { verificarColumnasRequeridas, COLUMNAS_ESENCIALES_TALLER } = require("./u
 
 // Inicializar app
 const app = express();
+app.disable("x-powered-by");
+app.use(securityHeaders);
 const isProduction = process.env.NODE_ENV === "production";
-const sessionSecret = process.env.SESSION_SECRET || "tomza_dev_secret_change_me";
-const sessionMaxAge = Number(process.env.SESSION_MAX_AGE_MS || 1000 * 60 * 60 * 24 * 7);
+const {sessionSecret}=require('./utils/sessionConfig');
+const {protegerSesiones}=require('./middleware/sessionSecurity');
+const sessionMaxAge = Number(process.env.SESSION_MAX_AGE_MS || 1000 * 60 * 60 * 8);
 const transientDbErrors = new Set(["ECONNRESET", "PROTOCOL_CONNECTION_LOST", "ETIMEDOUT", "ENOTFOUND", "ECONNREFUSED"]);
 
 if (isProduction) {
@@ -183,6 +186,7 @@ app.use(session({
   secret: sessionSecret,
   resave: false,
   saveUninitialized: false,
+  rolling: true,
   cookie: {
     secure: isProduction,
     httpOnly: true,
@@ -191,9 +195,11 @@ app.use(session({
   }
 }));
 
+app.use(protegerSesiones(pool,sessionSecret));
+
 app.use("/uploads", require("./routes/uploads.routes"));
 // Serve public assets only after the private uploads handler has enforced access.
-app.use(express.static(path.join(__dirname, "..", "public")));
+app.use(bloquearRutaEstaticaPrivada,express.static(path.join(__dirname, "..", "public"),{dotfiles:'deny',index:false}));
 
 app.use(ensureCsrfToken);
 

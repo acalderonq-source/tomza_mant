@@ -14,3 +14,9 @@ tmp/
 output/
 outputs/
 public/uploads/facturas-correo/
+public/uploads/facturas/
+public/uploads/cotizaciones/
+secrets/
+*.key
+*.p12
+*.pfx

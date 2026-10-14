@@ -929,9 +929,9 @@
 <% } %>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-<script type="application/json" id="unidadesSemanalData"><%- JSON.stringify(unidadesLista.map(unidad => ({ placa: unidad.placa, sede: unidad.sede || '' }))) %></script>
-<script type="application/json" id="sedesSemanalData"><%- JSON.stringify(Object.fromEntries(sedesLista.map(sede => [sede, mostrarSede(sede)]))) %></script>
-<script type="application/json" id="pedidoCedisData"><%- JSON.stringify(pedidoSeleccionData) %></script>
+<script type="application/json" id="unidadesSemanalData"><%- JSON.stringify(unidadesLista.map(unidad => ({ placa: unidad.placa, sede: unidad.sede || '' }))).replace(/</g, '\\u003c') %></script>
+<script type="application/json" id="sedesSemanalData"><%- JSON.stringify(Object.fromEntries(sedesLista.map(sede => [sede, mostrarSede(sede)]))).replace(/</g, '\\u003c') %></script>
+<script type="application/json" id="pedidoCedisData"><%- JSON.stringify(pedidoSeleccionData).replace(/</g, '\\u003c') %></script>
 <script>
   const SEDE_RECOPE_LIMON = '<%= sedeRecope %>';
   const SEDE_RECOPE_ORIGEN = '<%= sedeRecopeOrigen %>';

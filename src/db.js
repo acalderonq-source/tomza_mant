@@ -9,6 +9,7 @@ const pool = mysql.createPool({
   user: process.env.MYSQLUSER,
   password: process.env.MYSQLPASSWORD,
   database: process.env.MYSQLDATABASE,
+  ssl: require('./utils/mysqlTls').mysqlTls(),
   timezone: "-06:00",
   waitForConnections: true,
   connectionLimit: Number(process.env.MYSQL_CONNECTION_LIMIT || 10),

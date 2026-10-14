@@ -359,7 +359,7 @@
 <% if (!carburacion && !proveeduria) { %><script src="/js/placa-search.js?v=20260811-3"></script><% } %>
 <script>
   let rowIndex = 0;
-  const lineasIniciales = <%- JSON.stringify(lineasIniciales) %>;
+  const lineasIniciales = <%- JSON.stringify(lineasIniciales).replace(/</g, '\\u003c') %>;
   const clientesOrden = <%- JSON.stringify(clientesOrden).replace(/</g, '\\u003c') %>;
   <% if(proveeduria){ %>
   const catalogoProveedores=<%- JSON.stringify(proveedores).replace(/</g,'\\u003c') %>;

@@ -15,6 +15,7 @@ const gestion=u=>['ADMIN','PROVEEDURIA','PROVEEDURIA_TALLER'].includes(u?.rol);
 const contabilidad=u=>['ADMIN','CONTABILIDAD'].includes(u?.rol);
 const parse=r=>({...r,datos:typeof r.datos==='string'?JSON.parse(r.datos):r.datos});
 const limitar=rateLimit({windowMs:15*60*1000,limit:10,standardHeaders:true,legacyHeaders:false,message:'Demasiados intentos. Intente en 15 minutos.'});
+const limiteCuenta=require('../middleware/accountLoginLimit').limitarCuenta(req=>req.body.email);
 const cargas=rateLimit({windowMs:3600000,limit:60,standardHeaders:true,legacyHeaders:false,message:'Límite de cargas alcanzado. Intente más tarde.'});
 async function transaccion(fn){for(let intento=0;intento<3;intento++){const db=await pool.getConnection();try{await db.beginTransaction();const r=await fn(db);await db.commit();return r;}catch(e){await db.rollback();if(!['ER_LOCK_DEADLOCK','ER_LOCK_WAIT_TIMEOUT'].includes(e.code)||intento===2)throw e;}finally{db.release();}}}
 async function guardarArchivo(db,a){const [r]=await db.query('INSERT INTO prov_adjuntos (nombre,mime,contenido) VALUES (?,?,?)',[a.nombre,a.mime,Buffer.from(a.base64,'base64')]);return {id:r.insertId,nombre:a.nombre,mime:a.mime};}
@@ -23,7 +24,7 @@ async function guardar(db,row,actor,accion){await db.query('UPDATE prov_document
 const sesion=(req)=>req.session.proveedorPortal;
 externo.use((req,res,next)=>{res.set('Cache-Control','no-store');res.set('Referrer-Policy','same-origin');next();});
 externo.get('/login',(req,res)=>res.render('portal_proveedores/login',{error:null}));
-externo.post('/login',limitar,wrap(async(req,res)=>{
+externo.post('/login',limitar,limiteCuenta,wrap(async(req,res)=>{
   const email=String(req.body.email||'').trim().toLowerCase(),password=String(req.body.password||'');
   if(password.length>128)return res.status(401).render('portal_proveedores/login',{error:'Correo o contraseña incorrectos'});
   const [rows]=await pool.query('SELECT c.*,p.nombre FROM prov_portal_cuentas c JOIN prov_proveedores p ON p.id=c.proveedor_id WHERE c.email=? AND c.activo=1 AND p.activo=1',[email]);
@@ -32,6 +33,8 @@ externo.post('/login',limitar,wrap(async(req,res)=>{
   const valido=await bcrypt.compare(password,cuenta?.password_hash||'$2a$12$R9h/cIPz0gi.URNNX3kh2OPST9/PgBkqquzi.Ss7KIUgO2t0jWMUW');
   if(!cuenta||!valido)return res.status(401).render('portal_proveedores/login',{error:'Correo o contraseña incorrectos'});
   await new Promise((resolve,reject)=>req.session.regenerate(e=>e?reject(e):resolve()));
+  req.loginVerificado=true;
+  req.session.authenticatedAt=Date.now();req.session.lastActivity=Date.now();
   req.session.proveedorPortal={id:cuenta.id,version:cuenta.version_acceso};
   await new Promise((resolve,reject)=>req.session.save(e=>e?reject(e):resolve()));
   res.redirect('/portal-proveedores');
