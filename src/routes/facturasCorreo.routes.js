@@ -145,8 +145,16 @@ async function saveAttachment(messageRowId, attachment, fileBuffer) {
   if (!type || !fileBuffer?.length || fileBuffer.length > MAX_ATTACHMENT_BYTES) return false;
 
   const graphHash = crypto.createHash("sha256").update(String(attachment.id)).digest("hex");
-  const [exists] = await pool.query("SELECT id FROM facturas_correo_adjuntos WHERE graph_adjunto_hash = ? LIMIT 1", [graphHash]);
-  if (exists.length) return false;
+  const [exists] = await pool.query("SELECT id, ruta_archivo FROM facturas_correo_adjuntos WHERE graph_adjunto_hash = ? LIMIT 1", [graphHash]);
+  if (exists.length) {
+    const stored = exists[0].ruta_archivo;
+    if (!/^[a-f\d-]+\.(xml|pdf)$/i.test(stored || '')) return false;
+    const destination = path.join(ensureUploadDirectory('facturas-correo'), stored);
+    if (fs.existsSync(destination)) return false;
+    // Recupera adjuntos sincronizados en otra instalación sin duplicar su registro.
+    fs.writeFileSync(destination, fileBuffer, { flag: 'wx', mode: 0o600 });
+    return true;
+  }
 
   const folder = ensureUploadDirectory("facturas-correo");
   const storedName = `${crypto.randomUUID()}${ext}`;
@@ -170,8 +178,8 @@ async function saveAttachment(messageRowId, attachment, fileBuffer) {
 
 async function attachmentAlreadySaved(attachmentId) {
   const graphHash = crypto.createHash("sha256").update(String(attachmentId)).digest("hex");
-  const [rows] = await pool.query("SELECT id FROM facturas_correo_adjuntos WHERE graph_adjunto_hash = ? LIMIT 1", [graphHash]);
-  return rows.length > 0;
+  const [rows] = await pool.query("SELECT id, ruta_archivo FROM facturas_correo_adjuntos WHERE graph_adjunto_hash = ? LIMIT 1", [graphHash]);
+  return rows.length > 0 && /^[a-f\d-]+\.(xml|pdf)$/i.test(rows[0].ruta_archivo || '') && fs.existsSync(path.join(UPLOAD_ROOT,'facturas-correo',rows[0].ruta_archivo));
 }
 
 async function syncInbox(accessToken) {
