@@ -2,7 +2,7 @@ const express=require('express');
 const bcrypt=require('bcryptjs');
 const {rateLimit}=require('express-rate-limit');
 const pool=require('../db');
-const {revisarFactura,exigirControl,excepciones,registrarRecepcionCompras}=require('../utils/portalControlFactura');
+const {revisarFactura,exigirControl,excepciones}=require('../utils/portalControlFactura');
 const {vincularOrden}=require('../utils/portalFacturaOrden');
 const {cruzarFactura}=require('../utils/portalCruceAutomatico');
 const {exigir,adjunto,saldo,numero}=require('../utils/proveeduria');
@@ -125,20 +125,18 @@ administracion.post('/receptores',wrap(async(req,res)=>{
   const cedula=String(req.body.cedula||'').trim(),nombre=String(req.body.nombre||'').trim();exigir(/^\d{9,12}$/.test(cedula)&&nombre&&nombre.length<=255,'Cédula y razón social requeridas');
   await pool.query('INSERT INTO prov_portal_receptores (cedula,nombre,activo) VALUES (?,?,?) ON DUPLICATE KEY UPDATE nombre=VALUES(nombre),activo=VALUES(activo)',[cedula,nombre,req.body.activo==='0'?0:1]);res.json({ok:true});
 }));
-interno.get('/facturas',wrap(async(req,res)=>{const [r]=await pool.query("SELECT * FROM prov_documentos WHERE tipo='factura_portal' ORDER BY id DESC");const docs=r.map(parse);for(const row of docs)row.datos.control=await revisarFactura(pool,row);res.render('portal_proveedores/bandeja',{docs,saldo,excepciones,puedeContabilidad:contabilidad(req.session.user),puedeRecibir:gestion(req.session.user),puedeAdministracion:await esPropietarioAdministracion(req.session.user,pool)});}));
+interno.get('/facturas',wrap(async(req,res)=>{const [r]=await pool.query("SELECT * FROM prov_documentos WHERE tipo='factura_portal' ORDER BY id DESC");const docs=r.map(parse);for(const row of docs)row.datos.control=await revisarFactura(pool,row);res.render('portal_proveedores/bandeja',{docs,saldo,excepciones,puedeContabilidad:contabilidad(req.session.user),puedeAdministracion:await esPropietarioAdministracion(req.session.user,pool)});}));
 interno.post('/facturas/:id/notas-credito',wrap(async(req,res)=>{if(!contabilidad(req.session.user))return res.sendStatus(403);await cargarNota(req,res);}));
 interno.post('/facturas/:id/:accion',wrap(async(req,res)=>{
-  const a=req.params.accion;exigir(['hacienda','aprobar','rechazar','pago','orden','programar','cancelar-programacion','aplicar-nota','recepcion'].includes(a),'Acción inválida');
-  if(a!=='hacienda'&&!(['orden','recepcion'].includes(a)&&gestion(req.session.user))&&!contabilidad(req.session.user))return res.sendStatus(403);
-  if(a==='recepcion'&&!gestion(req.session.user))return res.sendStatus(403);
+  const a=req.params.accion;exigir(['hacienda','aprobar','rechazar','pago','orden','programar','cancelar-programacion','aplicar-nota'].includes(a),'Acción inválida');
+  if(a!=='hacienda'&&!(['orden'].includes(a)&&gestion(req.session.user))&&!contabilidad(req.session.user))return res.sendStatus(403);
   let hacienda,actual,notasConsultadas=[];
   if(a==='hacienda'){actual=await documento(pool,req.params.id);hacienda=await consultarHacienda(actual.datos.factura.electronica.clave,actual.datos.factura.electronica);for(const n of (actual.datos.notas_credito||[]).filter(n=>!['ACEPTADA','RECHAZADA'].includes(n.hacienda.estado)).slice(0,20))notasConsultadas.push({clave:n.clave,anterior:JSON.stringify(n.hacienda),hacienda:await consultarHacienda(n.clave,n)});}
   await transaccion(async db=>{
     const row=await documento(db,req.params.id,true),f=row.datos.factura;
     if(a==='hacienda'){exigir(f.subida_en===actual.datos.factura.subida_en,'La factura cambió');if(JSON.stringify(f.electronica.hacienda)===JSON.stringify(actual.datos.factura.electronica.hacienda))f.electronica.hacienda=hacienda;for(const c of notasConsultadas){const n=row.datos.notas_credito?.find(n=>n.clave===c.clave);if(n&&JSON.stringify(n.hacienda)===c.anterior)n.hacienda=c.hacienda;}}
-    if(a==='recepcion')await registrarRecepcionCompras(db,row,req.body,req.session.user.id);
     if(a==='orden')await vincularOrden(db,row,req.body,req.session.user.id);
-    if(['aprobar','pago','programar'].includes(a)){row.datos.control=await revisarFactura(db,row,true);exigirControl(row.datos.control,a!=='aprobar');}
+    if(['aprobar','pago','programar'].includes(a)){row.datos.control=await revisarFactura(db,row,true);exigirControl(row.datos.control);}
     if(a==='aprobar'){exigir(f.estado==='PENDIENTE','Factura ya revisada');aprobable(f);f.estado='CONCILIADA';f.cuenta_por_pagar=true;f.aprobada_en=new Date().toISOString();}
     if(a==='rechazar'){exigir(f.estado==='PENDIENTE','Factura ya revisada');const motivo=String(req.body.motivo||'').trim();exigir(motivo&&motivo.length<=1000,'Indique el motivo');f.estado='RECHAZADA_INTERNA';f.motivo=motivo;}
     if(a==='programar'){

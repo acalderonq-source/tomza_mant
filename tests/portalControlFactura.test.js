@@ -1,5 +1,5 @@
 const test=require('node:test'),assert=require('node:assert/strict');
-const {compararLineas,revisarFactura,exigirControl,registrarRecepcionCompras,excepciones}=require('../src/utils/portalControlFactura');
+const {compararLineas,revisarFactura,exigirControl,excepciones}=require('../src/utils/portalControlFactura');
 const {saldo}=require('../src/utils/proveeduria');
 const {leerFacturaXML}=require('../src/utils/proveedorHacienda');
 const linea=(cantidad=1)=>({codigo:'A',cantidad,precio_unitario:100,iva:13,descuento:0});
@@ -29,41 +29,31 @@ function mock({origen='PROVEEDURIA',recibida=0,otras=[],total=565}={}){
   const row={id:5,datos:{proveedor:'Proveedor',orden_compra:{origen,id:7},moneda:'CRC',pagos:[],factura:{total:226,electronica:{lineas:[linea(2)]}}}};
   return {db,row,writes};
 }
-test('aprobación compara OC y XML; pago exige recepción acumulada de ambas facturas',async()=>{
+test('aprobar, programar y pagar no exigen entregas ni cantidades recibidas',async()=>{
   for(const origen of ['PROVEEDURIA','COMPRAS']){
-    const m=mock({origen,recibida:3,otras:[2]}),c=await revisarFactura(m.db,m.row,true);
-    assert.deepEqual(c.diferencias,[]);assert.equal(c.recepcion,false);
-    assert.doesNotThrow(()=>exigirControl(c));assert.throws(()=>exigirControl(c,true),/recibida/);
-    const n=mock({origen,recibida:4,otras:[2]}),ok=await revisarFactura(n.db,n.row,true);assert.doesNotThrow(()=>exigirControl(ok,true));
+    const m=mock({origen,recibida:0,otras:[2]}),query=m.db.query;
+    m.db.query=async(sql,args)=>{assert.doesNotMatch(sql,/prov_portal_recepciones/);return query(sql,args);};
+    const c=await revisarFactura(m.db,m.row,true);
+    assert.deepEqual(c.diferencias,[]);assert.equal(c.recepcion,undefined);assert.doesNotThrow(()=>exigirControl(c));
   }
 });
 test('reverifica el monto acumulado al aprobar y pagar',async()=>{
   const m=mock({recibida:5,otras:[4]}),c=await revisarFactura(m.db,m.row,true);
   assert.match(c.diferencias.join(),/Monto acumulado/);assert.match(c.diferencias.join(),/cantidad acumulada/);
 });
-test('recepción parcial conserva referencia, actor y cantidades; rechaza excesos',async()=>{
-  const m=mock({origen:'COMPRAS',recibida:2});
-  await registrarRecepcionCompras(m.db,m.row,{referencia:'Entrega 1',cantidad_0:2},1);
-  assert.equal(m.writes.length,1);assert.deepEqual(JSON.parse(m.writes[0].args[2]),[{codigo:'A',cantidad:2}]);
-  await assert.rejects(registrarRecepcionCompras(m.db,m.row,{referencia:'Entrega 2',cantidad_0:4},1),/Cantidades/);
-  await assert.rejects(registrarRecepcionCompras(m.db,m.row,{referencia:'Entrega 2',cantidad_0:-1},1),/Cantidades/);
-});
-
-test('recepción de Compras conserva el código de proveedor cuando el código interno es nulo',async()=>{
+test('comparación de Compras reconoce el código del proveedor sin código interno',async()=>{
   const m=mock({origen:'COMPRAS'}),query=m.db.query;
   m.db.query=async(sql,args)=>sql.includes('FROM ordenes_compra_detalle')?[[{...linea(5),id:77,codigo:null,codigo_producto:'A',subtotal:500}]]:query(sql,args);
   const c=await revisarFactura(m.db,m.row,true);assert.equal(c.orden[0].codigo,'A');assert.deepEqual(c.diferencias,[]);
-  await registrarRecepcionCompras(m.db,m.row,{referencia:'Entrega Maxi',cantidad_77:2},1);
-  assert.deepEqual(JSON.parse(m.writes[0].args[2]),[{codigo:'A',cantidad:2}]);
 });
 test('programación no reduce saldo; solo notas aplicadas reducen cuentas por pagar',()=>{
   const d={factura:{total:113},pagos:[{monto:20}],programacion:{monto:93},notas_credito:[{total:30,aplicada:true},{total:50,aplicada:false}]};
   assert.deepEqual(saldo(d),{facturado:113,pagos:20,creditos:30,saldo:63});
 });
-test('excepciones incluyen Hacienda, OC, precios y recepción',()=>{
+test('excepciones incluyen Hacienda, OC y precios sin exigir recepción',()=>{
   const d={factura:{electronica:{hacienda:{estado:'RECHAZADA'}}},control:{diferencias:['Precio diferente'],recepcion:false}};
   assert.deepEqual(excepciones(d),['Sin OC','Rechazada por Hacienda','Precio diferente']);
-  d.orden_compra={id:1};assert.ok(excepciones(d).includes('Recepción pendiente'));
+  d.orden_compra={id:1};assert.ok(!excepciones(d).includes('Recepción pendiente'));
 });
 test('XML extrae detalle, descuento, impuesto y referencia de nota de crédito',()=>{
   const consecutivo='00100001030000000001',clave='506141026003101123456'+consecutivo+'112345678',original='50614102600310112345600100001010000000001112345678';

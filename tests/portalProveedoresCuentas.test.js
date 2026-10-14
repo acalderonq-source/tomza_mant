@@ -62,7 +62,7 @@ test('aprobación interna exige aceptación Hacienda y pago no supera saldo',asy
   const original=pool.query,connection=pool.getConnection;let row=doc(),writes=0;
   const linea={codigo:'A',cantidad:1,precio_unitario:100,iva:13};row.datos.factura.electronica.lineas=[linea];row.datos.orden_compra={origen:'PROVEEDURIA',id:7};
   pool.getConnection=async()=>({beginTransaction:async()=>{},commit:async()=>{},rollback:async()=>{},release(){},query:async(sql,args)=>{
-    if(sql.includes("tipo='oc'"))return [[{datos:{proveedor:'Proveedor',moneda:'CRC',total:113,estado:'RECIBIDA',lineas:[linea]}}]];
+    if(sql.includes("tipo='oc'"))return [[{datos:{proveedor:'Proveedor',moneda:'CRC',total:113,estado:'EMITIDA',lineas:[linea]}}]];
     if(sql.includes('SELECT d.id,d.datos FROM prov_portal_factura_orden'))return [[]];
     if(sql.includes('AS total FROM prov_documentos'))return [[{total:113}]];
     if(sql.includes('FROM prov_documentos'))return [[structuredClone(row)]];
@@ -78,6 +78,7 @@ test('aprobación interna exige aceptación Hacienda y pago no supera saldo',asy
     pago.monto=50;assert.equal((await c.post('/proveeduria/portal-proveedores/facturas/11/pago',pago)).status,200);assert.equal(saldo(row.datos).saldo,63);
     assert.equal((await c.post('/proveeduria/portal-proveedores/facturas/11/pago',pago)).status,400);
     assert.equal((await c.post('/proveeduria/portal-proveedores/facturas/11/programar',{monto:63,fecha:'2026-10-20'})).status,200);assert.equal(saldo(row.datos).saldo,63);assert.equal(row.datos.programacion.monto,63);
+    assert.equal((await c.post('/proveeduria/portal-proveedores/facturas/11/recepcion',{referencia:'Entrega'})).status,400);
     row.datos.notas_credito=[{clave:'NC1',total:20,hacienda:{estado:'PENDIENTE',ambiente:'produccion'}}];
     assert.equal((await c.post('/proveeduria/portal-proveedores/facturas/11/aplicar-nota',{clave:'NC1'})).status,400);
     row.datos.notas_credito[0].hacienda.estado='ACEPTADA';assert.equal((await c.post('/proveeduria/portal-proveedores/facturas/11/aplicar-nota',{clave:'NC1'})).status,200);assert.equal(saldo(row.datos).saldo,43);assert.equal(row.datos.programacion,undefined);
@@ -88,5 +89,5 @@ test('aprobación interna exige aceptación Hacienda y pago no supera saldo',asy
 test('pantallas de cuentas y bandeja renderizan estados y permisos',async()=>{
   const dir=path.join(__dirname,'../src/views/portal_proveedores');
   const admin=await ejs.renderFile(path.join(dir,'cuentas.ejs'),{proveedores:[{id:1,nombre:'Proveedor'}],cuentas:[account],receptores:[],puedeGestion:true});assert.match(admin,/Crear acceso de proveedor/);assert.match(admin,/Restablecer contraseña/);
-  const page=await ejs.renderFile(path.join(dir,'bandeja.ejs'),{docs:[doc()],saldo,excepciones:require('../src/utils/portalControlFactura').excepciones,puedeContabilidad:true});assert.match(page,/Aprobar cuenta por pagar/);assert.match(page,/Consultar Hacienda/);
+  const page=await ejs.renderFile(path.join(dir,'bandeja.ejs'),{docs:[doc()],saldo,excepciones:require('../src/utils/portalControlFactura').excepciones,puedeContabilidad:true});assert.match(page,/Aprobar cuenta por pagar/);assert.match(page,/Consultar Hacienda/);assert.doesNotMatch(page,/Confirmar cantidades recibidas|Registrar recepción|Mercadería:/);
 });
