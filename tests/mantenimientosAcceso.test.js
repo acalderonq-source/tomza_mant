@@ -179,14 +179,15 @@ test("un mecanico sin sede asignada no puede cerrar mantenimientos de otras sede
   assert.equal(tx.released, true);
 });
 
-test("un mecanico de sede puede cerrar el mantenimiento de su sede", async () => {
+for (const sedeTrabajo of ["Alajuela", "Orotina"]) {
+test(`el mecanico de Alajuela puede registrar trabajo y cerrar mantenimiento en ${sedeTrabajo}`, async () => {
   const tx = { writes: [], committed: false, rolledBack: false, released: false };
   const connection = {
     async beginTransaction() {},
     async query(sql, params = []) {
       tx.writes.push({ sql, params });
       if (sql.includes("SELECT m.id, m.estado, u.placa, u.sede")) {
-        return [[{ id: 20, estado: "PROGRAMADO", placa: "A1", sede: "Alajuela" }]];
+        return [[{ id: 20, estado: "PROGRAMADO", placa: "A1", sede: sedeTrabajo }]];
       }
       if (sql.includes("SELECT id FROM mecanicos")) return [[{ id: 7 }]];
       if (sql.includes("UPDATE mantenimientos m")) return [{ affectedRows: 1 }];
@@ -209,9 +210,11 @@ test("un mecanico de sede puede cerrar el mantenimiento de su sede", async () =>
     assert.equal(tx.rolledBack, false);
     const mecanicosQuery = tx.writes.find(item => item.sql.includes("SELECT id FROM mecanicos"));
     assert.ok(mecanicosQuery.params.flat().includes("Alajuela"));
+    assert.ok(mecanicosQuery.params.flat().includes("Orotina"));
   });
   assert.equal(tx.released, true);
 });
+}
 
 test("si falla la asignación de un mecánico, el cierre revierte todos los cambios", async () => {
   const tx = { committed: false, rolledBack: false, released: false };
