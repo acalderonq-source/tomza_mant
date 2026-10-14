@@ -28,12 +28,12 @@ function leerFacturaXML(archivo, notaCredito = false) {
     const codigos=array(l.CodigoComercial).map(c=>String(c.Codigo||'')).filter(Boolean);
     const cantidad=numero(l.Cantidad,'Cantidad XML',0.00001),precio=numero(l.PrecioUnitario,'Precio XML');
     const impuestos=array(l.Impuesto),descuento=array(l.Descuento).reduce((s,x)=>s+numero(x.MontoDescuento,'Descuento XML'),0);
-    if(impuestos.some(i=>i.Exoneracion||i.Codigo&&String(i.Codigo)!=='01')||l.ImpuestoAsumidoEmisorFabrica)observaciones_control.push('El XML incluye exoneraciones u otros impuestos: requiere revisión fiscal');
+    if(impuestos.some(i=>i.Exoneracion||i.Codigo&&String(i.Codigo)!=='01')||Number(l.ImpuestoAsumidoEmisorFabrica||0)>0)observaciones_control.push('El XML incluye exoneraciones u otros impuestos: requiere revisión fiscal');
     return {codigo:codigos[0]||String(l.CodigoCABYS||l.Codigo||''),codigos,descripcion:String(l.Detalle||''),cantidad,precio_unitario:precio,descuento,iva:impuestos.reduce((s,x)=>s+numero(x.Tarifa||0,'IVA XML'),0),subtotal:numero(l.SubTotal??cantidad*precio-descuento,'Subtotal XML')};
   });
   const referencias=array(f.InformacionReferencia).map(r=>({tipo:String(r.TipoDoc||r.TipoDocIR||''),numero:String(r.Numero||''),razon:String(r.Razon||'')}));
   if(notaCredito)exigir(referencias.length===1&&referencias[0].tipo==='01'&&/^506\d{47}$/.test(referencias[0].numero),'La nota de crédito debe referenciar una única factura electrónica original');
-  return { lineas,observaciones_control:[...new Set(observaciones_control)],referencias,tipo:notaCredito?'NOTA_CREDITO':'FACTURA',clave, consecutivo, emisor, receptor, nombre_emisor: String(f.Emisor?.Nombre || ''), nombre_comercial_emisor: String(f.Emisor?.NombreComercial || ''), nombre_receptor: String(f.Receptor?.Nombre || ''), fecha: f.FechaEmision, total, moneda,
+  return { detalle_version:2,lineas,observaciones_control:[...new Set(observaciones_control)],referencias,tipo:notaCredito?'NOTA_CREDITO':'FACTURA',clave, consecutivo, emisor, receptor, nombre_emisor: String(f.Emisor?.Nombre || ''), nombre_comercial_emisor: String(f.Emisor?.NombreComercial || ''), nombre_receptor: String(f.Receptor?.Nombre || ''), fecha: f.FechaEmision, total, moneda,
     archivo: { nombre: String(archivo.nombre || 'factura.xml').replace(/[^\w. -]/g,'_').slice(0,120), mime:'application/xml', base64:bytes.toString('base64') } };
 }
 

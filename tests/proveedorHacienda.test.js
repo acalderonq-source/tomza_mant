@@ -5,6 +5,13 @@ const consecutivo='00100001010000000001';
 const clave='506141026003101123456'+consecutivo+'112345678';
 const xml=`<FacturaElectronica><Clave>${clave}</Clave><NumeroConsecutivo>${consecutivo}</NumeroConsecutivo><FechaEmision>2026-10-14T10:00:00-06:00</FechaEmision><Emisor><Nombre>Proveedor</Nombre><Identificacion><Numero>3101123456</Numero></Identificacion></Emisor><Receptor><Nombre>Tomza</Nombre><Identificacion><Numero>3101654321</Numero></Identificacion></Receptor><ResumenFactura><CodigoTipoMoneda><CodigoMoneda>CRC</CodigoMoneda></CodigoTipoMoneda><TotalComprobante>113.00</TotalComprobante></ResumenFactura></FacturaElectronica>`;
 const archivo = value=>({nombre:'factura.xml',base64:Buffer.from(value).toString('base64')});
+
+test('impuesto asumido en cero no se clasifica como excepción fiscal',()=>{
+  const detalle='<DetalleServicio><LineaDetalle><CodigoComercial><Codigo>A</Codigo></CodigoComercial><Detalle>Artículo</Detalle><Cantidad>1</Cantidad><PrecioUnitario>100</PrecioUnitario><SubTotal>100</SubTotal><Impuesto><Codigo>01</Codigo><Tarifa>13</Tarifa><Monto>13</Monto></Impuesto><ImpuestoAsumidoEmisorFabrica>0.00000</ImpuestoAsumidoEmisorFabrica></LineaDetalle></DetalleServicio>';
+  const contenido=xml.replace('<ResumenFactura>',detalle+'<ResumenFactura>');
+  assert.deepEqual(leerFacturaXML(archivo(contenido)).observaciones_control,[]);
+  assert.ok(leerFacturaXML(archivo(contenido.replace('>0.00000<','>13.00000<'))).observaciones_control.length);
+});
 test('lee clave sin perder ceros, exige factura XML y rechaza entidades',()=>{
   const f=leerFacturaXML(archivo(xml));assert.equal(f.clave,clave);assert.equal(f.total,113);assert.equal(f.consecutivo,consecutivo);
   assert.throws(()=>leerFacturaXML(archivo('<!DOCTYPE foo>'+xml)));

@@ -36,7 +36,7 @@ async function revisarFactura(db,row,lock=false){
   }else{
     const [r]=await db.query('SELECT o.*,p.nombre,p.cedula_juridica FROM ordenes_compra o LEFT JOIN proveedores p ON p.id=o.proveedor_id WHERE o.id=?'+bloqueo,[oc.id]);
     if(r.length){const o=r[0];identidad({estado:o.estado,proveedor:o.nombre,cedula:o.cedula_juridica,moneda:o.moneda,total:Number(o.total),factura_registrada:!!o.factura});const [ls]=await db.query('SELECT * FROM ordenes_compra_detalle WHERE orden_compra_id=? ORDER BY id'+bloqueo,[oc.id]);
-      lineas=ls.map(l=>({...l,iva:Number(o.iva),descuento:Number(o.subtotal)>0?Number(o.descuento||0)*Number(l.subtotal)/Number(o.subtotal):0}));
+      lineas=ls.map(l=>({...l,codigo:l.codigo||l.codigo_producto||`LINEA-${l.id}`,iva:Number(o.iva),descuento:Number(o.subtotal)>0?Number(o.descuento||0)*Number(l.subtotal)/Number(o.subtotal):0}));
       const [entregas]=await db.query('SELECT lineas FROM prov_portal_recepciones_compras WHERE orden_id=?'+bloqueo,[oc.id]);
       recibidas=lineas.map(l=>({...l,recibida:o.estado==='RECIBIDA_TOTAL'?Number(l.cantidad):entregas.flatMap(r=>parse(r.lineas)).filter(x=>code(x.codigo)===code(l.codigo)).reduce((s,x)=>s+Number(x.cantidad),0)}));
       if(Number(o.transporte)>0)issues.push('La OC incluye transporte: requiere revisar su correspondencia en el XML');
@@ -61,10 +61,10 @@ async function revisarFactura(db,row,lock=false){
   return {diferencias:[...new Set(issues)],recepcion,revisado_en:new Date().toISOString(),lineas:actual,orden:recibidas};
 }
 async function cargarDetalleXML(db,d){
-  const e=d.factura.electronica;if(e.lineas||!e.archivo?.id)return;
+  const e=d.factura.electronica;if(!e.archivo?.id||(e.lineas&&(e.detalle_version===2||!e.observaciones_control?.length)))return;
   const [r]=await db.query('SELECT nombre,contenido FROM prov_adjuntos WHERE id=?',[e.archivo.id]);
   if(!r.length)return;
-  try{const f=require('./proveedorHacienda').leerFacturaXML({nombre:r[0].nombre,base64:Buffer.from(r[0].contenido).toString('base64')});if(f.clave===e.clave){e.lineas=f.lineas;e.observaciones_control=f.observaciones_control;}}catch(_){/* Los XML antiguos no válidos quedan como excepción, nunca se aprueban. */}
+  try{const f=require('./proveedorHacienda').leerFacturaXML({nombre:r[0].nombre,base64:Buffer.from(r[0].contenido).toString('base64')});if(f.clave===e.clave){e.lineas=f.lineas;e.observaciones_control=f.observaciones_control;e.detalle_version=f.detalle_version;}}catch(_){/* Los XML antiguos no válidos quedan como excepción, nunca se aprueban. */}
 }
 async function registrarRecepcionCompras(db,row,body,actor){
   const oc=row.datos.orden_compra;exigir(oc?.origen==='COMPRAS','Registre esta recepción desde el módulo de Proveeduría');

@@ -48,6 +48,14 @@ test('recepción parcial conserva referencia, actor y cantidades; rechaza exceso
   await assert.rejects(registrarRecepcionCompras(m.db,m.row,{referencia:'Entrega 2',cantidad_0:4},1),/Cantidades/);
   await assert.rejects(registrarRecepcionCompras(m.db,m.row,{referencia:'Entrega 2',cantidad_0:-1},1),/Cantidades/);
 });
+
+test('recepción de Compras conserva el código de proveedor cuando el código interno es nulo',async()=>{
+  const m=mock({origen:'COMPRAS'}),query=m.db.query;
+  m.db.query=async(sql,args)=>sql.includes('FROM ordenes_compra_detalle')?[[{...linea(5),id:77,codigo:null,codigo_producto:'A',subtotal:500}]]:query(sql,args);
+  const c=await revisarFactura(m.db,m.row,true);assert.equal(c.orden[0].codigo,'A');assert.deepEqual(c.diferencias,[]);
+  await registrarRecepcionCompras(m.db,m.row,{referencia:'Entrega Maxi',cantidad_77:2},1);
+  assert.deepEqual(JSON.parse(m.writes[0].args[2]),[{codigo:'A',cantidad:2}]);
+});
 test('programación no reduce saldo; solo notas aplicadas reducen cuentas por pagar',()=>{
   const d={factura:{total:113},pagos:[{monto:20}],programacion:{monto:93},notas_credito:[{total:30,aplicada:true},{total:50,aplicada:false}]};
   assert.deepEqual(saldo(d),{facturado:113,pagos:20,creditos:30,saldo:63});

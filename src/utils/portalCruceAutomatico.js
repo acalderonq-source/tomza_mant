@@ -27,7 +27,7 @@ async function buscarCandidatos(db,datos){
     }else{
       const compra=compras.find(r=>r.id===o.id),[ls]=await db.query('SELECT * FROM ordenes_compra_detalle WHERE orden_compra_id=?',[o.id]);
       if(Number(compra.transporte)>0)continue;
-      lineas=ls.map(l=>({...l,iva:Number(compra.iva),descuento:Number(compra.subtotal)>0?Number(compra.descuento||0)*Number(l.subtotal)/Number(compra.subtotal):0}));
+      lineas=ls.map(l=>({...l,codigo:l.codigo||l.codigo_producto||`LINEA-${l.id}`,iva:Number(compra.iva),descuento:Number(compra.subtotal)>0?Number(compra.descuento||0)*Number(l.subtotal)/Number(compra.subtotal):0}));
     }
     const [usadas]=await db.query("SELECT d.datos FROM prov_portal_factura_orden v JOIN prov_documentos d ON d.id=v.factura_id WHERE v.origen=? AND v.orden_id=? AND JSON_UNQUOTE(JSON_EXTRACT(d.datos,'$.factura.estado'))<>'RECHAZADA_INTERNA'",[o.origen,o.id]);
     const otras=usadas.map(r=>typeof r.datos==='string'?JSON.parse(r.datos):r.datos);
