@@ -1,7 +1,7 @@
 const express = require("express");
 const pool = require("../db");
 const { getSedesPermitidas, esUsuarioTodasSedes, etiquetaSede } = require("../utils/sedes");
-const { hoyCostaRica, fechaValida, sumarDias, lunesSemana, fechasProgramadas, puedeProgramar, generarPreventivos, asegurarProgramacionSemanal } = require("../utils/preventivosSemanales");
+const { hoyCostaRica, fechaValida, sumarDias, lunesSemana, fechasProgramadas, puedeProgramar, generarPreventivos, asegurarProgramacionSemanal, repartirUnidadesSemana } = require("../utils/preventivosSemanales");
 const { ensureNumeroMantenimientoColumn } = require("../utils/mantenimientosNumero");
 const router = express.Router();
 
@@ -71,6 +71,69 @@ router.get("/", async (req, res) => {
     console.error("Error cargando preventivos semanales:", error);
     res.status(500).send("No se pudo cargar la programación semanal de preventivos.");
   }
+});
+
+router.post("/automatico", async (req, res) => {
+  if (!puedeProgramar(req.session.user)) return res.status(403).send("No autorizado para programar preventivos.");
+  if (!fechaValida(req.body.semana) || typeof req.body.sede !== "string" || req.body.sede.length > 100) {
+    return res.status(400).send("Revise la semana y la sede seleccionadas.");
+  }
+  const hoy = hoyCostaRica();
+  const seleccionada = lunesSemana(req.body.semana);
+  const inicio = seleccionada < hoy ? sumarDias(lunesSemana(hoy), 7) : seleccionada;
+  const sede = req.body.sede.trim();
+  let connection;
+  try {
+    await asegurarProgramacionSemanal(pool);
+    connection = await pool.getConnection();
+    await connection.beginTransaction();
+    const [unidades] = await connection.query(
+      `SELECT id, placa, sede FROM unidades WHERE COALESCE(activa, 1) = 1
+       ${sede ? "AND sede = ?" : ""} ORDER BY id FOR UPDATE`, sede ? [sede] : []
+    );
+    const reparto = repartirUnidadesSemana(unidades, inicio);
+    if (reparto.length) {
+      const [existentes] = await connection.query(
+        `SELECT id, unidad_id, intervalo_semanas, activa, DATE_FORMAT(fecha_inicio, '%Y-%m-%d') AS inicio
+         FROM preventivos_programaciones WHERE unidad_id IN (?) FOR UPDATE`, [reparto.map(unidad => unidad.id)]
+      );
+      const porUnidad = new Map(existentes.map(regla => [regla.unidad_id, regla]));
+      for (const unidad of reparto) {
+        const actual = porUnidad.get(unidad.id);
+        if (actual && actual.intervalo_semanas === 1 && actual.activa && actual.inicio === unidad.fecha) continue;
+        if (actual) {
+          await connection.query(
+            `UPDATE preventivos_programaciones SET fecha_inicio = ?, intervalo_semanas = 1, activa = 1,
+             procesada_hasta = ?, version = version + 1, actualizado_por = ? WHERE id = ?`,
+            [unidad.fecha, sumarDias(hoy, -1), req.session.user.id, actual.id]
+          );
+        } else {
+          await connection.query(
+            `INSERT INTO preventivos_programaciones
+             (unidad_id, fecha_inicio, intervalo_semanas, activa, procesada_hasta, creado_por, actualizado_por)
+             VALUES (?, ?, 1, 1, ?, ?, ?)`,
+            [unidad.id, unidad.fecha, sumarDias(hoy, -1), req.session.user.id, req.session.user.id]
+          );
+        }
+      }
+    }
+    await connection.commit();
+    req.session.preventivosSuccess = reparto.length
+      ? `${reparto.length} unidades distribuidas de lunes a viernes por sede. Ciclo semanal desde ${inicio.split("-").reverse().join("/")}.`
+      : "No hay unidades activas para programar en esta sede.";
+  } catch (error) {
+    await connection?.rollback().catch(() => {});
+    console.error("Error repartiendo preventivos automáticamente:", error);
+    return res.status(500).send("No se pudo completar la programación automática. Puede reintentar.");
+  } finally {
+    connection?.release();
+  }
+  try { await ensureNumeroMantenimientoColumn(pool); await generarPreventivos(pool); }
+  catch (error) {
+    console.error("Error generando preventivos después del reparto:", error);
+    req.session.preventivosError = "El ciclo quedó guardado. La generación se reintentará automáticamente.";
+  }
+  res.redirect(`/mantenimientos/semana?${new URLSearchParams({ semana: inicio, sede })}`);
 });
 
 router.post("/programacion", async (req, res) => {

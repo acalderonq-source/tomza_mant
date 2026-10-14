@@ -41,6 +41,13 @@
     <div class="btn-group"><a class="btn btn-outline-secondary" href="<%= enlaceSemana(anterior) %>" aria-label="Semana anterior" title="Semana anterior"><i class="bi bi-chevron-left"></i></a><a class="btn btn-outline-secondary" href="<%= enlaceSemana(siguiente) %>" aria-label="Semana siguiente" title="Semana siguiente"><i class="bi bi-chevron-right"></i></a></div>
     <div><label for="buscar">Buscar unidad</label><input class="form-control" id="buscar" type="search" placeholder="Placa o sede"></div>
   </form>
+  <% if (puedeProgramar) { %>
+    <form method="POST" action="/mantenimientos/semana/automatico" class="d-flex align-items-center gap-3 flex-wrap mb-3" id="programarAutomatico">
+      <input type="hidden" name="semana" value="<%= semana %>"><input type="hidden" name="sede" value="<%= sede %>">
+      <button class="btn btn-success" type="submit" <%= !filas.length ? 'disabled' : '' %>><i class="bi bi-calendar2-check me-1"></i>Programar automáticamente</button>
+      <span class="small text-secondary">Ciclo semanal de lunes a viernes · <%= sede ? etiquetaSede(sede) : 'Todas las sedes' %>. Se actualizarán las frecuencias de estas unidades.</span>
+    </form>
+  <% } %>
   <div class="row g-3 mb-3">
     <% [['Unidades',resumen.unidades],['Con frecuencia automática',resumen.conFrecuencia],['Con preventivo esta semana',resumen.estaSemana],['Preventivos cerrados',resumen.cerrados]].forEach(([label,valor]) => { %>
     <div class="col-6 col-lg-3"><div class="metric"><span><%= label %></span><strong><%= valor %></strong></div></div><% }) %>
@@ -84,6 +91,11 @@
 <% } %>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
+  document.getElementById('programarAutomatico')?.addEventListener('submit', event => {
+    const button = event.target.querySelector('button[type="submit"]');
+    button.disabled = true;
+    button.textContent = 'Programando…';
+  });
   document.getElementById('buscar').addEventListener('input', event => {
     const value = event.target.value.trim().toLowerCase();
     document.querySelectorAll('tr[data-buscar]').forEach(row => { row.hidden = !row.dataset.buscar.includes(value); });

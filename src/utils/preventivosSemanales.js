@@ -40,6 +40,25 @@ function puedeProgramar(user) {
   return ["ADMIN", "TALLER", "PROVEEDURIA_TALLER"].includes(user?.rol);
 }
 
+function repartirUnidadesSemana(unidades, inicio) {
+  const porSede = new Map();
+  const cargaTotal = Array(5).fill(0);
+  return [...unidades].sort((a, b) =>
+    String(a.sede).localeCompare(String(b.sede)) || String(a.placa).localeCompare(String(b.placa)) || a.id - b.id
+  ).map(unidad => {
+    const cargaSede = porSede.get(unidad.sede) || Array(5).fill(0);
+    let dia = 0;
+    for (let candidato = 1; candidato < 5; candidato += 1) {
+      if (cargaSede[candidato] < cargaSede[dia] ||
+          (cargaSede[candidato] === cargaSede[dia] && cargaTotal[candidato] < cargaTotal[dia])) dia = candidato;
+    }
+    cargaSede[dia] += 1;
+    cargaTotal[dia] += 1;
+    porSede.set(unidad.sede, cargaSede);
+    return { ...unidad, fecha: sumarDias(lunesSemana(inicio), dia) };
+  });
+}
+
 let esquemaPendiente;
 function asegurarProgramacionSemanal(pool) {
   if (!esquemaPendiente) {
@@ -127,4 +146,4 @@ async function generarPreventivos(pool, hoy = hoyCostaRica()) {
   return creados;
 }
 
-module.exports = { hoyCostaRica, fechaValida, sumarDias, lunesSemana, fechasProgramadas, puedeProgramar, generarPreventivos, asegurarProgramacionSemanal };
+module.exports = { hoyCostaRica, fechaValida, sumarDias, lunesSemana, fechasProgramadas, puedeProgramar, generarPreventivos, asegurarProgramacionSemanal, repartirUnidadesSemana };
