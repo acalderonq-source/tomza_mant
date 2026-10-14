@@ -181,6 +181,14 @@ function sedeInventarioAceite(sede) {
   return claveSedeAceite(operativa) === "SANCARLOS" ? "Guapiles" : operativa;
 }
 
+function grupoAceite(sede) {
+  return esSedeAceiteTransportadora(sede) || claveSedeAceite(sede) === "ACEITELIMON" ? "TRANSPORTE" : "CILINDREROS";
+}
+
+function destinoCompatible(destino, sede) {
+  return destino === undefined || destino === grupoAceite(sede);
+}
+
 function expandirSedeInventarioAceite(sede) {
   const inventario = sedeInventarioAceite(sede);
   if (esSedeAceiteTransportadora(inventario)) {
@@ -797,6 +805,7 @@ router.get("/", async (req, res) => {
       resumen,
       sedesGestion,
       unidadesRelleno,
+      grupoAceite,
       capacidadEstandar: CAPACIDAD_ESTANON_LITROS,
       capacidadEstandarGalones: CAPACIDAD_ESTANON_GALONES,
       galonALitros: GALON_A_LITROS,
@@ -903,7 +912,7 @@ router.get("/nuevo", async (req, res) => {
       [sedesPermitidas]
     );
 
-    res.render("aceite_nuevo", { unidades, user: req.session.user });
+    res.render("aceite_nuevo", { unidades, grupoAceite, user: req.session.user });
   } catch (error) {
     console.error("ERROR form aceite:", error);
     res.status(500).send("Error interno");
@@ -936,6 +945,8 @@ router.post("/estanones", async (req, res) => {
       req.session.error = "Seleccione una sede permitida para el estañón.";
       return res.redirect("/aceite");
     }
+
+    if (!destinoCompatible(req.body.destino, sede)) return res.status(400).send("La sede no corresponde al uso del aceite seleccionado.");
 
     if (galonesIniciales <= 0 || galonesIniciales > galonesCapacidad) {
       req.session.error = "Los galones iniciales deben ser mayores a cero y no superar la capacidad.";
@@ -1147,6 +1158,7 @@ router.post("/rellenos", async (req, res) => {
       if (!sedesGestion.includes(sede)) return res.status(403).send("No autorizado para esa sede");
     }
 
+    if (!destinoCompatible(req.body.destino, sede)) return res.status(400).send("La unidad o sede no corresponde al uso del aceite seleccionado.");
     const detalle = String(observaciones || "").trim();
     const concepto = unidad ? `Relleno de aceite ${unidad.placa}` : "Relleno de aceite";
     const descripcion = detalle
@@ -1204,6 +1216,8 @@ router.post("/", async (req, res) => {
     if (!unidad || !puedeUsarSede(unidad.sede, sedesPermitidas)) {
       return res.status(403).send("No autorizado para esa unidad");
     }
+
+    if (!destinoCompatible(req.body.destino, unidad.sede)) return res.status(400).send("La unidad no corresponde al uso del aceite seleccionado.");
 
     await connection.beginTransaction();
 
@@ -1265,3 +1279,4 @@ router.post("/", async (req, res) => {
 });
 
 module.exports = router;
+module.exports.grupoAceite = grupoAceite;

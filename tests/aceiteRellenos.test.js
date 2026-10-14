@@ -133,7 +133,7 @@ test('supervisors cannot record oil fills', async () => {
 test('rendered fill form supports an optional plate and requires a site for general fills', async () => {
   const html = await ejs.renderFile(path.join(__dirname, '../src/views/aceite_listado.ejs'), {
     galonALitros: 3.78541, capacidadEstandar: 208.2, capacidadEstandarGalones: 55,
-    etiquetaSede: value => value, etiquetaSedeInventario: value => value,
+    etiquetaSede: value => value, etiquetaSedeInventario: value => value, grupoAceite: router.grupoAceite,
     estanones: [], movimientos: [], cambios: [], gastoPorPlaca: [], ordenesAceite: [], resumen: {},
     sedesGestion: ['Guapiles'], unidadesRelleno: [{ id: 7, placa: 'C174021', sede: 'Cabezales', sede_inventario: 'Transportadora' }],
     fechaHoy: '2026-09-22', puedeGestionar: true, user: bodeguero, success: '', error: ''
@@ -143,7 +143,37 @@ test('rendered fill form supports an optional plate and requires a site for gene
   assert.match(form, /name="unidad_id"/);
   assert.match(form, /Sin placa · relleno general/);
   assert.match(form, /name="galones_usados"/);
-  assert.match(form, /value="Guapiles" selected/);
+  assert.match(form, /value="Guapiles"[^>]* selected/);
+  assert.match(form, /name="destino"/);
+});
+
+test('oil destination separates transport and granel from cylinder inventories', () => {
+  for (const sede of ['Transportadora', 'Cabezales', 'granel_alajuela', 'Granel', 'ACEITE LIMON']) assert.equal(router.grupoAceite(sede), 'TRANSPORTE');
+  for (const sede of ['Cartago', 'Alajuela', 'Guapiles', 'Nicoya']) assert.equal(router.grupoAceite(sede), 'CILINDREROS');
+});
+
+test('a mismatching destination cannot consume oil for a site or a unit', async () => {
+  assert.equal((await fill({ destino: 'TRANSPORTE', sede: 'Guapiles', galones_usados: '1' })).status, 400);
+  assert.equal((await fill({ destino: 'CILINDREROS', unidad_id: '7', galones_usados: '1' })).status, 400);
+  assert.equal(writes.length, 0);
+  assert.equal(connected, false);
+});
+
+test('a cylinder fill uses its own site stock when the destination matches', async () => {
+  await fill({ destino: 'CILINDREROS', sede: 'Guapiles', galones_usados: '1' });
+  assert.equal(committed, true);
+  assert.equal(writes.find(item => /INSERT/.test(item.sql)).params[2], 'Guapiles');
+});
+
+test('the oil change form offers destinations and their permitted units', async () => {
+  const html = await ejs.renderFile(path.join(__dirname, '../src/views/aceite_nuevo.ejs'), {
+    unidades: [{ id: 1, placa: 'C123456', sede: 'Cabezales' }, { id: 2, placa: 'C654321', sede: 'Guapiles' }],
+    grupoAceite: router.grupoAceite, user: bodeguero
+  });
+  assert.match(html, /Granel \/ Transportadora/);
+  assert.match(html, /Cilindreros/);
+  assert.match(html, /value="1" data-destino="TRANSPORTE"/);
+  assert.match(html, /value="2" data-destino="CILINDREROS"/);
 });
 
 test('drum detail displays the consumption breakdown and movement ledger', async () => {

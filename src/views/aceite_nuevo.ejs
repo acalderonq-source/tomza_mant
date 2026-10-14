@@ -73,20 +73,20 @@
       <p>Al guardar, el sistema rebaja los galones usados del estañón activo de la sede de la unidad.</p>
     </div>
 
-    <form method="POST" action="/aceite" class="p-4">
+    <form method="POST" action="/aceite" class="p-4" data-aceite-destino>
       <div class="hint-box mb-3">
         Un estañón completo tiene 55 galones. En este formulario registre cuántos galones se usaron en el cambio.
       </div>
 
       <div class="row g-3">
+        <%- include('partials/aceite_destino', {id:'destinoCambio',grupos:[...new Set(unidades.map(unidad => grupoAceite(unidad.sede)))]}) %>
         <div class="col-md-12">
           <label class="form-label">Placa</label>
-          <div data-placa-search data-placa-mode="unidad" data-placa-target="#unidadAceiteId">
-            <input type="text" class="form-control text-uppercase" data-placa-input data-placa-autocomplete placeholder="Escriba la placa" required>
-            <input type="hidden" name="unidad_id" id="unidadAceiteId" required>
-            <div data-placa-results></div>
-            <div data-placa-selected class="small text-muted mt-1"></div>
-          </div>
+          <input type="search" class="form-control text-uppercase mb-2" data-aceite-placa-buscar placeholder="Buscar placa" aria-label="Buscar placa">
+          <select name="unidad_id" id="unidadAceiteId" class="form-select" required>
+            <option value="">Seleccione una unidad</option>
+            <% unidades.forEach(unidad => { %><option value="<%= unidad.id %>" data-destino="<%= grupoAceite(unidad.sede) %>"><%= unidad.placa %> · <%= unidad.sede %></option><% }) %>
+          </select>
         </div>
 
         <div class="col-md-4">
@@ -118,7 +118,7 @@
   </section>
 </main>
 
-<script src="/js/placa-search.js?v=20260811-3"></script>
+<script src="/js/aceite-destino.js"></script>
 <script src="/js/loading-guard.js"></script>
 </body>
 </html>

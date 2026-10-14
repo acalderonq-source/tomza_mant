@@ -422,13 +422,14 @@
   <% if (puedeGestionar) { %>
     <section class="collapse mb-3" id="formEstanon">
       <div class="form-card">
-        <form method="POST" action="/aceite/estanones" class="row g-3 align-items-end">
+        <form method="POST" action="/aceite/estanones" class="row g-3 align-items-end" data-aceite-destino>
+          <%- include('partials/aceite_destino', {id:'destinoEstanon',grupos:[...new Set(sedesGestion.map(grupoAceite))]}) %>
           <div class="col-md-3">
             <label class="form-label fw-bold">Sede</label>
             <select name="sede" class="form-select" required>
               <option value="">Seleccione</option>
               <% sedesGestion.forEach(sede => { %>
-                <option value="<%= sede %>"><%= etiquetaSede(sede) %></option>
+                <option value="<%= sede %>" data-destino="<%= grupoAceite(sede) %>"><%= etiquetaSede(sede) %></option>
               <% }) %>
             </select>
           </div>
@@ -478,13 +479,14 @@
 
     <section class="collapse mb-3" id="formRelleno">
       <div class="form-card">
-        <form method="POST" action="/aceite/rellenos" class="row g-3 align-items-end" id="formRellenoAceite">
+        <form method="POST" action="/aceite/rellenos" class="row g-3 align-items-end" id="formRellenoAceite" data-aceite-destino>
+          <%- include('partials/aceite_destino', {id:'destinoRelleno',grupos:[...new Set(sedesGestion.map(grupoAceite))]}) %>
           <div class="col-md-3">
             <label for="sedeAceiteRelleno" class="form-label fw-bold">Sede del estañón</label>
             <select name="sede" id="sedeAceiteRelleno" class="form-select" required>
               <option value="">Seleccione la sede</option>
               <% sedesGestion.forEach(sede => { %>
-                <option value="<%= sede %>" <%= sedesGestion.length === 1 ? 'selected' : '' %>><%= etiquetaSede(sede) %></option>
+                <option value="<%= sede %>" data-destino="<%= grupoAceite(sede) %>" <%= sedesGestion.length === 1 ? 'selected' : '' %>><%= etiquetaSede(sede) %></option>
               <% }) %>
             </select>
           </div>
@@ -493,7 +495,7 @@
             <select name="unidad_id" id="unidadAceiteRelleno" class="form-select">
               <option value="">Sin placa · relleno general</option>
               <% (unidadesRelleno || []).forEach(unidad => { %>
-                <option value="<%= unidad.id %>" data-sede-inventario="<%= unidad.sede_inventario %>">
+                <option value="<%= unidad.id %>" data-sede-inventario="<%= unidad.sede_inventario %>" data-destino="<%= grupoAceite(unidad.sede_inventario) %>">
                   <%= unidad.placa %> · <%= etiquetaSede(unidad.sede) %>
                 </option>
               <% }) %>
@@ -884,6 +886,7 @@
     }
   });
 </script>
+<script src="/js/aceite-destino.js"></script>
 <script src="/js/loading-guard.js"></script>
 </body>
 </html>

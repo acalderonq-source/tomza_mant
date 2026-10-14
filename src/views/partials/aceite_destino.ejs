@@ -1,0 +1,9 @@
+<div class="col-md-3">
+  <label for="<%= id %>" class="form-label fw-bold">Uso del aceite</label>
+  <select id="<%= id %>" name="destino" class="form-select" required>
+    <option value="">Seleccione</option>
+    <% grupos.forEach(grupo => { %>
+      <option value="<%= grupo %>" <%= grupos.length === 1 ? 'selected' : '' %>><%= grupo === 'TRANSPORTE' ? 'Granel / Transportadora' : 'Cilindreros' %></option>
+    <% }) %>
+  </select>
+</div>
