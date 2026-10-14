@@ -62,7 +62,7 @@
     ['ADMIN', 'TALLER', 'PROVEEDURIA_TALLER', 'PROVEEDURIA', 'SUPERVISOR_PESADO', 'BODEGUERO', 'BODEGA', 'MENSAJERO', 'MENSAJERIA', 'MENSAJERO_FACTURAS'].includes(user.rol)
     || usuarioDashboardLower === 'pesados'
   ) && (esAdminDashboard ? (areaTaller || areaProveeduria) : (areaTaller || areaProveeduria || areaOperaciones));
-  const puedeVerRepuestosSemanales = puedeVerRepuestos || user.rol === 'BODEGUERO';
+  const puedeVerRepuestosSemanales = (puedeVerRepuestos && user.rol !== 'BODEGA') || user.rol === 'BODEGUERO';
   const puedeVerBodega = !esMecanicoLimitado && ['ADMIN', 'TALLER', 'PROVEEDURIA_TALLER', 'BODEGA', 'BODEGUERO'].includes(user.rol) && (areaTaller || areaProveeduria);
   const prioridadesLista = Array.isArray(prioridadesTaller) ? prioridadesTaller : [];
   const llantasEnProceso = Number(exec.llantasSolicitadas || 0) + Number(exec.llantasCotizadas || 0) + Number(exec.llantasCompradas || 0);
