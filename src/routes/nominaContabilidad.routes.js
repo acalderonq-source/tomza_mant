@@ -8,7 +8,7 @@ const {fechaActualCostaRica}=require('../utils/fechaCostaRica');
 const wrap=fn=>(req,res,next)=>Promise.resolve(fn(req,res,next)).catch(next);
 router.use((req,res,next)=>{
  if(!req.session?.user)return res.redirect('/login');
- if(!['ADMIN','CONTABILIDAD'].includes(req.session.user.rol))return res.status(403).send('Acceso exclusivo de Contabilidad y Administración.');
+ if(req.session.user.rol!=='ADMIN')return res.status(403).send('Planilla disponible solo para Administración.');
  res.set('Cache-Control','no-store');next();
 });
 router.get('/',wrap(async(req,res)=>{

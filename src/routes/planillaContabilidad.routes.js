@@ -5,6 +5,11 @@ const {DEPARTAMENTOS}=require('../utils/departamentos');
 const {fechaActualCostaRica}=require('../utils/fechaCostaRica');
 const {sincronizarPersonas,validarFecha,calcular}=require('../utils/planillaContabilidad');
 const wrap=fn=>(req,res,next)=>Promise.resolve(fn(req,res,next)).catch(next);
+router.use((req,res,next)=>{
+ if(!req.session?.user)return res.redirect('/login');
+ if(req.session.user.rol!=='ADMIN')return res.status(403).send('Planilla disponible solo para Administración.');
+ res.set('Cache-Control','no-store');next();
+});
 function filtro(q){
  const periodo=String(q.periodo||fechaActualCostaRica().slice(0,7)),empresa=normalizarEmpresa(q.empresa),moneda=String(q.moneda||'CRC'),sede=String(q.sede||''),departamento=String(q.departamento||''),buscar=String(q.buscar||'').trim();
  P.exigir(P.periodoValido(periodo)&&empresa.length<=120&&sede.length<=120&&buscar.length<=180&&P.MONEDAS.includes(moneda),'Filtros inválidos.');

@@ -8,8 +8,8 @@
 ['/compras/facturas','Facturas','Consultar documentos, vencimientos y pagos.','bi-receipt'],
 ['/proveeduria/portal-proveedores/facturas','Facturas de proveedores','Facturas del portal, validación Hacienda y enlace a órdenes de compra.','bi-receipt-cutoff'],
 ['/compras/facturas/asientos','Asientos de pasivos','Preparar asientos y consultar el historial.','bi-journal-check']]],
-['Personal','Personas y obligaciones salariales',[
-['/contabilidad/planilla','Planilla','Personal, empresa y salario del período.','bi-people']]],
+...(user.rol === 'ADMIN' ? [['Personal','Personas y obligaciones salariales',[
+['/contabilidad/planilla','Planilla','Personal, empresa y salario del período.','bi-people']]]] : []),
 ['Operación y gastos','Conceptos, importes confirmados y pagos',[
 ['SERVICIOS','Servicios y alquileres','Servicios contratados y arrendamientos.','bi-building'],['GASTOS_GENERALES','Gastos generales','Gastos de operación por empresa.','bi-wallet2'],['COMBUSTIBLE','Combustible','Consumos e importes de combustible.','bi-fuel-pump'],['MANTENIMIENTO','Mantenimiento','Trabajos, proveedores y pagos.','bi-tools'],['IMPUESTOS','Impuestos','Obligaciones y pagos tributarios.','bi-receipt'],['EXTRAORDINARIOS','Extraordinarios','Operaciones fuera del gasto habitual.','bi-exclamation-circle']]],
 ['Capital y obligaciones','Inversiones, financiamiento y reservas',[

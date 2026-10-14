@@ -3,7 +3,7 @@ const pool=require('../src/db');
 const P=require('../src/utils/presupuestosContabilidad');
 const {extraerPersonas,calcular,validarFecha}=require('../src/utils/planillaContabilidad');
 const parent=require('../src/routes/presupuestos.routes');
-const user={id:1,rol:'CONTABILIDAD',usuario:'Conta'};
+const user={id:1,rol:'ADMIN',usuario:'Admin'};
 const persona={id:7,periodo:'2026-09',empresa:'GAS TOMZA',moneda:'CRC',sede:'General de la empresa',departamento:'GENERAL',nombre:'Persona de prueba',puesto:'Chofer',grupo:'Operaciones',presupuesto:1000,periodo_origen:'AGOSTO 2026',version:1};
 async function servidor(query,run,usuario=user){
  const original=pool.query,connection=pool.getConnection;pool.query=query;let commits=0,rollbacks=0;
@@ -23,7 +23,12 @@ test('costo, neto y pagos se calculan por separado y respetan centavos',()=>{
  assert.equal(validarFecha('2026-09-30'),'2026-09-30');assert.throws(()=>validarFecha('2026-09-31'));
 });
 test('roles ajenos no acceden al control de planilla',async()=>{
- await servidor(()=>{throw new Error('No debe consultar datos');},async base=>assert.equal((await fetch(base+'/planilla')).status,403),{rol:'TALLER'});
+ for(const rol of ['TALLER','CONTABILIDAD','PROVEEDURIA_TALLER']){
+  await servidor(()=>{throw new Error('No debe consultar datos');},async base=>{
+   assert.equal((await fetch(base+'/planilla')).status,403);
+   assert.equal((await fetch(base+'/planilla/7/gasto',{method:'POST'})).status,403);
+  },{rol});
+ }
 });
 test('Planilla abre como pantalla nativa con salarios reales vacíos, sin cabeceras de Excel',async()=>{
  await servidor(async sql=>{

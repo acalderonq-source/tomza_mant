@@ -1,9 +1,9 @@
 const test=require('node:test'),assert=require('node:assert/strict'),express=require('express'),path=require('path');
 const pool=require('../src/db'),router=require('../src/routes/nominaContabilidad.routes');
 async function servidor(user,query,run){const original=pool.query;pool.query=query;const app=express();app.set('view engine','ejs');app.set('views',path.resolve(__dirname,'../src/views'));app.use((req,res,next)=>{req.session={user};next();});app.use('/contabilidad/planilla',router);const s=app.listen(0,'127.0.0.1');await new Promise(r=>s.once('listening',r));try{await run('http://127.0.0.1:'+s.address().port+'/contabilidad/planilla');}finally{await new Promise(r=>s.close(r));pool.query=original;}}
-const user={id:1,rol:'CONTABILIDAD'};
+const user={id:1,rol:'ADMIN'};
 test('directorio de planilla deniega roles ajenos antes de consultar datos',async()=>{
- for(const [u,status] of [[null,302],[{rol:'TALLER'},403]])await servidor(u,()=>{throw Error('No debe consultar');},async base=>assert.equal((await fetch(base,{redirect:'manual'})).status,status));
+ for(const [u,status] of [[null,302],[{rol:'TALLER'},403],[{rol:'CONTABILIDAD'},403],[{rol:'PROVEEDURIA_TALLER'},403]])await servidor(u,()=>{throw Error('No debe consultar');},async base=>assert.equal((await fetch(base,{redirect:'manual'})).status,status));
 });
 test('directorio pagina personas y conserva filtros con salarios cero confirmados',async()=>{
  const personas=Array.from({length:121},(_,i)=>({nombre:'Persona '+String(i).padStart(3,'0'),empresa:i<100?'GAS TOMZA':'SUPER GAS',puesto:'Operador',moneda:'CRC',salario:i<10?0:null,presupuesto:100}));

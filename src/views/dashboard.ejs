@@ -403,10 +403,12 @@
         </a>
         <% if (['ADMIN', 'CONTABILIDAD'].includes(user.rol) && areaContabilidad) { %>
           <a href="/proveeduria/portal-proveedores/facturas" class="module-card"><span class="module-icon icon-blue"><i class="bi bi-receipt-cutoff"></i></span><div><div class="module-title">Facturas de proveedores</div><p class="module-copy">Facturas del portal, órdenes vinculadas y cuentas por pagar.</p></div></a>
+          <% if (user.rol === 'ADMIN') { %>
           <a href="/contabilidad/planilla" class="module-card">
             <span class="module-icon icon-blue"><i class="bi bi-people"></i></span>
             <div><div class="module-title">Planilla</div><p class="module-copy">Personal, empresa y salarios. Consulta de todas las empresas.</p></div>
           </a>
+          <% } %>
           <% [
             ['SERVICIOS','Servicios y alquileres','bi-building'],
             ['GASTOS_GENERALES','Gastos generales','bi-wallet2'],

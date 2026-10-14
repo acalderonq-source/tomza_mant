@@ -2,7 +2,7 @@
 <a href="/dashboard" class="accounting-home">Inicio</a>
 <a href="/contabilidad/presupuestos/resumen-ejecutivo">Resumen ejecutivo</a>
 <a href="/contabilidad/presupuestos">Presupuestos</a>
-<a href="/contabilidad/planilla">Planilla</a>
+<% if (typeof user !== 'undefined' && user.rol === 'ADMIN') { %><a href="/contabilidad/planilla">Planilla</a><% } %>
 <details class="accounting-menu"><summary>Controles por rubro</summary><div class="accounting-menu-items">
 <% [['SERVICIOS','Servicios y alquileres'],['GASTOS_GENERALES','Gastos generales'],['COMBUSTIBLE','Combustible'],['MANTENIMIENTO','Mantenimiento'],['IMPUESTOS','Impuestos'],['EXTRAORDINARIOS','Extraordinarios'],['INVERSIONES','Inversiones'],['PRESTAMOS','Préstamos'],['PROVISIONES','Provisiones']].forEach(([key,label])=>{ %><a data-rubro="<%= key %>" href="/contabilidad/presupuestos/modulos/<%= key %>"><%= label %></a><% }) %></div></details>
 <a href="/compras/ordenes">Órdenes</a><a href="/compras/facturas">Facturas</a><a href="/compras/facturas/asientos">Asientos</a>
