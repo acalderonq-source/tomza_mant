@@ -59,7 +59,7 @@
   const puedeVerOrdenesMotor = !esMecanicoLimitado && ['ADMIN', 'TALLER', 'PROVEEDURIA_TALLER'].includes(user.rol) && areaTaller;
   const puedeVerResumenEjecutivo = areaTaller && (esMecanicoLimitado || ['ADMIN', 'TALLER', 'PROVEEDURIA_TALLER'].includes(user.rol));
   const puedeVerRepuestos = !esMecanicoLimitado && (
-    ['ADMIN', 'TALLER', 'PROVEEDURIA_TALLER', 'PROVEEDURIA', 'SUPERVISOR_PESADO', 'MENSAJERO', 'MENSAJERIA', 'MENSAJERO_FACTURAS'].includes(user.rol)
+    ['ADMIN', 'TALLER', 'PROVEEDURIA_TALLER', 'PROVEEDURIA', 'SUPERVISOR_PESADO', 'BODEGUERO', 'BODEGA', 'MENSAJERO', 'MENSAJERIA', 'MENSAJERO_FACTURAS'].includes(user.rol)
     || usuarioDashboardLower === 'pesados'
   ) && (esAdminDashboard ? (areaTaller || areaProveeduria) : (areaTaller || areaProveeduria || areaOperaciones));
   const puedeVerRepuestosSemanales = puedeVerRepuestos || user.rol === 'BODEGUERO';
