@@ -28,9 +28,24 @@
   document.querySelectorAll('form[data-api]').forEach(f=>f.addEventListener('submit',async e=>{
     e.preventDefault();if(f.dataset.confirm&&!confirm(f.dataset.confirm))return;
     const btn=f.querySelector('button[type="submit"],button:not([type])');if(btn)btn.disabled=true;
-    try{const local=f.querySelector('[data-form-status]');if(local)local.hidden=true;const body=Object.fromEntries(new FormData(f));const box=f.querySelector('[data-lineas]');if(box)body.lineas=leer(box);const estado=f.querySelector('[data-estado]');if(estado)body.partidas=leer(estado);if(f===oc&&body.modo==='manual')body.precios=Object.fromEntries(body.lineas.map(l=>[l.codigo,l.precio_unitario]));const file=f.querySelector('[data-archivo]')?.files[0];if(file)body.archivo=await archivo(file);await api(f.dataset.api,body);location.reload();}catch(e){const local=f.querySelector('[data-form-status]');if(local){local.hidden=false;local.className='alert alert-danger';local.textContent=e.message;}else aviso(e.message,true);if(btn)btn.disabled=false;}
+    try{const local=f.querySelector('[data-form-status]');if(local)local.hidden=true;const body=Object.fromEntries(new FormData(f));const box=f.querySelector('[data-lineas]');if(box)body.lineas=leer(box);const estado=f.querySelector('[data-estado]');if(estado)body.partidas=leer(estado);if(f===oc&&body.modo==='manual')body.precios=Object.fromEntries(body.lineas.map(l=>[l.codigo,l.precio_unitario]));const file=f.querySelector('[data-archivo]')?.files[0];if(file)body.archivo=await archivo(file);const xml=f.querySelector('[data-xml]')?.files[0];if(xml)body.xml=await archivo(xml);await api(f.dataset.api,body);location.reload();}catch(e){const local=f.querySelector('[data-form-status]');if(local){local.hidden=false;local.className='alert alert-danger';local.textContent=e.message;}else aviso(e.message,true);if(btn)btn.disabled=false;}
   }));
   oc?.addEventListener('input',()=>{const ls=leer(document.getElementById('oc-lineas'));const total=ls.reduce((s,l)=>{const base=Math.round(Number(l.cantidad)*Number(l.precio_unitario)*100)/100;return s+base+Math.round(base*Number(l.iva))/100;},0);document.getElementById('oc-total').textContent=`Total estimado: ${Number.isFinite(total)?total.toFixed(2):'Complete los precios'}`;});
+  document.querySelector('[data-xml]')?.addEventListener('change',async e=>{
+    try{
+      const file=e.target.files[0];if(!file)return;if(file.size>2*1024*1024)throw Error('El XML debe ser de hasta 2 MB');
+      const doc=new DOMParser().parseFromString(await file.text(),'application/xml');
+      if(doc.querySelector('parsererror'))throw Error('XML inválido');
+      const tag=(parent,name)=>parent?.getElementsByTagNameNS('*',name)[0];
+      const text=(parent,name)=>tag(parent,name)?.textContent||'';
+      const f=e.target.closest('form'),root=doc.documentElement;
+      f.elements.numero.value=text(root,'NumeroConsecutivo');
+      f.elements.proveedor.value=text(tag(root,'Emisor'),'Nombre');
+      f.elements.total.value=text(tag(root,'ResumenFactura'),'TotalComprobante');
+      f.elements.moneda.value=text(tag(root,'CodigoTipoMoneda'),'CodigoMoneda')||'CRC';
+      aviso('Datos del XML cargados. Revise las líneas y adjunte la representación PDF.');
+    }catch(e){aviso(e.message,true);}
+  });
   document.querySelector('[data-leer-factura]')?.addEventListener('click',async e=>{const b=e.target;b.disabled=true;try{const f=b.closest('form'),file=f.querySelector('[data-archivo]').files[0];if(!file)throw Error('Seleccione la factura');const c=await api(b.dataset.leerFactura,await archivo(file));for(const k of ['numero','proveedor','moneda','total'])if(c[k]!==null)f.elements[k].value=c[k];tabla(document.getElementById('factura-lineas'),c.lineas);aviso('Factura leída. Revise los datos antes de subir.');}catch(e){aviso(e.message,true);}finally{b.disabled=false;}});
   document.querySelector('[data-leer-estado]')?.addEventListener('click',async e=>{const b=e.target;b.disabled=true;try{const f=b.closest('form'),file=f.querySelector('[data-archivo]').files[0];if(!file)throw Error('Seleccione el estado de cuenta');const c=await api(b.dataset.leerEstado,await archivo(file));for(const k of ['fecha','moneda'])if(c[k])f.elements[k].value=c[k];estadoTabla(c.partidas);aviso('Estado leído. Revise OC, factura, depósitos y saldos antes de subir.');}catch(e){aviso(e.message,true);}finally{b.disabled=false;}});
   if(document.getElementById('Alertas')){let ultimo=datos.ultimaAlerta;setInterval(async()=>{try{const r=await fetch('/proveeduria/alertas?desde='+ultimo);if(!r.ok)return;const rows=await r.json();if(rows.length){ultimo=rows.at(-1).id;const b=document.getElementById('nuevas-alertas');b.className='alert alert-info';b.textContent=rows.map(a=>a.mensaje).join(' · ');}}catch(_){}},15000);}

@@ -8,8 +8,8 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
   <%- include('../partials/ordenes_styles') %>
   <link rel="stylesheet" href="/css/compras.css">
-</head>
-<body>
+<% if(user.rol === "CONTABILIDAD" || (user.rol === "ADMIN" && user.departamentoActivo === "CONTABILIDAD")){ %><link href="/css/contabilidad-erp.css" rel="stylesheet"><link href="/css/contabilidad-taller.css" rel="stylesheet"><script src="/js/contabilidad-erp.js" defer></script><% } %></head>
+<body class="<%= user.rol === "CONTABILIDAD" || (user.rol === "ADMIN" && user.departamentoActivo === "CONTABILIDAD") ? "erp-accounting" : "" %>">
 
 <nav class="navbar navbar-dark bg-dark px-3 py-2">
   <span class="navbar-brand fw-semibold">🛒 Órdenes de Compra</span>
@@ -17,7 +17,7 @@
     <%= user.usuario %> (<%= user.rol %>)
     <a href="/dashboard" class="btn btn-sm btn-outline-light ms-2">Volver</a>
   </div>
-</nav>
+</nav><% if(user.rol === "CONTABILIDAD" || (user.rol === "ADMIN" && user.departamentoActivo === "CONTABILIDAD")){ %><%- include("../partials/contabilidad_navegacion") %><% } %>
 
 <div class="container py-4">
   <%
@@ -88,6 +88,7 @@
     <div class="alert alert-danger"><i class="bi bi-exclamation-triangle me-1"></i><%= error %></div>
   <% } %>
 
+<%- include('../partials/contabilidad_departamento', { documento: 'ordenes', departamentoConsulta: 'TALLER' }) %>
   <!-- Filtros -->
   <div class="filtros-card">
     <h5 class="mb-3 fw-semibold"><i class="bi bi-funnel me-2"></i>Filtrar órdenes</h5>

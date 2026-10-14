@@ -1,0 +1,15 @@
+<% if (user && (user.rol === 'CONTABILIDAD' || (user.rol === 'ADMIN' && user.departamentoActivo === 'CONTABILIDAD'))) { %>
+<div class="card p-3 mb-3">
+  <form method="GET" action="/compras/consulta-departamento" class="d-flex align-items-end gap-2 flex-wrap">
+    <input type="hidden" name="documento" value="<%= documento %>">
+    <div>
+      <label for="departamentoConsulta" class="form-label fw-semibold">Departamento de <%= documento === 'ordenes' ? 'las órdenes' : 'las facturas' %></label>
+      <select id="departamentoConsulta" name="departamento" class="form-select">
+        <option value="TALLER" <%= departamentoConsulta === 'TALLER' ? 'selected' : '' %>>Taller</option>
+        <option value="PROVEEDURIA" <%= departamentoConsulta === 'PROVEEDURIA' ? 'selected' : '' %>>Proveeduría</option>
+      </select>
+    </div>
+    <button class="btn btn-primary" type="submit">Ver <%= documento === 'ordenes' ? 'órdenes' : 'facturas' %></button>
+  </form>
+</div>
+<% } %>

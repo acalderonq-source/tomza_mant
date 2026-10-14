@@ -1,3 +1,4 @@
+const {facturasDeOrden}=require('../utils/portalFacturaOrden');
 const express = require("express");
 const router = express.Router();
 const pool = require("../db");
@@ -39,6 +40,17 @@ function allowRoles(...roles) {
     return res.status(403).send("No autorizado");
   };
 }
+
+// Consulta entre los módulos financieros disponibles para Contabilidad.
+router.get('/consulta-departamento', requireAuth, allowRoles('ADMIN', 'CONTABILIDAD'), (req, res) => {
+  const bases = { TALLER: '/compras', PROVEEDURIA: '/proveeduria' };
+  const base = bases[req.query.departamento];
+  const documento = req.query.documento;
+  if (!base || !['ordenes', 'facturas'].includes(documento)) {
+    return res.status(400).send('Seleccione un departamento y un documento válidos.');
+  }
+  return res.redirect(`${base}/${documento}`);
+});
 
 const ROLES_GESTION_FACTURAS = ["ADMIN", "TALLER", "PROVEEDURIA_TALLER"];
 const ROLES_MENSAJERO_FACTURAS = ["MENSAJERO", "MENSAJERIA", "MENSAJERO_FACTURAS"];
@@ -5418,7 +5430,7 @@ router.get("/ordenes/:id/detalle", requireAuth, allowRoles(...ROLES_VER_ORDENES)
     if (!orden) return res.status(404).send("Orden no encontrada");
     const [[proveedor]] = await pool.query("SELECT * FROM proveedores WHERE id = ?", [orden.proveedor_id]);
     const [lineas] = await pool.query("SELECT * FROM ordenes_compra_detalle WHERE orden_compra_id = ?", [id]);
-    res.render("compras/orden_detalle", { orden, proveedor, lineas, user: req.session.user });
+    res.render("compras/orden_detalle", { orden, proveedor, lineas, user: req.session.user, facturasPortal:await facturasDeOrden(pool,"COMPRAS",id) });
   } catch (error) {
     console.error(error);
     res.status(500).send("Error cargando detalle");

@@ -1,4 +1,6 @@
 const router = require('express').Router();
+const {facturasDeOrden}=require('../utils/portalFacturaOrden');
+const { leerFacturaXML, consultarHacienda, aprobable, vencimiento } = require('../utils/proveedorHacienda');
 const { rateLimit } = require('express-rate-limit');
 const pool = require('../db');
 const crypto = require('crypto');
@@ -388,6 +390,26 @@ router.post('/salidas/:id/:accion',wrap(async(req,res)=>{
   });res.json({ok:true});
 }));
 router.get('/salidas/:id/imprimir',wrap(async(req,res)=>{const row=await documento(pool,req.params.id,'salida');visible(req,row);res.render('proveeduria/salida',{row});}));
+router.get('/cuentas-por-pagar',wrap(async(req,res)=>{
+  if(!contabilidad(req.session.user))throw error(403,'Solo Contabilidad');
+  const [rows]=await pool.query("SELECT * FROM prov_documentos WHERE tipo IN ('oc','factura_portal') AND JSON_TYPE(JSON_EXTRACT(datos,'$.factura')) = 'OBJECT' ORDER BY id DESC");
+  const docs=rows.map(datos);
+  res.render('proveeduria/cuentas_por_pagar',{user:req.session.user,docs,saldo});
+}));
+router.post('/ordenes/:id/hacienda',limitarLectura,wrap(async(req,res)=>{
+  if(!gestion(req.session.user)&&!contabilidad(req.session.user))throw error(403,'No autorizado');
+  const actual=await documento(pool,req.params.id,'oc');
+  exigir(actual.datos.factura?.electronica,'Cargue el XML de la factura');
+  const clave=actual.datos.factura.electronica.clave;
+  const hacienda=await consultarHacienda(clave,actual.datos.factura.electronica);
+  await transaccion(async db=>{
+    const row=await documento(db,actual.id,'oc',true);
+    exigir(row.datos.factura?.electronica?.clave===clave,'La factura cambió; vuelva a consultar');
+    row.datos.factura.electronica.hacienda=hacienda;
+    await guardar(db,row,req.session.user.id,'Consulta Hacienda: '+hacienda.estado);
+  });
+  res.json({ok:true,hacienda});
+}));
 router.get('/portal/:token',wrap(async(req,res)=>{res.render('proveeduria/portal',{row:req.portal,token:req.params.token,saldo:saldo(req.portal.datos)});}));
 router.post('/portal/:token/leer-factura',limitarLectura,wrap(async(req,res)=>{res.json(await leerDocumento(req.body,'factura'));}));
 router.post('/portal/:token/leer-estado',limitarLectura,wrap(async(req,res)=>{res.json(await leerDocumento(req.body,'estado'));}));
@@ -408,7 +430,13 @@ router.post('/portal/:token/estado-general',wrap(async(req,res)=>{
     await alerta(db,r.insertId,`Estado de cuenta de ${estado.proveedor}: ${resultado.filter(p=>p.error).length} partidas con diferencias`,null,'CONTABILIDAD');
   });res.json({ok:true});
 }));
-router.post('/portal/:token/:accion',wrap(async(req,res)=>{
+router.post('/portal/:token/:accion',limitarLectura,wrap(async(req,res)=>{
+  let electronica;
+  if(req.params.accion==='factura'){
+    electronica=leerFacturaXML(req.body.xml);
+    const {archivo,...campos}=electronica;
+    electronica={...campos,archivo,hacienda:await consultarHacienda(campos.clave,campos)};
+  }
   await transaccion(async db=>{
     const row=await documento(db,req.portal.id,'oc',true);
     exigir(row.datos.portal_hash===hash(req.params.token) && Date.now()<=row.datos.portal_vence,'Enlace revocado o vencido');
@@ -419,6 +447,16 @@ router.post('/portal/:token/:accion',wrap(async(req,res)=>{
       const f={numero:String(req.body.numero||'').trim(),proveedor:String(req.body.proveedor||'').trim(),moneda:req.body.moneda,lineas,...totalesConAjustes(lineas,req.body),archivo,subida_en:new Date().toISOString(),estado:'PENDIENTE'};
       exigir(f.numero && f.proveedor && ['CRC','USD'].includes(f.moneda),'Complete número, proveedor y moneda');
       exigir(Math.abs(numero(req.body.total,'Total factura')-f.total)<=0.01,'El total declarado no coincide con las líneas');
+      exigir(Math.abs(electronica.total-f.total)<=0.01 && electronica.moneda===f.moneda,'El total o moneda del XML no coincide con la factura');
+      exigir(f.numero===electronica.consecutivo,'El número debe coincidir con el consecutivo del XML');
+      exigir(electronica.nombre_emisor.trim().toUpperCase()===f.proveedor.trim().toUpperCase(),'El proveedor debe coincidir con el emisor del XML');
+      exigir(electronica.nombre_receptor.trim().toUpperCase()===row.datos.razon_social.trim().toUpperCase(),'El receptor del XML no coincide con la razón social de la OC');
+      const [claves]=await db.query('SELECT documento_id FROM prov_facturas_claves WHERE clave=? FOR UPDATE',[electronica.clave]);
+      exigir(!claves.length || Number(claves[0].documento_id)===Number(row.id),'Esta factura ya fue cargada en otra OC');
+      if(!claves.length)await db.query('INSERT INTO prov_facturas_claves (clave,documento_id) VALUES (?,?)',[electronica.clave,row.id]);
+      electronica.archivo=await guardarAdjunto(db,electronica.archivo);
+      f.electronica=electronica;
+      f.fecha_vencimiento=vencimiento(electronica.fecha,row.datos.credito);
       f.diferencias=compararFactura(row.datos,f);
       if(row.datos.factura){row.datos.factura_historial=row.datos.factura_historial||[];row.datos.factura_historial.push(row.datos.factura);}
       row.datos.factura=f;
@@ -437,9 +475,9 @@ router.post('/ordenes/:id/factura/:accion',wrap(async(req,res)=>{
     exigir(f,'No hay factura');const a=req.params.accion;
     if(['aceptar','devolver'].includes(a)){
       if(!gestion(req.session.user))throw error(403,'No autorizado');exigir(f.estado==='PENDIENTE','Factura ya revisada');
-      if(a==='aceptar'){exigir(!f.diferencias.length,'Devuelva la factura para corregir las diferencias');f.estado='CONTABILIDAD';await alerta(db,row.id,'Factura aceptada por Proveeduría, pendiente de conciliación',null,'CONTABILIDAD');}else f.estado='DEVUELTA';
+      if(a==='aceptar'){aprobable(f);exigir(!f.diferencias.length,'Devuelva la factura para corregir las diferencias');f.estado='CONTABILIDAD';await alerta(db,row.id,'Factura aceptada por Proveeduría, pendiente de conciliación',null,'CONTABILIDAD');}else f.estado='DEVUELTA';
     }else if(['conciliar','devolver-contabilidad'].includes(a)){
-      if(!contabilidad(req.session.user))throw error(403,'Solo Contabilidad');exigir(f.estado==='CONTABILIDAD','Primero debe aceptar Proveeduría');f.estado=a==='conciliar'?'CONCILIADA':'DEVUELTA_CONTABILIDAD';
+      if(!contabilidad(req.session.user))throw error(403,'Solo Contabilidad');exigir(f.estado==='CONTABILIDAD','Primero debe aceptar Proveeduría');if(a==='conciliar'){aprobable(f);f.cuenta_por_pagar=true;f.aprobada_en=new Date().toISOString();}f.estado=a==='conciliar'?'CONCILIADA':'DEVUELTA_CONTABILIDAD';
     }else throw error(404,'Acción inválida');
     if(a.startsWith('devolver')){exigir(String(req.body.motivo||'').trim(),'Indique el motivo');f.motivo=String(req.body.motivo).slice(0,1000);await alerta(db,row.id,`Factura devuelta: ${f.motivo}`);}
     await guardar(db,row,req.session.user.id,a);
@@ -449,8 +487,10 @@ router.post('/ordenes/:id/pagos',wrap(async(req,res)=>{
   if(!contabilidad(req.session.user))throw error(403,'Solo Contabilidad puede registrar pagos');
   await transaccion(async db=>{
     const row=await documento(db,req.params.id,'oc',true);exigir(row.datos.factura?.estado==='CONCILIADA','Factura pendiente de conciliación');
+    aprobable(row.datos.factura);
     const p={referencia:String(req.body.referencia||'').trim(),monto:numero(req.body.monto,'Monto',0.01),fecha:String(req.body.fecha||''),archivo:await guardarAdjunto(db,adjunto(req.body.archivo))};
     exigir(p.referencia && /^\d{4}-\d{2}-\d{2}$/.test(p.fecha)&&Number.isFinite(Date.parse(p.fecha)),'Referencia y fecha requeridas');
+    exigir(p.monto<=saldo(row.datos).saldo,'El pago supera el saldo pendiente');
     exigir(!row.datos.pagos.some(x=>x.referencia===p.referencia),'Comprobante ya registrado');row.datos.pagos.push(p);await guardar(db,row,req.session.user.id,'Pago registrado');await alerta(db,row.id,'Contabilidad registró un comprobante de pago');
   });res.json({ok:true});
 }));
@@ -465,7 +505,7 @@ router.get('/estados/:id/archivo',wrap(async(req,res)=>{
 }));
 router.get('/portal/:token/adjunto/:tipo/:indice?',wrap(async(req,res)=>{await enviarAdjunto(res,req.portal,req.params.tipo,req.params.indice);}));
 async function enviarAdjunto(res,row,tipo,indice){
-  const a=tipo==='factura'?row.datos.factura?.archivo:tipo==='cotizacion'?row.datos.cotizacion_archivo:tipo==='estado-cuenta'?row.datos.estado_cuenta?.archivo:tipo==='pago'?row.datos.pagos[Number(indice)]?.archivo:null;
+  const a=tipo==='xml'?row.datos.factura?.electronica?.archivo:tipo==='factura'?row.datos.factura?.archivo:tipo==='cotizacion'?row.datos.cotizacion_archivo:tipo==='estado-cuenta'?row.datos.estado_cuenta?.archivo:tipo==='pago'?row.datos.pagos[Number(indice)]?.archivo:null;
   if(!a)throw error(404,'Archivo no encontrado');
   const [files]=await pool.query('SELECT contenido FROM prov_adjuntos WHERE id=?',[a.id]);
   if(!files[0])throw error(404,'Archivo no encontrado');
@@ -473,7 +513,7 @@ async function enviarAdjunto(res,row,tipo,indice){
 }
 router.get('/ordenes/:id',wrap(async(req,res)=>{
   const row=await documento(pool,req.params.id,'oc');visible(req,row);
-  res.render('proveeduria/modulo',{user:req.session.user,row,modulo:'detalle',titulo:`Orden de compra PR-${row.id}`,puedeGestion:gestion(req.session.user),puedeContabilidad:contabilidad(req.session.user),saldo,alertas:[]});
+  res.render('proveeduria/modulo',{user:req.session.user,row,modulo:'detalle',titulo:`Orden de compra PR-${row.id}`,facturasPortal:await facturasDeOrden(pool,'PROVEEDURIA',row.id),puedeGestion:gestion(req.session.user),puedeContabilidad:contabilidad(req.session.user),saldo,alertas:[]});
 }));
 router.use((e,req,res,next)=>{console.error('Proveeduría:',e.code||e.message);res.status(e.status||500).json({error:e.status?e.message:'No se pudo completar la operación. Verifique la migración de Proveeduría y vuelva a intentar.'});});
 module.exports=router;

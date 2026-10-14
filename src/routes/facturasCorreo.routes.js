@@ -4,6 +4,8 @@ const fs = require("fs");
 const path = require("path");
 const { ConfidentialClientApplication } = require("@azure/msal-node");
 const pool = require("../db");
+const {conciliarHaciendaCorreo}=require('../utils/haciendaCorreo');
+const {esPropietarioAdministracion}=require('../utils/administracionPrivada');
 const { UPLOAD_ROOT, ensureUploadDirectory } = require("../utils/uploadStorage");
 
 const router = express.Router();
@@ -25,12 +27,15 @@ function configReady() {
   );
 }
 
-function requireAdmin(req, res, next) {
+async function requireAdmin(req, res, next) {
   if (!req.session?.user) return res.redirect("/login");
   if (!ALLOWED_ROLES.has(String(req.session.user.rol || "").toUpperCase())) {
     return res.status(403).send("No autorizado");
   }
-  return next();
+  try {
+    if(!await esPropietarioAdministracion(req.session.user,pool))return res.status(403).send('Solo el propietario puede administrar la conexión Outlook.');
+    return next();
+  }catch(error){return next(error);}
 }
 
 function msalClient() {
@@ -218,6 +223,20 @@ async function syncInbox(accessToken) {
   return { processed, saved };
 }
 
+let syncing=false;
+async function synchronizeMailbox(){
+  if(syncing)return {processed:0,saved:0,actualizadas:0,ocupado:true};
+  syncing=true;
+  try{
+    if(!configReady())return {processed:0,saved:0,actualizadas:0};
+    const connection=await getConnection();
+    if(!connection)return {processed:0,saved:0,actualizadas:0};
+    const result=await syncInbox(await getAccessToken(connection));
+    const reconciled=await conciliarHaciendaCorreo(pool);
+    return {...result,...reconciled};
+  }finally{syncing=false;}
+}
+
 router.get("/", requireAdmin, async (req, res) => {
   try {
     const connection = await getConnection();
@@ -296,9 +315,8 @@ router.post("/sincronizar", requireAdmin, async (_req, res) => {
     if (!configReady()) return res.redirect("/compras/facturas/correo?error=Falta%20configurar%20Microsoft%20365%20en%20Render.");
     const connection = await getConnection();
     if (!connection) return res.redirect("/compras/facturas/correo?error=Primero%20conecte%20su%20correo%20corporativo.");
-    const accessToken = await getAccessToken(connection);
-    const result = await syncInbox(accessToken);
-    const message = `Sincronización lista: ${result.saved} archivo(s) nuevo(s), ${result.processed} correo(s) revisado(s).`;
+    const result = await synchronizeMailbox();
+    const message = result.ocupado?'Hay una sincronización en curso.':`Sincronización lista: ${result.saved} archivo(s) nuevo(s), ${result.processed} correo(s) revisado(s), ${result.actualizadas} factura(s) con respuesta de Hacienda verificada.`;
     return res.redirect(`/compras/facturas/correo?ok=${encodeURIComponent(message)}`);
   } catch (error) {
     console.error("Falló sincronización de correo Microsoft:", error.message, error.detail || "");
@@ -344,3 +362,4 @@ module.exports.parseXmlInvoice = parseXmlInvoice;
 module.exports.encryptCache = encryptCache;
 module.exports.decryptCache = decryptCache;
 module.exports.syncInbox = syncInbox;
+module.exports.synchronizeMailbox = synchronizeMailbox;

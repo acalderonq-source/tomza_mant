@@ -1,7 +1,9 @@
 <!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title><%= titulo %> · Proveeduría</title><link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"><link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet"><%- include('../partials/ordenes_styles') %><link href="/css/compras.css" rel="stylesheet"><link href="/css/proveeduria-modulos.css" rel="stylesheet"></head><body>
 <nav class="navbar navbar-dark bg-dark px-3 py-2"><span class="navbar-brand fw-semibold">Gas Tomza · Proveeduría</span><div class="text-white d-flex gap-2 align-items-center"><span><%= user.usuario %></span><a href="/proveeduria" class="btn btn-sm btn-outline-light">Inicio</a></div></nav>
 <main class="container py-4"><div class="page-heading"><div><h1 class="page-title"><%= titulo %></h1><p class="page-subtitle">Departamento de Proveeduría<% if(modulo!=='detalle'){ %> · Sede: <%= sedeActual %><% } %></p></div><a class="btn btn-secondary btn-sm" href="<%= modulo==='detalle'?'/proveeduria/ordenes':'/proveeduria' %>">Volver</a></div>
-<div id="resultado" role="status" aria-live="polite"></div>
+<% if(modulo === 'facturas'){ %><%- include('../partials/contabilidad_departamento', { documento: 'facturas', departamentoConsulta: 'PROVEEDURIA' }) %>
+<% } %>
+<% if(puedeContabilidad){ %><a class="btn btn-primary mb-3" href="/proveeduria/cuentas-por-pagar">Cuentas por pagar</a><% } %><div id="resultado" role="status" aria-live="polite"></div>
 <% if(modulo==='detalle'){ %><%- include('orden_detalle') %>
 <% }else if(modulo==='salidas'){ %><div class="mb-3"><a class="btn btn-dark btn-sm" href="/proveeduria/solicitudes">Alistar desde solicitudes</a></div><%- include('salidas_listado') %><% if(!docs.some(d=>d.tipo==='salida')){ %><div class="card-modern p-4 text-center text-muted">No hay salidas registradas. Aliste una solicitud cuando su compra esté recibida.</div><% } %>
 <% }else if(modulo==='conciliacion'){ %><%- include('conciliacion_listado') %><%- include('estados_listado') %>

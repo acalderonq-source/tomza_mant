@@ -8,6 +8,7 @@
   <link rel="stylesheet" href="/css/login.css">
 </head>
 <body>
+<header class="login-topbar"><a href="/" class="login-wordmark">Gas Tomza <span>Sistema empresarial</span></a><a href="/portal-proveedores/login">Portal de proveedores <span aria-hidden="true">↗</span></a></header>
 
 <main class="login-shell">
   <section class="brand-panel">
@@ -19,45 +20,45 @@
       </div>
     </div>
 
-    <h1 class="hero-title">Un solo acceso para Gas Tomza.</h1>
+    <h1 class="hero-title">Tu equipo.<br>Tus procesos.<br><span>Todo conectado.</span></h1>
     <p class="hero-copy">
       Ingresá al área asignada para consultar las herramientas y procesos de tu departamento.
     </p>
 
     <div class="feature-row">
       <span class="feature-pill"><%= departamentoNombre %></span>
-      <span class="feature-pill">Acceso personal con cédula y PIN</span>
+      <span class="feature-pill">Herramientas de tu departamento</span>
       <span class="feature-pill">Gas Tomza</span>
     </div>
   </section>
 
   <section class="login-card">
     <div class="login-card-header">
-      <h2 class="login-title">Ingreso al sistema</h2>
+      <div class="access-label">ACCESO INTERNO</div><h2 class="login-title">Bienvenido de nuevo</h2>
       <p class="login-subtitle">Departamento: <strong><%= departamentoNombre %></strong></p>
       <a class="small" href="/?next=<%= encodeURIComponent(next || '') %>">Cambiar departamento</a>
     </div>
 
     <div class="login-card-body">
       <% if (error) { %>
-        <div class="alert alert-danger rounded-4"><%= error %></div>
+        <div class="alert alert-danger rounded-4" role="alert"><%= error %></div>
       <% } %>
 
       <form method="POST" action="/login" class="d-grid gap-3">
         <input type="hidden" name="next" value="<%= typeof next !== 'undefined' ? next : '' %>">
         <input type="hidden" name="departamento" value="<%= departamento %>">
         <div>
-          <label class="form-label">Cédula</label>
-          <input class="form-control" name="cedula" placeholder="Ingrese su cédula" inputmode="numeric" autocomplete="username" required>
+          <label class="form-label" for="login-identidad"><%= departamento==='ADMINISTRACION'?'Usuario':'Cédula o usuario' %></label>
+          <input class="form-control" id="login-identidad" name="cedula" placeholder="<%= departamento==='ADMINISTRACION'?'Ingrese su usuario':'Ingrese su cédula o usuario' %>" autocomplete="username" required>
         </div>
         <div>
-          <label class="form-label">PIN (código de trabajador)</label>
-          <input class="form-control" type="password" name="pin" placeholder="Ingrese su código de trabajador" inputmode="numeric" autocomplete="current-password" required>
+          <label class="form-label" for="login-clave"><%= departamento==='ADMINISTRACION'?'Contraseña':'PIN o contraseña' %></label>
+          <div class="password-field"><input class="form-control" id="login-clave" type="password" name="pin" placeholder="Ingrese su clave de acceso" autocomplete="current-password" required><button type="button" data-toggle-password="login-clave" aria-label="Mostrar contraseña" aria-pressed="false">Mostrar</button></div>
         </div>
-        <button class="btn btn-login">Entrar</button>
+        <button class="btn btn-login">Ingresar al sistema <span aria-hidden="true">→</span></button>
       </form>
       <% if (departamento === 'TALLER') { %>
-        <div class="my-4 d-flex align-items-center gap-3 text-secondary" aria-hidden="true">
+        <details class="screen-access"><summary>Acceso para pantallas de taller</summary><div class="my-4 d-flex align-items-center gap-3 text-secondary" aria-hidden="true">
           <hr class="flex-grow-1 my-0"><span class="small">o</span><hr class="flex-grow-1 my-0">
         </div>
         <form method="POST" action="/login" class="d-grid gap-3">
@@ -75,7 +76,7 @@
           </div>
           <button class="btn btn-outline-primary" type="submit">Ingresar a la pantalla</button>
         </form>
-      <% } %>
+      </details><% } %>
       <% if (typeof perfiles !== 'undefined' && perfiles.length) { %>
         <div class="mt-4">
           <p class="mb-2">La cédula tiene acceso a más de un perfil. Seleccione dónde desea ingresar:</p>
@@ -90,7 +91,7 @@
     </div>
 
     <div class="login-footer">
-      Aplicación instalable para uso interno de Gas Tomza.
+      ¿Necesitás ayuda para ingresar? Contactá a Administración.
     </div>
   </section>
 </main>
@@ -101,12 +102,6 @@
   }
 </script>
 
-</body>
-</html>
-      </div>
-    </div>
-  </div>
-</div>
-
+<script src="/js/login.js" defer></script>
 </body>
 </html>

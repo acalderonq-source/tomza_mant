@@ -12,7 +12,9 @@
   },
   "dependencies": {
     "@azure/msal-node": "^7.0.0",
+    "@peculiar/x509": "^2.1.0",
     "@sendgrid/mail": "^8.1.6",
+    "@xmldom/xmldom": "^0.9.12",
     "bcryptjs": "^2.4.3",
     "cookie-parser": "^1.4.6",
     "dotenv": "^16.6.1",
@@ -22,13 +24,17 @@
     "express-mysql-session": "^3.0.3",
     "express-rate-limit": "^8.7.0",
     "express-session": "^1.19.0",
+    "fast-xml-parser": "^5.11.2",
     "jsonwebtoken": "^9.0.2",
+    "jszip": "^3.10.1",
     "mysql2": "^3.16.2",
     "node-cron": "^4.2.1",
     "nodemailer": "^10.0.10",
     "pdfmake": "^0.2.7",
     "qrcode": "^1.5.4",
-    "web-push": "^3.6.7"
+    "reflect-metadata": "^0.2.2",
+    "web-push": "^3.6.7",
+    "xml-crypto": "^6.4.0"
   },
   "overrides": {
     "exceljs": {

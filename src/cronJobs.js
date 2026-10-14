@@ -1,6 +1,15 @@
 const cron = require("node-cron");
 const pool = require("./db");               // Ajusta la ruta si db.js está en src/
 const { enviarRecordatorio } = require("./utils/emailService");
+const { actualizarHaciendaPendientes } = require('./utils/proveedorHaciendaPendientes');
+const {synchronizeMailbox}=require('./routes/facturasCorreo.routes');
+const {cruzarFacturasPendientes}=require('./utils/portalCruceAutomatico');
+
+cron.schedule('*/5 * * * *', () => {
+  actualizarHaciendaPendientes(pool).catch(error => console.error('Consulta pendiente Hacienda:', error.code || error.message));
+  synchronizeMailbox().catch(error=>console.error('Sincronización Outlook pendiente:',error.code||error.message));
+  cruzarFacturasPendientes(pool).catch(error=>console.error('Cruce de facturas pendiente:',error.code||error.message));
+});
 
 // Función para formatear fecha a YYYY-MM-DD
 const formatDate = (d) => d.toISOString().split("T")[0];

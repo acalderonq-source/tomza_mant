@@ -6,6 +6,7 @@ const session = require("express-session");
 const MySQLStore = require("express-mysql-session")(session);
 const cron = require("node-cron");
 const pool = require("./db");
+const {esPropietarioAdministracion}=require("./utils/administracionPrivada");
 const enviarAlertasDekra = require("./utils/dekraMail");
 const { enviarRecordatoriosCitasDekra } = require("./utils/dekraMail");
 const { enviarRecordatoriosMantenimientos, ensurePushTables } = require("./utils/notificacionesPush");
@@ -205,7 +206,10 @@ app.use(async (req, _res, next) => {
     return next();
   }
   if (String(user.rol || "").toUpperCase() === "ADMIN") {
-    user.departamentos = departamentosPermitidosPorRol(user.rol);
+    try {
+      user.esPropietarioAdministracion = await esPropietarioAdministracion(user,pool);
+      user.departamentos = departamentosPermitidosPorRol(user.rol,[],user.esPropietarioAdministracion);
+    } catch(error) { return next(error); }
     user.departamentoActivo = user.departamentos.includes(user.departamentoActivo)
       ? user.departamentoActivo
       : "TALLER";
@@ -374,6 +378,9 @@ const apiRoutes = require("./routes/api.routes");
 const carnetsRoutes = require("./routes/carnets.routes");
 
 // ===================== USAR RUTAS =====================
+const portalProveedores = require('./routes/portalProveedores.routes');
+app.use('/portal-proveedores', portalProveedores.externo);
+
 app.use("/", authRoutes);
 app.use((req, res, next) => {
   const user = req.session.user;
@@ -382,6 +389,8 @@ app.use((req, res, next) => {
   return res.redirect("/cambiar-clave");
 });
 app.use("/", sedeRoutes);
+app.use('/administracion',require('./routes/administracion.routes'));
+app.use('/administracion/portal-proveedores',portalProveedores.administracion);
 app.use("/", adminRoutes);
 app.use("/", carnetsRoutes);
 app.use("/dashboard", dashboardRoutes);
@@ -398,6 +407,10 @@ app.use("/minae", minaeRoutes);
 app.use("/aresep", aresepRoutes);
 app.use("/compras/facturas/correo", facturasCorreoRoutes);
 app.use("/compras", comprasRoutes);
+app.use('/contabilidad/presupuestos', require('./routes/presupuestos.routes'));
+app.use('/contabilidad/planilla', require('./routes/nominaContabilidad.routes'));
+app.use('/proveeduria/portal-proveedores', portalProveedores.interno);
+app.use('/proveeduria/portal-proveedores',portalProveedores.administracion);
 app.use("/proveeduria", require("./routes/proveeduria.routes"));
 app.use("/carburacion", require("./routes/carburacion.routes"));
 app.use("/llantas", llantasRoutes);

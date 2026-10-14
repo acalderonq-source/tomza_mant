@@ -2,11 +2,12 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const { DEPARTAMENTOS, departamentosInicialesPorRol, departamentosPermitidosPorRol, esDepartamentoValido, rutaPerteneceATaller, puedeAbrirRutaPorDepartamento, ensurePortalDepartmentSchema } = require("../src/utils/departamentos");
 
-test("el portal ofrece los ocho departamentos previstos", () => {
+test("el portal ofrece departamentos y Administración privada", () => {
   assert.deepEqual(DEPARTAMENTOS.map(item => item.key), [
     "TALLER",
     "OPERACIONES",
     "CONTABILIDAD",
+    "ADMINISTRACION",
     "SEGURIDAD_OCUPACIONAL",
     "LOGISTICA",
     "PROVEEDURIA",
@@ -20,7 +21,7 @@ test("la matriz inicial mantiene separados los accesos principales", () => {
   assert.deepEqual(departamentosInicialesPorRol("TALLER"), ["TALLER"]);
   assert.ok(departamentosInicialesPorRol("SUPERVISOR").includes("OPERACIONES"));
   assert.deepEqual(departamentosInicialesPorRol("CONTABILIDAD"), ["CONTABILIDAD"]);
-  assert.deepEqual(departamentosInicialesPorRol("ADMIN"), DEPARTAMENTOS.map(item => item.key));
+  assert.deepEqual(departamentosInicialesPorRol("ADMIN"), DEPARTAMENTOS.filter(d=>d.key!=='ADMINISTRACION').map(item => item.key));
 });
 
 test("un nuevo usuario TALLER sin asignaciones recibe solamente Taller", async () => {
@@ -41,7 +42,7 @@ test("un nuevo usuario TALLER sin asignaciones recibe solamente Taller", async (
 });
 
 test("ADMIN conserva acceso a todos los departamentos aunque su asignación guardada esté incompleta", () => {
-  assert.deepEqual(departamentosPermitidosPorRol("ADMIN", ["TALLER"]), DEPARTAMENTOS.map(item => item.key));
+  assert.deepEqual(departamentosPermitidosPorRol("ADMIN", ["TALLER"]), DEPARTAMENTOS.filter(d=>d.key!=='ADMINISTRACION').map(item => item.key));
   assert.deepEqual(departamentosPermitidosPorRol("MECANICO", ["TALLER"]), ["TALLER"]);
 });
 
@@ -63,6 +64,8 @@ test("los módulos de Taller se identifican por ruta sin confundir rutas similar
   assert.equal(puedeAbrirRutaPorDepartamento("OPERACIONES", "/bodega"), false);
   assert.equal(puedeAbrirRutaPorDepartamento("CONTABILIDAD", "/compras/facturas/asientos"), true);
   assert.equal(puedeAbrirRutaPorDepartamento("CONTABILIDAD", "/compras/ordenes"), true);
+  assert.equal(puedeAbrirRutaPorDepartamento("CONTABILIDAD", "/compras/consulta-departamento"), true);
+  assert.equal(puedeAbrirRutaPorDepartamento("OPERACIONES", "/compras/consulta-departamento"), false);
   assert.equal(puedeAbrirRutaPorDepartamento("CONTABILIDAD", "/aresep"), true);
   assert.equal(puedeAbrirRutaPorDepartamento("CONTABILIDAD", "/mantenimientos"), false);
   assert.equal(puedeAbrirRutaPorDepartamento("PROVEEDURIA", "/compras/facturas"), true);

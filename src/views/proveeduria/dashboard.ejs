@@ -17,6 +17,8 @@ const facturas=ordenes.filter(d=>['PENDIENTE','CONTABILIDAD'].includes(d.datos.f
 const salidas=docs.filter(d=>d.tipo==='salida'&&d.datos.estado!=='RECIBIDA');
 const indicadores=[['Solicitudes pendientes',solicitudes.length,'Pendientes de orden de compra'],['Órdenes por recibir',ordenes.filter(d=>d.datos.estado!=='RECIBIDA').length,'Mercadería pendiente de recepción'],['Facturas por revisar',facturas.length,'Aceptación y revisión contable'],['Pedidos en proceso',salidas.length,'Alistando o en camino']];
 const modulos=[
+['Bandeja del portal','/proveeduria/portal-proveedores/facturas','bi-receipt','icon-amber','Validación Hacienda y revisión de facturas de proveedores.'],
+...(['ADMIN','CONTABILIDAD'].includes(user.rol)?[['Cuentas por pagar','/proveeduria/cuentas-por-pagar','bi-journal-check','icon-green','Facturas, aceptación Hacienda, vencimientos y saldos.']]:[]),
 ['Solicitudes','/proveeduria/solicitudes','bi-clipboard-check','icon-blue','Recibir solicitudes de otros departamentos, cotizar y gestionar la entrega.'],
 ['Órdenes de compra','/proveeduria/ordenes','bi-receipt','icon-green','Cotizaciones, órdenes manuales, PDF y envío al proveedor.'],
 ['Proveedores','/proveeduria/proveedores','bi-building','icon-green','Consultar el catálogo de proveedores de Proveeduría.'],

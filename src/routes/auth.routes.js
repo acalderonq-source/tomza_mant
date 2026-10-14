@@ -5,6 +5,7 @@ const pool = require("../db");
 const { DEPARTAMENTOS, departamentosPermitidosPorRol, esDepartamentoValido } = require("../utils/departamentos");
 const { normalizarCedula } = require("../utils/cedula");
 
+const { esPropietarioAdministracion } = require('../utils/administracionPrivada');
 const router = express.Router();
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -208,7 +209,8 @@ async function iniciarSesion(req, res, user, departamento, nextUrl) {
     );
     const departamentosPermitidos = departamentosPermitidosPorRol(
       user.rol,
-      departmentRows.map(row => row.departamento)
+      departmentRows.map(row => row.departamento),
+      await esPropietarioAdministracion(user,pool)
     );
     if (!departamentosPermitidos.includes(departamento)) {
       return res.status(403).render("login", {

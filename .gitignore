@@ -10,3 +10,7 @@ android/build/
 *.jks
 *.keystore
 .tomza-vapid-keys.json
+tmp/
+output/
+outputs/
+public/uploads/facturas-correo/

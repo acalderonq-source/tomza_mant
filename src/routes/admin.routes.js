@@ -26,7 +26,7 @@ router.get("/admin/departamentos", async (req, res) => {
       ORDER BY u.nombre, u.usuario
     `);
     res.render("admin_departamentos", {
-      departamentos: DEPARTAMENTOS,
+      departamentos: DEPARTAMENTOS.filter(d=>d.key!=='ADMINISTRACION'),
       usuarios,
       guardado: req.query.guardado === "1",
     });
@@ -45,7 +45,7 @@ router.post("/admin/departamentos/:id", async (req, res) => {
     .map(value => String(value).toUpperCase()))];
   const cedulaRaw = String(req.body.cedula || "").trim();
   const cedula = cedulaRaw ? normalizarCedula(cedulaRaw) : null;
-  if (!Number.isInteger(usuarioId) || usuarioId < 1 || !seleccionados.length || seleccionados.some(key => !esDepartamentoValido(key))) {
+  if (!Number.isInteger(usuarioId) || usuarioId < 1 || !seleccionados.length || seleccionados.some(key => (!esDepartamentoValido(key)||key==='ADMINISTRACION'))) {
     return res.status(400).send("Seleccione al menos un departamento válido.");
   }
   if (!cedulaValida(cedulaRaw)) return res.status(400).send("La cédula debe contener entre 9 y 12 dígitos.");
@@ -79,7 +79,7 @@ router.post("/admin/departamentos/:id", async (req, res) => {
       }
     }
 
-    const claves = users[0].rol === "ADMIN" ? DEPARTAMENTOS.map(dept => dept.key) : seleccionados;
+    const claves = users[0].rol === "ADMIN" ? DEPARTAMENTOS.filter(d=>d.key!=='ADMINISTRACION').map(dept => dept.key) : seleccionados;
     await connection.query("UPDATE usuarios SET cedula = ? WHERE id = ?", [cedula, usuarioId]);
     await connection.query("DELETE FROM usuario_departamentos WHERE usuario_id = ?", [usuarioId]);
     for (const departamento of claves) {

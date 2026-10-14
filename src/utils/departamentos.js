@@ -1,7 +1,8 @@
 const DEPARTAMENTOS = [
   { key: "TALLER", nombre: "Taller", icono: "bi-tools", descripcion: "Mantenimientos, repuestos y bodega del taller." },
   { key: "OPERACIONES", nombre: "Operaciones", icono: "bi-truck", descripcion: "Área en preparación; sus procesos se habilitarán en una versión posterior." },
-  { key: "CONTABILIDAD", nombre: "Contabilidad", icono: "bi-journal-check", descripcion: "Área en preparación; sus procesos se habilitarán en una versión posterior." },
+  { key: "CONTABILIDAD", nombre: "Contabilidad", icono: "bi-journal-check", descripcion: "Facturas de proveedores, validación Hacienda, cuentas por pagar y pagos." },
+  { key: "ADMINISTRACION", nombre: "Administración", icono: "bi-shield-lock", descripcion: "Acceso privado del propietario. Administración del portal de proveedores." },
   { key: "SEGURIDAD_OCUPACIONAL", nombre: "Seguridad Ocupacional", icono: "bi-shield-check", descripcion: "Área lista para incorporar sus procesos." },
   { key: "LOGISTICA", nombre: "Logística", icono: "bi-diagram-3", descripcion: "Área lista para incorporar sus procesos." },
   { key: "PROVEEDURIA", nombre: "Proveeduría", icono: "bi-box-seam", descripcion: "Solicitudes, órdenes de compra, inventario, facturas y pagos." },
@@ -40,7 +41,7 @@ const RUTAS_TALLER = [
 ];
 
 const RUTAS_COMPARTIDAS_POR_DEPARTAMENTO = {
-  CONTABILIDAD: ["/compras/facturas", "/compras/ordenes", "/aresep"],
+  CONTABILIDAD: ["/compras/facturas", "/compras/ordenes", "/compras/consulta-departamento", "/aresep"],
   PROVEEDURIA: [
     "/compras/facturas",
     "/compras/ordenes",
@@ -73,6 +74,7 @@ function puedeAbrirRutaPorDepartamento(departamento, pathname, rol = "") {
 
 function controlarAccesoPorDepartamento(req, res, next) {
   const user = req.session?.user;
+  if (user?.esPropietarioAdministracion && coincideRuta(req.path, ['/compras/facturas/correo'])) return next();
   if (!user || puedeAbrirRutaPorDepartamento(user.departamentoActivo, req.path, user.rol)) return next();
 
   const mensaje = "Este modulo pertenece a Taller. Cambie el area activa a Taller para continuar.";
@@ -85,7 +87,7 @@ function controlarAccesoPorDepartamento(req, res, next) {
 function departamentosInicialesPorRol(rol, usuario = "") {
   if (/^mecanicos?/i.test(String(usuario || "").trim())) return ["TALLER"];
   const asignaciones = {
-    ADMIN: DEPARTAMENTOS.map(({ key }) => key),
+    ADMIN: DEPARTAMENTOS.filter(d=>d.key!=='ADMINISTRACION').map(({ key }) => key),
     TALLER: ["TALLER"],
     MECANICO: ["TALLER"],
     PANTALLA_MECANICOS: ["TALLER"],
@@ -106,11 +108,11 @@ function departamentosInicialesPorRol(rol, usuario = "") {
   return asignaciones[String(rol || "").toUpperCase()] || [];
 }
 
-function departamentosPermitidosPorRol(rol, asignados = []) {
+function departamentosPermitidosPorRol(rol, asignados = [], propietario = false) {
   if (String(rol || "").toUpperCase() === "ADMIN") {
-    return DEPARTAMENTOS.map(({ key }) => key);
+    return DEPARTAMENTOS.filter(d=>d.key!=='ADMINISTRACION'||propietario).map(({ key }) => key);
   }
-  return asignados;
+  return asignados.filter(d=>d!=='ADMINISTRACION');
 }
 
 function esDepartamentoValido(departamento) {

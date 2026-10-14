@@ -107,7 +107,7 @@ test('Taller sin asignación y proveedor sin token válido no acceden',async()=>
 test('facturas con diferencias no pasan a Contabilidad y un gestor no concilia',async()=>{
   const original=pool.getConnection;let estado='PENDIENTE';let diferencias=['Total diferente'];let cambios=0;
   pool.getConnection=async()=>({beginTransaction:async()=>{},commit:async()=>{},rollback:async()=>{},release(){},query:async(sql,args)=>{
-    if(sql.startsWith('SELECT'))return [[{id:1,usuario_id:99,sede:'Cartago',datos:{factura:{estado,diferencias}}}]];
+    if(sql.startsWith('SELECT'))return [[{id:1,usuario_id:99,sede:'Cartago',datos:{factura:{estado,diferencias,electronica:{hacienda:{estado:'ACEPTADA',ambiente:'produccion'}}}}}]];
     if(sql.startsWith('UPDATE')){estado=JSON.parse(args[0]).factura.estado;cambios++;}return [{affectedRows:1}];
   }});
   try{await servidor(gestor,async base=>{
