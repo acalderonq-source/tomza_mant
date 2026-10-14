@@ -62,6 +62,14 @@ test('TLS de MySQL exige verificar certificado e identidad, sin degradar a conex
   assert.throws(()=>mysqlTls({MYSQL_SSL_CA:'x',MYSQL_SSL_CA_FILE:'x'}),/solo MYSQL_SSL_CA/);
 });
 
+test('el proxy TCP conserva la validación de la identidad certificada de MySQL',()=>{
+  const {mysqlNetwork,mysqlTls}=require('../src/utils/mysqlTls');
+  assert.throws(()=>mysqlNetwork({MYSQL_SSL_SERVER_NAME:'MySQL_Server'}),/requiere TLS/);
+  const env={MYSQL_SSL:'true',MYSQL_SSL_SERVER_NAME:'MySQL_Server',MYSQLHOST:'proxy.test',MYSQLPORT:'3306'};
+  assert.equal(mysqlNetwork(env).host,'MySQL_Server');assert.equal(typeof mysqlNetwork(env).stream,'function');assert.equal(mysqlTls(env).verifyIdentity,true);
+  assert.throws(()=>mysqlNetwork({...env,MYSQL_SSL_SERVER_NAME:'https://otro.test'}),/inválido/);
+});
+
 test('los datos de órdenes no pueden cerrar el script e inyectar HTML',()=>{
   const fs=require('node:fs'),ejs=require('ejs');
   const source=fs.readFileSync(require('node:path').join(__dirname,'../src/views/compras/orden_form.ejs'),'utf8');

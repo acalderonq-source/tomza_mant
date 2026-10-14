@@ -10,13 +10,15 @@
 - Los formularios incluyen protección CSRF, también el ingreso. Se rechazan orígenes distintos, se evita enviar tokens a servicios externos y se restringen las redirecciones del login. Las páginas incluyen protección contra marcos externos, interpretación incorrecta de archivos y filtración de referencias.
 - Las rutas estáticas rechazan intentos de alcanzar archivos privados mediante directorios relativos. Los adjuntos financieros siguen detrás de la comprobación de sesión y permisos.
 
-## Cifrado de MySQL: pendiente de configuración del servidor
+## Cifrado de MySQL
 
-La conexión local examinada el 14 de octubre de 2026 no tenía TLS activo. Una prueba con validación estricta falló porque Railway presentó una cadena autofirmada. No se desactivó la validación ni se cambió la conexión activa sin un certificado confiable.
+La conexión original no usaba TLS. Se obtuvieron la CA y el certificado público del servicio **man-cartago** mediante la consola autenticada de Railway. La conexión local ya se verificó cifrada con TLS y se comprobó que una identidad incorrecta se rechaza antes del acceso a MySQL.
 
-El código ya permite `MYSQL_SSL_CA` (certificado PEM, con saltos de línea reales o `\n`) o `MYSQL_SSL_CA_FILE` (archivo privado). También permite `MYSQL_SSL=true` cuando el servidor usa una autoridad reconocida por el sistema. Se exige TLS 1.2 o superior, certificado válido e identidad del servidor coincidente con `MYSQLHOST`. Una conexión TLS fallida no vuelve automáticamente a texto plano. Configurar la CA puede requerir también ajustar el certificado del servidor para su nombre público. [Documentación de TLS de mysql2](https://sidorares.github.io/node-mysql2/docs/documentation/ssl).
+El código admite `MYSQL_SSL_CA` (certificado PEM, con saltos de línea reales o `\n`) o `MYSQL_SSL_CA_FILE` (archivo privado). `MYSQL_SSL=true` utiliza las autoridades del sistema. Se exige TLS 1.2 o superior, certificado válido e identidad verificada, sin volver automáticamente a texto plano ante un fallo. [Documentación de TLS de mysql2](https://sidorares.github.io/node-mysql2/docs/documentation/ssl).
 
-Una vez configurado, comprobar `SHOW STATUS LIKE 'Ssl_cipher'` en la conexión real. El valor debe ser no vacío. No usar `rejectUnauthorized=false` ni `NODE_TLS_REJECT_UNAUTHORIZED=0` para resolver errores de certificado.
+En Railway, el nombre del proxy TCP difiere del nombre certificado de MySQL. `MYSQL_SSL_SERVER_NAME` establece esa identidad, obtenida del certificado descargado por el canal administrativo autenticado. La conexión TCP sigue usando `MYSQLHOST` y `MYSQLPORT`; la verificación TLS usa el nombre certificado y la CA propia de ese servicio. No se desactiva `verifyIdentity` ni `rejectUnauthorized`. No obtener este nombre o la CA de una conexión de red sin autenticar.
+
+La CA local se guarda en `secrets/mysql-ca.pem`, excluido de Git, y la configuración en `.env`. En Render se configura la CA como variable de entorno y la identidad como `MYSQL_SSL_SERVER_NAME`. Para verificar producción, `/ready` debe responder `database_tls: true`. Si Railway regenera sus certificados, obtener los nuevos desde su consola autenticada y probarlos antes de reemplazar la configuración.
 
 ## Operación
 

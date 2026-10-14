@@ -107,7 +107,8 @@ app.get("/ready", async (_req, res) => {
         release
       });
     }
-    res.status(200).json({ status: "ready", database: "connected", schema: "ready", uploads: "ready", release });
+    const [tls]=await pool.query("SHOW STATUS LIKE 'Ssl_cipher'");
+    res.status(200).json({ status: "ready", database: "connected", database_tls:Boolean(tls[0]?.Value), schema: "ready", uploads: "ready", release });
   } catch (error) {
     console.error("Readiness check fallo:", error.code || error.message);
     res.status(503).json({ status: "not_ready", database: "unavailable", release });
