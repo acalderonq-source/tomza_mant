@@ -404,12 +404,10 @@
             <div><div class="module-title">Asientos de pasivos</div><p class="module-copy">Seleccionar facturas, generar el Excel y consultar el historial.</p></div>
           </a>
         <% } %>
-        <% if (user.rol !== 'CONTABILIDAD') { %>
           <a href="/compras/dashboard" class="module-card">
             <span class="module-icon icon-blue"><i class="bi bi-bar-chart"></i></span>
             <div><div class="module-title">Compras</div><p class="module-copy">Resumen del área.</p></div>
           </a>
-        <% } %>
       <% } %>
       <% if (['SEGURIDAD_OCUPACIONAL', 'LOGISTICA', 'RECURSOS_HUMANOS', 'CARBURACION'].includes(departamentoActivo)) { %>
         <div class="module-card">
