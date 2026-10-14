@@ -82,6 +82,7 @@ async function conciliarHaciendaCorreo(pool,verify=verificarRespuesta){
         await db.commit();
       }catch(error){await db.rollback();throw error;}finally{db.release();}
     }
+    actualizadas+=await require('./portalNotasCorreo').conciliarNotasCorreo(pool,verify);
     return {actualizadas};
   }finally{ejecutando=false;}
 }

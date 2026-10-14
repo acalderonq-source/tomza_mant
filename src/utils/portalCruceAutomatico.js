@@ -1,3 +1,4 @@
+const {compararLineas,cargarDetalleXML,lineasProveeduria}=require('./portalControlFactura');
 const {validarCorrespondencia,vincularOrden}=require('./portalFacturaOrden');
 const parse=r=>({...r,datos:typeof r.datos==='string'?JSON.parse(r.datos):r.datos});
 function candidatosUnicos(factura,ordenes){
@@ -8,19 +9,32 @@ function candidatosUnicos(factura,ordenes){
   });
 }
 async function buscarCandidatos(db,datos){
+  if(datos.factura.electronica.observaciones_control?.length)return {limite:false,candidatos:[]};
   const monto=datos.factura.total;
   const [pr]=await db.query(`SELECT d.* FROM prov_documentos d WHERE d.tipo='oc'
-    AND ABS(CAST(JSON_UNQUOTE(JSON_EXTRACT(d.datos,'$.total')) AS DECIMAL(14,5))-?)<=0.01 ORDER BY d.id DESC LIMIT 201`,[monto]);
-  const [compras]=await db.query(`SELECT o.id,o.po_numero,o.total,o.moneda,o.factura,p.nombre,p.cedula_juridica
-    FROM ordenes_compra o LEFT JOIN proveedores p ON p.id=o.proveedor_id WHERE ABS(o.total-?)<=0.01 ORDER BY o.id DESC LIMIT 201`,[monto]);
+    AND CAST(JSON_UNQUOTE(JSON_EXTRACT(d.datos,'$.total')) AS DECIMAL(14,5))>=?-0.01 ORDER BY d.id DESC LIMIT 201`,[monto]);
+  const [compras]=await db.query(`SELECT o.*,p.nombre,p.cedula_juridica
+    FROM ordenes_compra o LEFT JOIN proveedores p ON p.id=o.proveedor_id WHERE o.total>=?-0.01 ORDER BY o.id DESC LIMIT 201`,[monto]);
   if(pr.length>200||compras.length>200)return {limite:true,candidatos:[]};
-  const ordenes=[...pr.map(parse).map(r=>({origen:'PROVEEDURIA',id:r.id,numero:`PR-${r.id}`,referencia:`PR-${r.id}`,proveedor:r.datos.proveedor,cedula:r.datos.proveedor_cedula,total:Number(r.datos.total),moneda:r.datos.moneda,factura_registrada:!!r.datos.factura})),
-    ...compras.map(o=>({origen:'COMPRAS',id:o.id,numero:o.po_numero,referencia:`#${o.id}`,proveedor:o.nombre,cedula:o.cedula_juridica,total:Number(o.total),moneda:o.moneda,factura_registrada:!!o.factura}))];
-  let candidatos=candidatosUnicos(datos,ordenes);
-  if(candidatos.length){
-    const [usados]=await db.query(`SELECT v.origen,v.orden_id,SUM(v.monto) AS asignado FROM prov_portal_factura_orden v JOIN prov_documentos d ON d.id=v.factura_id
-      WHERE JSON_UNQUOTE(JSON_EXTRACT(d.datos,'$.factura.estado'))<>'RECHAZADA_INTERNA' GROUP BY v.origen,v.orden_id`);
-    candidatos=candidatos.filter(o=>!usados.some(u=>u.origen===o.origen&&Number(u.orden_id)===Number(o.id)&&Number(u.asignado)>0));
+  const ordenes=[...pr.map(parse).map(r=>({origen:'PROVEEDURIA',id:r.id,numero:`PR-${r.id}`,referencia:`PR-${r.id}`,estado:r.datos.estado,proveedor:r.datos.proveedor,cedula:r.datos.proveedor_cedula,total:Number(r.datos.total),moneda:r.datos.moneda,factura_registrada:!!r.datos.factura})),
+    ...compras.map(o=>({origen:'COMPRAS',id:o.id,numero:o.po_numero,referencia:`#${o.id}`,estado:o.estado,proveedor:o.nombre,cedula:o.cedula_juridica,total:Number(o.total),moneda:o.moneda,factura_registrada:!!o.factura}))];
+  const candidatos=[];
+  for(const o of ordenes){
+    try{validarCorrespondencia(datos,o);}catch(_){continue;}
+    let lineas;
+    if(o.origen==='PROVEEDURIA'){
+      const r=pr.map(parse).find(r=>r.id===o.id);if(Number(r.datos.transporte)>0)continue;lineas=lineasProveeduria(r.datos);
+    }else{
+      const compra=compras.find(r=>r.id===o.id),[ls]=await db.query('SELECT * FROM ordenes_compra_detalle WHERE orden_compra_id=?',[o.id]);
+      if(Number(compra.transporte)>0)continue;
+      lineas=ls.map(l=>({...l,iva:Number(compra.iva),descuento:Number(compra.subtotal)>0?Number(compra.descuento||0)*Number(l.subtotal)/Number(compra.subtotal):0}));
+    }
+    const [usadas]=await db.query("SELECT d.datos FROM prov_portal_factura_orden v JOIN prov_documentos d ON d.id=v.factura_id WHERE v.origen=? AND v.orden_id=? AND JSON_UNQUOTE(JSON_EXTRACT(d.datos,'$.factura.estado'))<>'RECHAZADA_INTERNA'",[o.origen,o.id]);
+    const otras=usadas.map(r=>typeof r.datos==='string'?JSON.parse(r.datos):r.datos);
+    for(const anterior of otras)await cargarDetalleXML(db,anterior);
+    if(otras.some(o=>!o.factura.electronica.lineas?.length))continue;
+    if(otras.reduce((s,d)=>s+Number(d.factura.total),Number(datos.factura.total))>o.total+0.01)continue;
+    if(compararLineas(datos.factura.electronica.lineas,lineas,otras.flatMap(d=>d.factura.electronica.lineas||[])).length===0)candidatos.push(o);
   }
   return {limite:false,candidatos};
 }
@@ -32,6 +46,7 @@ async function cruzarFactura(pool,id){
     if(!rows.length){await db.commit();return {estado:'NO_ENCONTRADA'};}
     const row=parse(rows[0]),d=row.datos;
     if(d.orden_compra||d.pagos?.length||!['PENDIENTE','CONCILIADA'].includes(d.factura.estado)){await db.commit();return {estado:'SIN_CAMBIOS'};}
+    await cargarDetalleXML(db,d);
     const {limite,candidatos}=await buscarCandidatos(db,d);
     let estado=limite?'REQUIERE_REVISION':candidatos.length===0?'SIN_COINCIDENCIA':candidatos.length>1?'VARIAS_COINCIDENCIAS':'ENLAZADA';
     if(estado==='ENLAZADA'){
@@ -40,7 +55,7 @@ async function cruzarFactura(pool,id){
       catch(e){if(!e.status)throw e;estado='REQUIERE_REVISION';}
     }
     const anterior=d.cruce_automatico;
-    d.cruce_automatico={estado,coincidencias:candidatos.length,revisado_en:new Date().toISOString(),criterio:'Proveedor, moneda y total exactos'};
+    d.cruce_automatico={estado,coincidencias:candidatos.length,revisado_en:new Date().toISOString(),criterio:'Proveedor, moneda, artículos, precios, impuestos y cantidades disponibles'};
     await db.query("UPDATE prov_documentos SET datos=JSON_SET(datos,'$.cruce_automatico',CAST(? AS JSON)) WHERE id=?",[JSON.stringify(d.cruce_automatico),row.id]);
     if(estado==='ENLAZADA')await db.query("UPDATE prov_documentos SET datos=JSON_SET(datos,'$.orden_compra',CAST(? AS JSON)) WHERE id=?",[JSON.stringify(d.orden_compra),row.id]);
     if(anterior?.estado!==estado)await db.query('INSERT INTO prov_auditoria (documento_id,actor,accion) VALUES (?,?,?)',[row.id,'Sistema',`Cruce automático: ${estado}`]);

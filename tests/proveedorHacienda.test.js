@@ -47,6 +47,6 @@ test('reconsulta pendientes sin sobrescribir pagos y avisa cambios terminales',a
   }};
   try{
     await actualizarHaciendaPendientes(pool,async()=>({estado:'ACEPTADA',ambiente:'produccion'}));
-    assert.equal(statements.length,3);assert.match(statements[1].sql,/JSON_SET/);assert.match(statements[1].sql,/factura.subida_en/);assert.equal(statements[1].args[2],clave);assert.match(statements[2].sql,/prov_alertas/);
+    assert.equal(statements.length,4);assert.match(statements[1].sql,/JSON_SET/);assert.match(statements[1].sql,/factura.subida_en/);assert.equal(statements[1].args[2],clave);assert.match(statements[2].sql,/prov_alertas/);
   }finally{if(u===undefined)delete process.env.HACIENDA_USUARIO;else process.env.HACIENDA_USUARIO=u;if(p===undefined)delete process.env.HACIENDA_PASSWORD;else process.env.HACIENDA_PASSWORD=p;}
 });

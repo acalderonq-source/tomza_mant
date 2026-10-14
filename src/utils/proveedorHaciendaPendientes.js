@@ -23,6 +23,7 @@ async function actualizarHaciendaPendientes(pool, consulta=consultarHacienda) {
         await pool.query("INSERT INTO prov_alertas (grupo,mensaje,documento_id) VALUES ('CONTABILIDAD',?,?)",[`Hacienda: factura ${f.numero} ${resultado.estado}`,row.id]);
       }
     }
+    await require('./portalNotasCorreo').actualizarNotasAPI(pool,consulta);
   } finally {ejecutando=false;}
 }
 module.exports={actualizarHaciendaPendientes};

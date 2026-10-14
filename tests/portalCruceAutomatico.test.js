@@ -1,6 +1,7 @@
 const test=require('node:test'),assert=require('node:assert/strict');
 const {candidatosUnicos,cruzarFactura,buscarCandidatos}=require('../src/utils/portalCruceAutomatico');
-const datos=()=>({proveedor:'Caribe Tools',moneda:'CRC',pagos:[],factura:{estado:'PENDIENTE',total:2650,electronica:{emisor:'304400875',nombre_emisor:'Yendry Melissa Alvarado Quiros'}}});
+const linea={codigo:'A',cantidad:1,precio_unitario:2345.13274,iva:13,descuento:0};
+const datos=()=>({proveedor:'Caribe Tools',moneda:'CRC',pagos:[],factura:{estado:'PENDIENTE',total:2650,electronica:{lineas:[linea],emisor:'304400875',nombre_emisor:'Yendry Melissa Alvarado Quiros'}}});
 test('cruce exacto descarta proveedor, moneda, monto y órdenes consumidas',()=>{
   const o={proveedor:'Caribe Tools',moneda:'CRC',total:2650};
   assert.equal(candidatosUnicos(datos(),[o]).length,1);
@@ -12,20 +13,28 @@ function mock(ordenes){
     if(sql.includes("tipo='factura_portal'"))return [[{id:5,tipo:'factura_portal',datos:datos()}]];
     if(sql.includes("d.tipo='oc'"))return [ordenes];
     if(sql.includes('FROM ordenes_compra'))return [[]];
-    if(sql.includes('GROUP BY'))return [[]];
+    if(sql.includes('SELECT d.datos FROM prov_portal_factura_orden'))return [[]];
     if(sql.includes("tipo='oc' FOR UPDATE"))return [[ordenes[0]]];
     if(sql.includes('SUM(v.monto)'))return [[{total:0}]];
     writes.push({sql,args});return [{affectedRows:1}];
   }};
   return {pool:{getConnection:async()=>db},writes,get commit(){return commit;}};
 }
-const orden=id=>({id,datos:{proveedor:'Caribe Tools',total:2650,moneda:'CRC'}});
+const orden=id=>({id,datos:{proveedor:'Caribe Tools',total:2650,moneda:'CRC',lineas:[linea]}});
 test('una única coincidencia se enlaza y se audita sin aprobar ni pagar',async()=>{
   const m=mock([orden(7)]),r=await cruzarFactura(m.pool,5);
   assert.equal(r.estado,'ENLAZADA');assert.equal(r.orden.numero,'PR-7');assert.equal(r.orden.automatico,true);assert.equal(m.commit,true);
   assert.ok(m.writes.some(w=>w.sql.startsWith('INSERT INTO prov_portal_factura_orden')));
   assert.ok(m.writes.some(w=>w.sql.includes('prov_auditoria')));
   assert.ok(m.writes.every(w=>!w.sql.includes('cuenta_por_pagar')));
+});
+
+test('una factura parcial se enlaza por detalle aunque el total de la OC sea mayor',async()=>{
+  const o=orden(7);o.datos.total=5300;o.datos.lineas=[{...linea,cantidad:2}];
+  const m=mock([o]),r=await cruzarFactura(m.pool,5);
+  assert.equal(r.estado,'ENLAZADA');assert.equal(r.orden.numero,'PR-7');
+  const distinta=orden(8);distinta.datos.lineas=[{...linea,precio_unitario:100}];
+  assert.equal((await cruzarFactura(mock([distinta]).pool,5)).estado,'SIN_COINCIDENCIA');
 });
 test('cero o varias coincidencias se identifican sin elegir una orden',async()=>{
   for(const [rows,estado] of [[[],'SIN_COINCIDENCIA'],[[orden(7),orden(8)],'VARIAS_COINCIDENCIAS']]){
@@ -36,7 +45,7 @@ test('un listado truncado no autoriza un enlace automático',async()=>{
   const m=mock(Array.from({length:201},(_,i)=>orden(i+1))),r=await cruzarFactura(m.pool,5);assert.equal(r.estado,'REQUIERE_REVISION');assert.equal(r.orden,null);
 });
 test('coincidencias entre ambos módulos conservan la ambigüedad',async()=>{
-  const db={query:async sql=>sql.includes("d.tipo='oc'")?[[orden(7)]]:sql.includes('FROM ordenes_compra')?[[{id:9,po_numero:'2026-200',nombre:'Caribe Tools',total:2650,moneda:'CRC'}]]:[[]]};
+  const db={query:async sql=>sql.includes("d.tipo='oc'")?[[orden(7)]]:sql.includes('FROM ordenes_compra_detalle')?[[linea]]:sql.includes('FROM ordenes_compra')?[[{id:9,po_numero:'2026-200',nombre:'Caribe Tools',total:2650,moneda:'CRC',iva:13}]]:[[]]};
   const r=await buscarCandidatos(db,datos());assert.equal(r.candidatos.length,2);assert.deepEqual(r.candidatos.map(o=>o.origen),['PROVEEDURIA','COMPRAS']);
 });
 test('el cruce no cambia una factura que ya está enlazada o pagada',async()=>{

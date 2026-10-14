@@ -22,7 +22,7 @@
   function filtrar(){
     const q=normalizar(document.querySelector('[data-buscar]')?.value||'');let visibles=0;
     const filas=document.querySelectorAll('[data-factura]');
-    filas.forEach(row=>{row.hidden=!(normalizar(row.textContent).includes(q)&&(filtro==='todas'||row.dataset.invoiceState===filtro));if(!row.hidden)visibles++;});
+    filas.forEach(row=>{row.hidden=!(normalizar(row.textContent).includes(q)&&(filtro==='todas'||(filtro==='excepciones'?row.dataset.excepcion==='1':row.dataset.invoiceState===filtro)));if(!row.hidden)visibles++;});
     const vacio=document.querySelector('[data-sin-resultados]');if(vacio)vacio.hidden=visibles>0||filas.length===0;
     const contador=document.querySelector('[data-invoice-results]');if(contador)contador.textContent=`${visibles} documentos`;
   }

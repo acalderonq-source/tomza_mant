@@ -2,14 +2,15 @@ const { XMLParser, XMLValidator } = require('fast-xml-parser');
 const { exigir, numero } = require('./proveeduria');
 const parser = new XMLParser({ removeNSPrefix: true, parseTagValue: false, processEntities: false });
 
-function leerFacturaXML(archivo) {
+function leerFacturaXML(archivo, notaCredito = false) {
   exigir(archivo && typeof archivo.base64 === 'string' && archivo.base64.length <= 2800000, 'Adjunte el XML de hasta 2 MB');
   const bytes = Buffer.from(archivo.base64, 'base64');
   const xml = bytes.toString('utf8');
   exigir(bytes.length > 0 && bytes.length <= 2 * 1024 * 1024 && !/<!DOCTYPE|<!ENTITY/i.test(xml), 'XML inválido');
   exigir(XMLValidator.validate(xml) === true, 'El XML no está bien formado');
-  const f = parser.parse(xml).FacturaElectronica;
-  exigir(f && !Array.isArray(f), 'Solo se admiten facturas electrónicas');
+  const raiz=parser.parse(xml);
+  const f = notaCredito ? raiz.NotaCreditoElectronica : raiz.FacturaElectronica;
+  exigir(f && !Array.isArray(f), notaCredito?'Solo se admiten notas de crédito electrónicas':'Solo se admiten facturas electrónicas');
   const clave = String(f.Clave || '');
   const consecutivo = String(f.NumeroConsecutivo || '');
   exigir(/^506\d{47}$/.test(clave) && /^\d{20}$/.test(consecutivo) && clave.slice(21,41) === consecutivo, 'Clave o consecutivo electrónico inválido');
@@ -20,7 +21,19 @@ function leerFacturaXML(archivo) {
   const total = numero(f.ResumenFactura?.TotalComprobante, 'Total XML', 0.01);
   const moneda = f.ResumenFactura?.CodigoTipoMoneda?.CodigoMoneda || 'CRC';
   exigir(['CRC','USD'].includes(moneda), 'Moneda XML no admitida');
-  return { clave, consecutivo, emisor, receptor, nombre_emisor: String(f.Emisor?.Nombre || ''), nombre_comercial_emisor: String(f.Emisor?.NombreComercial || ''), nombre_receptor: String(f.Receptor?.Nombre || ''), fecha: f.FechaEmision, total, moneda,
+  const array=x=>x==null?[]:Array.isArray(x)?x:[x];
+  const observaciones_control=[];
+  if(array(f.OtrosCargos).length)observaciones_control.push('El XML incluye otros cargos que requieren revisión en la OC');
+  const lineas=array(f.DetalleServicio?.LineaDetalle).map(l=>{
+    const codigos=array(l.CodigoComercial).map(c=>String(c.Codigo||'')).filter(Boolean);
+    const cantidad=numero(l.Cantidad,'Cantidad XML',0.00001),precio=numero(l.PrecioUnitario,'Precio XML');
+    const impuestos=array(l.Impuesto),descuento=array(l.Descuento).reduce((s,x)=>s+numero(x.MontoDescuento,'Descuento XML'),0);
+    if(impuestos.some(i=>i.Exoneracion||i.Codigo&&String(i.Codigo)!=='01')||l.ImpuestoAsumidoEmisorFabrica)observaciones_control.push('El XML incluye exoneraciones u otros impuestos: requiere revisión fiscal');
+    return {codigo:codigos[0]||String(l.CodigoCABYS||l.Codigo||''),codigos,descripcion:String(l.Detalle||''),cantidad,precio_unitario:precio,descuento,iva:impuestos.reduce((s,x)=>s+numero(x.Tarifa||0,'IVA XML'),0),subtotal:numero(l.SubTotal??cantidad*precio-descuento,'Subtotal XML')};
+  });
+  const referencias=array(f.InformacionReferencia).map(r=>({tipo:String(r.TipoDoc||r.TipoDocIR||''),numero:String(r.Numero||''),razon:String(r.Razon||'')}));
+  if(notaCredito)exigir(referencias.length===1&&referencias[0].tipo==='01'&&/^506\d{47}$/.test(referencias[0].numero),'La nota de crédito debe referenciar una única factura electrónica original');
+  return { lineas,observaciones_control:[...new Set(observaciones_control)],referencias,tipo:notaCredito?'NOTA_CREDITO':'FACTURA',clave, consecutivo, emisor, receptor, nombre_emisor: String(f.Emisor?.Nombre || ''), nombre_comercial_emisor: String(f.Emisor?.NombreComercial || ''), nombre_receptor: String(f.Receptor?.Nombre || ''), fecha: f.FechaEmision, total, moneda,
     archivo: { nombre: String(archivo.nombre || 'factura.xml').replace(/[^\w. -]/g,'_').slice(0,120), mime:'application/xml', base64:bytes.toString('base64') } };
 }
 

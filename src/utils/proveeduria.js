@@ -55,7 +55,8 @@ function compararFactura(oc, factura) {
 function saldo(oc) {
   const pagos = redondear((oc.pagos || []).reduce((s,p) => s + p.monto, 0));
   const facturado = oc.factura?.total ?? 0;
-  return { facturado, pagos, saldo: redondear(facturado - pagos) };
+  const creditos=redondear((oc.notas_credito||[]).filter(n=>n.aplicada).reduce((s,n)=>s+Number(n.total),0));
+  return { facturado, pagos, ...(oc.notas_credito?{creditos}:{}), saldo: redondear(facturado - pagos - creditos) };
 }
 const hash = token => crypto.createHash('sha256').update(token).digest('hex');
 function conciliarEstado(estado,ordenes) {
