@@ -5,14 +5,14 @@ const pool = require("../src/db");
 const router = require("../src/routes/preventivosSemanales.routes");
 const { repartirUnidadesSemana } = require("../src/utils/preventivosSemanales");
 
-const unidades = Array.from({ length: 19 }, (_, i) => ({ id: i + 1, placa: `C${100 + i}`, sede: i < 12 ? "Cartago" : "Alajuela" }));
+const unidades = Array.from({ length: 19 }, (_, i) => ({ id: i + 1, placa: `C${100 + i}`, sede: i < 12 ? "Cartago" : "Guapiles" }));
 
 test("reparte todas las unidades una vez por semana, con carga equilibrada por sede", () => {
   const reparto = repartirUnidadesSemana(unidades, "2030-01-07");
   assert.equal(reparto.length, unidades.length);
   assert.equal(new Set(reparto.map(unidad => unidad.id)).size, unidades.length);
   const cargaTotal = Array(5).fill(0);
-  for (const sede of ["Cartago", "Alajuela"]) {
+  for (const sede of ["Cartago", "Guapiles"]) {
     const counts = Array(5).fill(0);
     for (const unidad of reparto.filter(unidad => unidad.sede === sede)) {
       const dia = new Date(unidad.fecha + "T00:00:00Z").getUTCDay();
@@ -42,7 +42,7 @@ async function servidor({ falla = false, rol = "TALLER" } = {}, run) {
       async beginTransaction() { local = structuredClone(state); },
       async query(sql, params) {
         if (sql.includes("SELECT id, placa, sede FROM unidades")) {
-          return [unidades.filter(unidad => !params.length || unidad.sede === params[0])];
+          return [[...unidades, { id: 99, placa: "EXCLUIDA", sede: "Alajuela" }].filter(unidad => !params.length || unidad.sede === params[0])];
         }
         if (sql.includes("SELECT id, unidad_id")) return [local.filter(regla => params[0].includes(regla.unidad_id))];
         if (/UPDATE preventivos_programaciones|INSERT INTO preventivos_programaciones/.test(sql)) {
@@ -83,6 +83,7 @@ test("el botón programa el ciclo completo, conserva planes y repetirlo no modif
   await servidor({}, async ({ post, getState, getWrites }) => {
     assert.equal((await post()).status, 302);
     assert.equal(getState().length, unidades.length);
+    assert.ok(!getState().some(regla => regla.unidad_id === 99));
     assert.equal(getState().find(regla => regla.unidad_id === 1).plan, "Plan conservado");
     assert.ok(getState().every(regla => regla.intervalo_semanas === 1 && regla.activa));
     const writes = getWrites();

@@ -4,7 +4,7 @@ const express = require("express");
 const path = require("node:path");
 const pool = require("../src/db");
 const router = require("../src/routes/preventivosSemanales.routes");
-const { fechasProgramadas, lunesSemana, hoyCostaRica, generarPreventivos } = require("../src/utils/preventivosSemanales");
+const { fechasProgramadas, lunesSemana, hoyCostaRica, generarPreventivos, sedeAdmitePreventivos } = require("../src/utils/preventivosSemanales");
 
 test("repite por semanas sin desplazar el día y respeta los límites de la semana", () => {
   assert.equal(lunesSemana("2027-01-03"), "2026-12-28");
@@ -22,7 +22,7 @@ function baseGenerador({ falla = false, activa = true } = {}) {
   return {
     get state() { return state; },
     get released() { return released; },
-    async query() { return [activa && state.procesada < "2026-10-15" ? [{ id: 1, unidad_id: 10 }] : []]; },
+    async query() { return [activa && state.procesada < "2026-10-15" ? [{ id: 1, unidad_id: 10, sede: "Cartago" }] : []]; },
     async getConnection() {
       let local, unlock;
       return {
@@ -33,7 +33,7 @@ function baseGenerador({ falla = false, activa = true } = {}) {
           local = structuredClone(state);
         },
         async query(sql, params) {
-          if (sql.includes("SELECT id, sede FROM unidades")) return [[{ id: 10, sede: "Orotina" }]];
+          if (sql.includes("SELECT id, sede FROM unidades")) return [[{ id: 10, sede: "Cartago" }]];
           if (sql.includes("SELECT p.*")) return [[{ id: 1, unidad_id: 10, inicio: "2026-10-01", intervalo_semanas: 1, procesada: local.procesada, creado_por: 2 }]];
           if (sql.includes("SELECT id FROM mantenimientos")) return [[...local.trabajos.filter(trabajo => trabajo.fecha === params[1])]];
           if (sql.includes("INSERT INTO mantenimientos")) {
@@ -104,8 +104,9 @@ test("la vista semanal incluye todas las unidades, previstas y sin frecuencia, c
       if (sql.includes("SELECT u.id, u.placa")) {
         assert.deepEqual(params, []);
         return [[
-          { id: 10, placa: "A1", sede: "Orotina", programacion_id: 1, programacion_activa: 1, version: 1, fecha_inicio: "2026-10-14", intervalo_semanas: 4, plan: '<script>alert("x")</script>' },
-          { id: 11, placa: "C2", sede: "Cartago", programacion_id: null }
+          { id: 10, placa: "A1", sede: "Guapiles", programacion_id: 1, programacion_activa: 1, version: 1, fecha_inicio: "2026-10-14", intervalo_semanas: 4, plan: '<script>alert("x")</script>' },
+          { id: 11, placa: "C2", sede: "Cartago", programacion_id: null },
+          { id: 12, placa: "EXCLUIDA99", sede: "Orotina", programacion_id: null }
         ]];
       }
       return [[]];
@@ -118,6 +119,7 @@ test("la vista semanal incluye todas las unidades, previstas y sin frecuencia, c
     assert.match(html, /C2/);
     assert.match(html, /14\/10\/2026 · Previsto/);
     assert.match(html, /Sin frecuencia/);
+    assert.doesNotMatch(html, /EXCLUIDA99|>Orotina</);
     assert.doesNotMatch(html, /<script>alert/);
   });
 });
@@ -129,7 +131,7 @@ test("Michelle y Daniel pueden configurar frecuencias desde sus perfiles de Tall
       async getConnection() { return {
         async beginTransaction() {},
         async query(sql, params) {
-          if (sql.includes("SELECT id FROM unidades")) return [[{ id: 10 }]];
+          if (sql.includes("SELECT id, sede FROM unidades")) return [[{ id: 10, sede: "Cartago" }]];
           if (sql.includes("SELECT id, version")) return [[]];
           if (sql.includes("INSERT INTO preventivos_programaciones")) insert = params;
           return [{ insertId: 1 }];
@@ -158,7 +160,7 @@ test("rechaza modificaciones de mecánicos y versiones desactualizadas sin guard
     async getConnection() { return {
       async beginTransaction() {},
       async query(sql) {
-        if (sql.includes("SELECT id FROM unidades")) return [[{id:10}]];
+        if (sql.includes("SELECT id, sede FROM unidades")) return [[{id:10,sede:"Cartago"}]];
         if (sql.includes("SELECT id, version")) return [[{id:1,version:2}]];
         throw new Error("No debe guardar");
       },
@@ -172,4 +174,17 @@ test("rechaza modificaciones de mecánicos y versiones desactualizadas sin guard
     assert.equal(response.status, 409);
     assert.equal(rollback, true);
   });
+});
+
+test("excluye sedes con sus variantes de acentos y nombres internos", async () => {
+  for (const sede of ["Alajuela", "Cabezales", "Carretas", "Cisternas", "Granel", "granel_cartago", "Granel Guápiles", "granel_la_cruz", "granel_perez_zeledon", "Orotina", "San Carlos", "Taller", "Tándem", "Tamden", "Técnicos", "Transportadora"]) {
+    assert.equal(sedeAdmitePreventivos(sede), false, sede);
+  }
+  for (const sede of ["Cartago", "Guapiles", "La Cruz", "Nicoya", "Rio Claro", "Perez Zeledon", "granel_alajuela"]) {
+    assert.equal(sedeAdmitePreventivos(sede), true, sede);
+  }
+  const db = baseGenerador();
+  db.query = async () => [[{ id: 1, unidad_id: 10, sede: "Alajuela" }]];
+  assert.equal(await generarPreventivos(db, "2026-10-15"), 0);
+  assert.equal(db.released, 0);
 });

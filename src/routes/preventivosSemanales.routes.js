@@ -1,7 +1,7 @@
 const express = require("express");
 const pool = require("../db");
 const { getSedesPermitidas, esUsuarioTodasSedes, etiquetaSede } = require("../utils/sedes");
-const { hoyCostaRica, fechaValida, sumarDias, lunesSemana, fechasProgramadas, puedeProgramar, generarPreventivos, asegurarProgramacionSemanal, repartirUnidadesSemana } = require("../utils/preventivosSemanales");
+const { hoyCostaRica, fechaValida, sumarDias, lunesSemana, fechasProgramadas, puedeProgramar, generarPreventivos, asegurarProgramacionSemanal, repartirUnidadesSemana, sedeAdmitePreventivos } = require("../utils/preventivosSemanales");
 const { ensureNumeroMantenimientoColumn } = require("../utils/mantenimientosNumero");
 const router = express.Router();
 
@@ -31,9 +31,10 @@ router.get("/", async (req, res) => {
        FROM unidades u LEFT JOIN preventivos_programaciones p ON p.unidad_id = u.id
        WHERE ${condiciones.join(" AND ")} ORDER BY u.sede, u.placa`, params
     );
-    const sedes = [...new Set(unidades.map(unidad => unidad.sede))];
+    const elegibles = unidades.filter(unidad => sedeAdmitePreventivos(unidad.sede));
+    const sedes = [...new Set(elegibles.map(unidad => unidad.sede))];
     const sede = sedes.includes(req.query.sede) ? req.query.sede : "";
-    const visibles = unidades.filter(unidad => !sede || unidad.sede === sede);
+    const visibles = elegibles.filter(unidad => !sede || unidad.sede === sede);
     const ids = visibles.map(unidad => unidad.id);
     const [mantenimientos] = ids.length ? await pool.query(
       `SELECT id, unidad_id, estado, numero_mantenimiento, DATE_FORMAT(fecha_programada, '%Y-%m-%d') AS fecha
@@ -82,6 +83,7 @@ router.post("/automatico", async (req, res) => {
   const seleccionada = lunesSemana(req.body.semana);
   const inicio = seleccionada < hoy ? sumarDias(lunesSemana(hoy), 7) : seleccionada;
   const sede = req.body.sede.trim();
+  if (sede && !sedeAdmitePreventivos(sede)) return res.status(403).send("Esta sede está excluida de los preventivos semanales.");
   let connection;
   try {
     await asegurarProgramacionSemanal(pool);
@@ -91,7 +93,7 @@ router.post("/automatico", async (req, res) => {
       `SELECT id, placa, sede FROM unidades WHERE COALESCE(activa, 1) = 1
        ${sede ? "AND sede = ?" : ""} ORDER BY id FOR UPDATE`, sede ? [sede] : []
     );
-    const reparto = repartirUnidadesSemana(unidades, inicio);
+    const reparto = repartirUnidadesSemana(unidades.filter(unidad => sedeAdmitePreventivos(unidad.sede)), inicio);
     if (reparto.length) {
       const [existentes] = await connection.query(
         `SELECT id, unidad_id, intervalo_semanas, activa, DATE_FORMAT(fecha_inicio, '%Y-%m-%d') AS inicio
@@ -154,8 +156,9 @@ router.post("/programacion", async (req, res) => {
     await asegurarProgramacionSemanal(pool);
     connection = await pool.getConnection();
     await connection.beginTransaction();
-    const [[unidad]] = await connection.query("SELECT id FROM unidades WHERE id = ? AND COALESCE(activa, 1) = 1 FOR UPDATE", [unidadId]);
+    const [[unidad]] = await connection.query("SELECT id, sede FROM unidades WHERE id = ? AND COALESCE(activa, 1) = 1 FOR UPDATE", [unidadId]);
     if (!unidad) { await connection.rollback(); return res.status(404).send("Unidad no encontrada."); }
+    if (!sedeAdmitePreventivos(unidad.sede)) { await connection.rollback(); return res.status(403).send("Esta sede está excluida de los preventivos semanales."); }
     const [[actual]] = await connection.query("SELECT id, version FROM preventivos_programaciones WHERE unidad_id = ? FOR UPDATE", [unidadId]);
     if ((actual?.version || 0) !== version) {
       await connection.rollback();

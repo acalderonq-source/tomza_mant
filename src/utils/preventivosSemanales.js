@@ -1,4 +1,14 @@
 const DIA_MS = 86400000;
+const SEDES_EXCLUIDAS = new Set([
+  "ALAJUELA", "CABEZALES", "CARRETAS", "CISTERNAS", "GRANEL", "GRANELCARTAGO",
+  "GRANELGUAPILES", "GRANELLACRUZ", "GRANELPEREZZELEDON", "OROTINA", "SANCARLOS",
+  "TALLER", "TANDEM", "TAMDEN", "TECNICOS", "TRANSPORTADORA"
+]);
+
+function sedeAdmitePreventivos(sede) {
+  const clave = String(sede || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+  return Boolean(clave) && !SEDES_EXCLUIDAS.has(clave);
+}
 
 function hoyCostaRica(fecha = new Date()) {
   return new Intl.DateTimeFormat("en-CA", {
@@ -85,7 +95,7 @@ function asegurarProgramacionSemanal(pool) {
 async function generarPreventivos(pool, hoy = hoyCostaRica()) {
   if (!fechaValida(hoy)) throw new Error("Fecha de generación inválida.");
   const [programaciones] = await pool.query(
-    `SELECT p.id, p.unidad_id FROM preventivos_programaciones p
+    `SELECT p.id, p.unidad_id, u.sede FROM preventivos_programaciones p
      JOIN unidades u ON u.id = p.unidad_id
      WHERE p.activa = 1 AND COALESCE(u.activa, 1) = 1
        AND p.procesada_hasta < ? AND p.fecha_inicio <= ?
@@ -93,13 +103,14 @@ async function generarPreventivos(pool, hoy = hoyCostaRica()) {
   );
   let creados = 0;
   for (const programacion of programaciones) {
+    if (!sedeAdmitePreventivos(programacion.sede)) continue;
     const connection = await pool.getConnection();
     try {
       await connection.beginTransaction();
       const [[unidad]] = await connection.query(
         "SELECT id, sede FROM unidades WHERE id = ? AND COALESCE(activa, 1) = 1 FOR UPDATE", [programacion.unidad_id]
       );
-      if (!unidad) { await connection.commit(); continue; }
+      if (!unidad || !sedeAdmitePreventivos(unidad.sede)) { await connection.commit(); continue; }
       const [[regla]] = await connection.query(
         `SELECT p.*, DATE_FORMAT(p.fecha_inicio, '%Y-%m-%d') AS inicio,
                 DATE_FORMAT(p.procesada_hasta, '%Y-%m-%d') AS procesada
@@ -146,4 +157,4 @@ async function generarPreventivos(pool, hoy = hoyCostaRica()) {
   return creados;
 }
 
-module.exports = { hoyCostaRica, fechaValida, sumarDias, lunesSemana, fechasProgramadas, puedeProgramar, generarPreventivos, asegurarProgramacionSemanal, repartirUnidadesSemana };
+module.exports = { hoyCostaRica, fechaValida, sumarDias, lunesSemana, fechasProgramadas, puedeProgramar, generarPreventivos, asegurarProgramacionSemanal, repartirUnidadesSemana, sedeAdmitePreventivos };
