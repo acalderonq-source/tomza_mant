@@ -23,17 +23,26 @@ function analizarFilas(filas, proveedores = []) {
     const subtotal = numero(tokens.at(-1));
     const precio = numero(tokens.at(-2));
     if (!Number.isFinite(subtotal) || !Number.isFinite(precio) || precio <= 0) continue;
-    let cantidad, descripcion, codigo = '';
-    const antesPrecio = numero(tokens.at(-3));
-    if (Number.isFinite(antesPrecio) && antesPrecio > 0) {
-      cantidad = antesPrecio;
-      descripcion = tokens.slice(0, -3);
-    } else {
-      cantidad = numero(tokens[0]);
-      descripcion = tokens.slice(1, -2);
+    const esCodigo = t => /^(?=.*\d)[A-Z0-9._\/-]+$/i.test(t);
+    const candidatos = [
+      { cantidad: numero(tokens.at(-3)), descripcion: tokens.slice(0, -3) },
+      { cantidad: numero(tokens[0]), descripcion: tokens.slice(1, -2) }
+    ];
+    // Algunos proveedores imprimen codigo, cantidad y descripcion, en ese orden.
+    if (esCodigo(tokens[0])) candidatos.push({ cantidad: numero(tokens[1]), descripcion: [tokens[0], ...tokens.slice(2, -2)] });
+    const candidato = candidatos.find(c => c.cantidad > 0 && Number.isFinite(c.cantidad) && c.descripcion.length &&
+      Math.abs(c.cantidad * precio - subtotal) <= Math.max(0.02, subtotal * 0.0001));
+    if (!candidato) continue;
+    const { cantidad, descripcion } = candidato;
+    let codigo = '';
+    if (esCodigo(descripcion[0]) && descripcion.length > 1) codigo = descripcion.shift();
+    // Codigo explicitamente rotulado dentro de la fila, sin interpretar modelos como codigos.
+    const etiqueta = descripcion.join(' ').match(/\b(?:c[oó]digo|cod\.?|sku|referencia)\s*[:#]\s*([A-Z0-9._\/-]+)/i);
+    if (etiqueta) {
+      codigo = etiqueta[1];
+      const limpio = descripcion.join(' ').replace(etiqueta[0], '').trim();
+      descripcion.splice(0, descripcion.length, limpio);
     }
-    if (!Number.isFinite(cantidad) || cantidad <= 0 || !descripcion.length) continue;
-    if (/^(?=.*\d)[A-Z0-9-]{3,}$/i.test(descripcion[0]) && descripcion.length > 1) codigo = descripcion.shift();
     const detalle = descripcion.join(' ').replace(/[₡$]\s*$/, '').trim();
     if (!/[a-záéíóúñ]/i.test(detalle)) continue;
     // Solo aceptar filas cuyo importe confirma cantidad y precio, sin adivinar columnas.

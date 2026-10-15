@@ -30,6 +30,23 @@ test('no adivina impuestos ni proveedor y rechaza tablas sin cantidades', () => 
   assert.throws(()=>analizarFilas(['Total 1000','Filtro sin precio']), /No se reconoció/);
 });
 
+test('conserva codigos antes o despues de cantidad, con ceros, puntos y barras', () => {
+  const ejemplos = [
+    ['AB.123/45 2 Filtro aceite 100.00 200.00', 'AB.123/45'],
+    ['2 AB.123/45 Filtro aceite 100.00 200.00', 'AB.123/45'],
+    ['AB_123 Filtro aceite 2 100.00 200.00', 'AB_123'],
+    ['000123 2 Filtro aceite 100.00 200.00', '000123'],
+    ['Filtro aceite Código: ABC/DEF 2 100.00 200.00', 'ABC/DEF']
+  ];
+  for (const [fila, codigo] of ejemplos) {
+    const linea = analizarFilas([fila]).lineas[0];
+    assert.equal(linea.codigo_producto, codigo, fila);
+    assert.equal(linea.cantidad, 2, fila);
+    assert.equal(linea.descripcion, 'Filtro aceite', fila);
+  }
+  assert.equal(analizarFilas(['2 Bombillo 24V 100.00 200.00']).lineas[0].codigo_producto, '');
+});
+
 test('rechaza imagenes y archivos falsos sin invocar servicios externos', async () => {
   await assert.rejects(leerCotizacionLocal({archivo_data:'data:image/png;base64,AA=='}), /sin IA admite PDF/);
   await assert.rejects(leerCotizacionLocal({archivo_data:'data:application/pdf;base64,AA=='}), /PDF válido/);
@@ -38,7 +55,7 @@ test('rechaza imagenes y archivos falsos sin invocar servicios externos', async 
 test('lee un PDF real localmente sin clave ni llamadas HTTP', async () => {
   const Printer = require('pdfmake');
   const printer = new Printer({Roboto:{normal:'Helvetica'}});
-  const doc = printer.createPdfKitDocument({content:['Proveedor Prueba','Placa: C12345','IVA 13%', '2 Filtro de aceite 1000.00 2000.00']});
+  const doc = printer.createPdfKitDocument({content:['Proveedor Prueba','Placa: C12345','IVA 13%', '000123/AB 2 Filtro de aceite 1000.00 2000.00']});
   const buffer = await new Promise((resolve,reject)=>{const chunks=[];doc.on('data',c=>chunks.push(c));doc.on('end',()=>resolve(Buffer.concat(chunks)));doc.on('error',reject);doc.end();});
   const originalFetch = global.fetch;
   global.fetch = () => { throw Error('No se permiten servicios externos'); };
@@ -46,6 +63,7 @@ test('lee un PDF real localmente sin clave ni llamadas HTTP', async () => {
     const result = await leerCotizacionLocal({archivo_data:'data:application/pdf;base64,'+buffer.toString('base64')});
     assert.equal(result.lineas.length,1);
     assert.equal(result.lineas[0].descripcion,'Filtro de aceite');
+    assert.equal(result.lineas[0].codigo_producto,'000123/AB');
     assert.equal(result.lineas[0].subtotal,2000);
   } finally { global.fetch = originalFetch; }
 });
