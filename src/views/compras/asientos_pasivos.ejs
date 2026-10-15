@@ -62,6 +62,7 @@
         <div class="col-lg-1 col-md-12 d-grid"><button class="btn btn-primary btn-sm">Filtrar</button></div>
       </form>
       <form method="POST" action="/compras/facturas/asientos" id="crear-asiento">
+        <div id="seleccion-otras-facturas"></div>
         <div class="table-wrap">
           <table class="table table-hover align-middle table-facturas mb-0">
             <thead><tr><th class="ps-2"><input type="checkbox" id="seleccionar-todas" title="Seleccionar facturas disponibles" aria-label="Seleccionar facturas disponibles"></th><th>PO Número</th><th>Proveedor</th><th>Fecha</th><th>Recepción</th><th>N° Factura</th><th>Factura electrónica</th><th class="text-end">Monto</th><th>Fecha Vencimiento</th><th>Estado</th><th>Acciones</th></tr></thead>
@@ -97,6 +98,7 @@
         </div>
         <div class="selection-bar p-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
           <div class="fw-semibold"><span id="cantidad-seleccionada">0</span> seleccionada(s) · ₡<span id="monto-seleccionado">0,00</span></div>
+          <button type="button" class="btn btn-outline-secondary btn-sm" id="limpiar-seleccion">Limpiar selección</button>
           <button class="btn btn-primary" id="generar-asiento" disabled><i class="bi bi-file-earmark-excel"></i> Guardar y descargar asiento 01</button>
         </div>
       </form>
@@ -134,19 +136,49 @@
     const selectedCount = document.getElementById('cantidad-seleccionada');
     const selectedAmount = document.getElementById('monto-seleccionado');
     const submit = document.getElementById('generar-asiento');
+    const storageKey = 'asientos-seleccion:' + <%- JSON.stringify(String(user.id || user.usuario || '')).replace(/</g, '\\u003c') %>;
+    const selection = new Map();
+    try {
+      const saved = JSON.parse(sessionStorage.getItem(storageKey) || '[]');
+      if (Array.isArray(saved)) saved.forEach(([ref, monto]) => {
+        if (/^[a-z_]+:\d+$/i.test(ref) && Number.isFinite(monto) && monto > 0) selection.set(ref, monto);
+      });
+    } catch (_) { /* La selección sigue funcionando si el almacenamiento no está disponible. */ }
+    <% if (descargarCreado) { %>selection.clear();<% } %>
+    document.querySelectorAll('.factura-check:disabled').forEach(check => selection.delete(check.value));
+    checks.forEach(check => { check.checked = selection.has(check.value); });
     function updateSelection() {
+      checks.forEach(check => {
+        if (check.checked) selection.set(check.value, Number(check.dataset.monto || 0));
+        else selection.delete(check.value);
+      });
+      try { sessionStorage.setItem(storageKey, JSON.stringify([...selection])); } catch (_) {}
       const selected = checks.filter(check => check.checked);
-      selectedCount.textContent = selected.length;
-      selectedAmount.textContent = selected.reduce((sum, check) => sum + Number(check.dataset.monto || 0), 0).toLocaleString('es-CR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-      submit.disabled = selected.length === 0 || selected.length > 1000;
+      selectedCount.textContent = selection.size;
+      selectedAmount.textContent = [...selection.values()].reduce((sum, monto) => sum + monto, 0).toLocaleString('es-CR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      submit.disabled = selection.size === 0 || selection.size > 1000;
       all.checked = checks.length > 0 && selected.length === checks.length;
       all.indeterminate = selected.length > 0 && selected.length < checks.length;
     }
     all.addEventListener('change', () => { checks.forEach(check => { check.checked = all.checked; }); updateSelection(); });
     checks.forEach(check => check.addEventListener('change', updateSelection));
+    document.getElementById('limpiar-seleccion').addEventListener('click', () => {
+      selection.clear(); checks.forEach(check => { check.checked = false; }); updateSelection();
+    });
+    updateSelection();
     document.getElementById('crear-asiento').addEventListener('submit', event => {
-      if (!checks.some(check => check.checked) || !confirm('¿Guardar este asiento con las facturas seleccionadas?')) event.preventDefault();
-      else submit.disabled = true;
+      if (!selection.size || selection.size > 1000 || !confirm('¿Guardar este asiento con las ' + selection.size + ' facturas seleccionadas de todos los proveedores?')) event.preventDefault();
+      else {
+        const hidden = document.getElementById('seleccion-otras-facturas');
+        hidden.replaceChildren();
+        const visible = new Set(checks.filter(check => check.checked).map(check => check.value));
+        selection.forEach((_monto, ref) => {
+          if (visible.has(ref)) return;
+          const input = document.createElement('input');
+          input.type = 'hidden'; input.name = 'factura_ref'; input.value = ref; hidden.appendChild(input);
+        });
+        submit.disabled = true;
+      }
     });
     <% if (descargarCreado) { %>
     window.addEventListener('load', () => document.getElementById('descargar-creado').click(), { once: true });

@@ -7,13 +7,13 @@ const { chromium } = require("playwright");
 
 async function main() {
   const app = express();
-  app.get("/compras/facturas/asientos", async (_req, res) => {
+  app.get("/compras/facturas/asientos", async (req, res) => {
     const html = await ejs.renderFile(path.join(__dirname, "../src/views/compras/asientos_pasivos.ejs"), {
       user: { usuario: "admin", rol: "ADMIN" },
       facturas: [
         { id: 1, tipo: "orden", fecha: new Date("2026-09-22T12:00:00Z"), po_numero: "2026-100", numero_factura: "001001", proveedor_nombre: "Proveedor Uno", placa_recepcion: "C164528", sede_recepcion: "Cartago", negocio_recepcion: "Cilindrero", monto: 1250, nota_credito_monto: 0, fecha_vencimiento_factura: new Date("2026-10-22T12:00:00Z") },
         { id: 2, tipo: "independiente", fecha: new Date("2026-09-21T12:00:00Z"), numero_factura: "001002", proveedor_nombre: "Proveedor Dos", monto: 300, nota_credito_monto: 0, lote_asiento_id: 4 }
-      ],
+      ].map(f => req.query.proveedor_id === '2' && f.id === 1 ? { ...f, id: 3, proveedor_nombre: 'Proveedor Tres', monto: 500 } : f),
       proveedores: [{ id: 1, nombre: "Proveedor Uno" }],
       filtros: { proveedor_id: "", fecha_desde: "", fecha_hasta: "", q: "", estado: "todos" },
       historial: [{ id: 4, creado_en: new Date("2026-09-22T12:00:00Z"), creado_por_usuario: "admin", cantidad_facturas: 1, monto_total: 300 }],
@@ -44,6 +44,28 @@ async function main() {
     assert.equal(await page.locator('#cantidad-seleccionada').textContent(), '1');
     assert.match(await page.locator('#monto-seleccionado').textContent(), /1.250,00/);
     assert.equal(await page.getByRole('link', { name: '#4' }).count(), 2);
+    const base = `http://127.0.0.1:${server.address().port}/compras/facturas/asientos`;
+    await page.goto(base + '?proveedor_id=2');
+    assert.equal(await page.locator('#cantidad-seleccionada').textContent(), '1');
+    await page.locator('.factura-check:not(:disabled)').check();
+    assert.equal(await page.locator('#cantidad-seleccionada').textContent(), '2');
+    await page.goto(base);
+    assert.equal(await page.locator('.factura-check:not(:disabled)').isChecked(), true);
+    assert.equal(await page.locator('#cantidad-seleccionada').textContent(), '2');
+    page.once('dialog', dialog => dialog.accept());
+    await page.route('**/compras/facturas/asientos', async route => {
+      if (route.request().method() !== 'POST') return route.continue();
+      const refs = new URLSearchParams(route.request().postData()).getAll('factura_ref');
+      assert.deepEqual(refs.sort(), ['orden:1', 'orden:3']);
+      await route.fulfill({ contentType: 'text/html', body: 'Asiento recibido' });
+    });
+    await page.locator('#generar-asiento').click();
+    await page.waitForURL(base);
+    await page.goto(base);
+    await page.locator('#limpiar-seleccion').click();
+    assert.equal(await page.locator('#cantidad-seleccionada').textContent(), '0');
+    await page.reload();
+    assert.equal(await page.locator('.factura-check:not(:disabled)').isChecked(), false);
     await page.screenshot({ path: path.join(os.tmpdir(), "asientos-pasivos-desktop.png"), fullPage: true });
     await page.setViewportSize({ width: 390, height: 844 });
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
