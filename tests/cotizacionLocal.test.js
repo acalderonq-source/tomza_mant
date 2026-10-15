@@ -52,6 +52,18 @@ test('rechaza imagenes y archivos falsos sin invocar servicios externos', async 
   await assert.rejects(leerCotizacionLocal({archivo_data:'data:application/pdf;base64,AA=='}), /PDF válido/);
 });
 
+test('formato Maxi separa codigo entre producto y cantidad sin quitar medidas de rotulas', () => {
+  const result = analizarFilas([
+    'Imagen Producto Código Cantidad Precio Total',
+    'Rótula 1 1/8" x 5.44" Lh Elgin A23330022010 1 12,100.00 12,100.00',
+    'Rótula 1 1/8" x 5.44" Rh Elgin A23330022110 1 12,100.00 12,100.00'
+  ]);
+  assert.deepEqual(result.lineas.map(l=>l.codigo_producto), ['A23330022010','A23330022110']);
+  assert.equal(result.lineas[0].descripcion, 'Rótula 1 1/8" x 5.44" Lh Elgin');
+  assert.equal(result.lineas[1].descripcion, 'Rótula 1 1/8" x 5.44" Rh Elgin');
+  assert.equal(result.lineas.reduce((s,l)=>s+l.subtotal,0),24200);
+});
+
 test('lee un PDF real localmente sin clave ni llamadas HTTP', async () => {
   const Printer = require('pdfmake');
   const printer = new Printer({Roboto:{normal:'Helvetica'}});

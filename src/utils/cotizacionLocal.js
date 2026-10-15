@@ -16,6 +16,7 @@ function analizarFilas(filas, proveedores = []) {
   const normalizar = s => String(s).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/[^A-Z0-9]/g, '');
   const proveedor = proveedores.filter(p => normalizar(p.nombre).length >= 6 && normalizar(texto).includes(normalizar(p.nombre)));
   const lineas = [];
+  const codigoDespuesDescripcion = filas.some(f => /(?:producto|descripci[oó]n).*c[oó]digo.*cantidad/i.test(f));
   for (const fila of filas) {
     if (/^\s*(?:sub\s*total|total|iva|impuesto|descuento|transporte|saldo)\b/i.test(fila)) continue;
     const tokens = fila.trim().split(/\s+/).filter(t => !/^(?:₡|\$|CRC|USD|UND|UNID|UNIDAD|PZA)$/i.test(t));
@@ -36,6 +37,7 @@ function analizarFilas(filas, proveedores = []) {
     const { cantidad, descripcion } = candidato;
     let codigo = '';
     if (esCodigo(descripcion[0]) && descripcion.length > 1) codigo = descripcion.shift();
+    if (!codigo && codigoDespuesDescripcion && esCodigo(descripcion.at(-1)) && descripcion.length > 1) codigo = descripcion.pop();
     // Codigo explicitamente rotulado dentro de la fila, sin interpretar modelos como codigos.
     const etiqueta = descripcion.join(' ').match(/\b(?:c[oó]digo|cod\.?|sku|referencia)\s*[:#]\s*([A-Z0-9._\/-]+)/i);
     if (etiqueta) {
@@ -92,7 +94,16 @@ async function leerCotizacionLocal({ archivo_data }, proveedores = []) {
         if (!grupo) { grupo = { y, items: [] }; grupos.push(grupo); }
         grupo.items.push(item);
       }
-      grupos.sort((a,b) => b.y-a.y).forEach(g => filas.push(g.items.sort((a,b) => a.transform[4]-b.transform[4]).map(i => i.str).join(' ')));
+      grupos.sort((a,b) => b.y-a.y).forEach(g => {
+        const items = g.items.sort((a,b) => a.transform[4]-b.transform[4]);
+        let fila = '', anterior;
+        for (const item of items) {
+          const espacio = anterior && item.transform[4] - (anterior.transform[4] + anterior.width) > 1;
+          fila += (espacio ? ' ' : '') + item.str;
+          anterior = item;
+        }
+        filas.push(fila);
+      });
       page.cleanup();
     }
     return analizarFilas(filas, proveedores);
