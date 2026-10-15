@@ -31,10 +31,10 @@ async function revisarFactura(db,row,lock=false){
   const identidad=o=>{try{validarCorrespondencia(d,o);}catch(e){if(!e.status)throw e;issues.push(e.message);}};
   if(oc.origen==='PROVEEDURIA'){
     const [r]=await db.query("SELECT datos FROM prov_documentos WHERE id=? AND tipo='oc'"+bloqueo,[oc.id]);
-    if(r.length){const o=parse(r[0].datos);identidad({estado:o.estado,proveedor:o.proveedor,cedula:o.proveedor_cedula,moneda:o.moneda,total:Number(o.total),factura_registrada:!!o.factura});lineas=lineasProveeduria(o);if(Number(o.transporte)>0)issues.push('La OC incluye transporte: requiere revisar su correspondencia en el XML');}
+    if(r.length){const o=parse(r[0].datos);identidad({estado:o.estado,razon_social:o.razon_social,empresa_destino:o.empresa_destino,proveedor:o.proveedor,cedula:o.proveedor_cedula,moneda:o.moneda,total:Number(o.total),factura_registrada:!!o.factura});lineas=lineasProveeduria(o);if(Number(o.transporte)>0)issues.push('La OC incluye transporte: requiere revisar su correspondencia en el XML');}
   }else{
     const [r]=await db.query('SELECT o.*,p.nombre,p.cedula_juridica FROM ordenes_compra o LEFT JOIN proveedores p ON p.id=o.proveedor_id WHERE o.id=?'+bloqueo,[oc.id]);
-    if(r.length){const o=r[0];identidad({estado:o.estado,proveedor:o.nombre,cedula:o.cedula_juridica,moneda:o.moneda,total:Number(o.total),factura_registrada:!!o.factura});const [ls]=await db.query('SELECT * FROM ordenes_compra_detalle WHERE orden_compra_id=? ORDER BY id'+bloqueo,[oc.id]);
+    if(r.length){const o=r[0];identidad({estado:o.estado,razon_social:o.razon_social,empresa_destino:o.empresa_destino,proveedor:o.nombre,cedula:o.cedula_juridica,moneda:o.moneda,total:Number(o.total),factura_registrada:!!o.factura});const [ls]=await db.query('SELECT * FROM ordenes_compra_detalle WHERE orden_compra_id=? ORDER BY id'+bloqueo,[oc.id]);
       lineas=ls.map(l=>({...l,codigo:l.codigo||l.codigo_producto||`LINEA-${l.id}`,iva:Number(o.iva),descuento:Number(o.subtotal)>0?Number(o.descuento||0)*Number(l.subtotal)/Number(o.subtotal):0}));
       if(Number(o.transporte)>0)issues.push('La OC incluye transporte: requiere revisar su correspondencia en el XML');
     }

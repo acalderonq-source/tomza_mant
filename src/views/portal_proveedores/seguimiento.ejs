@@ -1,0 +1,14 @@
+<div class="invoice-followup">
+<% const seg=typeof seguimiento==='function'?seguimiento(o):null; if(seg){ %>
+<div class="small fw-semibold <%= seg.vencida||seg.atrasada?'text-danger':'text-primary' %>"><%= seg.estado %><%= seg.vencida?' · Vencida':seg.atrasada?' · Plazo de revisión vencido':seg.proxima?' · Vence en 7 días':'' %></div>
+<div class="small">Siguiente paso: <%= seg.siguiente %></div>
+<div class="small text-secondary">Responsable: <%= seg.responsable %><%= seg.plazo?' · Plazo: '+seg.plazo:'' %></div>
+<% } %>
+<details class="small mt-2"><summary>Observaciones y correcciones (<%= (o.mensajes||[]).length %>)</summary>
+<% if(!(o.mensajes||[]).length){ %><p class="text-secondary">Sin observaciones.</p><% } %>
+<% for(const mensaje of o.mensajes||[]){ %><div class="border-start border-3 ps-2 my-2"><strong><%= mensaje.tipo==='respuesta'?'Proveedor':mensaje.tipo==='devolucion'?'Devolución':'Revisión' %></strong> · <%= mensaje.fecha.slice(0,16).replace('T',' ') %> UTC<p class="mb-0" style="white-space:pre-wrap"><%= mensaje.texto %></p></div><% } %>
+<% if(interno){ %><form data-portal-api="<%= url %>/comentar"><label>Comentario visible para el proveedor<textarea class="form-control form-control-sm" name="mensaje" required minlength="5" maxlength="2000"></textarea></label><button class="btn btn-sm btn-outline-primary mt-2">Agregar comentario</button></form><% } %>
+</details>
+<% if(!interno&&o.factura.estado==='RECHAZADA_INTERNA'){ %><form class="mt-2" data-portal-api="<%= url %>/responder"><label class="small">Respuesta a la devolución<textarea class="form-control form-control-sm" name="mensaje" required minlength="5" maxlength="2000" placeholder="Explique la aclaración o corrección"></textarea></label><p class="small text-secondary">Si cambia el comprobante fiscal, presente la nota de crédito y una nueva factura. El XML original se conserva.</p><button class="btn btn-sm btn-primary">Enviar a revisión</button></form><% } %>
+<% if(interno&&typeof responsables!=='undefined'&&(!o.factura.cuenta_por_pagar||saldo(o).saldo>0)){ %><details class="small mt-2"><summary>Asignar responsable y plazo</summary><form data-portal-api="<%= url %>/asignar"><label>Responsable<select class="form-select form-select-sm" name="responsable_id" required><option value="">Seleccione</option><% for(const r of responsables){ %><option value="<%= r.id %>" <%= Number(o.gestion?.responsable_id)===Number(r.id)?'selected':'' %>><%= r.username %></option><% } %></select></label><label>Atender antes de<input class="form-control form-control-sm" type="date" name="fecha_limite" value="<%= o.gestion?.fecha_limite||'' %>" required></label><button class="btn btn-sm btn-outline-primary mt-2">Guardar responsable</button></form></details><% } %>
+</div>

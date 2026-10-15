@@ -16,8 +16,8 @@ async function buscarCandidatos(db,datos){
   const [compras]=await db.query(`SELECT o.*,p.nombre,p.cedula_juridica
     FROM ordenes_compra o LEFT JOIN proveedores p ON p.id=o.proveedor_id WHERE o.total>=?-0.01 ORDER BY o.id DESC LIMIT 201`,[monto]);
   if(pr.length>200||compras.length>200)return {limite:true,candidatos:[]};
-  const ordenes=[...pr.map(parse).map(r=>({origen:'PROVEEDURIA',id:r.id,numero:`PR-${r.id}`,referencia:`PR-${r.id}`,estado:r.datos.estado,proveedor:r.datos.proveedor,cedula:r.datos.proveedor_cedula,total:Number(r.datos.total),moneda:r.datos.moneda,factura_registrada:!!r.datos.factura})),
-    ...compras.map(o=>({origen:'COMPRAS',id:o.id,numero:o.po_numero,referencia:`#${o.id}`,estado:o.estado,proveedor:o.nombre,cedula:o.cedula_juridica,total:Number(o.total),moneda:o.moneda,factura_registrada:!!o.factura}))];
+  const ordenes=[...pr.map(parse).map(r=>({origen:'PROVEEDURIA',id:r.id,numero:`PR-${r.id}`,referencia:`PR-${r.id}`,estado:r.datos.estado,razon_social:r.datos.razon_social,empresa_destino:r.datos.empresa_destino,proveedor:r.datos.proveedor,cedula:r.datos.proveedor_cedula,total:Number(r.datos.total),moneda:r.datos.moneda,factura_registrada:!!r.datos.factura})),
+    ...compras.map(o=>({origen:'COMPRAS',id:o.id,numero:o.po_numero,referencia:`#${o.id}`,estado:o.estado,empresa_destino:o.empresa_destino,proveedor:o.nombre,cedula:o.cedula_juridica,total:Number(o.total),moneda:o.moneda,factura_registrada:!!o.factura}))];
   const candidatos=[];
   for(const o of ordenes){
     try{validarCorrespondencia(datos,o);}catch(_){continue;}

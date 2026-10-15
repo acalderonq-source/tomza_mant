@@ -5,6 +5,8 @@ const pool=require('../db');
 const {revisarFactura,exigirControl,excepciones}=require('../utils/portalControlFactura');
 const {vincularOrden}=require('../utils/portalFacturaOrden');
 const {cruzarFactura}=require('../utils/portalCruceAutomatico');
+const {seguimiento,responderCorreccion,diaCR}=require('../utils/portalSeguimiento');
+const {ordenesDisponibles}=require('../utils/portalOrdenesDisponibles');
 const {exigir,adjunto,saldo,numero}=require('../utils/proveeduria');
 const {leerFacturaXML,consultarHacienda,aprobable,vencimiento}=require('../utils/proveedorHacienda');
 const {esPropietarioAdministracion}=require('../utils/administracionPrivada');
@@ -46,11 +48,36 @@ externo.use(wrap(async(req,res,next)=>{
   req.proveedor=rows[0];next();
 }));
 externo.post('/logout',(req,res)=>{delete req.session.proveedorPortal;res.redirect('/portal-proveedores/login');});
+externo.get('/ordenes',wrap(async(req,res)=>res.json({ordenes:await ordenesDisponibles(pool,req.proveedor.cedula)})));
+externo.post('/validar',cargas,wrap(async(req,res)=>{
+  const e=leerFacturaXML(req.body.xml),id=v=>String(v||'').replace(/^0+/,'');
+  exigir(id(e.emisor)===id(req.proveedor.cedula),'El emisor del XML no corresponde a su cuenta');
+  const [receptores]=await pool.query('SELECT cedula FROM prov_portal_receptores WHERE activo=1');
+  exigir(receptores.some(r=>id(r.cedula)===id(e.receptor)),'La empresa receptora no está autorizada');
+  const [duplicadas]=await pool.query('SELECT documento_id FROM prov_facturas_claves WHERE clave=?',[e.clave]);
+  exigir(!duplicadas.length,'Esta factura ya está registrada');
+  let diferencias=[];
+  if(req.body.orden){
+    const disponibles=await ordenesDisponibles(pool,req.proveedor.cedula),oc=disponibles.find(o=>`${o.origen}:${o.id}`===String(req.body.orden));
+    exigir(oc,'La orden no está disponible para su cuenta');
+    const d={proveedor:req.proveedor.nombre,moneda:e.moneda,pagos:[],orden_compra:oc,factura:{total:e.total,electronica:e}};
+    diferencias=(await revisarFactura(pool,{id:0,datos:d})).diferencias;
+  }
+  res.json({ok:true,numero:e.consecutivo,empresa:e.nombre_receptor,moneda:e.moneda,total:e.total,fecha:e.fecha,diferencias});
+}));
+externo.post('/facturas/:id/responder',cargas,wrap(async(req,res)=>{
+  await transaccion(async db=>{
+    const row=await documento(db,req.params.id,true);
+    exigir(Number(row.datos.cuenta_id)===Number(req.proveedor.id),'Factura no encontrada');
+    responderCorreccion(row,req.body,`Proveedor ${req.proveedor.id}`);
+    await guardar(db,row,`Proveedor ${req.proveedor.id}`,'Corrección enviada para revisión');
+  });res.json({ok:true});
+}));
 externo.get('/',wrap(async(req,res)=>{
   const [rows]=await pool.query("SELECT id,datos,creado_en FROM prov_documentos WHERE tipo='factura_portal' AND JSON_UNQUOTE(JSON_EXTRACT(datos,'$.cuenta_id'))=? ORDER BY id DESC",[String(req.proveedor.id)]);
   const [receptores]=await pool.query('SELECT cedula,nombre FROM prov_portal_receptores WHERE activo=1 ORDER BY nombre');
   const docs=rows.map(parse);for(const row of docs)row.datos.control=await revisarFactura(pool,row);
-  res.render('portal_proveedores/inicio',{proveedor:req.proveedor,docs,receptores,saldo,excepciones});
+  res.render('portal_proveedores/inicio',{proveedor:req.proveedor,docs,receptores,saldo,excepciones,seguimiento});
 }));
 externo.post('/password',limitar,wrap(async(req,res)=>{
   const password=String(req.body.password||'');exigir(password.length>=12&&password.length<=128,'Use una contraseña de 12 a 128 caracteres');
@@ -72,9 +99,16 @@ externo.post('/facturas',cargas,wrap(async(req,res)=>{
     const [cuentas]=await db.query('SELECT id FROM prov_portal_cuentas WHERE id=? AND activo=1 AND version_acceso=? FOR UPDATE',[req.proveedor.id,sesion(req).version]);exigir(cuentas.length,'La cuenta fue deshabilitada; vuelva a ingresar');
     const [claves]=await db.query('SELECT documento_id FROM prov_facturas_claves WHERE clave=? FOR UPDATE',[campos.clave]);exigir(!claves.length,'Esta factura ya está registrada');
     const f={numero:campos.consecutivo,total:campos.total,estado:'PENDIENTE',diferencias:[],subida_en:new Date().toISOString(),fecha_vencimiento:vencimiento(campos.fecha,req.proveedor.plazo_dias),archivo:await guardarArchivo(db,pdf),electronica:{...campos,archivo:await guardarArchivo(db,archivo),hacienda}};
-    const d={cuenta_id:req.proveedor.id,proveedor:req.proveedor.nombre,moneda:campos.moneda,razon_social:campos.nombre_receptor,pagos:[],factura:f};
+    const d={cuenta_id:req.proveedor.id,proveedor:req.proveedor.nombre,moneda:campos.moneda,razon_social:campos.nombre_receptor,pagos:[],factura:f,gestion:{fecha_limite:diaCR(new Date(Date.now()+3*86400000))}};
     const [r]=await db.query("INSERT INTO prov_documentos (tipo,usuario_id,sede,datos) VALUES ('factura_portal',0,'PORTAL',?)",[JSON.stringify(d)]);
     await db.query('INSERT INTO prov_facturas_claves (clave,documento_id) VALUES (?,?)',[campos.clave,r.insertId]);
+    if(req.body.orden){
+      const disponibles=await ordenesDisponibles(db,req.proveedor.cedula);
+      const orden=disponibles.find(o=>`${o.origen}:${o.id}`===String(req.body.orden));
+      exigir(orden,'La orden seleccionada no está disponible para su cuenta');
+      const row={id:r.insertId,datos:d};await vincularOrden(db,row,orden,0);
+      await guardar(db,row,`Proveedor ${req.proveedor.id}`,'Orden seleccionada al presentar factura');
+    }
     await db.query('INSERT INTO prov_auditoria (documento_id,actor,accion) VALUES (?,?,?)',[r.insertId,`Proveedor ${req.proveedor.id}`,'Factura cargada desde cuenta del proveedor']);
     return r.insertId;
   });
@@ -128,20 +162,39 @@ administracion.post('/receptores',wrap(async(req,res)=>{
   const cedula=String(req.body.cedula||'').trim(),nombre=String(req.body.nombre||'').trim();exigir(/^\d{9,12}$/.test(cedula)&&nombre&&nombre.length<=255,'Cédula y razón social requeridas');
   await pool.query('INSERT INTO prov_portal_receptores (cedula,nombre,activo) VALUES (?,?,?) ON DUPLICATE KEY UPDATE nombre=VALUES(nombre),activo=VALUES(activo)',[cedula,nombre,req.body.activo==='0'?0:1]);res.json({ok:true});
 }));
-interno.get('/facturas',wrap(async(req,res)=>{const [r]=await pool.query("SELECT * FROM prov_documentos WHERE tipo='factura_portal' ORDER BY id DESC");const docs=r.map(parse);for(const row of docs)row.datos.control=await revisarFactura(pool,row);res.render('portal_proveedores/bandeja',{docs,saldo,excepciones,puedeContabilidad:contabilidad(req.session.user),puedeAdministracion:await esPropietarioAdministracion(req.session.user,pool)});}));
+async function bandeja(req,res){
+  const [r]=await pool.query("SELECT * FROM prov_documentos WHERE tipo='factura_portal' ORDER BY id DESC");
+  const docs=r.map(parse);for(const row of docs)row.datos.control=await revisarFactura(pool,row);
+  docs.sort((a,b)=>seguimiento(a.datos).prioridad-seguimiento(b.datos).prioridad||String(a.datos.factura.fecha_vencimiento).localeCompare(String(b.datos.factura.fecha_vencimiento))||b.id-a.id);
+  const [responsables]=await pool.query("SELECT id,usuario AS username FROM usuarios WHERE rol IN ('ADMIN','CONTABILIDAD','PROVEEDURIA','PROVEEDURIA_TALLER') ORDER BY username");
+  res.render('portal_proveedores/bandeja',{docs,saldo,excepciones,responsables,seguimiento,usuarioId:req.session.user.id,puedeContabilidad:contabilidad(req.session.user),puedeAdministracion:await esPropietarioAdministracion(req.session.user,pool)});
+}
+interno.get('/facturas',wrap(bandeja));
+administracion.get('/seguimiento',wrap(bandeja));
 interno.post('/facturas/:id/notas-credito',wrap(async(req,res)=>{if(!contabilidad(req.session.user))return res.sendStatus(403);await cargarNota(req,res);}));
 interno.post('/facturas/:id/:accion',wrap(async(req,res)=>{
-  const a=req.params.accion;exigir(['hacienda','aprobar','rechazar','pago','orden','programar','cancelar-programacion','aplicar-nota'].includes(a),'Acción inválida');
-  if(a!=='hacienda'&&!(['orden'].includes(a)&&gestion(req.session.user))&&!contabilidad(req.session.user))return res.sendStatus(403);
+  const a=req.params.accion;exigir(['hacienda','aprobar','rechazar','pago','orden','programar','cancelar-programacion','aplicar-nota','asignar','comentar'].includes(a),'Acción inválida');
+  if(a!=='hacienda'&&!(['orden','asignar','comentar'].includes(a)&&gestion(req.session.user))&&!contabilidad(req.session.user))return res.sendStatus(403);
   let hacienda,actual,notasConsultadas=[];
   if(a==='hacienda'){actual=await documento(pool,req.params.id);hacienda=await consultarHacienda(actual.datos.factura.electronica.clave,actual.datos.factura.electronica);for(const n of (actual.datos.notas_credito||[]).filter(n=>!['ACEPTADA','RECHAZADA'].includes(n.hacienda.estado)).slice(0,20))notasConsultadas.push({clave:n.clave,anterior:JSON.stringify(n.hacienda),hacienda:await consultarHacienda(n.clave,n)});}
   await transaccion(async db=>{
     const row=await documento(db,req.params.id,true),f=row.datos.factura;
+    if(a==='asignar'){
+      exigir(!f.cuenta_por_pagar||saldo(row.datos).saldo>0,'La factura ya está pagada');
+      const [usuarios]=await db.query("SELECT id,usuario AS username FROM usuarios WHERE id=? AND rol IN ('ADMIN','CONTABILIDAD','PROVEEDURIA','PROVEEDURIA_TALLER')",[req.body.responsable_id]);
+      exigir(usuarios.length===1,'Seleccione un responsable autorizado');
+      const fecha=String(req.body.fecha_limite||'');exigir(/^\d{4}-\d{2}-\d{2}$/.test(fecha)&&!Number.isNaN(Date.parse(fecha)),'Indique una fecha límite válida');
+      row.datos.gestion={responsable_id:usuarios[0].id,responsable_nombre:usuarios[0].username,fecha_limite:fecha,asignado_por:req.session.user.id};
+    }
+    if(a==='comentar'){
+      const texto=String(req.body.mensaje||'').trim();exigir(texto.length>=5&&texto.length<=2000,'Escriba un comentario (5 a 2000 caracteres)');
+      (row.datos.mensajes??=[]).push({tipo:'revision',texto,actor:req.session.user.usuario||String(req.session.user.id),fecha:new Date().toISOString()});
+    }
     if(a==='hacienda'){exigir(f.subida_en===actual.datos.factura.subida_en,'La factura cambió');if(JSON.stringify(f.electronica.hacienda)===JSON.stringify(actual.datos.factura.electronica.hacienda))f.electronica.hacienda=hacienda;for(const c of notasConsultadas){const n=row.datos.notas_credito?.find(n=>n.clave===c.clave);if(n&&JSON.stringify(n.hacienda)===c.anterior)n.hacienda=c.hacienda;}}
     if(a==='orden')await vincularOrden(db,row,req.body,req.session.user.id);
     if(['aprobar','pago','programar'].includes(a)){row.datos.control=await revisarFactura(db,row,true);exigirControl(row.datos.control);}
     if(a==='aprobar'){exigir(f.estado==='PENDIENTE','Factura ya revisada');aprobable(f);f.estado='CONCILIADA';f.cuenta_por_pagar=true;f.aprobada_en=new Date().toISOString();}
-    if(a==='rechazar'){exigir(f.estado==='PENDIENTE','Factura ya revisada');const motivo=String(req.body.motivo||'').trim();exigir(motivo&&motivo.length<=1000,'Indique el motivo');f.estado='RECHAZADA_INTERNA';f.motivo=motivo;}
+    if(a==='rechazar'){exigir(f.estado==='PENDIENTE','Factura ya revisada');const motivo=String(req.body.motivo||'').trim();exigir(motivo&&motivo.length<=1000,'Indique el motivo');f.estado='RECHAZADA_INTERNA';f.motivo=motivo;(row.datos.mensajes??=[]).push({tipo:'devolucion',texto:motivo,actor:req.session.user.usuario||String(req.session.user.id),fecha:new Date().toISOString()});}
     if(a==='programar'){
       exigir(f.cuenta_por_pagar&&f.estado==='CONCILIADA','Factura pendiente de aprobación');aprobable(f);
       const monto=numero(req.body.monto,'Monto programado',0.01),fecha=String(req.body.fecha||'');

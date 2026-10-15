@@ -1,4 +1,5 @@
 const {exigir}=require('./proveeduria');
+const {normalizarEmpresa}=require('./empresasContabilidad');
 const {claveProveedor}=require('./proveeduriaProveedores');
 const parse=r=>({...r,datos:typeof r.datos==='string'?JSON.parse(r.datos):r.datos});
 function validarCorrespondencia(factura,orden){
@@ -7,6 +8,8 @@ function validarCorrespondencia(factura,orden){
   if(orden.cedula)exigir(id(orden.cedula)===id(e.emisor),'El proveedor de la OC no coincide con el emisor de la factura');
   else exigir([factura.proveedor,e.nombre_emisor,e.nombre_comercial_emisor].filter(Boolean).some(n=>nombre(n)===nombre(orden.proveedor)),'El proveedor de la OC no coincide con la factura');
   exigir((orden.moneda||'CRC').toUpperCase()===factura.moneda,'La moneda de la OC no coincide con la factura');
+  const empresa=normalizarEmpresa(orden.razon_social||orden.empresa_destino);
+  if(empresa)exigir(empresa===normalizarEmpresa(e.nombre_receptor),'La empresa receptora de la OC no coincide con la factura');
   exigir(!orden.factura_registrada,'La OC ya tiene una factura registrada por el flujo anterior; revise antes de enlazar otra');
   exigir(Number.isFinite(orden.total)&&orden.total>0,'La OC no tiene un monto válido');
 }
@@ -18,11 +21,11 @@ async function vincularOrden(db,row,body,actor){
   if(origen==='PROVEEDURIA'){
     const id=referencia.replace(/^PR-/i,'');exigir(/^\d+$/.test(id),'Use el número PR- de Proveeduría');
     const [r]=await db.query("SELECT * FROM prov_documentos WHERE id=? AND tipo='oc' FOR UPDATE",[id]);exigir(r.length===1,'Orden de Proveeduría no encontrada');const d=parse(r[0]);
-    orden={id:d.id,numero:`PR-${d.id}`,estado:d.datos.estado,proveedor:d.datos.proveedor,total:Number(d.datos.total),moneda:d.datos.moneda,cedula:d.datos.proveedor_cedula,factura_registrada:!!d.datos.factura,url:`/proveeduria/ordenes/${d.id}`};
+    orden={id:d.id,numero:`PR-${d.id}`,estado:d.datos.estado,razon_social:d.datos.razon_social,empresa_destino:d.datos.empresa_destino,proveedor:d.datos.proveedor,total:Number(d.datos.total),moneda:d.datos.moneda,cedula:d.datos.proveedor_cedula,factura_registrada:!!d.datos.factura,url:`/proveeduria/ordenes/${d.id}`};
   }else{
     const porId=/^#\d+$/.test(referencia);
-    const [r]=await db.query(`SELECT o.id,o.po_numero,o.total,o.moneda,o.factura,o.estado,p.nombre,p.cedula_juridica FROM ordenes_compra o LEFT JOIN proveedores p ON p.id=o.proveedor_id WHERE ${porId?'o.id':'o.po_numero'}=? FOR UPDATE`,[porId?referencia.slice(1):referencia]);exigir(r.length===1,'Orden de Taller / Compras no encontrada');const o=r[0];
-    orden={id:o.id,numero:o.po_numero,estado:o.estado,proveedor:o.nombre,cedula:o.cedula_juridica,total:Number(o.total),moneda:o.moneda,factura_registrada:!!o.factura,url:`/compras/ordenes/${o.id}/detalle`};
+    const [r]=await db.query(`SELECT o.id,o.po_numero,o.total,o.moneda,o.factura,o.estado,o.empresa_destino,p.nombre,p.cedula_juridica FROM ordenes_compra o LEFT JOIN proveedores p ON p.id=o.proveedor_id WHERE ${porId?'o.id':'o.po_numero'}=? FOR UPDATE`,[porId?referencia.slice(1):referencia]);exigir(r.length===1,'Orden de Taller / Compras no encontrada');const o=r[0];
+    orden={id:o.id,numero:o.po_numero,estado:o.estado,empresa_destino:o.empresa_destino,proveedor:o.nombre,cedula:o.cedula_juridica,total:Number(o.total),moneda:o.moneda,factura_registrada:!!o.factura,url:`/compras/ordenes/${o.id}/detalle`};
   }
   validarCorrespondencia(row.datos,orden);
   const [s]=await db.query(`SELECT COALESCE(SUM(v.monto),0) AS total FROM prov_portal_factura_orden v JOIN prov_documentos d ON d.id=v.factura_id WHERE v.origen=? AND v.orden_id=? AND v.factura_id<>? AND JSON_UNQUOTE(JSON_EXTRACT(d.datos,'$.factura.estado')) <> 'RECHAZADA_INTERNA'`,[origen,orden.id,row.id]);

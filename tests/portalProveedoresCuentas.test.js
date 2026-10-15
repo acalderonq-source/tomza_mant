@@ -20,6 +20,39 @@ async function server(user,fn){
 }
 const doc=()=>({id:11,tipo:'factura_portal',datos:{cuenta_id:5,proveedor:'Proveedor',razon_social:'Tomza',moneda:'CRC',pagos:[],factura:{numero:'00100001010000000001',total:113,estado:'PENDIENTE',fecha_vencimiento:'2026-11-13',subida_en:'2026-10-14T10:00:00Z',archivo:{id:1},electronica:{clave:'50614102600310112345600100001010000000001112345678',fecha:'2026-10-14T10:00:00-06:00',emisor:'3101123456',receptor:'3101654321',total:113,moneda:'CRC',archivo:{id:2},hacienda:{estado:'ACEPTADA',ambiente:'produccion'}}}}});
 async function login(c){const r=await c.post('/portal-proveedores/login',{email:account.email,password});assert.equal(r.status,302);assert.equal(r.headers.get('location'),'/portal-proveedores');await c.csrf();}
+
+test('asignación valida rol del responsable y limita comentarios; registra cambios auditados',async()=>{
+  const connection=pool.getConnection;let asignable=false,guardado,acciones=0;
+  pool.getConnection=async()=>({beginTransaction:async()=>{},commit:async()=>{},rollback:async()=>{},release(){},query:async(sql,args)=>{
+    if(sql.includes('SELECT * FROM prov_documentos'))return [[doc()]];
+    if(sql.includes('FROM usuarios')){assert.match(sql,/usuario AS username/);return [asignable?[{id:3,username:'conta'}]:[]];}
+    if(sql.startsWith('UPDATE prov_documentos'))guardado=JSON.parse(args[0]);
+    if(sql.includes('INSERT INTO prov_auditoria'))acciones++;return [{affectedRows:1}];
+  }});
+  try{await server({id:1,rol:'CONTABILIDAD'},async c=>{
+    assert.equal((await c.post('/proveeduria/portal-proveedores/facturas/11/asignar',{responsable_id:3,fecha_limite:'2026-10-20'})).status,400);
+    asignable=true;assert.equal((await c.post('/proveeduria/portal-proveedores/facturas/11/asignar',{responsable_id:3,fecha_limite:'2026-10-20'})).status,200);
+    assert.equal(guardado.gestion.responsable_nombre,'conta');assert.equal(acciones,1);
+    assert.equal((await c.post('/proveeduria/portal-proveedores/facturas/11/comentar',{mensaje:'x'.repeat(2001)})).status,400);
+    assert.equal(acciones,1);
+  });}finally{pool.getConnection=connection;}
+});
+
+test('proveedor solo responde devoluciones propias y no modifica XML ni aprueba el saldo',async()=>{
+  const original=pool.query,connection=pool.getConnection;let row=doc(),guardado;
+  row.datos.factura.estado='RECHAZADA_INTERNA';
+  pool.query=async()=>[[{...account,password_hash:hash}]];
+  pool.getConnection=async()=>({beginTransaction:async()=>{},commit:async()=>{},rollback:async()=>{},release(){},query:async(sql,args)=>{
+    if(sql.includes('SELECT * FROM prov_documentos'))return [[row]];
+    if(sql.startsWith('UPDATE prov_documentos'))guardado=JSON.parse(args[0]);return [{affectedRows:1}];
+  }});
+  try{await server(null,async c=>{
+    await login(c);assert.equal((await c.post('/portal-proveedores/facturas/11/responder',{mensaje:'Ya aclaré el número de orden'})).status,200);
+    assert.equal(guardado.factura.estado,'PENDIENTE');assert.equal(guardado.factura.cuenta_por_pagar,undefined);assert.equal(guardado.factura.electronica.clave,row.datos.factura.electronica.clave);
+    row=doc();row.datos.cuenta_id=9;row.datos.factura.estado='RECHAZADA_INTERNA';guardado=null;
+    assert.equal((await c.post('/portal-proveedores/facturas/11/responder',{mensaje:'Intento sobre factura ajena'})).status,400);assert.equal(guardado,null);
+  });}finally{pool.query=original;pool.getConnection=connection;}
+});
 test('cuenta externa entra sin usuario interno, mantiene sesión y solo ve sus documentos',async()=>{
   const original=pool.query;let enabled=true;
   pool.query=async(sql,args)=>{
