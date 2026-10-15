@@ -1,5 +1,23 @@
 # Tomza Taller Android
 
+## APK para celulares
+
+La variante `movil` se instala como Gas Tomza, con paquete
+`com.gastomza.taller.movil`, independiente de Tomza Pantalla. Abre el
+dashboard del servidor y permite la orientacion del dispositivo.
+
+Compilar con `gradlew.bat assembleMovilDebug`. El APK firmado para instalacion
+directa queda en `app/build/outputs/apk/movil/debug/app-movil-debug.apk`.
+La compilacion debug no es un paquete para publicar en Google Play.
+
+Los cambios del sistema web llegan al abrir o recargar la aplicacion despues
+de desplegarlos en Render. Requiere Internet; no contiene una base de datos
+local. Los cambios nativos de Android requieren un nuevo APK. Para actualizar
+una instalacion existente se debe conservar la misma firma y aumentar la
+version de Android.
+
+La variante `pantalla` conserva la entrada y orientacion de las pantallas.
+
 Proyecto Android para publicar el sistema Tomza Taller en Google Play.
 
 ## Qué genera
