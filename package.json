@@ -30,6 +30,7 @@
     "mysql2": "^3.16.2",
     "node-cron": "^4.2.1",
     "nodemailer": "^10.0.10",
+    "pdfjs-dist": "^4.10.38",
     "pdfmake": "^0.2.7",
     "qrcode": "^1.5.4",
     "reflect-metadata": "^0.2.2",

@@ -338,7 +338,7 @@
         <input type="hidden" name="cotizacion_tipo" id="cotizacionTipo">
         <div class="d-flex gap-2 flex-wrap mt-2">
           <button type="button" class="btn btn-sm btn-outline-dark" id="analizarCotizacionBtn" disabled>
-            <i class="bi bi-magic"></i> Llenar orden desde cotización
+            <i class="bi bi-file-earmark-text"></i> Llenar desde PDF sin IA
           </button>
         </div>
         <div id="cotizacionPreview" class="small text-muted mt-2">
@@ -508,7 +508,7 @@
     if (orden.moneda) setSelectValue('select[name="moneda"]', orden.moneda);
     document.getElementById("descuento").value = orden.descuento ?? 0;
     document.getElementById("transporte").value = orden.transporte ?? 0;
-    document.getElementById("iva").value = orden.iva ?? 13;
+    if (orden.iva !== null && orden.iva !== undefined) document.getElementById("iva").value = orden.iva;
 
     const obs = document.querySelector('[name="observaciones"]');
     if (orden.observaciones && !obs.value.trim()) {
@@ -529,7 +529,7 @@
     if (!(orden.lineas || []).length) addRow();
     updateTotals();
 
-    let mensaje = '<span class="text-success fw-semibold">Orden llenada desde la cotización.</span> Revise y corrija antes de guardar.';
+    let mensaje = '<span class="text-success fw-semibold">Líneas reconocidas del PDF cargadas sin IA.</span> Compare todas las líneas, impuestos y descuentos con la cotización antes de guardar.';
     if (!proveedorAsignado && orden.proveedor_nombre) {
       mensaje += ` <span class="text-warning">Proveedor detectado: ${orden.proveedor_nombre}, pero no existe igual en la lista.</span>`;
     }

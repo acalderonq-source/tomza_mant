@@ -234,10 +234,9 @@ router.get('/solicitudes/:id/cotizacion/archivo',wrap(async(req,res)=>{
 }));
 router.post('/cotizacion/analizar',limitarLectura,wrap(async(req,res)=>{
   if(!gestion(req.session.user))throw error(403,'No autorizado');
-  const match=String(req.body.archivo_data||'').match(/^data:[^;]+;base64,(.+)$/);
-  exigir(match,'Adjunte una cotización');
-  const c=await leerDocumento({nombre:req.body.archivo_nombre,base64:match[1]},'cotizacion');
-  res.json({ok:true,orden:{...c,proveedor_nombre:c.proveedor,forma_pago:c.condicion,iva:c.lineas[0]?.iva??13,lineas:c.lineas.map(l=>({...l,codigo:'',codigo_producto:l.codigo,subtotal:Number(l.cantidad)*Number(l.precio_unitario)}))}});
+  const [proveedores]=await pool.query('SELECT id,nombre FROM proveedores ORDER BY nombre');
+  const orden=await require('../utils/cotizacionLocal').leerCotizacionLocal(req.body,proveedores);
+  res.json({ok:true,orden});
 }));
 router.post('/solicitudes',wrap(async(req,res) => {
   exigir(Array.isArray(req.body.lineas),'Agregue los artículos solicitados');

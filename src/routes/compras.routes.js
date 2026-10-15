@@ -266,22 +266,6 @@ function agruparGastosPorPlaca(gastos = []) {
   return grupos;
 }
 
-function extraerJsonRespuestaIA(texto) {
-  const raw = String(texto || "").trim();
-  if (!raw) return null;
-
-  try {
-    return JSON.parse(raw);
-  } catch (_) {
-    const match = raw.match(/\{[\s\S]*\}/);
-    if (!match) return null;
-    try {
-      return JSON.parse(match[0]);
-    } catch (error) {
-      return null;
-    }
-  }
-}
 
 function parseMontoCotizacion(value) {
   if (typeof value === "number") return Number.isFinite(value) ? value : 0;
@@ -5458,117 +5442,15 @@ router.get("/ordenes/:id/pdf", requireAuth, allowRoles("ADMIN", "TALLER", "PROVE
 
 router.post("/cotizacion/analizar", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER"), async (req, res) => {
   try {
-    const apiKey = process.env.OPENAI_API_KEY;
-    if (!apiKey) {
-      return res.status(400).json({
-        ok: false,
-        error: "Falta configurar OPENAI_API_KEY para leer cotizaciones automáticamente."
-      });
-    }
-
-    const { archivo_data, archivo_nombre, archivo_tipo } = req.body;
-    const dataUrl = String(archivo_data || "").trim();
-    const mimeType = String(archivo_tipo || "").trim();
-
-    if (!dataUrl) {
-      return res.status(400).json({ ok: false, error: "Debe adjuntar una cotización." });
-    }
-
-    if (!/^data:(application\/pdf|image\/jpeg|image\/jpg|image\/png|image\/webp);base64,/.test(dataUrl)) {
-      return res.status(400).json({ ok: false, error: "La cotización debe ser PDF, JPG, PNG o WEBP." });
-    }
-
-    const base64 = dataUrl.split(",")[1] || "";
-    const buffer = Buffer.from(base64, "base64");
-    if (buffer.length > 5 * 1024 * 1024) {
-      return res.status(400).json({ ok: false, error: "La cotización supera 5 MB." });
-    }
-
     const [proveedores] = await queryWithRetry("SELECT id, nombre FROM proveedores ORDER BY nombre");
-    const proveedoresTexto = proveedores.map(p => `${p.id}: ${p.nombre}`).join("\n");
-    const contenidoArchivo = mimeType === "application/pdf" || dataUrl.startsWith("data:application/pdf")
-      ? {
-          type: "input_file",
-          filename: archivo_nombre || "cotizacion.pdf",
-          file_data: dataUrl
-        }
-      : {
-          type: "input_image",
-          image_url: dataUrl
-        };
-
-    const prompt = [
-      "Lee esta cotización de compra y devuelve SOLO JSON válido.",
-      "Debe servir para llenar una orden de compra.",
-      "Campos requeridos:",
-      "{",
-      '  "proveedor_nombre": "nombre del proveedor si aparece",',
-      '  "forma_pago": "contado, credito, transferencia, etc si aparece",',
-      '  "moneda": "CRC o USD",',
-      '  "placa_unidad": "placa si aparece, si no null",',
-      '  "descuento": monto numerico de descuento o 0, no porcentaje,',
-      '  "transporte": monto numerico o 0,',
-      '  "iva": porcentaje numerico, normalmente 13 si aplica, 0 si indica exento,',
-      '  "observaciones": "notas utiles breves",',
-      '  "lineas": [',
-      '    {"codigo": "placa si aparece, GENERAL TALLER/GENERAL GASTOS/ACEITES si aplica", "codigo_producto": "código del producto si aparece", "descripcion": "producto/servicio", "cantidad": numero, "precio_unitario": numero, "subtotal": numero}',
-      "  ]",
-      "}",
-      "Reglas:",
-      "- No inventes líneas. Si no puedes leer algo, omítelo o usa 0.",
-      "- Los montos deben ir sin símbolos ni separadores de miles.",
-      "- Si hay varias líneas, sepáralas.",
-      "- Si la descripción contiene llantas/repuestos/trabajo, mantenla clara.",
-      "- Si el proveedor coincide con uno de estos, usa el nombre más parecido:",
-      proveedoresTexto
-    ].join("\n");
-
-    const response = await fetch("https://api.openai.com/v1/responses", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${apiKey}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        model: process.env.OPENAI_MODEL_COTIZACIONES || process.env.OPENAI_MODEL || "gpt-4.1-mini",
-        input: [
-          {
-            role: "user",
-            content: [
-              { type: "input_text", text: prompt },
-              contenidoArchivo
-            ]
-          }
-        ],
-        temperature: 0,
-        max_output_tokens: 1800
-      })
-    });
-
-    const data = await response.json();
-    if (!response.ok) {
-      const message = data.error && data.error.message ? data.error.message : "No se pudo analizar la cotización.";
-      throw new Error(message);
-    }
-
-    const texto = data.output_text || (data.output || []).flatMap(item => item.content || []).map(content => content.text || "").join("\n");
-    const json = extraerJsonRespuestaIA(texto);
-    if (!json) {
-      return res.status(422).json({ ok: false, error: "La IA no devolvió datos válidos de la cotización." });
-    }
-
-    const orden = sanearAnalisisCotizacion(json, proveedores);
-    if (!orden.lineas.length) {
-      return res.status(422).json({ ok: false, error: "No se detectaron líneas de productos o servicios en la cotización." });
-    }
-
+    const datos = await require('../utils/cotizacionLocal').leerCotizacionLocal(req.body, proveedores);
+    const orden = sanearAnalisisCotizacion(datos, proveedores);
+    // No aplicar un impuesto que el documento no declara.
+    if (datos.iva === null) orden.iva = null;
     res.json({ ok: true, orden });
   } catch (error) {
-    console.error("Error analizando cotización:", error);
-    res.status(500).json({
-      ok: false,
-      error: error.message || "No se pudo analizar la cotización."
-    });
+    console.error("Error leyendo cotización local:", error.message);
+    res.status(error.status || 422).json({ ok: false, error: error.status ? error.message : "No se pudo leer el PDF. Revise que contenga texto y no esté protegido." });
   }
 });
 

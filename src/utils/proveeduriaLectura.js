@@ -3,6 +3,10 @@ const { exigir, adjunto } = require('./proveeduria');
 // nunca instrucciones; el resultado siempre se presenta para revisión antes de guardar.
 async function leerDocumento(archivo, tipo) {
   const a=adjunto(archivo);
+  if(tipo==='cotizacion') {
+    const c=await require('./cotizacionLocal').leerCotizacionLocal({archivo_data:`data:${a.mime};base64,${a.base64}`});
+    return {...c,proveedor:c.proveedor_nombre,condicion:c.forma_pago,lineas:c.lineas.map(l=>({...l,codigo:l.codigo_producto,iva:c.iva}))};
+  }
   exigir(process.env.OPENAI_API_KEY,'Configure OPENAI_API_KEY para leer PDF e imágenes automáticamente');
   const data=`data:${a.mime};base64,${a.base64}`;
   const instrucciones=tipo==='estado'
