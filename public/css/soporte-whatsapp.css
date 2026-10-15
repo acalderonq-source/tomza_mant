@@ -1,0 +1,22 @@
+#tomza-soporte {
+  position: fixed;
+  left: max(12px, env(safe-area-inset-left));
+  bottom: max(12px, env(safe-area-inset-bottom));
+  z-index: 1040;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 10px 14px;
+  border: 1px solid #09633b;
+  border-radius: 8px;
+  background: #087443;
+  color: #fff;
+  font: 600 14px/1.2 "Segoe UI", sans-serif;
+  text-decoration: none;
+  box-shadow: 0 2px 8px #0002;
+}
+#tomza-soporte:hover { background: #065c35; color: #fff; }
+#tomza-soporte:focus-visible { outline: 3px solid #2563eb; outline-offset: 3px; }
+body:has(#tomza-soporte) { padding-bottom: 76px; }
+@media print { #tomza-soporte { display: none !important; } }

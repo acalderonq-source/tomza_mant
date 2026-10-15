@@ -81,6 +81,7 @@ function bloquearRutaEstaticaPrivada(req,res,next){
 }
 
 function injectSecurityAssets(html, csrfToken) {
+  html = require('../utils/soporteWhatsApp').injectSupport(html);
   if (typeof html !== "string" || !csrfToken) return html;
 
   let output = html;
