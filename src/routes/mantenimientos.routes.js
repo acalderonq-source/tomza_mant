@@ -45,6 +45,7 @@ function puedeTrabajarComoMecanico(user) {
 
 const MECANICOS_USUARIOS_CENTRALES = [
   "Norman Fonseca",
+  "Rafael Masis",
   "Martin Montenegro",
   "Roberto Montenegro",
   "Christian Maroto"

@@ -13,6 +13,7 @@ async function withServer(user, poolHandlers, run) {
   const app = express();
   app.use(express.urlencoded({ extended: true }));
   app.use((req, _res, next) => {
+    if (poolHandlers.render) _res.render = (_view, data) => _res.json(poolHandlers.render(data));
     req.session = { user, sedeSeleccionada: "Cartago" };
     next();
   });
@@ -42,6 +43,30 @@ function post(base, path, values) {
     body
   });
 }
+
+test("Rafael aparece como mecanico compartido igual que Norman sin incluir a Enrique", async () => {
+  for (const usuario of ['mecanico', 'pesados']) {
+    let nombres;
+    await withServer({id:1,usuario,rol:'MECANICO',sede:'Cartago'}, {
+      query: async (sql, params) => {
+        if (sql.includes('SELECT c.*, u.placa')) return [[{id:1,placa:'C1',sede:'Cartago'}]];
+        if (sql.includes('SELECT id, nombre FROM mecanicos')) {
+          // En Pesados el primer arreglo contiene sedes; el ultimo contiene nombres.
+          nombres = params.filter(Array.isArray).at(-1);
+          return [[{id:6,nombre:'Rafael Masis'}]];
+        }
+        return [[]];
+      },
+      render: data => ({mecanicos:data.mecanicosDisponibles})
+    }, async base => {
+      const response = await fetch(base + '/mantenimientos/correctivos/1/agregar');
+      assert.equal(response.status,200);
+      assert.ok(nombres.includes('Rafael Masis'));
+      assert.ok(nombres.includes('Norman Fonseca'));
+      assert.ok(!nombres.some(nombre => /Enrique/i.test(nombre)));
+    });
+  }
+});
 
 test("guardar plan requiere que la unidad del mantenimiento pertenezca a la sede activa", async () => {
   const updates = [];
