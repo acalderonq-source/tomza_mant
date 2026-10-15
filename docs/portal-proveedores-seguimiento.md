@@ -2,9 +2,9 @@
 
 ## Proveedor
 
-En `/portal-proveedores` puede consultar sus órdenes de Proveeduría y Taller / Compras, elegir una al presentar el XML y PDF o conservar la búsqueda automática. La selección es opcional. La consulta se limita a su identidad fiscal; una orden antigua sin cédula solo se muestra si corresponde exactamente a un proveedor registrado con una única cédula en sus cuentas. Se muestran hasta 200 órdenes por módulo.
+En `/portal-proveedores` solo presenta XML y PDF. No selecciona ni escribe una orden de compra. El sistema busca coincidencias entre Proveeduría y Taller / Compras; si hay varias o ninguna, la vinculación se resuelve internamente. El proveedor puede consultar la OC una vez enlazada en el historial.
 
-Al seleccionar XML se verifican emisor, receptor autorizado y duplicados; si se elige OC, también se muestran diferencias con su detalle. La carga definitiva vuelve a validar y bloquea la orden dentro de una transacción. Una vista previa nunca equivale a aceptación fiscal ni a aprobación de pago.
+Al seleccionar XML se verifican emisor, receptor autorizado y duplicados. La carga definitiva vuelve a validar. La vista previa nunca equivale a aceptación fiscal ni a aprobación de pago. Los campos de OC enviados por un cliente antiguo se ignoran; solo el cruce automático y los usuarios internos autorizados pueden vincularla.
 
 Cada factura muestra próximo paso, responsable, plazo, observaciones, programación, saldo y comprobantes de pago. Una devolución admite respuesta del proveedor y regresa a revisión. Se conservan el XML y PDF originales, motivo y conversación. Los cambios fiscales requieren nota de crédito y nuevo comprobante; responder no altera importes, no aprueba ni registra pagos.
 

@@ -66,7 +66,7 @@ test('cuenta externa entra sin usuario interno, mantiene sesión y solo ve sus d
     assert.equal((await c.get('/portal-proveedores')).status,302);
     assert.equal((await c.post('/portal-proveedores/login',{email:account.email,password:'incorrecta'})).status,401);
     await login(c);
-    const home=await c.get('/portal-proveedores');assert.equal(home.status,200);const html=await home.text();assert.match(html,/Mis facturas/);assert.match(html,/sin número de orden de compra/);assert.doesNotMatch(html,/password_hash/);
+    const home=await c.get('/portal-proveedores');assert.equal(home.status,200);const html=await home.text();assert.match(html,/Mis facturas/);assert.match(html,/Suba únicamente el XML y el PDF/);assert.doesNotMatch(html,/data-ordenes-proveedor|Mis órdenes disponibles|name="orden"/);assert.doesNotMatch(html,/password_hash/);
     assert.equal((await c.get('/portal-proveedores/facturas/12/archivo/pdf')).status,404);
     enabled=false;assert.equal((await c.get('/portal-proveedores')).status,302);
   });}finally{pool.query=original;}
@@ -85,7 +85,7 @@ test('proveedor carga varias facturas propias sin OC; bloquea emisor ajeno y dup
   try{await server(null,async c=>{
     await login(c);
     assert.equal((await c.post('/portal-proveedores/facturas',body('3101000000'))).status,400);assert.equal(saved.length,0);
-    assert.equal((await c.post('/portal-proveedores/facturas',body(account.cedula))).status,200);assert.equal(saved[0].cuenta_id,5);assert.equal(saved[0].factura.fecha_vencimiento,'2026-11-13');assert.equal(saved[0].solicitud_id,undefined);
+    assert.equal((await c.post('/portal-proveedores/facturas',{...body(account.cedula),orden:'COMPRAS:999999'})).status,200);assert.equal(saved[0].cuenta_id,5);assert.equal(saved[0].factura.fecha_vencimiento,'2026-11-13');assert.equal(saved[0].solicitud_id,undefined);
     const segunda=body(account.cedula);segunda.xml.base64=Buffer.from(factura(account.cedula).replaceAll('00100001010000000001','00100001010000000002')).toString('base64');
     assert.equal((await c.post('/portal-proveedores/facturas',segunda)).status,200);assert.equal(saved.length,2);
     duplicate=true;assert.equal((await c.post('/portal-proveedores/facturas',body(account.cedula))).status,400);assert.equal(saved.length,2);

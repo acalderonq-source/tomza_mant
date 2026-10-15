@@ -46,36 +46,19 @@
       input.files=files;input.dispatchEvent(new Event('change',{bubbles:true}));
     });
   });
-  const ordenes=document.querySelector('[data-ordenes-proveedor]');
-  if(ordenes){
-    const avisoOrdenes=document.querySelector('[data-ordenes-aviso]'),lista=document.querySelector('[data-lista-ordenes]');
-    async function cargarOrdenes(){
-      try{
-        const r=await fetch('/portal-proveedores/ordenes');if(r.redirected){location.assign(r.url);return;}if(!r.ok)throw Error('No se pudieron cargar las órdenes');
-        const j=await r.json();
-        avisoOrdenes.textContent=j.ordenes.length?'Seleccione una orden o conserve la búsqueda automática.':'No hay órdenes disponibles con su cédula fiscal. Puede presentar la factura para revisión.';
-        for(const o of j.ordenes){
-          const monto=Number(o.disponible).toLocaleString('es-CR',{style:'currency',currency:o.moneda});
-          const texto=`${o.numero} · ${o.origen==='COMPRAS'?'Taller / Compras':'Proveeduría'} · ${o.empresa||'Empresa por confirmar'} · Disponible ${monto}`;
-          const option=document.createElement('option');option.value=`${o.origen}:${o.id}`;option.textContent=texto;ordenes.append(option);
-          const fila=document.createElement('div');fila.className='d-flex flex-wrap justify-content-between gap-2 border-bottom py-2';const detalle=document.createElement('span');detalle.textContent=texto;const elegir=document.createElement('button');elegir.type='button';elegir.className='btn btn-sm btn-outline-primary';elegir.textContent='Usar esta orden';elegir.addEventListener('click',()=>{ordenes.value=option.value;ordenes.dispatchEvent(new Event('change'));document.getElementById('nueva-factura').scrollIntoView({behavior:'smooth'});});fila.append(detalle,elegir);lista.append(fila);
-        }
-        if(!j.ordenes.length)lista.textContent=avisoOrdenes.textContent;
-      }catch(e){avisoOrdenes.textContent=e.message+'. Puede usar la búsqueda automática al presentar la factura.';lista.textContent=avisoOrdenes.textContent;}
-    }
-    cargarOrdenes();
-    const xml=document.querySelector('#xml'),panel=document.createElement('div');panel.className='small mt-3';panel.setAttribute('aria-live','polite');ordenes.parentElement.append(panel);
+  const xml=document.querySelector('#xml'),panel=document.querySelector('[data-validacion-factura]');
+  if(xml&&panel){
     let revision=0;
     async function validar(){
       const actual=++revision;if(!xml.files[0]){panel.textContent='';return;}
       panel.textContent='Validando XML…';
       try{
-        const body={xml:await archivo(xml.files[0],2),orden:ordenes.value};
+        const body={xml:await archivo(xml.files[0],2)};
         const r=await fetch('/portal-proveedores/validar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
         if(r.redirected){location.assign(r.url);return;}const j=await r.json();if(actual!==revision)return;if(!r.ok)throw Error(j.error||'No se pudo validar');
         panel.className='alert alert-'+(j.diferencias.length?'warning':'success')+' mt-3';panel.textContent=`Factura ${j.numero} · ${j.empresa} · ${Number(j.total).toLocaleString('es-CR',{style:'currency',currency:j.moneda})}. `+(j.diferencias.length?'Requiere revisión: '+j.diferencias.join('; '):'Identidad y duplicados verificados. La aceptación de Hacienda se consulta por separado.');
       }catch(e){if(actual===revision){panel.className='alert alert-danger mt-3';panel.textContent=e.message;}}
     }
-    xml.addEventListener('change',validar);ordenes.addEventListener('change',validar);
+    xml.addEventListener('change',validar);
   }
 })();

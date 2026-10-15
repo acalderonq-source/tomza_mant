@@ -6,7 +6,6 @@ const {revisarFactura,exigirControl,excepciones}=require('../utils/portalControl
 const {vincularOrden}=require('../utils/portalFacturaOrden');
 const {cruzarFactura}=require('../utils/portalCruceAutomatico');
 const {seguimiento,responderCorreccion,diaCR}=require('../utils/portalSeguimiento');
-const {ordenesDisponibles}=require('../utils/portalOrdenesDisponibles');
 const {exigir,adjunto,saldo,numero}=require('../utils/proveeduria');
 const {leerFacturaXML,consultarHacienda,aprobable,vencimiento}=require('../utils/proveedorHacienda');
 const {esPropietarioAdministracion}=require('../utils/administracionPrivada');
@@ -48,7 +47,6 @@ externo.use(wrap(async(req,res,next)=>{
   req.proveedor=rows[0];next();
 }));
 externo.post('/logout',(req,res)=>{delete req.session.proveedorPortal;res.redirect('/portal-proveedores/login');});
-externo.get('/ordenes',wrap(async(req,res)=>res.json({ordenes:await ordenesDisponibles(pool,req.proveedor.cedula)})));
 externo.post('/validar',cargas,wrap(async(req,res)=>{
   const e=leerFacturaXML(req.body.xml),id=v=>String(v||'').replace(/^0+/,'');
   exigir(id(e.emisor)===id(req.proveedor.cedula),'El emisor del XML no corresponde a su cuenta');
@@ -56,14 +54,7 @@ externo.post('/validar',cargas,wrap(async(req,res)=>{
   exigir(receptores.some(r=>id(r.cedula)===id(e.receptor)),'La empresa receptora no está autorizada');
   const [duplicadas]=await pool.query('SELECT documento_id FROM prov_facturas_claves WHERE clave=?',[e.clave]);
   exigir(!duplicadas.length,'Esta factura ya está registrada');
-  let diferencias=[];
-  if(req.body.orden){
-    const disponibles=await ordenesDisponibles(pool,req.proveedor.cedula),oc=disponibles.find(o=>`${o.origen}:${o.id}`===String(req.body.orden));
-    exigir(oc,'La orden no está disponible para su cuenta');
-    const d={proveedor:req.proveedor.nombre,moneda:e.moneda,pagos:[],orden_compra:oc,factura:{total:e.total,electronica:e}};
-    diferencias=(await revisarFactura(pool,{id:0,datos:d})).diferencias;
-  }
-  res.json({ok:true,numero:e.consecutivo,empresa:e.nombre_receptor,moneda:e.moneda,total:e.total,fecha:e.fecha,diferencias});
+  res.json({ok:true,numero:e.consecutivo,empresa:e.nombre_receptor,moneda:e.moneda,total:e.total,fecha:e.fecha,diferencias:[]});
 }));
 externo.post('/facturas/:id/responder',cargas,wrap(async(req,res)=>{
   await transaccion(async db=>{
@@ -102,13 +93,6 @@ externo.post('/facturas',cargas,wrap(async(req,res)=>{
     const d={cuenta_id:req.proveedor.id,proveedor:req.proveedor.nombre,moneda:campos.moneda,razon_social:campos.nombre_receptor,pagos:[],factura:f,gestion:{fecha_limite:diaCR(new Date(Date.now()+3*86400000))}};
     const [r]=await db.query("INSERT INTO prov_documentos (tipo,usuario_id,sede,datos) VALUES ('factura_portal',0,'PORTAL',?)",[JSON.stringify(d)]);
     await db.query('INSERT INTO prov_facturas_claves (clave,documento_id) VALUES (?,?)',[campos.clave,r.insertId]);
-    if(req.body.orden){
-      const disponibles=await ordenesDisponibles(db,req.proveedor.cedula);
-      const orden=disponibles.find(o=>`${o.origen}:${o.id}`===String(req.body.orden));
-      exigir(orden,'La orden seleccionada no está disponible para su cuenta');
-      const row={id:r.insertId,datos:d};await vincularOrden(db,row,orden,0);
-      await guardar(db,row,`Proveedor ${req.proveedor.id}`,'Orden seleccionada al presentar factura');
-    }
     await db.query('INSERT INTO prov_auditoria (documento_id,actor,accion) VALUES (?,?,?)',[r.insertId,`Proveedor ${req.proveedor.id}`,'Factura cargada desde cuenta del proveedor']);
     return r.insertId;
   });
