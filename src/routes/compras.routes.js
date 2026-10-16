@@ -4429,6 +4429,21 @@ router.get("/proveedores", requireAuth, allowRoles("ADMIN", "PROVEEDURIA_TALLER"
   }
 });
 
+router.get("/proveedores/excel", requireAuth, allowRoles("ADMIN", "PROVEEDURIA_TALLER"), async (req, res) => {
+  try {
+    const [proveedores] = await pool.query("SELECT id,nombre,cedula_juridica,contacto,telefono,email,direccion FROM proveedores ORDER BY nombre");
+    const libro = require('../utils/proveedoresExcel').crearLibroProveedores(proveedores);
+    const archivo = await libro.xlsx.writeBuffer();
+    res.set('Cache-Control', 'no-store');
+    res.attachment(`Proveedores-Taller-${fechaActualCostaRica()}.xlsx`);
+    res.type('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.send(Buffer.from(archivo));
+  } catch (error) {
+    console.error('Error exportando proveedores:', error.message);
+    res.status(500).send('No se pudo descargar el directorio de proveedores. Intente nuevamente.');
+  }
+});
+
 router.get("/proveedores/nuevo", requireAuth, allowRoles("ADMIN", "PROVEEDURIA_TALLER"), (req, res) => {
   res.render("compras/proveedor_form", { proveedor: null, user: req.session.user });
 });
