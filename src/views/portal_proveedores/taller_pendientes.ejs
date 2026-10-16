@@ -1,0 +1,9 @@
+<section class="card p-4 my-4" data-taller-pendientes="<%= interno?'/proveeduria/portal-proveedores/facturas-taller':'/portal-proveedores/taller/facturas' %>">
+<h2 class="h4">Facturas de Taller pendientes de pago</h2>
+<p class="small text-secondary">Facturas ya registradas en Taller. El saldo incluye abonos y notas de crédito y se actualiza con los pagos registrados allí. Las nuevas facturas se presentan con XML y PDF en el formulario del portal.</p>
+<p class="small text-secondary">La empresa indicada es la de la orden de compra; su comprobación fiscal requiere el XML. Los registros históricos conservan la información y los archivos disponibles en Taller.</p>
+<div data-taller-resumen class="mb-3" role="status">Cargando facturas pendientes…</div>
+<details><summary class="fw-semibold mb-3">Ver facturas y filtrar por proveedor</summary>
+<div class="row g-3 mb-3"><label class="col-md-4">Proveedor<select data-taller-proveedor class="form-select"><option value="">Todos</option></select></label><label class="col-md-3">Empresa de la OC<select data-taller-empresa class="form-select"><option value="">Todas</option></select></label><label class="col-md-5">Buscar factura u orden<input data-taller-buscar class="form-control" type="search"></label></div>
+<div class="table-responsive"><table class="table table-sm align-middle"><thead><tr><th>Proveedor</th><th>Factura / OC</th><th>Empresa OC</th><th>Fecha / vencimiento</th><th>Total</th><th>Notas de crédito</th><th>Abonos</th><th>Saldo pendiente</th><th>Registro de origen</th></tr></thead><tbody data-taller-filas></tbody></table></div><p data-taller-contador class="small text-secondary"></p>
+</details></section><script src="/js/portal-facturas-taller.js" defer></script>

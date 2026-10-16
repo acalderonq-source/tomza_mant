@@ -2,6 +2,7 @@ const express=require('express');
 const bcrypt=require('bcryptjs');
 const {rateLimit}=require('express-rate-limit');
 const pool=require('../db');
+const {facturasPendientesTaller}=require('../utils/portalFacturasTaller');
 const {revisarFactura,exigirControl,excepciones}=require('../utils/portalControlFactura');
 const {vincularOrden}=require('../utils/portalFacturaOrden');
 const {cruzarFactura,buscarCandidatos}=require('../utils/portalCruceAutomatico');
@@ -48,6 +49,7 @@ externo.use(wrap(async(req,res,next)=>{
   req.proveedor=rows[0];next();
 }));
 externo.post('/logout',(req,res)=>{delete req.session.proveedorPortal;res.redirect('/portal-proveedores/login');});
+externo.get('/taller/facturas',wrap(async(req,res)=>res.json(await facturasPendientesTaller(pool,{cedula:req.proveedor.cedula}))));
 externo.post('/validar',cargas,wrap(async(req,res)=>{
   const e=leerFacturaXML(req.body.xml),id=v=>String(v||'').replace(/^0+/,'');
   exigir(id(e.emisor)===id(req.proveedor.cedula),'El emisor del XML no corresponde a su cuenta');
@@ -159,6 +161,7 @@ async function bandeja(req,res){
   res.render('portal_proveedores/bandeja',{docs,saldo,excepciones,responsables,seguimiento,empresaFactura,usuarioId:req.session.user.id,puedeContabilidad:contabilidad(req.session.user),puedeAdministracion:await esPropietarioAdministracion(req.session.user,pool)});
 }
 interno.get('/facturas',wrap(bandeja));
+interno.get('/facturas-taller',wrap(async(req,res)=>res.json(await facturasPendientesTaller(pool,{interno:true}))));
 administracion.get('/seguimiento',wrap(bandeja));
 interno.post('/facturas/:id/notas-credito',wrap(async(req,res)=>{if(!contabilidad(req.session.user))return res.sendStatus(403);await cargarNota(req,res);}));
 interno.post('/facturas/:id/:accion',wrap(async(req,res)=>{
