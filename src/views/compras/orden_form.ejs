@@ -176,6 +176,7 @@
 
   <div class="form-card">
     <form id="ordenForm" method="POST" action="<%= accionFormulario %>">
+      <% if(typeof versionEdicion!=='undefined'){ %><input type="hidden" name="version" value="<%= versionEdicion %>"><% } %>
       <% if(proveeduria){ %><input type="hidden" name="origen_formulario" value="taller"><input type="hidden" name="solicitud_id" value="<%= solicitudId %>"><div class="alert alert-light border">Departamento de Proveeduría<% if(solicitudId){ %> · Sede: <%= sedeActual %> · Solicitud PR-<%= solicitudId %>. Ingrese los precios; el detalle y el IVA se toman de la solicitud.<% } %></div>
       <% if(!solicitudId){ %><div class="mb-3"><label for="sedeOrden">Sede de la orden</label><select id="sedeOrden" name="sede" class="form-select" required><option value="">Seleccione la sede</option><% sedesPermitidas.forEach(s=>{ %><option value="<%= s %>" <%= s===sedeActual?'selected':'' %>><%= s %></option><% }) %></select></div><% } %><% } %>
       <div class="row">

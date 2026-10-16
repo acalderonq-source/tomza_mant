@@ -1,6 +1,7 @@
 const router = require('express').Router();
 const {facturasDeOrden,vincularOrden,adjuntarFacturas}=require('../utils/portalFacturaOrden');
 const {articulosExcel,articuloExcel,ivaArticulo,condicionesOrden}=require('../utils/proveeduriaCatalogo');
+const {motivoBloqueoOrden,versionOrden,cambiosOrden}=require('../utils/proveeduriaOrdenEdicion');
 const { leerFacturaXML, consultarHacienda, aprobable, vencimiento } = require('../utils/proveedorHacienda');
 const { rateLimit } = require('express-rate-limit');
 const pool = require('../db');
@@ -57,6 +58,11 @@ async function sedeFormulario(req) {
   const elegida=sedeCanonicaVisible(String(req.body.sede).trim());
   if(!(await sedesOrden(req)).includes(elegida))throw error(403,'No tiene acceso a la sede seleccionada');
   return elegida;
+}
+async function ordenModificable(db,row,lock=false){
+  const motivo=motivoBloqueoOrden(row.datos);exigir(!motivo,motivo);
+  const [facturas]=await db.query(`SELECT factura_id FROM prov_portal_factura_orden WHERE origen='PROVEEDURIA' AND orden_id=? LIMIT 1 ${lock?'FOR UPDATE':''}`,[row.id]);
+  exigir(!facturas.length,'La orden ya tiene facturas vinculadas');
 }
 async function pdf(row) {
   const d = row.datos;
@@ -185,7 +191,55 @@ router.get('/ordenes',wrap(async(req,res)=>{
     const fecha=new Date(r.creado_en).toLocaleDateString('en-CA',{timeZone:'America/Costa_Rica'});
     return (!filtros.buscar||`PR-${r.id} ${r.datos.proveedor} ${r.sede}`.toLowerCase().includes(filtros.buscar.toLowerCase()))&&(!filtros.estado||r.datos.estado===filtros.estado)&&(!filtros.fecha_desde||fecha>=filtros.fecha_desde)&&(!filtros.fecha_hasta||fecha<=filtros.fecha_hasta);
   });
-  res.render('proveeduria/ordenes',{user:u,ordenes,filtros,puedeGestion:gestion(u)});
+  res.render('proveeduria/ordenes',{user:u,ordenes,filtros,puedeGestion:gestion(u),motivoBloqueoOrden,versionOrden});
+}));
+router.get('/ordenes/:id/editar',wrap(async(req,res)=>{
+  if(!gestion(req.session.user))throw error(403,'No autorizado');
+  const row=await documento(pool,req.params.id,'oc');
+  const sedesPermitidas=await sedesOrden(req);if(!sedesPermitidas.includes(row.sede))throw error(403,'No tiene acceso a la sede de esta OC');
+  await ordenModificable(pool,row);
+  const solicitud=row.datos.solicitud_id?await documento(pool,row.datos.solicitud_id,'solicitud'):null;
+  if(solicitud)exigir(!solicitud.datos.salida_id,'La solicitud ya tiene una entrega asociada');
+  const [proveedores]=await pool.query('SELECT p.nombre,c.telefono,c.correos,c.correo_original,c.direccion,c.condicion_pago FROM prov_proveedores p LEFT JOIN prov_proveedor_contactos c ON c.clave=p.clave WHERE p.activo=1 ORDER BY p.nombre');proveedores.forEach(p=>{p.correos=leerCorreosJSON(p.correos);});
+  const orden={...row.datos,id:row.id,fecha:row.creado_en,cotizacion_archivo:row.datos.cotizacion_archivo?`/proveeduria/adjunto/${row.id}/cotizacion`:null};
+  res.set('Cache-Control','no-store');
+  res.render('compras/orden_form',{orden,esNuevaOrden:false,solicitudId:solicitud?.datos.departamento?solicitud.id:'',lineas:row.datos.lineas.map(l=>({...l,codigo:l.referencia||'',codigo_producto:l.codigo})),proveedores,siguientePO:`PR-${row.id}`,esProveeduria:true,sedesPermitidas,sedeActual:row.sede,articulosExcel,versionEdicion:versionOrden(row),tituloOrden:`Editar orden PR-${row.id}`,textoGuardar:'Actualizar orden',subtituloOrden:'Proveeduría · Actualice los datos de esta orden de compra.',volverUrl:`/proveeduria/ordenes/${row.id}`,cancelarUrl:`/proveeduria/ordenes/${row.id}`,formAction:`/proveeduria/ordenes/${row.id}/editar`});
+}));
+router.post('/ordenes/:id/editar',wrap(async(req,res)=>{
+  if(!gestion(req.session.user))throw error(403,'No autorizado');
+  const sedesPermitidas=await sedesOrden(req);
+  await transaccion(async db=>{
+    const row=await documento(db,req.params.id,'oc',true);
+    if(!sedesPermitidas.includes(row.sede))throw error(403,'No tiene acceso a la sede de esta OC');
+    await ordenModificable(db,row,true);
+    exigir(req.body.version===versionOrden(row),'La orden cambió. Recargue la página antes de guardar');
+    const s=row.datos.solicitud_id?await documento(db,row.datos.solicitud_id,'solicitud',true):null;
+    if(s)exigir(Number(s.datos.oc_id)===Number(row.id)&&!s.datos.salida_id,'La solicitud cambió o ya tiene una entrega asociada');
+    const destino=req.body.sede?await sedeFormulario(req):row.sede;
+    if(s?.datos.departamento)exigir(destino===s.sede,'Conserve la sede de la solicitud');
+    const cambios=cambiosOrden(req.body,s);
+    if(req.body.cotizacion_data){const match=String(req.body.cotizacion_data).match(/^data:[^;]+;base64,(.+)$/);exigir(match,'Cotización inválida');cambios.cotizacion_archivo=await guardarAdjunto(db,adjunto({nombre:req.body.cotizacion_nombre,base64:match[1]}));cambios.cotizacion_nombre=cambios.cotizacion_archivo.nombre;}
+    row.datos={...row.datos,...cambios,revision:Number(row.datos.revision||0)+1,editada_en:new Date().toISOString(),editada_por:req.session.user.id};
+    delete row.datos.portal_hash;delete row.datos.portal_vence;
+    row.sede=destino;await db.query('UPDATE prov_documentos SET sede=? WHERE id=?',[destino,row.id]);
+    await guardar(db,row,req.session.user.id,'Orden de compra editada');
+    if(s&&!s.datos.departamento){s.datos.lineas=cambios.lineas.map(l=>({...l,precio_unitario:0,subtotal:0,impuesto:0}));s.sede=destino;await db.query('UPDATE prov_documentos SET sede=? WHERE id=?',[destino,s.id]);await guardar(db,s,req.session.user.id,'Solicitud directa actualizada desde la OC');}
+  });res.redirect(`/proveeduria/ordenes/${req.params.id}?actualizada=1`);
+}));
+router.post('/ordenes/:id/eliminar',wrap(async(req,res)=>{
+  if(!gestion(req.session.user))throw error(403,'No autorizado');
+  const sedesPermitidas=await sedesOrden(req);
+  await transaccion(async db=>{
+    const row=await documento(db,req.params.id,'oc',true);
+    if(!sedesPermitidas.includes(row.sede))throw error(403,'No tiene acceso a la sede de esta OC');
+    await ordenModificable(db,row,true);
+    exigir(req.body.version===versionOrden(row),'La orden cambió. Recargue el listado antes de eliminar');
+    if(row.datos.solicitud_id){const s=await documento(db,row.datos.solicitud_id,'solicitud',true);exigir(Number(s.datos.oc_id)===Number(row.id)&&!s.datos.salida_id,'La solicitud cambió o ya tiene una entrega asociada');delete s.datos.oc_id;s.datos.estado=s.datos.cotizacion?'COTIZADA':'PENDIENTE';await guardar(db,s,req.session.user.id,'OC eliminada; solicitud disponible nuevamente');}
+    row.datos.eliminada_en=new Date().toISOString();row.datos.eliminada_por=req.session.user.id;delete row.datos.portal_hash;delete row.datos.portal_vence;
+    await guardar(db,row,req.session.user.id,'Orden de compra eliminada');
+    // Sale de los listados y de los enlaces públicos; se conserva para auditoría.
+    await db.query("UPDATE prov_documentos SET tipo='oc_eliminada' WHERE id=?",[row.id]);
+  });res.json({ok:true,redirect:'/proveeduria/ordenes'});
 }));
 router.get('/recepciones',wrap(async(req,res)=>{
   if(!gestion(req.session.user)&&!contabilidad(req.session.user))throw error(403,'No autorizado');
@@ -537,7 +591,7 @@ router.get('/ordenes/:id',wrap(async(req,res)=>{
   row.datos.facturas_vinculadas=facturasPortal.map(r=>r.datos);
   const [disponibles]=await pool.query("SELECT * FROM prov_documentos WHERE tipo='factura_portal' AND JSON_EXTRACT(datos,'$.orden_compra') IS NULL AND JSON_UNQUOTE(JSON_EXTRACT(datos,'$.factura.estado')) IN ('PENDIENTE','CONCILIADA') ORDER BY id DESC LIMIT 500");
   const facturasDisponibles=disponibles.filter(r=>r.tipo==='factura_portal').map(datos);
-  res.render('proveeduria/modulo',{user:req.session.user,row,modulo:'detalle',titulo:`Orden de compra PR-${row.id}`,facturasPortal,facturasDisponibles,urlVincular:`/proveeduria/ordenes/${row.id}/vincular-factura`,puedeVincular:gestion(req.session.user)||contabilidad(req.session.user),puedeGestion:gestion(req.session.user),puedeContabilidad:contabilidad(req.session.user),saldo,alertas:[]});
+  res.render('proveeduria/modulo',{user:req.session.user,row,modulo:'detalle',titulo:`Orden de compra PR-${row.id}`,facturasPortal,facturasDisponibles,urlVincular:`/proveeduria/ordenes/${row.id}/vincular-factura`,puedeVincular:gestion(req.session.user)||contabilidad(req.session.user),puedeGestion:gestion(req.session.user),puedeContabilidad:contabilidad(req.session.user),saldo,alertas:[],motivoBloqueoOrden,versionOrden,ordenActualizada:req.query.actualizada==='1'});
 }));
 router.use((e,req,res,next)=>{console.error('Proveeduría:',e.code||e.message);res.status(e.status||500).json({error:e.status?e.message:'No se pudo completar la operación. Verifique la migración de Proveeduría y vuelva a intentar.'});});
 module.exports=router;

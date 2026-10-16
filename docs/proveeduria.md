@@ -12,6 +12,8 @@ Cada factura nueva cargada mediante el enlace privado de una OC se guarda como d
 
 La navegación sigue el inicio por módulos de Taller. Cada opción abre una pantalla propia: órdenes, solicitudes, proveedores, inventario, recepciones, salidas, facturas, pagos, conciliación y alertas. La pantalla única de gestión se retiró; `/proveeduria/gestion` redirige al listado de órdenes. El detalle y las acciones de cada OC están en `/proveeduria/ordenes/:id`, sin volver a mezclar los listados de todos los módulos.
 
+El menú Acciones del listado y el detalle incluyen Editar orden y Eliminar orden para gestión de Proveeduría. Editar reutiliza el formulario de Taller, conserva el número y los adjuntos existentes, recalcula precios/IVA/totales y guarda responsable y revisión. Los artículos y cantidades de solicitudes de otros departamentos se conservan; una compra directa permite cambiar su detalle y mantiene sincronizada su solicitud. Cada formulario verifica la versión bajo bloqueo de la OC. Recepciones, facturas vinculadas o del flujo anterior, pagos y entregas impiden cambiar o eliminar la orden. Eliminar pide confirmación, retira la OC del listado y del portal, conserva el documento como `oc_eliminada` para auditoría y libera la solicitud vinculada. Editar revoca el enlace anterior del proveedor; la OC modificada debe enviarse nuevamente. Estas acciones no alteran inventario ni facturas y no requieren migración nueva.
+
 ## Activación
 
 1. Probar primero la migración `202610130001_proveeduria.sql` en una copia de la base, según `migrations/README.md`. Luego aplicar con el proceso habitual `npm run migrate`.
