@@ -1,5 +1,5 @@
 const {exigir}=require('./proveeduria');
-const {validarCorrespondencia}=require('./portalFacturaOrden');
+const {validarCorrespondencia,facturaAnterior}=require('./portalFacturaOrden');
 const parse=d=>typeof d==='string'?JSON.parse(d):d;
 const code=s=>String(s||'').trim().toUpperCase();
 function coincide(l,o){return [o.codigo,o.codigo_producto,o.referencia].filter(Boolean).some(c=>[l.codigo,...(l.codigos||[])].map(code).includes(code(c)));}
@@ -24,14 +24,14 @@ function lineasProveeduria(o){
   return (o.lineas||[]).map(l=>({...l,iva:o.iva_global?Number(o.iva):l.iva,descuento:Number(l.descuento||0)+(base?Number(o.descuento||0)*Number(l.subtotal??Number(l.cantidad)*Number(l.precio_unitario))/base:0)}));
 }
 async function revisarFactura(db,row,lock=false){
-  const d=row.datos,oc=d.orden_compra,issues=[];let lineas=[];
+  const d=row.datos,oc=d.orden_compra,issues=[];let lineas=[],previa=null;
   if(!oc)return {diferencias:['Sin orden de compra vinculada'],revisado_en:new Date().toISOString()};
   await cargarDetalleXML(db,row.datos);
   const bloqueo=lock?' FOR UPDATE':'';
   const identidad=o=>{try{validarCorrespondencia(d,o);}catch(e){if(!e.status)throw e;issues.push(e.message);}};
   if(oc.origen==='PROVEEDURIA'){
     const [r]=await db.query("SELECT datos FROM prov_documentos WHERE id=? AND tipo='oc'"+bloqueo,[oc.id]);
-    if(r.length){const o=parse(r[0].datos);identidad({estado:o.estado,razon_social:o.razon_social,empresa_destino:o.empresa_destino,proveedor:o.proveedor,cedula:o.proveedor_cedula,moneda:o.moneda,total:Number(o.total),factura_registrada:!!o.factura});lineas=lineasProveeduria(o);if(Number(o.transporte)>0)issues.push('La OC incluye transporte: requiere revisar su correspondencia en el XML');}
+    if(r.length){const o=parse(r[0].datos);previa=facturaAnterior(o);identidad({estado:o.estado,razon_social:o.razon_social,empresa_destino:o.empresa_destino,proveedor:o.proveedor,cedula:o.proveedor_cedula,moneda:o.moneda,total:Number(o.total),factura_registrada:!!o.factura,factura_previa_total:previa?.total??0});lineas=lineasProveeduria(o);if(Number(o.transporte)>0)issues.push('La OC incluye transporte: requiere revisar su correspondencia en el XML');}
   }else{
     const [r]=await db.query('SELECT o.*,p.nombre,p.cedula_juridica FROM ordenes_compra o LEFT JOIN proveedores p ON p.id=o.proveedor_id WHERE o.id=?'+bloqueo,[oc.id]);
     if(r.length){const o=r[0];identidad({estado:o.estado,razon_social:o.razon_social,empresa_destino:o.empresa_destino,proveedor:o.nombre,cedula:o.cedula_juridica,moneda:o.moneda,total:Number(o.total),factura_registrada:!!o.factura});const [ls]=await db.query('SELECT * FROM ordenes_compra_detalle WHERE orden_compra_id=? ORDER BY id'+bloqueo,[oc.id]);
@@ -42,9 +42,10 @@ async function revisarFactura(db,row,lock=false){
   const [rs]=await db.query("SELECT d.id,d.datos FROM prov_portal_factura_orden v JOIN prov_documentos d ON d.id=v.factura_id WHERE v.origen=? AND v.orden_id=? AND v.factura_id<>? AND JSON_UNQUOTE(JSON_EXTRACT(d.datos,'$.factura.estado'))<>'RECHAZADA_INTERNA'"+bloqueo,[oc.origen,oc.id,row.id]);
   const anteriores=rs.map(r=>parse(r.datos));for(const anterior of anteriores)await cargarDetalleXML(db,anterior);
   if(anteriores.some(o=>!o.factura.electronica.lineas?.length))issues.push('Otra factura de esta OC no tiene detalle verificable');
-  const otras=anteriores.flatMap(o=>o.factura.electronica.lineas||[]),actual=d.factura.electronica.lineas||[];
+  const otras=[...anteriores.flatMap(o=>o.factura.electronica.lineas||[]),...(previa?.electronica?.lineas||previa?.lineas||[])],actual=d.factura.electronica.lineas||[];
+  if(previa&&!(previa.electronica?.lineas||previa.lineas)?.length)issues.push('La factura anterior de la OC no tiene detalle verificable');
   issues.push(...(d.factura.electronica.observaciones_control||[]),...compararLineas(actual,lineas,otras));
-  const total=rs.reduce((s,r)=>s+Number(parse(r.datos).factura.total),Number(d.factura.total));
+  const total=rs.reduce((s,r)=>s+Number(parse(r.datos).factura.total),Number(d.factura.total)+Number(previa?.total||0));
   // El vínculo limita el monto; aquí se vuelve a verificar al aprobar y pagar.
   const [limite]=oc.origen==='PROVEEDURIA'?await db.query("SELECT JSON_UNQUOTE(JSON_EXTRACT(datos,'$.total')) AS total FROM prov_documentos WHERE id=?",[oc.id]):await db.query('SELECT total FROM ordenes_compra WHERE id=?',[oc.id]);
   if(!limite.length||total>Number(limite[0].total)+0.01)issues.push('Monto acumulado supera el total de la OC');

@@ -53,6 +53,11 @@ function compararFactura(oc, factura) {
   return diferencias;
 }
 function saldo(oc) {
+  if(oc.facturas_vinculadas){
+    const base=saldo({...oc,factura:/DEVUELTA|RECHAZADA/.test(oc.factura?.estado||'')?undefined:oc.factura,facturas_vinculadas:undefined});
+    for(const d of oc.facturas_vinculadas.filter(d=>d.factura.estado!=='RECHAZADA_INTERNA')){const s=saldo(d);base.facturado=redondear(base.facturado+s.facturado);base.pagos=redondear(base.pagos+s.pagos);base.creditos=redondear((base.creditos||0)+(s.creditos||0));base.saldo=redondear(base.saldo+s.saldo);}
+    return base;
+  }
   const pagos = redondear((oc.pagos || []).reduce((s,p) => s + p.monto, 0));
   const facturado = oc.factura?.total ?? 0;
   const creditos=redondear((oc.notas_credito||[]).filter(n=>n.aplicada).reduce((s,n)=>s+Number(n.total),0));
@@ -66,7 +71,7 @@ function conciliarEstado(estado,ordenes) {
     const s=saldo(row.datos);
     const diferencia=redondear(p.saldo-s.saldo);
     const diferenciaDepositos=redondear(p.depositos-s.pagos);
-    const facturaCoincide=row.datos.factura?.numero===p.factura;
+    const facturaCoincide=[row.datos.factura,...(row.datos.facturas_vinculadas||[]).map(d=>d.factura)].filter(Boolean).some(f=>f.numero===p.factura);
     return {...p,sistema:s,diferencia,diferenciaDepositos,facturaCoincide,error:!facturaCoincide?'Factura diferente':(diferencia||diferenciaDepositos)?'Diferencias de saldo / depósitos':''};
   });
 }

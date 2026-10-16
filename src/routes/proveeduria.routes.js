@@ -1,5 +1,6 @@
 const router = require('express').Router();
-const {facturasDeOrden}=require('../utils/portalFacturaOrden');
+const {facturasDeOrden,vincularOrden,adjuntarFacturas}=require('../utils/portalFacturaOrden');
+const {articulosExcel,articuloExcel,ivaArticulo,condicionesOrden}=require('../utils/proveeduriaCatalogo');
 const { leerFacturaXML, consultarHacienda, aprobable, vencimiento } = require('../utils/proveedorHacienda');
 const { rateLimit } = require('express-rate-limit');
 const pool = require('../db');
@@ -105,9 +106,11 @@ router.get(['/', '/salidas', '/facturas', '/pagos', '/conciliacion', '/avisos'],
   const completo = gestion(u) || contabilidad(u);
   const [docs] = await pool.query(`SELECT * FROM prov_documentos ${completo ? '' : 'WHERE usuario_id = ?'} ORDER BY id DESC LIMIT 500`, completo ? [] : [u.id]);
   docs.forEach(datos);
+  await adjuntarFacturas(pool,docs);
   const faltantes=[...new Set(docs.filter(d=>d.tipo==='estado').flatMap(d=>d.datos.partidas.map(p=>p.oc_id)).filter(id=>!docs.some(d=>d.id===id)))];
   const [historicas]=faltantes.length?await pool.query(`SELECT * FROM prov_documentos WHERE tipo='oc' AND id IN (${faltantes.map(()=>'?').join(',')})`,faltantes):[[]];
   const ordenesConciliacion=[...docs,...historicas.map(datos)].filter(d=>d.tipo==='oc');
+  if(historicas.length)await adjuntarFacturas(pool,ordenesConciliacion);
   const sedeActual=req.session.sedeSeleccionada || u.sede || 'TODAS';
   const [alertas] = await pool.query('SELECT * FROM prov_alertas WHERE usuario_id = ? OR grupo = ? ORDER BY id DESC LIMIT 40',[u.id,gestion(u) ? 'PROVEEDURIA' : contabilidad(u) ? 'CONTABILIDAD' : 'USUARIO']);
   const modulo=req.path.slice(1),titulos={salidas:'Salidas de inventario',facturas:'Facturas',pagos:'Pagos y comprobantes',conciliacion:'Conciliación',avisos:'Alertas'};
@@ -176,6 +179,7 @@ router.post('/inventario/ajuste',wrap(async(req,res)=>{
 router.get('/ordenes',wrap(async(req,res)=>{
   const u=req.session.user, completo=gestion(u)||contabilidad(u);
   const [rows]=await pool.query(`SELECT * FROM prov_documentos WHERE tipo='oc' ${completo?'':'AND usuario_id=?'} ORDER BY id DESC`,completo?[]:[u.id]);
+  rows.forEach(datos);await adjuntarFacturas(pool,rows);
   const filtros={buscar:String(req.query.buscar||'').trim(),estado:String(req.query.estado||''),fecha_desde:String(req.query.fecha_desde||''),fecha_hasta:String(req.query.fecha_hasta||'')};
   const ordenes=rows.map(datos).filter(r=>{
     const fecha=new Date(r.creado_en).toLocaleDateString('en-CA',{timeZone:'America/Costa_Rica'});
@@ -223,7 +227,7 @@ router.get(['/ordenes/nueva','/solicitudes/:id/cotizacion'],wrap(async(req,res)=
   const sedeActual=sedesPermitidas.includes(seleccionada)?seleccionada:'';
   const cotizacion=solicitud?.datos.cotizacion;
   const precarga=cotizacion?{...cotizacion,cotizacion_archivo:cotizacion.cotizacion_archivo?`/proveeduria/solicitudes/${solicitud.id}/cotizacion/archivo`:null}:null;
-  res.render('compras/orden_form',{orden:precarga,esNuevaOrden:true,solicitudId:solicitud?.id||'',lineas:solicitud?solicitud.datos.lineas.map(l=>({...l,codigo:'',codigo_producto:l.codigo,precio_unitario:cotizacion?.lineas.find(x=>x.codigo===l.codigo)?.precio_unitario??'',subtotal:cotizacion?.lineas.find(x=>x.codigo===l.codigo)?.subtotal??0})):[],proveedores,siguientePO:esCotizacion?'Cotización · Sin OC':'Se asigna al guardar',esProveeduria:true,sedesPermitidas,sedeActual,tituloOrden:esCotizacion?'Cotizar solicitud PR-'+solicitud.id:'Nueva orden de compra',textoGuardar:esCotizacion?'Guardar cotización':'Guardar orden',subtituloOrden:esCotizacion?`Solicitud de ${solicitud.datos.departamento||'departamento solicitante'} · ${solicitud.datos.solicitante||'Usuario '+solicitud.usuario_id}`:'Departamento de Proveeduría · Complete el encabezado, líneas y totales de la orden.',volverUrl:esCotizacion?'/proveeduria/solicitudes':'/proveeduria/ordenes',cancelarUrl:'/proveeduria/solicitudes',formAction:esCotizacion?`/proveeduria/solicitudes/${solicitud.id}/cotizacion`:'/proveeduria/ordenes'});
+  res.render('compras/orden_form',{orden:precarga,esNuevaOrden:true,solicitudId:solicitud?.id||'',lineas:solicitud?solicitud.datos.lineas.map(l=>({...l,codigo:'',codigo_producto:l.codigo,iva:ivaArticulo(l.descripcion,l.iva),precio_unitario:cotizacion?.lineas.find(x=>x.codigo===l.codigo)?.precio_unitario??articuloExcel(l.descripcion)?.precio_unitario??'',subtotal:cotizacion?.lineas.find(x=>x.codigo===l.codigo)?.subtotal??0})):[],proveedores,siguientePO:esCotizacion?'Cotización · Sin OC':'Se asigna al guardar',esProveeduria:true,sedesPermitidas,sedeActual,articulosExcel,tituloOrden:esCotizacion?'Cotizar solicitud PR-'+solicitud.id:'Nueva orden de compra',textoGuardar:esCotizacion?'Guardar cotización':'Guardar orden',subtituloOrden:esCotizacion?`Solicitud de ${solicitud.datos.departamento||'departamento solicitante'} · ${solicitud.datos.solicitante||'Usuario '+solicitud.usuario_id}`:'Departamento de Proveeduría · Complete el encabezado, líneas y totales de la orden.',volverUrl:esCotizacion?'/proveeduria/solicitudes':'/proveeduria/ordenes',cancelarUrl:'/proveeduria/solicitudes',formAction:esCotizacion?`/proveeduria/solicitudes/${solicitud.id}/cotizacion`:'/proveeduria/ordenes'});
 }));
 router.get('/solicitudes/:id/cotizacion/archivo',wrap(async(req,res)=>{
   if(!gestion(req.session.user))throw error(403,'No autorizado');
@@ -240,7 +244,7 @@ router.post('/cotizacion/analizar',limitarLectura,wrap(async(req,res)=>{
 }));
 router.post('/solicitudes',wrap(async(req,res) => {
   exigir(Array.isArray(req.body.lineas),'Agregue los artículos solicitados');
-  const lineas = lineasCompra((req.body.lineas||[]).map(l=>({...l,codigo:String(l.codigo||'').trim()||'ART-'+crypto.createHash('sha256').update(String(l.descripcion||'').trim().toUpperCase()).digest('hex').slice(0,12),iva:13})));
+  const lineas = lineasCompra((req.body.lineas||[]).map(l=>({...l,codigo:String(l.codigo||'').trim()||'ART-'+crypto.createHash('sha256').update(String(l.descripcion||'').trim().toUpperCase()).digest('hex').slice(0,12),iva:ivaArticulo(l.descripcion)})));
   const sedeSolicitud=await sedeFormulario(req);
   const u=req.session.user;
   exigir(esDepartamentoValido(u.departamentoActivo),'Seleccione su departamento antes de crear una solicitud');
@@ -272,14 +276,15 @@ router.post(['/ordenes','/solicitudes/:id/cotizacion'],wrap(async(req,res)=>{
   if(esCotizacion)req.body.solicitud_id=req.params.id;
   const compartido=req.body.origen_formulario==='taller';
   if(compartido){
-    const b=req.body; const empresas={'GAS TOMZA':'GAS TOMZA DE COSTA RICA S.A.','SUPER GAS':'ENVASADORA SUPER GAS GLP S.A.','GRANEL':'GAS TOMZA DE COSTA RICA S.A.'};
+    const b=req.body; const empresas={'GAS TOMZA':'GAS TOMZA DE COSTA RICA S.A.','SUPER GAS':'ENVASADORA SUPER GAS GLP S.A.'};
     exigir(empresas[b.empresa_destino],'Empresa destinataria inválida');
-    b.lineas=Object.values(b.lineas||{}).map(l=>({...l,referencia:l.codigo,codigo:String(l.codigo_producto||'').trim()||'ART-'+crypto.createHash('sha256').update(String(l.descripcion||'')).digest('hex').slice(0,12),iva:b.iva??13}));
+    b.lineas=Object.values(b.lineas||{}).map(l=>({...l,referencia:l.codigo,codigo:String(l.codigo_producto||'').trim()||'ART-'+crypto.createHash('sha256').update(String(l.descripcion||'')).digest('hex').slice(0,12),iva:ivaArticulo(l.descripcion)}));
     b.precios=Object.fromEntries(b.lineas.map(l=>[l.codigo,l.precio_unitario]));
-    b.iva_global=!b.solicitud_id;
+    b.iva_global=false;b.iva=13;
     b.razon_social=empresas[b.empresa_destino];b.condicion=Number(b.credito)?'CREDITO':'CONTADO';b.modo=b.solicitud_id?'manual':'cotizacion';
   }
   const sedeDirecta=compartido&&!req.body.solicitud_id?await sedeFormulario(req):null;
+  if(compartido)Object.assign(req.body,condicionesOrden(req.body));
   const id=await transaccion(async db=>{
     let solicitud;
     if(compartido&&!req.body.solicitud_id){
@@ -291,7 +296,7 @@ router.post(['/ordenes','/solicitudes/:id/cotizacion'],wrap(async(req,res)=>{
     if(!esCotizacion&&solicitud.datos.departamento)exigir(solicitud.datos.cotizacion,'Primero prepare y guarde la cotización');
     let lineas;
     if(req.body.modo==='manual') {
-      lineas=lineasCompra(solicitud.datos.lineas.map(l=>({...l,precio_unitario:req.body.precios?.[l.codigo]})),true);
+      lineas=lineasCompra(solicitud.datos.lineas.map(l=>({...l,iva:ivaArticulo(l.descripcion,l.iva),precio_unitario:req.body.precios?.[l.codigo]})),true);
     } else {
       lineas=lineasCompra(req.body.lineas,true);
       exigir(lineas.length===solicitud.datos.lineas.length && solicitud.datos.lineas.every(l=>lineas.some(x=>x.codigo===l.codigo && x.cantidad===l.cantidad)),'La cotización debe corresponder a la solicitud');
@@ -302,9 +307,9 @@ router.post(['/ordenes','/solicitudes/:id/cotizacion'],wrap(async(req,res)=>{
     d.email=correos.join(', ');
     d.proveedor_telefono=String(req.body.proveedor_telefono||'').trim().slice(0,120);
     d.proveedor_direccion=String(req.body.proveedor_direccion||'').trim().slice(0,4000);
-    if(compartido)exigir(req.body.credito!=='' && req.body.credito!==undefined,'Seleccione contado o el plazo de crédito de 30, 60 o 90 días');
+    condicionesOrden(req.body);
     exigir(['CRC','USD'].includes(d.moneda)&&['CONTADO','CREDITO'].includes(d.condicion),'Condición o moneda inválida');
-    exigir(d.condicion==='CONTADO' ? d.credito===0 : [30,60,90].includes(d.credito),'Crédito: 30, 60 o 90 días; contado: 0');
+    exigir(d.condicion==='CONTADO' ? d.credito===0 : d.credito>0,'Los días de crédito deben corresponder a la condición de pago');
     d.placa_unidad=String(req.body.placa_unidad||'');
     d.iva_global=req.body.iva_global===true;
     if(req.body.cotizacion_data){
@@ -409,7 +414,7 @@ router.post('/ordenes/:id/hacienda',limitarLectura,wrap(async(req,res)=>{
   });
   res.json({ok:true,hacienda});
 }));
-router.get('/portal/:token',wrap(async(req,res)=>{res.render('proveeduria/portal',{row:req.portal,token:req.params.token,saldo:saldo(req.portal.datos)});}));
+router.get('/portal/:token',wrap(async(req,res)=>{const facturasPortal=await facturasDeOrden(pool,'PROVEEDURIA',req.portal.id);res.render('proveeduria/portal',{row:req.portal,token:req.params.token,facturasPortal,saldo:saldo({...req.portal.datos,facturas_vinculadas:facturasPortal.map(r=>r.datos)})});}));
 router.post('/portal/:token/leer-factura',limitarLectura,wrap(async(req,res)=>{res.json(await leerDocumento(req.body,'factura'));}));
 router.post('/portal/:token/leer-estado',limitarLectura,wrap(async(req,res)=>{res.json(await leerDocumento(req.body,'estado'));}));
 router.post('/portal/:token/estado-general',wrap(async(req,res)=>{
@@ -423,7 +428,8 @@ router.post('/portal/:token/estado-general',wrap(async(req,res)=>{
     const [ordenes]=await db.query("SELECT * FROM prov_documentos WHERE tipo='oc' AND JSON_UNQUOTE(JSON_EXTRACT(datos,'$.email'))=?",[row.datos.email]);
     const estado={proveedor:row.datos.proveedor,email:row.datos.email,moneda:req.body.moneda,fecha:String(req.body.fecha||''),partidas,archivo:await guardarAdjunto(db,adjunto(req.body.archivo))};
     exigir(/^\d{4}-\d{2}-\d{2}$/.test(estado.fecha)&&Number.isFinite(Date.parse(estado.fecha)),'Fecha inválida');
-    const resultado=conciliarEstado(estado,ordenes.map(datos));
+    ordenes.forEach(datos);await adjuntarFacturas(db,ordenes);
+    const resultado=conciliarEstado(estado,ordenes);
     exigir(resultado.every(p=>p.sistema),'Todas las OC deben pertenecer a este proveedor y moneda');
     const [r]=await db.query("INSERT INTO prov_documentos (tipo,usuario_id,sede,datos) VALUES ('estado',0,?,?)",[row.sede,JSON.stringify(estado)]);
     await alerta(db,r.insertId,`Estado de cuenta de ${estado.proveedor}: ${resultado.filter(p=>p.error).length} partidas con diferencias`,null,'CONTABILIDAD');
@@ -441,7 +447,6 @@ router.post('/portal/:token/:accion',limitarLectura,wrap(async(req,res)=>{
     exigir(row.datos.portal_hash===hash(req.params.token) && Date.now()<=row.datos.portal_vence,'Enlace revocado o vencido');
     const archivo=await guardarAdjunto(db,adjunto(req.body.archivo));
     if(req.params.accion==='factura'){
-      exigir(!row.datos.factura || ['DEVUELTA','DEVUELTA_CONTABILIDAD'].includes(row.datos.factura.estado),'Ya existe una factura en revisión o aceptada');
       const lineas=lineasCompra(req.body.lineas,true);
       const f={numero:String(req.body.numero||'').trim(),proveedor:String(req.body.proveedor||'').trim(),moneda:req.body.moneda,lineas,...totalesConAjustes(lineas,req.body),archivo,subida_en:new Date().toISOString(),estado:'PENDIENTE'};
       exigir(f.numero && f.proveedor && ['CRC','USD'].includes(f.moneda),'Complete número, proveedor y moneda');
@@ -451,15 +456,18 @@ router.post('/portal/:token/:accion',limitarLectura,wrap(async(req,res)=>{
       exigir(electronica.nombre_emisor.trim().toUpperCase()===f.proveedor.trim().toUpperCase(),'El proveedor debe coincidir con el emisor del XML');
       exigir(electronica.nombre_receptor.trim().toUpperCase()===row.datos.razon_social.trim().toUpperCase(),'El receptor del XML no coincide con la razón social de la OC');
       const [claves]=await db.query('SELECT documento_id FROM prov_facturas_claves WHERE clave=? FOR UPDATE',[electronica.clave]);
-      exigir(!claves.length || Number(claves[0].documento_id)===Number(row.id),'Esta factura ya fue cargada en otra OC');
-      if(!claves.length)await db.query('INSERT INTO prov_facturas_claves (clave,documento_id) VALUES (?,?)',[electronica.clave,row.id]);
+      exigir(!claves.length,'Esta factura ya está registrada. No se puede cargar dos veces');
       electronica.archivo=await guardarAdjunto(db,electronica.archivo);
       f.electronica=electronica;
       f.fecha_vencimiento=vencimiento(electronica.fecha,row.datos.credito);
-      f.diferencias=compararFactura(row.datos,f);
-      if(row.datos.factura){row.datos.factura_historial=row.datos.factura_historial||[];row.datos.factura_historial.push(row.datos.factura);}
-      row.datos.factura=f;
-      await alerta(db,row.id,`Factura ${f.numero} subida: ${f.diferencias.length ? f.diferencias.join('; ') : 'coincide con OC'}`);
+      f.diferencias=[];
+      const d={proveedor:row.datos.proveedor,email:row.datos.email,razon_social:row.datos.razon_social,moneda:row.datos.moneda,credito:row.datos.credito,pagos:[],factura:f,oc_token_id:row.id};
+      const [creada]=await db.query("INSERT INTO prov_documentos (tipo,usuario_id,sede,datos) VALUES ('factura_portal',0,?,?)",[row.sede,JSON.stringify(d)]);
+      const nueva={id:creada.insertId,tipo:'factura_portal',datos:d};
+      await vincularOrden(db,nueva,{origen:'PROVEEDURIA',referencia:`PR-${row.id}`},`Proveedor OC ${row.id}`);
+      await db.query('INSERT INTO prov_facturas_claves (clave,documento_id) VALUES (?,?)',[electronica.clave,nueva.id]);
+      await guardar(db,nueva,`Proveedor OC ${row.id}`,'Factura vinculada a OC');
+      await alerta(db,row.id,`Factura ${f.numero} cargada para la OC PR-${row.id}. Pendiente de revisión.`);
     }else if(req.params.accion==='estado-cuenta'){
       const fecha=String(req.body.fecha||'');exigir(/^\d{4}-\d{2}-\d{2}$/.test(fecha)&&Number.isFinite(Date.parse(fecha)),'Fecha inválida');
       row.datos.estado_cuenta={archivo,saldo:numero(req.body.saldo,'Saldo declarado',-1e10),fecha,subido_en:new Date().toISOString()};
@@ -503,6 +511,19 @@ router.get('/estados/:id/archivo',wrap(async(req,res)=>{
   if(!files[0])throw error(404,'Archivo no encontrado');res.set('X-Content-Type-Options','nosniff');res.attachment(a.nombre);res.type(a.mime).send(files[0].contenido);
 }));
 router.get('/portal/:token/adjunto/:tipo/:indice?',wrap(async(req,res)=>{await enviarAdjunto(res,req.portal,req.params.tipo,req.params.indice);}));
+router.get('/portal/:token/facturas/:facturaId/adjunto/:tipo/:indice?',wrap(async(req,res)=>{
+  const factura=await documento(pool,req.params.facturaId,'factura_portal');
+  if(factura.datos.orden_compra?.origen!=='PROVEEDURIA'||Number(factura.datos.orden_compra.id)!==Number(req.portal.id))throw error(403,'Factura ajena a esta OC');
+  await enviarAdjunto(res,factura,req.params.tipo,req.params.indice);
+}));
+router.post('/ordenes/:id/vincular-factura',wrap(async(req,res)=>{
+  if(!gestion(req.session.user)&&!contabilidad(req.session.user))throw error(403,'No autorizado');
+  await transaccion(async db=>{
+    const factura=await documento(db,req.body.factura_id,'factura_portal',true);
+    await vincularOrden(db,factura,{origen:'PROVEEDURIA',referencia:`PR-${req.params.id}`},req.session.user.id);
+    await guardar(db,factura,req.session.user.id,'Factura vinculada a OC desde su detalle');
+  });res.json({ok:true});
+}));
 async function enviarAdjunto(res,row,tipo,indice){
   const a=tipo==='xml'?row.datos.factura?.electronica?.archivo:tipo==='factura'?row.datos.factura?.archivo:tipo==='cotizacion'?row.datos.cotizacion_archivo:tipo==='estado-cuenta'?row.datos.estado_cuenta?.archivo:tipo==='pago'?row.datos.pagos[Number(indice)]?.archivo:null;
   if(!a)throw error(404,'Archivo no encontrado');
@@ -512,7 +533,11 @@ async function enviarAdjunto(res,row,tipo,indice){
 }
 router.get('/ordenes/:id',wrap(async(req,res)=>{
   const row=await documento(pool,req.params.id,'oc');visible(req,row);
-  res.render('proveeduria/modulo',{user:req.session.user,row,modulo:'detalle',titulo:`Orden de compra PR-${row.id}`,facturasPortal:await facturasDeOrden(pool,'PROVEEDURIA',row.id),puedeGestion:gestion(req.session.user),puedeContabilidad:contabilidad(req.session.user),saldo,alertas:[]});
+  const facturasPortal=await facturasDeOrden(pool,'PROVEEDURIA',row.id);
+  row.datos.facturas_vinculadas=facturasPortal.map(r=>r.datos);
+  const [disponibles]=await pool.query("SELECT * FROM prov_documentos WHERE tipo='factura_portal' AND JSON_EXTRACT(datos,'$.orden_compra') IS NULL AND JSON_UNQUOTE(JSON_EXTRACT(datos,'$.factura.estado')) IN ('PENDIENTE','CONCILIADA') ORDER BY id DESC LIMIT 500");
+  const facturasDisponibles=disponibles.filter(r=>r.tipo==='factura_portal').map(datos);
+  res.render('proveeduria/modulo',{user:req.session.user,row,modulo:'detalle',titulo:`Orden de compra PR-${row.id}`,facturasPortal,facturasDisponibles,urlVincular:`/proveeduria/ordenes/${row.id}/vincular-factura`,puedeVincular:gestion(req.session.user)||contabilidad(req.session.user),puedeGestion:gestion(req.session.user),puedeContabilidad:contabilidad(req.session.user),saldo,alertas:[]});
 }));
 router.use((e,req,res,next)=>{console.error('Proveeduría:',e.code||e.message);res.status(e.status||500).json({error:e.status?e.message:'No se pudo completar la operación. Verifique la migración de Proveeduría y vuelva a intentar.'});});
 module.exports=router;

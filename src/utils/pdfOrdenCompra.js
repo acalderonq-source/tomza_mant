@@ -109,8 +109,10 @@ function generarBuffer(docDefinition) {
   });
 }
 
-async function generarPDFOrden(orden, proveedor = {}, lineas = []) {
+function definirOrden(orden, proveedor = {}, lineas = []) {
   const empresa = getEmpresa(orden);
+  const colorEmpresa=orden.empresa_destino==='SUPER GAS'?'#b91c1c':'#1f4e79';
+  const fondoTotal=orden.empresa_destino==='SUPER GAS'?'#fee2e2':'#eaf2ff';
   if (orden.departamento && orden.razon_social) empresa.nombre = orden.razon_social;
   const subtotal = toNumber(orden.subtotal);
   const montoDescuento = toNumber(orden.descuento);
@@ -192,7 +194,7 @@ async function generarPDFOrden(orden, proveedor = {}, lineas = []) {
             ],
             [
               { text: orden.cotizacion_nombre || orden.cotizacion || "-", alignment: "center" },
-              { text: orden.forma_pago || "Credito", alignment: "center" },
+              { text: `${orden.forma_pago || 'Credito'}${Number(orden.credito)>0&&!/\d+\s*d[ií]as/i.test(orden.forma_pago||'')?' · '+Number(orden.credito)+' días':''}`, alignment: "center" },
               { text: orden.departamento || orden.tipo_mantenimiento || "CORRECTIVO", alignment: "center" },
               { text: formatDate(orden.fecha_envio), alignment: "center" }
             ]
@@ -245,8 +247,8 @@ async function generarPDFOrden(orden, proveedor = {}, lineas = []) {
                 ["Subtotal gravable", { text: formatMoney(baseIva), alignment: "right" }],
                 [orden.departamento ? 'IVA' : `IVA (${formatMoney(ivaPorc)}%)`, { text: formatMoney(montoIva), alignment: "right" }],
                 [
-                  { text: "TOTAL", bold: true, fillColor: "#eaf2ff" },
-                  { text: formatMoney(total), bold: true, alignment: "right", fillColor: "#eaf2ff" }
+                  { text: "TOTAL", bold: true, fillColor: fondoTotal },
+                  { text: formatMoney(total), bold: true, alignment: "right", fillColor: fondoTotal }
                 ]
               ]
             },
@@ -258,17 +260,17 @@ async function generarPDFOrden(orden, proveedor = {}, lineas = []) {
     ],
     styles: {
       title: { fontSize: 16, bold: true },
-      sectionHeader: { fillColor: "#1f4e79", color: "#ffffff", bold: true, alignment: "center", margin: [0, 3, 0, 3] },
-      miniHeader: { fillColor: "#1f4e79", color: "#ffffff", bold: true, alignment: "center", margin: [0, 3, 0, 3] },
+      sectionHeader: { fillColor: colorEmpresa, color: "#ffffff", bold: true, alignment: "center", margin: [0, 3, 0, 3] },
+      miniHeader: { fillColor: colorEmpresa, color: "#ffffff", bold: true, alignment: "center", margin: [0, 3, 0, 3] },
       infoCell: { margin: [3, 3, 3, 3] },
-      tableHeader: { fillColor: "#1f4e79", color: "#ffffff", bold: true, alignment: "center", margin: [0, 3, 0, 3] },
+      tableHeader: { fillColor: colorEmpresa, color: "#ffffff", bold: true, alignment: "center", margin: [0, 3, 0, 3] },
       tableCell: { margin: [2, 2, 2, 2] },
-      noteHeader: { fillColor: "#1f4e79", color: "#ffffff", bold: true, margin: [4, 4, 4, 4] },
+      noteHeader: { fillColor: colorEmpresa, color: "#ffffff", bold: true, margin: [4, 4, 4, 4] },
       noteBox: { margin: [4, 6, 4, 6] }
     }
   };
 
-  return generarBuffer(docDefinition);
+  return docDefinition;
 }
-
-module.exports = { generarPDFOrden };
+async function generarPDFOrden(orden,proveedor={},lineas=[]){return generarBuffer(definirOrden(orden,proveedor,lineas));}
+module.exports = { generarPDFOrden,definirOrden };

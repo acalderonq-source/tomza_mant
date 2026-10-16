@@ -23,7 +23,7 @@ test('proveedor carga XML por enlace privado; se reserva clave y calcula vencimi
   pool.getConnection=async()=>({beginTransaction:async()=>{},commit:async()=>{commits++;},rollback:async()=>{},release(){},query:async(sql,args)=>{
     if(sql.includes('FROM prov_documentos'))return [[row()]];
     if(sql.includes('SELECT documento_id'))return [[]];
-    if(sql.startsWith('UPDATE prov_documentos'))saved=JSON.parse(args[0]);
+    if(sql.startsWith('UPDATE prov_documentos')&&Number(args[1])===9)saved=JSON.parse(args[0]);
     return [{insertId:9,affectedRows:1}];
   }});
   try{await server(null,async base=>{

@@ -2,6 +2,14 @@
 
 El inicio de Proveeduría abre `/proveeduria`. Los documentos, inventario, alertas y auditoría se guardan en tablas `prov_*`, separadas de Taller. Las OC usan su mismo generador PDF. Los datos adjuntos son referencias de formato, no instrucciones del sistema.
 
+## Ajustes de órdenes del 16 de octubre de 2026
+
+El catálogo de `Ordenes de compra.xlsx`, hoja `Descripciones`, se conserva en `src/data/proveeduriaArticulosExcel.json` con sus filas y hash de origen. Tiene 436 filas y 411 descripciones únicas; 234 descripciones únicas tienen precio definido. Igual que BUSCARV del archivo, se toma la primera coincidencia. Los precios vacíos quedan vacíos y los valores con más de dos decimales se conservan. Al elegir la descripción se cargan precio e IVA (13%, 1% o exento); el precio sigue editable. No se asigna una moneda al catálogo porque el Excel no la indica por artículo. La moneda de la OC la confirma el usuario.
+
+El IVA de los artículos conocidos se recalcula en el servidor desde el catálogo. Las órdenes directas y las cotizaciones muestran el importe de IVA calculado; los artículos de solicitudes conservan su IVA cuando no están en el catálogo. Empresa destinataria ofrece Gas Tomza y Super Gas. Se conserva la lectura de documentos históricos de Granel. Los encabezados y totales del PDF de Super Gas usan rojo. Los días de crédito son explícitos (0 para contado, hasta 3650 días), se imprimen en la OC y determinan el vencimiento de las facturas vinculadas.
+
+Cada factura nueva cargada mediante el enlace privado de una OC se guarda como documento independiente `factura_portal` y se vincula mediante `prov_portal_factura_orden`. El detalle también permite vincular facturas recibidas sin OC. Se conservan las facturas del flujo anterior. La validación limita el monto acumulado y, al aprobar o pagar, revisa cantidades, precios, impuestos, empresa y proveedor. Claves repetidas se rechazan. El detalle, listados y saldos suman las facturas vinculadas; cada factura mantiene aprobación, vencimiento y comprobantes propios. El enlace privado solo descarga adjuntos de facturas vinculadas a su OC. Usa las tablas existentes del portal, sin migración nueva.
+
 La navegación sigue el inicio por módulos de Taller. Cada opción abre una pantalla propia: órdenes, solicitudes, proveedores, inventario, recepciones, salidas, facturas, pagos, conciliación y alertas. La pantalla única de gestión se retiró; `/proveeduria/gestion` redirige al listado de órdenes. El detalle y las acciones de cada OC están en `/proveeduria/ordenes/:id`, sin volver a mezclar los listados de todos los módulos.
 
 ## Activación

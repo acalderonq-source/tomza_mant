@@ -9,7 +9,7 @@ function validarCorrespondencia(factura,orden,{ignorarEmpresa=false}={}){
   else exigir([factura.proveedor,e.nombre_emisor,e.nombre_comercial_emisor].filter(Boolean).some(n=>nombre(n)===nombre(orden.proveedor)),'El proveedor de la OC no coincide con la factura');
   exigir((orden.moneda||'CRC').toUpperCase()===factura.moneda,'La moneda de la OC no coincide con la factura');
   if(!ignorarEmpresa){const diferencia=diferenciaEmpresa(factura,orden);exigir(!diferencia,diferencia);}
-  exigir(!orden.factura_registrada,'La OC ya tiene una factura registrada por el flujo anterior; revise antes de enlazar otra');
+  exigir(!orden.factura_registrada||Number.isFinite(orden.factura_previa_total),'La OC ya tiene una factura registrada por el flujo anterior; revise antes de enlazar otra');
   exigir(Number.isFinite(orden.total)&&orden.total>0,'La OC no tiene un monto válido');
 }
 async function vincularOrden(db,row,body,actor){
@@ -20,7 +20,7 @@ async function vincularOrden(db,row,body,actor){
   if(origen==='PROVEEDURIA'){
     const id=referencia.replace(/^PR-/i,'');exigir(/^\d+$/.test(id),'Use el número PR- de Proveeduría');
     const [r]=await db.query("SELECT * FROM prov_documentos WHERE id=? AND tipo='oc' FOR UPDATE",[id]);exigir(r.length===1,'Orden de Proveeduría no encontrada');const d=parse(r[0]);
-    orden={id:d.id,numero:`PR-${d.id}`,estado:d.datos.estado,razon_social:d.datos.razon_social,empresa_destino:d.datos.empresa_destino,proveedor:d.datos.proveedor,total:Number(d.datos.total),moneda:d.datos.moneda,cedula:d.datos.proveedor_cedula,factura_registrada:!!d.datos.factura,url:`/proveeduria/ordenes/${d.id}`};
+    orden={id:d.id,numero:`PR-${d.id}`,estado:d.datos.estado,razon_social:d.datos.razon_social,empresa_destino:d.datos.empresa_destino,proveedor:d.datos.proveedor,total:Number(d.datos.total),moneda:d.datos.moneda,cedula:d.datos.proveedor_cedula,factura_registrada:!!d.datos.factura,factura_previa_total:facturaAnterior(d.datos)?.total??0,credito:d.datos.credito,url:`/proveeduria/ordenes/${d.id}`};
   }else{
     const porId=/^#\d+$/.test(referencia);
     const [r]=await db.query(`SELECT o.id,o.po_numero,o.total,o.moneda,o.factura,o.estado,o.empresa_destino,p.nombre,p.cedula_juridica FROM ordenes_compra o LEFT JOIN proveedores p ON p.id=o.proveedor_id WHERE ${porId?'o.id':'o.po_numero'}=? FOR UPDATE`,[porId?referencia.slice(1):referencia]);exigir(r.length===1,'Orden de Taller / Compras no encontrada');const o=r[0];
@@ -28,12 +28,20 @@ async function vincularOrden(db,row,body,actor){
   }
   validarCorrespondencia(row.datos,orden);
   const [s]=await db.query(`SELECT COALESCE(SUM(v.monto),0) AS total FROM prov_portal_factura_orden v JOIN prov_documentos d ON d.id=v.factura_id WHERE v.origen=? AND v.orden_id=? AND v.factura_id<>? AND JSON_UNQUOTE(JSON_EXTRACT(d.datos,'$.factura.estado')) <> 'RECHAZADA_INTERNA'`,[origen,orden.id,row.id]);
-  exigir(Number(s[0]?.total||0)+row.datos.factura.total<=orden.total+0.01,'El total de facturas enlazadas supera el monto de la OC');
+  exigir(Number(s[0]?.total||0)+Number(orden.factura_previa_total||0)+row.datos.factura.total<=orden.total+0.01,'El total de facturas enlazadas supera el monto de la OC');
   await db.query('INSERT INTO prov_portal_factura_orden (factura_id,origen,orden_id,monto,moneda,vinculado_por) VALUES (?,?,?,?,?,?) ON DUPLICATE KEY UPDATE origen=VALUES(origen),orden_id=VALUES(orden_id),monto=VALUES(monto),moneda=VALUES(moneda),vinculado_por=VALUES(vinculado_por)',[row.id,origen,orden.id,row.datos.factura.total,row.datos.moneda,actor]);
   row.datos.orden_compra={origen,id:orden.id,numero:orden.numero,url:orden.url};
+  if(origen==='PROVEEDURIA'&&Number.isInteger(Number(orden.credito))){row.datos.credito=Number(orden.credito);row.datos.factura.fecha_vencimiento=require('./proveedorHacienda').vencimiento(row.datos.factura.electronica.fecha,Number(orden.credito));}
 }
+function facturaAnterior(d){const f=d.factura;return f&&!/DEVUELTA|RECHAZADA/.test(f.estado||'')?f:null;}
 async function facturasDeOrden(pool,origen,id){
   const [r]=await pool.query('SELECT d.* FROM prov_portal_factura_orden v JOIN prov_documentos d ON d.id=v.factura_id WHERE v.origen=? AND v.orden_id=? ORDER BY d.id DESC',[origen,id]);
   return r.filter(d=>d.tipo==='factura_portal').map(parse);
 }
-module.exports={vincularOrden,validarCorrespondencia,facturasDeOrden};
+async function adjuntarFacturas(db,docs){
+  const ordenes=docs.filter(d=>d.tipo==='oc');if(!ordenes.length)return;
+  const [rows]=await db.query("SELECT d.* FROM prov_portal_factura_orden v JOIN prov_documentos d ON d.id=v.factura_id WHERE v.origen='PROVEEDURIA' AND v.orden_id IN (?)",[ordenes.map(o=>o.id)]);
+  const facturas=rows.filter(r=>r.tipo==='factura_portal').map(parse);
+  for(const o of ordenes)o.datos.facturas_vinculadas=facturas.filter(r=>Number(r.datos.orden_compra?.id)===Number(o.id)).map(r=>r.datos);
+}
+module.exports={vincularOrden,validarCorrespondencia,facturasDeOrden,facturaAnterior,adjuntarFacturas};

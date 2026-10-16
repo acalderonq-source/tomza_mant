@@ -222,7 +222,6 @@
           <select name="empresa_destino" class="form-select" required>
             <option value="GAS TOMZA" <%= (safeOrden.empresa_destino || 'GAS TOMZA') === 'GAS TOMZA' ? 'selected' : '' %>>Gas Tomza de Costa Rica S.A.</option>
             <option value="SUPER GAS" <%= safeOrden.empresa_destino === 'SUPER GAS' ? 'selected' : '' %>>Envasadora Super Gas GLP S.A.</option>
-            <option value="GRANEL" <%= safeOrden.empresa_destino === 'GRANEL' ? 'selected' : '' %>>Granel</option>
           </select>
         </div>
         <div class="col-md-3">
@@ -267,12 +266,13 @@
       <% if(proveeduria){ %><div class="row mb-3">
         <div class="col-md-4"><label>Correo del proveedor</label><input required type="email" multiple name="email" class="form-control" value="<%= safeOrden.email || '' %>"><div class="form-text">Puede incluir varios correos separados por coma.</div></div>
         <div class="col-md-4"><label>Plazo de entrega</label><input required name="entrega" class="form-control" value="<%= safeOrden.entrega || '' %>"></div>
-        <div class="col-md-4"><label>Crédito</label><select name="credito" class="form-select" required><option value="">Seleccione el plazo</option><% [0,30,60,90].forEach(n=>{ %><option value="<%= n %>" <%= Number(safeOrden.credito||0)===n?'selected':'' %>><%= n===0?'Contado':n+' días' %></option><% }) %></select></div>
+        <div class="col-md-4"><label for="diasCredito">Días de crédito</label><input id="diasCredito" name="credito" type="number" class="form-control" required min="0" max="3650" step="1" value="<%= safeOrden.credito??0 %>" list="plazosCredito"><datalist id="plazosCredito"><option value="0">Contado</option><option value="30"></option><option value="60"></option><option value="90"></option></datalist><div class="form-text">0 = contado. Indique el plazo acordado con el proveedor.</div></div>
         <div class="col-md-4 mt-3"><label>Teléfono del proveedor</label><input name="proveedor_telefono" class="form-control" value="<%= safeOrden.proveedor_telefono||'' %>"></div>
         <div class="col-md-8 mt-3"><label>Dirección del proveedor</label><input name="proveedor_direccion" class="form-control" value="<%= safeOrden.proveedor_direccion||'' %>"></div>
         <div class="col-12"><p id="proveedorAviso" class="form-text mb-0" role="status"></p></div>
       </div><% } %>
       <h4 class="page-title fs-5 mb-3">Detalle de productos/servicios</h4>
+      <% if(proveeduria){ %><p class="small text-muted">Seleccione la descripción del Excel para cargar su precio e IVA. El precio unitario se puede editar. Confirme la moneda de la orden: el catálogo no indica moneda por artículo.</p><datalist id="articulosExcel"><% (typeof articulosExcel!=='undefined'?articulosExcel:[]).forEach(a=>{ %><option value="<%= a.descripcion %>"></option><% }) %></datalist><p id="catalogoAviso" class="small text-muted" role="status"></p><% } %>
       <div class="order-lines-wrap">
         <table class="table table-bordered order-lines-table" id="itemsTable">
           <colgroup>
@@ -307,9 +307,10 @@
           <input type="number" id="transporte" name="transporte" step="0.01" value="<%= safeOrden.transporte ?? 0 %>" class="form-control">
         </div>
         <div class="order-total-row">
-          <label for="iva">IVA (%)</label>
-          <input type="number" id="iva" name="iva" step="0.01" value="<%= safeOrden.iva ?? 13 %>" class="form-control">
+          <label for="iva"><%= proveeduria?'IVA transporte (%)':'IVA (%)' %></label>
+          <input type="number" id="iva" name="iva" step="0.01" value="<%= proveeduria?13:safeOrden.iva ?? 13 %>" class="form-control" <%= proveeduria?'readonly':'' %>>
         </div>
+        <% if(proveeduria){ %><div class="order-total-row"><label for="impuestoCalculado">IVA calculado</label><input id="impuestoCalculado" type="text" readonly class="form-control-plaintext money"></div><% } %>
         <div class="order-total-row total">
           <label for="total">Total</label>
           <input type="text" id="total" name="total" readonly class="form-control-plaintext fw-bold money" value="<%= safeOrden.total || '' %>">
@@ -387,9 +388,9 @@
     newRow.innerHTML = `
       <td data-label="<%= proveeduria ? 'Referencia' : carburacion ? 'Cliente' : 'Placa' %>"><% if(carburacion){ %><select name="lineas[${rowIndex}][codigo]" class="form-select" data-cliente-linea><option value="">Seleccione un cliente</option></select><% } else { %><input type="text" name="lineas[${rowIndex}][codigo]" class="form-control text-uppercase" placeholder="<%= proveeduria ? 'Área o destino' : 'Placa, GENERAL o ACEITES' %>" <% if(!proveeduria){ %>data-placa-autocomplete data-placa-mode="placa" data-placa-allow-free="true" data-placa-allow-general="true"<% } %>><% } %></td>
       <td data-label="Código"><input type="text" name="lineas[${rowIndex}][codigo_producto]" class="form-control text-uppercase" placeholder="Código"></td>
-      <td data-label="Descripción"><textarea name="lineas[${rowIndex}][descripcion]" class="form-control" rows="3" required></textarea></td>
+      <td data-label="Descripción"><% if(proveeduria){ %><input name="lineas[${rowIndex}][descripcion]" class="form-control" list="articulosExcel" required><small class="iva-articulo text-muted"></small><% }else{ %><textarea name="lineas[${rowIndex}][descripcion]" class="form-control" rows="3" required></textarea><% } %></td>
       <td data-label="Cantidad"><input type="number" name="lineas[${rowIndex}][cantidad]" class="form-control cantidad" value="1" step="0.01"></td>
-      <td data-label="Precio unitario"><input type="number" name="lineas[${rowIndex}][precio_unitario]" class="form-control precio" step="0.01"></td>
+      <td data-label="Precio unitario"><input type="number" name="lineas[${rowIndex}][precio_unitario]" class="form-control precio" step="<%= proveeduria?'any':'0.01' %>" min="0"></td>
       <td data-label="Subtotal"><input type="text" name="lineas[${rowIndex}][subtotal]" class="form-control subtotal money" readonly></td>
       <td data-label="Quitar"><button type="button" class="btn btn-danger btn-sm removeRow" title="Quitar línea"><i class="bi bi-x-lg"></i></button></td>
     `;
@@ -408,6 +409,7 @@
     newRow.querySelector(`[name="lineas[${rowIndex}][subtotal]"]`).value = linea.subtotal ?? '';
     rowIndex++;
     attachEventsToRow(newRow);
+    <% if(proveeduria){ %>newRow.dataset.iva=linea.iva??13;<% } %>
     <% if(proveeduria && solicitudId){ %>
     newRow.dataset.iva=linea.iva??13;
     newRow.querySelectorAll('textarea,input:not(.precio):not(.subtotal)').forEach(i=>i.readOnly=true);
@@ -450,9 +452,10 @@
     const totalConTransporte = subtotalDespuesDescuento + transporte;
     const iva = totalConTransporte * ivaPorc / 100;
     let impuestoCalculado=iva;
-    <% if(proveeduria && solicitudId){ %>
+    <% if(proveeduria){ %>
     const impuestoLineas=[...document.querySelectorAll('#itemsTable tbody tr')].reduce((s,r)=>s+Math.round(Number(r.querySelector('.subtotal').value||0)*Number(r.dataset.iva||0))/100,0);
     impuestoCalculado=Math.round((impuestoLineas*(subtotal?(subtotal-descuento)/subtotal:0)+transporte*ivaPorc/100)*100)/100;
+    document.getElementById('impuestoCalculado').value=impuestoCalculado.toFixed(2);
     <% } %>
     const total = totalConTransporte + impuestoCalculado;
     document.getElementById("subtotal").value = subtotal.toFixed(2);
@@ -473,7 +476,7 @@
 
   function hayLineasConDatos() {
     return Array.from(document.querySelectorAll("#itemsTable tbody tr")).some(row => {
-      const descripcion = row.querySelector("textarea[name*='[descripcion]']");
+      const descripcion = row.querySelector("[name*='[descripcion]']");
       const precio = row.querySelector("input[name*='[precio_unitario]']");
       return (descripcion && descripcion.value.trim()) || (precio && precio.value.trim());
     });
@@ -624,5 +627,6 @@
   });
 <% } %>
 </script>
+<% if(proveeduria){ %><script id="catalogo-excel-datos" type="application/json"><%- JSON.stringify(typeof articulosExcel!=='undefined'?articulosExcel:[]).replace(/</g,'\\u003c') %></script><link href="/css/proveeduria-orden.css" rel="stylesheet"><script src="/js/proveeduria-orden.js" defer></script><% } %>
 </body>
 </html>

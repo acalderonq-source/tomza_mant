@@ -67,7 +67,9 @@ async function cruzarFactura(pool,id){
     let estado=limite?'REQUIERE_REVISION':candidatos.length===0?(empresas_incompatibles.length?'EMPRESA_NO_COINCIDE':'SIN_COINCIDENCIA'):candidatos.length>1?'VARIAS_COINCIDENCIAS':'ENLAZADA';
     if(estado==='ENLAZADA'){
       const o=candidatos[0];
-      try{await vincularOrden(db,row,{origen:o.origen,referencia:o.referencia},0);d.orden_compra.automatico=true;}
+      try{await vincularOrden(db,row,{origen:o.origen,referencia:o.referencia},0);d.orden_compra.automatico=true;
+        if(o.origen==='PROVEEDURIA'&&d.factura.fecha_vencimiento)await db.query("UPDATE prov_documentos SET datos=JSON_SET(datos,'$.credito',?,'$.factura.fecha_vencimiento',?) WHERE id=?",[d.credito,d.factura.fecha_vencimiento,row.id]);
+      }
       catch(e){if(!e.status)throw e;estado='REQUIERE_REVISION';}
     }
     const anterior=d.cruce_automatico;

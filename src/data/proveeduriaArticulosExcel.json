@@ -1,0 +1,2624 @@
+{
+  "archivo": "Ordenes de compra.xlsx",
+  "hoja": "Descripciones",
+  "moneda": null,
+  "sha256": "3a2f3366b84ead56cf91b77961efcb2005a941dd1e822ef563aefa22946999a2",
+  "articulos": [
+    {
+      "fila": 2,
+      "descripcion": "Adaptador Tipo C a USB",
+      "precio_unitario": 885.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 3,
+      "descripcion": "Audifonos para computadora",
+      "precio_unitario": 9735.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 4,
+      "descripcion": "Base enfriadora para lapto",
+      "precio_unitario": 4646.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 5,
+      "descripcion": "Adaptadores varios puertos",
+      "precio_unitario": 4000.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 6,
+      "descripcion": "CABLE C-C",
+      "precio_unitario": 1017.7,
+      "iva": 13.0
+    },
+    {
+      "fila": 7,
+      "descripcion": "Licencias Microsoft",
+      "precio_unitario": 49500.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 8,
+      "descripcion": "Cable HDMI",
+      "precio_unitario": 1239.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 9,
+      "descripcion": "Cable USB - C",
+      "precio_unitario": 796.46,
+      "iva": 13.0
+    },
+    {
+      "fila": 10,
+      "descripcion": "Limpiador de contactos",
+      "precio_unitario": 5752.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 11,
+      "descripcion": "Aire Comprimido",
+      "precio_unitario": 5251.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 12,
+      "descripcion": "Mouse",
+      "precio_unitario": 2787.61,
+      "iva": 13.0
+    },
+    {
+      "fila": 13,
+      "descripcion": "Mouse pad",
+      "precio_unitario": 2212.39,
+      "iva": 13.0
+    },
+    {
+      "fila": 14,
+      "descripcion": "Pasta termica",
+      "precio_unitario": 1327.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 15,
+      "descripcion": "Teclado",
+      "precio_unitario": 2655.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 16,
+      "descripcion": "Cargadores",
+      "precio_unitario": 2434.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 17,
+      "descripcion": "Ajax limpiador multiusos",
+      "precio_unitario": 574.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 18,
+      "descripcion": "Ampos",
+      "precio_unitario": 908.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 19,
+      "descripcion": "Antigrasa",
+      "precio_unitario": 1612.77,
+      "iva": 13.0
+    },
+    {
+      "fila": 20,
+      "descripcion": "Aromatizante (Glade)",
+      "precio_unitario": 2551.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 21,
+      "descripcion": "Azúcar (2kg)",
+      "precio_unitario": 1450.0,
+      "iva": 1.0
+    },
+    {
+      "fila": 22,
+      "descripcion": "Azucar sobrecitos",
+      "precio_unitario": 668.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 23,
+      "descripcion": "Basurero con tapa 30 litros",
+      "precio_unitario": 7068.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 24,
+      "descripcion": "Baterias AA",
+      "precio_unitario": 364.82,
+      "iva": 13.0
+    },
+    {
+      "fila": 25,
+      "descripcion": "Baterias AAA",
+      "precio_unitario": 353.76,
+      "iva": 13.0
+    },
+    {
+      "fila": 26,
+      "descripcion": "Bolsa de basura medianas",
+      "precio_unitario": 254.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 27,
+      "descripcion": "Bolsa ligas delgadas",
+      "precio_unitario": 2058.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 28,
+      "descripcion": "Bolsa ligas gruesas",
+      "precio_unitario": 2240.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 29,
+      "descripcion": "Bolsas de basura grandes",
+      "precio_unitario": 403.0,
+      "iva": 1.0
+    },
+    {
+      "fila": 30,
+      "descripcion": "Bolsas de basura para jardin / estañon",
+      "precio_unitario": 756.0,
+      "iva": 1.0
+    },
+    {
+      "fila": 31,
+      "descripcion": "Bolsas de basura pequeñas",
+      "precio_unitario": 191.0,
+      "iva": 1.0
+    },
+    {
+      "fila": 32,
+      "descripcion": "Bolsas para monedas",
+      "precio_unitario": 1983.2,
+      "iva": 13.0
+    },
+    {
+      "fila": 33,
+      "descripcion": "Bolsas transparentes",
+      "precio_unitario": 2035.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 34,
+      "descripcion": "Bombillos luz blanca",
+      "precio_unitario": 595.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 35,
+      "descripcion": "Borrador",
+      "precio_unitario": 128.98,
+      "iva": 1.0
+    },
+    {
+      "fila": 36,
+      "descripcion": "Borrador para pizarra acrilica",
+      "precio_unitario": 285.0,
+      "iva": 1.0
+    },
+    {
+      "fila": 37,
+      "descripcion": "Café Volio 900 G",
+      "precio_unitario": 6732.67,
+      "iva": 1.0
+    },
+    {
+      "fila": 38,
+      "descripcion": "Caja clips grandes",
+      "precio_unitario": 233.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 39,
+      "descripcion": "Caja clips pequeños",
+      "precio_unitario": 100.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 40,
+      "descripcion": "Caja de grapas",
+      "precio_unitario": 224.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 41,
+      "descripcion": "Calculadora CASIO MX-12B",
+      "precio_unitario": 3915.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 42,
+      "descripcion": "Carpetas plasticas",
+      "precio_unitario": 121.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 43,
+      "descripcion": "Cinta Scotch",
+      "precio_unitario": 215.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 44,
+      "descripcion": "Cintas de empaque",
+      "precio_unitario": 275.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 45,
+      "descripcion": "Corrector tipo lapiz",
+      "precio_unitario": 255.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 46,
+      "descripcion": "Cortina para baño",
+      "precio_unitario": 2995.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 47,
+      "descripcion": "Crema para café",
+      "precio_unitario": 715.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 48,
+      "descripcion": "Cuaderno",
+      "precio_unitario": 710.0,
+      "iva": 1.0
+    },
+    {
+      "fila": 49,
+      "descripcion": "Cuadernitos de 80 hojas",
+      "precio_unitario": 475.0,
+      "iva": 1.0
+    },
+    {
+      "fila": 50,
+      "descripcion": "Cubo para cargar",
+      "precio_unitario": 5688.15,
+      "iva": 13.0
+    },
+    {
+      "fila": 51,
+      "descripcion": "Dedo facil",
+      "precio_unitario": 375.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 52,
+      "descripcion": "Detergente en polvo (2 kg)",
+      "precio_unitario": 750.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 53,
+      "descripcion": "Dispensador papel higenico rollo 400",
+      "precio_unitario": 9995.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 54,
+      "descripcion": "Escoba con palo",
+      "precio_unitario": 1029.7,
+      "iva": 1.0
+    },
+    {
+      "fila": 55,
+      "descripcion": "Escobitas pequeñas para sacudir superficies",
+      "precio_unitario": 560.0,
+      "iva": 1.0
+    },
+    {
+      "fila": 56,
+      "descripcion": "Escobon con palo",
+      "precio_unitario": 3407.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 57,
+      "descripcion": "Esponja lavar platos Scotch Brite",
+      "precio_unitario": 174.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 58,
+      "descripcion": "Filtros para café",
+      "precio_unitario": 375.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 59,
+      "descripcion": "Folder",
+      "precio_unitario": 2025.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 60,
+      "descripcion": "Folder de colores",
+      "precio_unitario": 2184.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 61,
+      "descripcion": "Fundas plasticas para hojas",
+      "precio_unitario": 1069.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 62,
+      "descripcion": "Gasas plasticas",
+      "precio_unitario": 1383.2,
+      "iva": 13.0
+    },
+    {
+      "fila": 63,
+      "descripcion": "Goma barra",
+      "precio_unitario": 295.0,
+      "iva": 1.0
+    },
+    {
+      "fila": 64,
+      "descripcion": "Goma liquida",
+      "precio_unitario": 208.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 65,
+      "descripcion": "Grapadora",
+      "precio_unitario": 950.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 66,
+      "descripcion": "Guantes para lavar baños",
+      "precio_unitario": 491.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 67,
+      "descripcion": "Hisopo para sanitario.",
+      "precio_unitario": 480.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 68,
+      "descripcion": "Hojas de colores",
+      "precio_unitario": 862.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 69,
+      "descripcion": "Hojas opalina",
+      "precio_unitario": 1500.8,
+      "iva": 13.0
+    },
+    {
+      "fila": 70,
+      "descripcion": "Insecticida",
+      "precio_unitario": 3046.38,
+      "iva": 13.0
+    },
+    {
+      "fila": 71,
+      "descripcion": "Jabon Lavaplatos",
+      "precio_unitario": 645.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 72,
+      "descripcion": "Lapicero Azul",
+      "precio_unitario": 80.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 73,
+      "descripcion": "Lapicero Negro",
+      "precio_unitario": 80.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 74,
+      "descripcion": "Lapicero rojo",
+      "precio_unitario": 80.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 75,
+      "descripcion": "Lapiz",
+      "precio_unitario": 86.0,
+      "iva": 1.0
+    },
+    {
+      "fila": 76,
+      "descripcion": "Limpia vidrios",
+      "precio_unitario": 1472.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 77,
+      "descripcion": "Llavines para puertas",
+      "precio_unitario": 5775.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 78,
+      "descripcion": "Lustrador de muebles",
+      "precio_unitario": 3724.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 79,
+      "descripcion": "Maquinilla con tarrito",
+      "precio_unitario": 100.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 80,
+      "descripcion": "Maskin blanco",
+      "precio_unitario": 529.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 81,
+      "descripcion": "Mecha 1/2\" Kilo",
+      "precio_unitario": 948.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 82,
+      "descripcion": "Pala con palo",
+      "precio_unitario": 617.82,
+      "iva": 1.0
+    },
+    {
+      "fila": 83,
+      "descripcion": "Palo piso",
+      "precio_unitario": 1592.0,
+      "iva": 1.0
+    },
+    {
+      "fila": 84,
+      "descripcion": "Paños limpieza",
+      "precio_unitario": 190.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 85,
+      "descripcion": "Papel higiénico doble hoja 4 und",
+      "precio_unitario": 1250.0,
+      "iva": 1.0
+    },
+    {
+      "fila": 86,
+      "descripcion": "Papel higienico para dispensador tamaño 400",
+      "precio_unitario": 896.0,
+      "iva": 1.0
+    },
+    {
+      "fila": 87,
+      "descripcion": "Paquete de prensas para folder",
+      "precio_unitario": 409.04,
+      "iva": 13.0
+    },
+    {
+      "fila": 88,
+      "descripcion": "Pastilla pato",
+      "precio_unitario": 920.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 89,
+      "descripcion": "Perforadoras",
+      "precio_unitario": 1100.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 90,
+      "descripcion": "Pilot azul permanente",
+      "precio_unitario": 170.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 91,
+      "descripcion": "Pilot azul pizarra",
+      "precio_unitario": 170.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 92,
+      "descripcion": "Pilot negro permanente",
+      "precio_unitario": 170.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 93,
+      "descripcion": "Pilot negro pizarra",
+      "precio_unitario": 170.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 94,
+      "descripcion": "Pilot rojo permanente",
+      "precio_unitario": 170.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 95,
+      "descripcion": "Pilot rojo pizarra",
+      "precio_unitario": 170.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 96,
+      "descripcion": "Post It paq 4 und",
+      "precio_unitario": 745.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 97,
+      "descripcion": "Post it pequeños 4 und",
+      "precio_unitario": 70.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 98,
+      "descripcion": "Post it traslucido",
+      "precio_unitario": 472.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 99,
+      "descripcion": "Prensas loteria",
+      "precio_unitario": 23.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 100,
+      "descripcion": "Regla 30 cm",
+      "precio_unitario": 125.0,
+      "iva": 1.0
+    },
+    {
+      "fila": 101,
+      "descripcion": "Removedores",
+      "precio_unitario": 780.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 102,
+      "descripcion": "Resaltadores de diferentes colores",
+      "precio_unitario": 150.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 103,
+      "descripcion": "Resmas hojas blancas",
+      "precio_unitario": 1375.0,
+      "iva": 1.0
+    },
+    {
+      "fila": 104,
+      "descripcion": "Rollo plástico adhesivo para forrar",
+      "precio_unitario": 616.69,
+      "iva": 13.0
+    },
+    {
+      "fila": 105,
+      "descripcion": "Saca grapas",
+      "precio_unitario": 131.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 106,
+      "descripcion": "Saniador",
+      "precio_unitario": 234.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 107,
+      "descripcion": "Servilletas",
+      "precio_unitario": 205.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 108,
+      "descripcion": "Sobre blanco",
+      "precio_unitario": 7.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 109,
+      "descripcion": "Sobre carta 9 x12\"",
+      "precio_unitario": 24.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 110,
+      "descripcion": "Sobre extra carta 10 x 13\"",
+      "precio_unitario": 29.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 111,
+      "descripcion": "Sobre extra oficio 12 x 15\"",
+      "precio_unitario": 44.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 112,
+      "descripcion": "Sobre media carta 6 x 9\"",
+      "precio_unitario": 14.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 113,
+      "descripcion": "Sobre medio oficio 7 x 10\"",
+      "precio_unitario": 17.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 114,
+      "descripcion": "Sobres oficio 10 x 15 \"",
+      "precio_unitario": 30.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 115,
+      "descripcion": "Tabla con prensa tamaño carta",
+      "precio_unitario": 470.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 116,
+      "descripcion": "Tachuelas para pizarra",
+      "precio_unitario": 85.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 117,
+      "descripcion": "Taipe negro",
+      "precio_unitario": 632.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 118,
+      "descripcion": "Tijeras grandes",
+      "precio_unitario": 575.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 119,
+      "descripcion": "Tinta amarila EPSON L4260",
+      "precio_unitario": 3950.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 120,
+      "descripcion": "Tinta amarilla EPSON 544",
+      "precio_unitario": 3805.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 121,
+      "descripcion": "Tinta amarilla EPSON L395",
+      "precio_unitario": 3100.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 122,
+      "descripcion": "Tinta cian EPSON 544",
+      "precio_unitario": 3803.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 123,
+      "descripcion": "Tinta cian EPSON L395",
+      "precio_unitario": 3100.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 124,
+      "descripcion": "Tinta cian EPSON L4260",
+      "precio_unitario": 3950.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 125,
+      "descripcion": "Tinta magenta EPSON L395",
+      "precio_unitario": 3100.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 126,
+      "descripcion": "Tinta magenta EPSON L4260",
+      "precio_unitario": 3449.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 127,
+      "descripcion": "Tinta magenta EPSON 544",
+      "precio_unitario": 3998.56,
+      "iva": 13.0
+    },
+    {
+      "fila": 128,
+      "descripcion": "Tinta negra EPSON 544",
+      "precio_unitario": 3541.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 129,
+      "descripcion": "Tinta negra EPSON L395",
+      "precio_unitario": 3449.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 130,
+      "descripcion": "Tinta negra EPSON L4260",
+      "precio_unitario": 3900.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 131,
+      "descripcion": "Toallas de cocina (paq 3 und)",
+      "precio_unitario": 598.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 132,
+      "descripcion": "Trapo de piso",
+      "precio_unitario": 928.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 133,
+      "descripcion": "Tuff Stuf",
+      "precio_unitario": 4171.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 134,
+      "descripcion": "Rollo papel termico 2 1/4\" x1 1/2 x 1",
+      "precio_unitario": 163.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 135,
+      "descripcion": "Rollo papel termico 3 1/8\" x 1 1/2\"",
+      "precio_unitario": 255.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 136,
+      "descripcion": "Linga con ajustador 2in x 27ft capacidad 4 toneladas",
+      "precio_unitario": 6500.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 137,
+      "descripcion": "OR-70D (108) 3/32 X 1/4.",
+      "precio_unitario": 34.59,
+      "iva": 13.0
+    },
+    {
+      "fila": 138,
+      "descripcion": "OR-70D (010) 1/16 X 1/4.",
+      "precio_unitario": 53.1,
+      "iva": 13.0
+    },
+    {
+      "fila": 139,
+      "descripcion": "OR-70D (209) 1/8 X 11/16.",
+      "precio_unitario": 83.12,
+      "iva": 13.0
+    },
+    {
+      "fila": 140,
+      "descripcion": "Spray amarillo",
+      "precio_unitario": 1248.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 141,
+      "descripcion": "Spray anaranjado",
+      "precio_unitario": 1248.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 142,
+      "descripcion": "Spay azul",
+      "precio_unitario": 1327.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 143,
+      "descripcion": "Spray blanco",
+      "precio_unitario": 1221.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 144,
+      "descripcion": "Spray plata cromado",
+      "precio_unitario": 1710.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 145,
+      "descripcion": "Spray dorado",
+      "precio_unitario": 1991.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 146,
+      "descripcion": "Spray negro",
+      "precio_unitario": 1195.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 147,
+      "descripcion": "Spray rojo",
+      "precio_unitario": 1195.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 148,
+      "descripcion": "Spray rosado",
+      "precio_unitario": 1195.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 149,
+      "descripcion": "Spray verde",
+      "precio_unitario": 1195.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 150,
+      "descripcion": "Spray violeta",
+      "precio_unitario": 1195.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 151,
+      "descripcion": "Impresora 58 MM Milestone Bluetooth antishock P58",
+      "precio_unitario": 39381.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 152,
+      "descripcion": "Envio Impresora",
+      "precio_unitario": 5752.0,
+      "iva": 0.0
+    },
+    {
+      "fila": 153,
+      "descripcion": "Calca TOMZA para tanque estacionario.",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 154,
+      "descripcion": "Rombo Códigos para tanque estacionario.",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 155,
+      "descripcion": "Rombo Flama para tanque estacionario.",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 156,
+      "descripcion": "Flechas de flujo izquierdas.",
+      "precio_unitario": 65.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 157,
+      "descripcion": "Flechas de flujo derechas.",
+      "precio_unitario": 65.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 158,
+      "descripcion": "Rótulos PVC Peligro.",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 159,
+      "descripcion": "Calca Litraje configurable.",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 160,
+      "descripcion": "Calca TOMZA dispensador",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 161,
+      "descripcion": "Cintillo GAS VEHICULAR dispensador.",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 162,
+      "descripcion": "Calca PROHIBIDO CARGAR dispensador.",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 163,
+      "descripcion": "Rótulo PVC PROHIBIDO",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 164,
+      "descripcion": "Calca TOMZA tanque Gas Vehicular.",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 165,
+      "descripcion": "Rombo Códigos tanque Gas Vehicular.",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 166,
+      "descripcion": "Rombo Flama tanque Gas Vehicular.",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 167,
+      "descripcion": "Texto GAS VEHICULAR para tanque vetical.",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 168,
+      "descripcion": "Texto GAS VEHICULAR para tanque horizontal.",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 169,
+      "descripcion": "Rótulo PVC Protocolo Carga y Descarga.",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 170,
+      "descripcion": "Calca litraje configurable.",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 171,
+      "descripcion": "Cloro",
+      "precio_unitario": 1600.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 172,
+      "descripcion": "Desinfectante",
+      "precio_unitario": 1350.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 173,
+      "descripcion": "Jabón antibacterial",
+      "precio_unitario": 4900.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 174,
+      "descripcion": "Alcohol multiusos",
+      "precio_unitario": 6900.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 175,
+      "descripcion": "Alcohol en gel",
+      "precio_unitario": 6900.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 176,
+      "descripcion": "Zapatos de seguridad talla 35",
+      "precio_unitario": 21500.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 177,
+      "descripcion": "Zapatos de seguridad talla 36",
+      "precio_unitario": 21500.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 178,
+      "descripcion": "Zapatos de seguridad talla 37",
+      "precio_unitario": 21500.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 179,
+      "descripcion": "Zapatos de seguridad talla 38",
+      "precio_unitario": 21500.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 180,
+      "descripcion": "Zapatos de seguridad talla 39",
+      "precio_unitario": 21500.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 181,
+      "descripcion": "Zapatos de seguridad talla 40",
+      "precio_unitario": 21500.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 182,
+      "descripcion": "Zapatos de seguridad talla 41",
+      "precio_unitario": 21500.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 183,
+      "descripcion": "Zapatos de seguridad talla 42",
+      "precio_unitario": 21500.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 184,
+      "descripcion": "Zapatos de seguridad talla 43",
+      "precio_unitario": 21500.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 185,
+      "descripcion": "Zapatos de seguridad talla 44",
+      "precio_unitario": 21500.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 186,
+      "descripcion": "Zapatos de seguridad talla 45",
+      "precio_unitario": 21500.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 187,
+      "descripcion": "Zapatos de seguridad talla 46",
+      "precio_unitario": 21500.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 188,
+      "descripcion": "4091 Talla S + logos",
+      "precio_unitario": 8348.72,
+      "iva": 13.0
+    },
+    {
+      "fila": 189,
+      "descripcion": "4091 Talla M + logos",
+      "precio_unitario": 8348.72,
+      "iva": 13.0
+    },
+    {
+      "fila": 190,
+      "descripcion": "4091 Talla L + logos",
+      "precio_unitario": 8348.72,
+      "iva": 13.0
+    },
+    {
+      "fila": 191,
+      "descripcion": "4091 Talla XL + logos",
+      "precio_unitario": 8348.72,
+      "iva": 13.0
+    },
+    {
+      "fila": 192,
+      "descripcion": "4091 Talla 2XL + logos",
+      "precio_unitario": 8348.72,
+      "iva": 13.0
+    },
+    {
+      "fila": 193,
+      "descripcion": "4091 Talla 3XL + logos",
+      "precio_unitario": 8348.72,
+      "iva": 13.0
+    },
+    {
+      "fila": 194,
+      "descripcion": "4091 Talla 4XL + logos",
+      "precio_unitario": 8348.72,
+      "iva": 13.0
+    },
+    {
+      "fila": 195,
+      "descripcion": "4091 Talla 5XL + logos",
+      "precio_unitario": 8348.72,
+      "iva": 13.0
+    },
+    {
+      "fila": 196,
+      "descripcion": "4100 Talla S + logos",
+      "precio_unitario": 9425.53,
+      "iva": 13.0
+    },
+    {
+      "fila": 197,
+      "descripcion": "4100 Talla M + logos",
+      "precio_unitario": 9425.53,
+      "iva": 13.0
+    },
+    {
+      "fila": 198,
+      "descripcion": "4100 Talla L + logos",
+      "precio_unitario": 9425.53,
+      "iva": 13.0
+    },
+    {
+      "fila": 199,
+      "descripcion": "4100 Talla XL + logos",
+      "precio_unitario": 9425.53,
+      "iva": 13.0
+    },
+    {
+      "fila": 200,
+      "descripcion": "4100 Talla 2XL + logos",
+      "precio_unitario": 9425.53,
+      "iva": 13.0
+    },
+    {
+      "fila": 201,
+      "descripcion": "4100 Talla 3XL + logos",
+      "precio_unitario": 9425.53,
+      "iva": 13.0
+    },
+    {
+      "fila": 202,
+      "descripcion": "4100 Talla 4XL + logos",
+      "precio_unitario": 9425.53,
+      "iva": 13.0
+    },
+    {
+      "fila": 203,
+      "descripcion": "4100 Talla 5XL + logos",
+      "precio_unitario": 9425.53,
+      "iva": 13.0
+    },
+    {
+      "fila": 204,
+      "descripcion": "4360 Talla S + logos",
+      "precio_unitario": 8042.88,
+      "iva": 13.0
+    },
+    {
+      "fila": 205,
+      "descripcion": "4360 Talla M + logos",
+      "precio_unitario": 8042.88,
+      "iva": 13.0
+    },
+    {
+      "fila": 206,
+      "descripcion": "4360 Talla L + logos",
+      "precio_unitario": 8042.88,
+      "iva": 13.0
+    },
+    {
+      "fila": 207,
+      "descripcion": "4360 Talla XL + logos",
+      "precio_unitario": 8042.88,
+      "iva": 13.0
+    },
+    {
+      "fila": 208,
+      "descripcion": "4360 Talla 2XL + logos",
+      "precio_unitario": 8042.88,
+      "iva": 13.0
+    },
+    {
+      "fila": 209,
+      "descripcion": "4360 Talla 3XL + logos",
+      "precio_unitario": 8042.88,
+      "iva": 13.0
+    },
+    {
+      "fila": 210,
+      "descripcion": "4360 Talla 4XL + logos",
+      "precio_unitario": 8042.88,
+      "iva": 13.0
+    },
+    {
+      "fila": 211,
+      "descripcion": "4360 Talla 5XL + logos",
+      "precio_unitario": 8042.88,
+      "iva": 13.0
+    },
+    {
+      "fila": 212,
+      "descripcion": "Sellos azules (pequeño - presión)",
+      "precio_unitario": 0.026,
+      "iva": 13.0
+    },
+    {
+      "fila": 213,
+      "descripcion": "Sellos blancos (pequeño - presión super gas)",
+      "precio_unitario": 0.026,
+      "iva": 13.0
+    },
+    {
+      "fila": 214,
+      "descripcion": "Sellos blancos (grande - rosca)",
+      "precio_unitario": 0.0402,
+      "iva": 13.0
+    },
+    {
+      "fila": 215,
+      "descripcion": "Sellos naranja (grande - rosca)",
+      "precio_unitario": 0.0402,
+      "iva": 13.0
+    },
+    {
+      "fila": 216,
+      "descripcion": "Pintura Azul Tomza",
+      "precio_unitario": 37611.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 217,
+      "descripcion": "Thinner",
+      "precio_unitario": 22124.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 218,
+      "descripcion": "Orings punta pol",
+      "precio_unitario": 350.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 219,
+      "descripcion": "Orings pequeños",
+      "precio_unitario": 71.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 220,
+      "descripcion": "Orings grandes",
+      "precio_unitario": 86.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 221,
+      "descripcion": "Mazo de hule",
+      "precio_unitario": 25000.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 222,
+      "descripcion": "Pintura  Minio Galon",
+      "precio_unitario": 8800.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 223,
+      "descripcion": "Pintura Fast Dry Amarilla Galón",
+      "precio_unitario": 16000.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 224,
+      "descripcion": "Pintura Fast Dry Café 1/4\"",
+      "precio_unitario": 6095.32,
+      "iva": 13.0
+    },
+    {
+      "fila": 225,
+      "descripcion": "Pintura Fast Dry Galon Blanca",
+      "precio_unitario": 16000.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 226,
+      "descripcion": "Pintura Fast Dry Galon Rojo",
+      "precio_unitario": 16000.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 227,
+      "descripcion": "Pintura Fast Dry Negro Galón",
+      "precio_unitario": 16000.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 228,
+      "descripcion": "Thiner industrial",
+      "precio_unitario": 5191.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 229,
+      "descripcion": "Algodon",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 230,
+      "descripcion": "Anclaje 90 cm",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 231,
+      "descripcion": "Ansell Traje Alphatec Talla L",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 232,
+      "descripcion": "Ansell Traje Alphatec Talla M",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 233,
+      "descripcion": "Aplicadores 100",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 234,
+      "descripcion": "Aposito de 10 x 10 envoltura individual",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 235,
+      "descripcion": "Arnes 3 argollas MOD 10208271",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 236,
+      "descripcion": "Baja lenguas",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 237,
+      "descripcion": "Bloqueador solar",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 238,
+      "descripcion": "Bolsas rojas",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 239,
+      "descripcion": "Bota PVC Negra Workman Safety N°37",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 240,
+      "descripcion": "Bota PVC Negra Workman Safety N°45",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 241,
+      "descripcion": "Botiquin TSD Basico anaranjado",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 242,
+      "descripcion": "Calzas",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 243,
+      "descripcion": "Capa 2 piezas",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 244,
+      "descripcion": "Capa Amarilla larga 2XL",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 245,
+      "descripcion": "Capa Amarilla larga L",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 246,
+      "descripcion": "Capa Amarilla larga M",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 247,
+      "descripcion": "Capa Amarilla larga S",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 248,
+      "descripcion": "Capa Amarilla larga XL",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 249,
+      "descripcion": "Capa larga (capote)",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 250,
+      "descripcion": "Caretas",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 251,
+      "descripcion": "Casco seguridad ERB americana Anaranjado",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 252,
+      "descripcion": "Casco seguridad ERB americana Azul",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 253,
+      "descripcion": "Casco seguridad ERB americana Gris",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 254,
+      "descripcion": "Cauchas cabeza mezclilla",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 255,
+      "descripcion": "Chaleco tipo ingeniero L",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 256,
+      "descripcion": "Chaleco tipo ingeniero M",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 257,
+      "descripcion": "Chaqueta resistente flama MOD 7040 Talla L",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 258,
+      "descripcion": "Chaqueta resistente flama MOD 7040 Talla M",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 259,
+      "descripcion": "Chaqueta resistente flama MOD 7040 Talla S",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 260,
+      "descripcion": "Cinta amarilla - Precaucion",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 261,
+      "descripcion": "Cinta antideslizante",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 262,
+      "descripcion": "CINTA DOBLE ADHESIVO (3M) 1\" X 33MTRS/",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 263,
+      "descripcion": "CINTA REFLECTIVA 2\" X 45,7 MTS ROJ/BLA",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 264,
+      "descripcion": "Cinta roja precaución",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 265,
+      "descripcion": "Cinturon araña",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 266,
+      "descripcion": "Cloro",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 267,
+      "descripcion": "Compresas",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 268,
+      "descripcion": "Conjunto (2 piezas)",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 269,
+      "descripcion": "Cono grande",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 270,
+      "descripcion": "Cono pequeño",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 271,
+      "descripcion": "Convertidor de Oxido Galón",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 272,
+      "descripcion": "Cortina para soldar de vinil 1,74 x 2,34 mts",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 273,
+      "descripcion": "Curitas",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 274,
+      "descripcion": "Delantal amarillo plastico",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 275,
+      "descripcion": "Delantal de cuero soldador",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 276,
+      "descripcion": "DISPENSADOR JABON NIQUELADO 800 ML",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 277,
+      "descripcion": "Espadrapo",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 278,
+      "descripcion": "Estuche para férula larga",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 279,
+      "descripcion": "Extensión para pintar Grande",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 280,
+      "descripcion": "Extensión para pintar pequeña",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 281,
+      "descripcion": "Extintores A agua",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 282,
+      "descripcion": "Extintores ABC pequeño",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 283,
+      "descripcion": "Faja sujeta barbilla de algodón",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 284,
+      "descripcion": "Filtros para polvo (rosado)",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 285,
+      "descripcion": "Gafas de protección",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 286,
+      "descripcion": "Gasa 2x10 yardas",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 287,
+      "descripcion": "Gasa 4x10 yardas",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 288,
+      "descripcion": "Gasa 6x10 yardas",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 289,
+      "descripcion": "Gasa esterilizada 10x10",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 290,
+      "descripcion": "Gorros tipo chavo",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 291,
+      "descripcion": "Guante ansell revestido de nitrilo MOD 11-840 negro",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 292,
+      "descripcion": "Guante anticorte",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 293,
+      "descripcion": "GUANTE CUERO SOLDADOR AZUL HILO DE KEVLAR",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 294,
+      "descripcion": "GUANTE LATEX TALLA S",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 295,
+      "descripcion": "GUANTE NITRILO FLEXTRIL SATINADO talla M",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 296,
+      "descripcion": "GUANTE NITRILO LARGO PROTEK talla L",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 297,
+      "descripcion": "GUANTE TEJIDO RECUBIERTO LATEX AZUL TALLA L",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 298,
+      "descripcion": "GUANTE TOWA ACTIVGRIP ADVANCE talla L",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 299,
+      "descripcion": "GUANTE TOWA ACTIVGRIP ADVANCE talla M",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 300,
+      "descripcion": "Guantes cabrito borde azul talla XL",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 301,
+      "descripcion": "Guantes cabrito borde café talla L",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 302,
+      "descripcion": "Guantes cabrito borde rojo talla S",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 303,
+      "descripcion": "Guantes cabrito borde verde talla M",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 304,
+      "descripcion": "Guantes látex azules",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 305,
+      "descripcion": "Guantes látex sin polvo safina Talla L",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 306,
+      "descripcion": "Guantes látex sin polvo safina Talla M",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 307,
+      "descripcion": "Guantes latex talla S",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 308,
+      "descripcion": "Inmovilizador de cabeza",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 309,
+      "descripcion": "Jabón antibacterial",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 310,
+      "descripcion": "Jabón antiséptico",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 311,
+      "descripcion": "Juego férulas rígidas para extremidades con cabestrillo",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 312,
+      "descripcion": "Lentes claros graduable CLARO PROTEK",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 313,
+      "descripcion": "Lentes de protección para kits antiderrame",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 314,
+      "descripcion": "Lentes oscuros graduable OSCURO PROTEK",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 315,
+      "descripcion": "Linea de vida ajustable MOD 10201456",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 316,
+      "descripcion": "Linea de vida T9111W-Z7/6FTAF MOD TITAN",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 317,
+      "descripcion": "MADERA 3 pulg grueso X 6,5 pulg ancho X 15 mts largo",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 318,
+      "descripcion": "Malla anaranjada",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 319,
+      "descripcion": "Mangas de cuero",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 320,
+      "descripcion": "Mangas de tela talla L",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 321,
+      "descripcion": "Manguera 1 1/2\"",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 322,
+      "descripcion": "Manguera 2 1/2\"",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 323,
+      "descripcion": "Manta de Soldadura de Fibra de Vidrio 4x6 pies",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 324,
+      "descripcion": "Manta térmica",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 325,
+      "descripcion": "MARCADOR DE NUMEROS 10 MM KORFF",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 326,
+      "descripcion": "Marco para cortina soldar 1,8 x 2,4 mts",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 327,
+      "descripcion": "mascara para soldar",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 328,
+      "descripcion": "Mascarilla quirúrgica",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 329,
+      "descripcion": "Master lock bloqueo valvula gas",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 330,
+      "descripcion": "Moldex - Cartucho MOD 7100 Vapores organicos",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 331,
+      "descripcion": "Moldex - Respirador Moldex 7002 Talla M",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 332,
+      "descripcion": "Monogafas antiempañante",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 333,
+      "descripcion": "Orejera diadema",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 334,
+      "descripcion": "Orejeras para casco",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 335,
+      "descripcion": "Pantalla oxicorte",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 336,
+      "descripcion": "Pantalla repuesto para careta esmerilar",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 337,
+      "descripcion": "Pantallas largas",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 338,
+      "descripcion": "Pañuelo Beige",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 339,
+      "descripcion": "Pañuelo primeros auxilios",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 340,
+      "descripcion": "Polainas de cuero",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 341,
+      "descripcion": "Protectores pasticos para filtros",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 342,
+      "descripcion": "Pruebas Actúa 6+",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 343,
+      "descripcion": "Punto de anclaje de 0,90 mts Skold",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 344,
+      "descripcion": "Recarga de extintores",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 345,
+      "descripcion": "Respirador desechable 3M",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 346,
+      "descripcion": "Respirador N95 para particulas",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 347,
+      "descripcion": "Respiradores de silicon",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 348,
+      "descripcion": "Saniquat",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 349,
+      "descripcion": "Servicios ambientales ordinarios",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 350,
+      "descripcion": "Servicios ambientales peligrosos",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 351,
+      "descripcion": "Solución alcalina",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 352,
+      "descripcion": "Suero Fisiologico 250 mL",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 353,
+      "descripcion": "SWSI 36307 CORTINA PROTECTORA ROJA PARA SOLDADURA 1.72X2.55M",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 354,
+      "descripcion": "Tapones para oidos",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 355,
+      "descripcion": "Tijeras punta romana",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 356,
+      "descripcion": "TORN CARROCERIA 3/8 X 6",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 357,
+      "descripcion": "TORN OJO 3/8 X 3 C/TUERCA",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 358,
+      "descripcion": "Venda elastica 4 pulg",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 359,
+      "descripcion": "3M - 6200 Pieza facial media cara",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 360,
+      "descripcion": "3M - 5P71 Filtro P95",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 361,
+      "descripcion": "3M - 501 Retenedor prefiltro serie 6000",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 362,
+      "descripcion": "Soldadura 6013 x 1/8 hilco punto rojo",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 363,
+      "descripcion": "Disco corte de 9\" corte fino para metal",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 364,
+      "descripcion": "Disco flat grano 80",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 365,
+      "descripcion": "Disco de 4 1/2 corte fino para metal",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 366,
+      "descripcion": "Disco de esmerilar de 4 1/2",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 367,
+      "descripcion": "Platinas de  2\" x 1/8",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 368,
+      "descripcion": "Tubos redondo de cañeria 1/2",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 369,
+      "descripcion": "Platina de 3/8\" x 3\"",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 370,
+      "descripcion": "Platina de 1/4\" x 2\"",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 371,
+      "descripcion": "Platina de 3/8\" x 2\"",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 372,
+      "descripcion": "Platina de 1/4\" x 2\"",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 373,
+      "descripcion": "Angulares de 1/4 x 2\"",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 374,
+      "descripcion": "Angulares de 1/8 x 2\"",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 375,
+      "descripcion": "Pintura negra fast dry",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 376,
+      "descripcion": "Pintura blanca fast dry",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 377,
+      "descripcion": "Varsol",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 378,
+      "descripcion": "Thiner",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 379,
+      "descripcion": "Soldadura 7018 hilco",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 380,
+      "descripcion": "Soldadura acero inox 308 de 1/8",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 381,
+      "descripcion": "Soldaduda acero inox 308 de 3/32",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 382,
+      "descripcion": "CILINDRO DE MONTACARGAS DE 10 LBS PARA GAS LICUADO",
+      "precio_unitario": 28.0,
+      "iva": 0.0
+    },
+    {
+      "fila": 383,
+      "descripcion": "CILINDRO DE 20 LBS PARA GAS LICUADO PRESIÓN / FISHER",
+      "precio_unitario": 28.0,
+      "iva": 0.0
+    },
+    {
+      "fila": 384,
+      "descripcion": "CILINDRO DE 35 LBS PARA GAS LICUADO PRESIÓN / FISHER",
+      "precio_unitario": 47.0,
+      "iva": 0.0
+    },
+    {
+      "fila": 385,
+      "descripcion": "CILINDRO DE 50 LBS PARA GAS LICUADO PRESIÓN / FISHER",
+      "precio_unitario": 55.0,
+      "iva": 0.0
+    },
+    {
+      "fila": 386,
+      "descripcion": "CILINDRO DE 25 LBS PARA GAS LICUADO PRESIÓN / FISHER",
+      "precio_unitario": 31.0,
+      "iva": 0.0
+    },
+    {
+      "fila": 387,
+      "descripcion": "CILINDRO DE 10 LBS PARA GAS LICUADO ROSCA / VALVULA POL",
+      "precio_unitario": 28.0,
+      "iva": 0.0
+    },
+    {
+      "fila": 388,
+      "descripcion": "CILINDRO DE 20 LBS PARA GAS LICUADO ROSCA / VALVULA POL",
+      "precio_unitario": 28.0,
+      "iva": 0.0
+    },
+    {
+      "fila": 389,
+      "descripcion": "CILINDRO DE 35 LBS PARA GAS LICUADO ROSCA / VALVULA POL",
+      "precio_unitario": 47.0,
+      "iva": 0.0
+    },
+    {
+      "fila": 390,
+      "descripcion": "CILINDRO DE 35 LBS PARA GAS LICUADO ROSCA / VALVULA POL",
+      "precio_unitario": 47.0,
+      "iva": 0.0
+    },
+    {
+      "fila": 391,
+      "descripcion": "CILINDRO DE 50 LBS PARA GAS LICUADO ROSCA / VALVULA POL",
+      "precio_unitario": 55.0,
+      "iva": 0.0
+    },
+    {
+      "fila": 392,
+      "descripcion": "CILINDRO DE 100 LBS PARA GAS LICUADO ROSCA / VALVULA POL",
+      "precio_unitario": 90.0,
+      "iva": 0.0
+    },
+    {
+      "fila": 393,
+      "descripcion": "CILINDRO DE 25 LBS PARA GAS LICUADO ROSCA / VALVULA POL",
+      "precio_unitario": 31.0,
+      "iva": 0.0
+    },
+    {
+      "fila": 394,
+      "descripcion": "VALVULAS CON PERILLA ALUMINIO CON ACOPLE PARA MONTACARGAS",
+      "precio_unitario": 40.0,
+      "iva": 0.0
+    },
+    {
+      "fila": 395,
+      "descripcion": "TANQUE DE 10 GLS PARA GAS LICUADO",
+      "precio_unitario": 200.0,
+      "iva": 0.0
+    },
+    {
+      "fila": 396,
+      "descripcion": "TANQUE DE 120 GLS PARA GAS LICUADO",
+      "precio_unitario": 360.0,
+      "iva": 0.0
+    },
+    {
+      "fila": 397,
+      "descripcion": "TANQUE DE 132 GLS PARA GAS LICUADO",
+      "precio_unitario": 430.0,
+      "iva": 0.0
+    },
+    {
+      "fila": 398,
+      "descripcion": "TANQUE DE 264 GLS PARA GAS LICUADO",
+      "precio_unitario": 700.0,
+      "iva": 0.0
+    },
+    {
+      "fila": 399,
+      "descripcion": "TANQUE DE 500 GLS PARA GAS LICUADO",
+      "precio_unitario": 1200.0,
+      "iva": 0.0
+    },
+    {
+      "fila": 400,
+      "descripcion": "TANQUE DE 991 GLS PARA GAS LICUADO",
+      "precio_unitario": 2200.0,
+      "iva": 0.0
+    },
+    {
+      "fila": 401,
+      "descripcion": "TANQUE DE 1321 GLS PARA GAS LICUADO HORIZONTAL",
+      "precio_unitario": 2900.0,
+      "iva": 0.0
+    },
+    {
+      "fila": 402,
+      "descripcion": "TANQUE DE 1321 GLS PARA GAS LICUADO VERTICAL",
+      "precio_unitario": 3500.0,
+      "iva": 0.0
+    },
+    {
+      "fila": 403,
+      "descripcion": "Servicio de recoleccion de residuos ordinarios",
+      "precio_unitario": 172300.0,
+      "iva": 13.0
+    },
+    {
+      "fila": 404,
+      "descripcion": "Varios",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 405,
+      "descripcion": "Remesas de cilindros",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 406,
+      "descripcion": "Conteo de camiones",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 407,
+      "descripcion": "Liquidacion",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 408,
+      "descripcion": "Orden de combustible",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 409,
+      "descripcion": "Orden de combustible Envasadora Super Gas",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 410,
+      "descripcion": "Requisicion de materiales",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 411,
+      "descripcion": "Liquidacion de Rutas Granel",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 412,
+      "descripcion": "Solicitud combustible Recope Cartago",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 413,
+      "descripcion": "Revision Gas Par",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 414,
+      "descripcion": "Reporte Diario de Gas a Granel",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 415,
+      "descripcion": "Cuido de camiones",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 416,
+      "descripcion": "Laptop Lenovo IdeaPad Slim 3 - Ryzen 3 7320U - 8GB RAM - 512GB SSD - 15.6\" FHD Abyss Blue - 82XQ00PQGJ",
+      "precio_unitario": 193805.3097,
+      "iva": 13.0
+    },
+    {
+      "fila": 417,
+      "descripcion": "Monitor Dahua 21,45\" DHI-LM22-A220 - 1ms- 144Hz - 1920x1080 - FHD 1.0.99.12.10982-9003",
+      "precio_unitario": 28318.5841,
+      "iva": 13.0
+    },
+    {
+      "fila": 418,
+      "descripcion": "Soldadura 6013 x 1/8 hilco punto rojo",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 419,
+      "descripcion": "Disco corte de 9\" corte fino para metal",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 420,
+      "descripcion": "Disco flat grano 80",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 421,
+      "descripcion": "Disco de 4 1/2 corte fino para metal",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 422,
+      "descripcion": "Disco de esmerilar de 4 1/2",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 423,
+      "descripcion": "Platinas de 2\" x 1/8",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 424,
+      "descripcion": "Tubos redondo de cañeria 1/2",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 425,
+      "descripcion": "Platina de 3/8\" x 3\"",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 426,
+      "descripcion": "Platina de 1/4\" x 2\"",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 427,
+      "descripcion": "Platina de 3/8\" x 2\"",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 428,
+      "descripcion": "Platina de 1/4\" x 2\"",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 429,
+      "descripcion": "Angulares de 1/4 x 2\"",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 430,
+      "descripcion": "Angulares de 1/8 x 2\"",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 431,
+      "descripcion": "Pintura negra fast dry",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 432,
+      "descripcion": "Pintura blanca fast dry",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 433,
+      "descripcion": "Varsol",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 434,
+      "descripcion": "Thinner",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 435,
+      "descripcion": "Soldadura 7018 hilco",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 436,
+      "descripcion": "Soldadura acero inox 308 de 1/8",
+      "precio_unitario": null,
+      "iva": 13.0
+    },
+    {
+      "fila": 437,
+      "descripcion": "Soldaduda acero inox 308 de 3/32",
+      "precio_unitario": null,
+      "iva": 13.0
+    }
+  ]
+}

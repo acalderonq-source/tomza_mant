@@ -13,7 +13,7 @@
 <%
 const ordenes=docs.filter(d=>d.tipo==='oc');
 const solicitudes=docs.filter(d=>d.tipo==='solicitud'&&['PENDIENTE','COTIZADA'].includes(d.datos.estado));
-const facturas=ordenes.filter(d=>['PENDIENTE','CONTABILIDAD'].includes(d.datos.factura?.estado));
+const facturas=docs.filter(d=>['oc','factura_portal'].includes(d.tipo)&&['PENDIENTE','CONTABILIDAD'].includes(d.datos.factura?.estado));
 const salidas=docs.filter(d=>d.tipo==='salida'&&d.datos.estado!=='RECIBIDA');
 const indicadores=[['Solicitudes pendientes',solicitudes.length,'Pendientes de orden de compra'],['Órdenes por recibir',ordenes.filter(d=>d.datos.estado!=='RECIBIDA').length,'Mercadería pendiente de recepción'],['Facturas por revisar',facturas.length,'Aceptación y revisión contable'],['Pedidos en proceso',salidas.length,'Alistando o en camino']];
 const modulos=[
