@@ -21,6 +21,21 @@ async function server(user,fn){
 const doc=()=>({id:11,tipo:'factura_portal',datos:{cuenta_id:5,proveedor:'Proveedor',razon_social:'Tomza',moneda:'CRC',pagos:[],factura:{numero:'00100001010000000001',total:113,estado:'PENDIENTE',fecha_vencimiento:'2026-11-13',subida_en:'2026-10-14T10:00:00Z',archivo:{id:1},electronica:{clave:'50614102600310112345600100001010000000001112345678',fecha:'2026-10-14T10:00:00-06:00',emisor:'3101123456',receptor:'3101654321',total:113,moneda:'CRC',archivo:{id:2},hacienda:{estado:'ACEPTADA',ambiente:'produccion'}}}}});
 async function login(c){const r=await c.post('/portal-proveedores/login',{email:account.email,password});assert.equal(r.status,302);assert.equal(r.headers.get('location'),'/portal-proveedores');await c.csrf();}
 
+test('vista previa y carga rechazan factura Tomza cuando la OC compatible es Super Gas sin guardar archivos',async()=>{
+  const original=pool.query,connection=pool.getConnection;let transacciones=0;
+  pool.query=async sql=>{
+    if(sql.includes('FROM prov_portal_cuentas'))return [[{...account,password_hash:hash}]];
+    if(sql.includes('FROM prov_portal_receptores'))return [[{cedula:'3101349880',nombre:'GAS TOMZA DE COSTA RICA SOCIEDAD ANONIMA'}]];
+    if(sql.includes('FROM ordenes_compra_detalle'))return [[{codigo:'A',cantidad:1,precio_unitario:100}]];
+    if(sql.includes('FROM ordenes_compra'))return [[{id:1,po_numero:'SG-1',nombre:'Proveedor',cedula_juridica:account.cedula,moneda:'CRC',total:113,iva:13,subtotal:100,empresa_destino:'SUPER GAS'}]];
+    return [[]];
+  };
+  pool.getConnection=async()=>{transacciones++;throw Error('No debe guardar la factura');};
+  const xml=`<FacturaElectronica><Clave>${doc().datos.factura.electronica.clave}</Clave><NumeroConsecutivo>00100001010000000001</NumeroConsecutivo><FechaEmision>2026-10-16T10:00:00-06:00</FechaEmision><Emisor><Nombre>Proveedor</Nombre><Identificacion><Numero>${account.cedula}</Numero></Identificacion></Emisor><Receptor><Nombre>GAS TOMZA DE COSTA RICA SOCIEDAD ANONIMA</Nombre><Identificacion><Numero>3101349880</Numero></Identificacion></Receptor><DetalleServicio><LineaDetalle><CodigoComercial><Codigo>A</Codigo></CodigoComercial><Cantidad>1</Cantidad><PrecioUnitario>100</PrecioUnitario><SubTotal>100</SubTotal><Impuesto><Codigo>01</Codigo><Tarifa>13</Tarifa></Impuesto></LineaDetalle></DetalleServicio><ResumenFactura><TotalComprobante>113</TotalComprobante></ResumenFactura></FacturaElectronica>`;
+  const body={xml:{nombre:'f.xml',base64:Buffer.from(xml).toString('base64')},archivo:{nombre:'f.pdf',base64:Buffer.from('%PDF-1.7').toString('base64')}};
+  try{await server(null,async c=>{await login(c);for(const ruta of ['/portal-proveedores/validar','/portal-proveedores/facturas']){const r=await c.post(ruta,body);assert.equal(r.status,400);assert.match((await r.json()).error,/OC es de SUPER GAS/);}assert.equal(transacciones,0);});}finally{pool.query=original;pool.getConnection=connection;}
+});
+
 test('asignación valida rol del responsable y limita comentarios; registra cambios auditados',async()=>{
   const connection=pool.getConnection;let asignable=false,guardado,acciones=0;
   pool.getConnection=async()=>({beginTransaction:async()=>{},commit:async()=>{},rollback:async()=>{},release(){},query:async(sql,args)=>{
@@ -73,7 +88,7 @@ test('cuenta externa entra sin usuario interno, mantiene sesión y solo ve sus d
 });
 test('proveedor carga varias facturas propias sin OC; bloquea emisor ajeno y duplicados',async()=>{
   const original=pool.query,connection=pool.getConnection;let saved=[],duplicate=false;
-  pool.query=async sql=>sql.includes('FROM prov_portal_cuentas')?[[{...account,password_hash:hash}]]:sql.includes('FROM prov_portal_receptores')?[[{cedula:'3101654321'}]]:[[]];
+  pool.query=async sql=>sql.includes('FROM prov_portal_cuentas')?[[{...account,password_hash:hash}]]:sql.includes('FROM prov_portal_receptores')?[[{cedula:'3101654321',nombre:'Tomza'}]]:[[]];
   pool.getConnection=async()=>({beginTransaction:async()=>{},commit:async()=>{},rollback:async()=>{},release(){},query:async(sql,args)=>{
     if(sql.includes('FROM prov_portal_cuentas'))return [[{id:5}]];
     if(sql.includes('SELECT documento_id'))return [duplicate?[{documento_id:11}]:[]];

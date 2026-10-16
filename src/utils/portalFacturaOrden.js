@@ -1,15 +1,14 @@
 const {exigir}=require('./proveeduria');
-const {normalizarEmpresa}=require('./empresasContabilidad');
+const {diferenciaEmpresa}=require('./portalEmpresaReceptora');
 const {claveProveedor}=require('./proveeduriaProveedores');
 const parse=r=>({...r,datos:typeof r.datos==='string'?JSON.parse(r.datos):r.datos});
-function validarCorrespondencia(factura,orden){
+function validarCorrespondencia(factura,orden,{ignorarEmpresa=false}={}){
   exigir(!/ANUL|CANCEL/.test(String(orden.estado||'').toUpperCase()),'La orden está anulada o cancelada');
   const e=factura.factura.electronica,id=n=>String(n||'').replace(/\D/g,'').replace(/^0+/,''),nombre=n=>claveProveedor(String(n||'').split('(')[0]);
   if(orden.cedula)exigir(id(orden.cedula)===id(e.emisor),'El proveedor de la OC no coincide con el emisor de la factura');
   else exigir([factura.proveedor,e.nombre_emisor,e.nombre_comercial_emisor].filter(Boolean).some(n=>nombre(n)===nombre(orden.proveedor)),'El proveedor de la OC no coincide con la factura');
   exigir((orden.moneda||'CRC').toUpperCase()===factura.moneda,'La moneda de la OC no coincide con la factura');
-  const empresa=normalizarEmpresa(orden.razon_social||orden.empresa_destino);
-  if(empresa)exigir(empresa===normalizarEmpresa(e.nombre_receptor),'La empresa receptora de la OC no coincide con la factura');
+  if(!ignorarEmpresa){const diferencia=diferenciaEmpresa(factura,orden);exigir(!diferencia,diferencia);}
   exigir(!orden.factura_registrada,'La OC ya tiene una factura registrada por el flujo anterior; revise antes de enlazar otra');
   exigir(Number.isFinite(orden.total)&&orden.total>0,'La OC no tiene un monto válido');
 }

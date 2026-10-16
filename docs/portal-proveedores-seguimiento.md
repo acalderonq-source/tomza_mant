@@ -10,6 +10,14 @@ Cada factura muestra próximo paso, responsable, plazo, observaciones, programac
 
 ## Contabilidad y Administración
 
+### Separación de empresas receptoras
+
+El XML identifica automáticamente la empresa receptora por cédula. Gas Tomza usa `3101349880`; Super Gas, `3101044021` (ENVASADORA SUPER GAS GLP SOCIEDAD ANONIMA). Ambas están habilitadas en el catálogo de receptores. El nombre del XML debe corresponder al titular de esa cédula. No se solicita al proveedor seleccionar empresa ni orden.
+
+El portal y Contabilidad tienen filtro por empresa, conteo de facturas y cuentas por pagar separadas en CRC y USD. El enlace automático solo considera órdenes de la misma empresa; si hay una OC compatible por proveedor y detalle, pero pertenece a otra empresa, la vista previa y la carga muestran el motivo y rechazan la factura antes de guardar archivos. Si hay una orden correcta de la misma empresa, se usa esa coincidencia y se descartan las de otra empresa.
+
+Las facturas históricas sin enlace pueden mostrar `EMPRESA_NO_COINCIDE`, con la OC y empresa esperada. El enlace manual, la aprobación, programación y registro de pago también verifican la correspondencia de empresa. Si una OC tiene razón social y empresa destino contradictorias, se bloquea hasta corregirla. Las verificaciones de Hacienda continúan siendo independientes.
+
 Bandeja: `/proveeduria/portal-proveedores/facturas`. Panel del propietario: `/administracion/portal-proveedores/seguimiento`, también accesible desde la administración del portal.
 
 Las facturas vencidas y los plazos vencidos aparecen primero. Hay filtros por responsable, excepciones, vencidas, revisión atrasada, sin OC, correcciones y estados de pago. El resumen muestra cuentas por pagar en CRC y USD, vencimientos a siete días y carga de trabajo por responsable, sin mezclar documentos sin aprobación con cuentas por pagar aprobadas.

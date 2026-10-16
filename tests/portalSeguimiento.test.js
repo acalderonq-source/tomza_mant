@@ -24,7 +24,7 @@ test('corrección bloqueada si existen pagos o la factura ya está aprobada',()=
 });
 test('empresa receptora también limita el enlace, con equivalencias legales conocidas',()=>{
   const d=datos(),o={cedula:'3101000000',total:113,moneda:'CRC',empresa_destino:'GAS TOMZA'};
-  assert.doesNotThrow(()=>validarCorrespondencia(d,o));assert.throws(()=>validarCorrespondencia(d,{...o,empresa_destino:'SUPER GAS'}),/receptora/);
+  assert.doesNotThrow(()=>validarCorrespondencia(d,o));assert.throws(()=>validarCorrespondencia(d,{...o,empresa_destino:'SUPER GAS'}),/OC es de SUPER GAS/);
 });
 test('listado fiscal de ambos módulos calcula saldo disponible y oculta órdenes agotadas o canceladas',async()=>{
   const queries=[];const db={query:async(sql,args)=>{queries.push({sql,args});

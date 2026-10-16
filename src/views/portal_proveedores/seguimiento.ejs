@@ -1,4 +1,6 @@
 <div class="invoice-followup">
+<% if(typeof empresaFactura==='function'){ %><div class="small"><strong data-empresa-factura><%= empresaFactura(o) %></strong> · Receptor: <%= o.factura.electronica.receptor %></div><% } %>
+<% if(o.cruce_automatico?.estado==='EMPRESA_NO_COINCIDE'){ %><div class="alert alert-danger small mt-2">Empresa incorrecta: factura bloqueada para esta orden.<% for(const error of o.cruce_automatico.empresas_incompatibles||[]){ %><div><%= error.numero %>: <%= error.detalle %></div><% } %></div><% } %>
 <% const seg=typeof seguimiento==='function'?seguimiento(o):null; if(seg){ %>
 <div class="small fw-semibold <%= seg.vencida||seg.atrasada?'text-danger':'text-primary' %>"><%= seg.estado %><%= seg.vencida?' · Vencida':seg.atrasada?' · Plazo de revisión vencido':seg.proxima?' · Vence en 7 días':'' %></div>
 <div class="small">Siguiente paso: <%= seg.siguiente %></div>

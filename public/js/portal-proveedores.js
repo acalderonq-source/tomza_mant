@@ -22,12 +22,14 @@
   function filtrar(){
     const q=normalizar(document.querySelector('[data-buscar]')?.value||''),responsable=document.querySelector('[data-responsable-filtro]')?.value||'';let visibles=0;
     const filas=document.querySelectorAll('[data-factura]');
-    filas.forEach(row=>{const estado=filtro==='todas'||(filtro==='excepciones'?row.dataset.excepcion==='1':filtro==='vencidas'?row.dataset.vencida==='1':filtro==='atrasadas'?row.dataset.atrasada==='1':filtro==='sin-orden'?row.dataset.sinOrden==='1':row.dataset.invoiceState===filtro);const asignado=!responsable||(responsable==='sin-asignar'?!row.dataset.responsable:row.dataset.responsable===responsable);row.hidden=!(normalizar(row.textContent).includes(q)&&estado&&asignado);if(!row.hidden)visibles++;});
+    const empresa=document.querySelector('[data-empresa-filtro]')?.value||'';
+    filas.forEach(row=>{const estado=filtro==='todas'||(filtro==='excepciones'?row.dataset.excepcion==='1':filtro==='vencidas'?row.dataset.vencida==='1':filtro==='atrasadas'?row.dataset.atrasada==='1':filtro==='sin-orden'?row.dataset.sinOrden==='1':row.dataset.invoiceState===filtro);const asignado=!responsable||(responsable==='sin-asignar'?!row.dataset.responsable:row.dataset.responsable===responsable);const mismaEmpresa=!empresa||row.querySelector('[data-empresa-factura]')?.textContent===empresa;row.hidden=!(normalizar(row.textContent).includes(q)&&estado&&asignado&&mismaEmpresa);if(!row.hidden)visibles++;});
     const vacio=document.querySelector('[data-sin-resultados]');if(vacio)vacio.hidden=visibles>0||filas.length===0;
     const contador=document.querySelector('[data-invoice-results]');if(contador)contador.textContent=`${visibles} documentos`;
   }
   document.querySelector('[data-buscar]')?.addEventListener('input',filtrar);
   document.querySelector('[data-responsable-filtro]')?.addEventListener('change',filtrar);
+  document.querySelector('[data-empresa-filtro]')?.addEventListener('change',filtrar);
   document.querySelectorAll('[data-filter-state]').forEach(button=>button.addEventListener('click',()=>{
     filtro=button.dataset.filterState;
     document.querySelectorAll('[data-filter-state]').forEach(b=>{const activo=b===button;b.classList.toggle('active',activo);b.setAttribute('aria-pressed',String(activo));});filtrar();
