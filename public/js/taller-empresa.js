@@ -1,5 +1,41 @@
 document.addEventListener('DOMContentLoaded', () => {
   if (!document.body.classList.contains('taller-empresa')) return;
+  const desktop = window.matchMedia('(min-width: 1100px) and (pointer: fine)');
+  const sidebar = document.createElement('nav');
+  sidebar.className = 'taller-desktop-sidebar';
+  sidebar.setAttribute('aria-label', 'Navegación de Taller');
+  const brand = document.createElement('div');
+  brand.className = 'taller-sidebar-brand';
+  brand.textContent = 'TALLER';
+  sidebar.appendChild(brand);
+  const links = new Map([
+    ['/dashboard', 'Inicio'],
+    ['/taller/dashboard', 'Panel operativo'],
+    ['/mantenimientos', 'Mantenimientos']
+  ]);
+  // Reutilizar accesos ya autorizados y renderizados, nunca copiar permisos entre sesiones.
+  document.querySelectorAll('.module-card[href], .navbar a[href]').forEach(anchor => {
+    const href = anchor.getAttribute('href');
+    if (!href.startsWith('/') || href === '/logout' || href.includes('?') || href.startsWith('/descargas/')) return;
+    const label = anchor.querySelector('.module-title')?.textContent || anchor.textContent;
+    links.set(href, label.trim());
+  });
+  for (const [href, label] of links) {
+    const anchor = document.createElement('a');
+    anchor.href = href; anchor.textContent = label;
+    if (window.location.pathname === href) anchor.setAttribute('aria-current', 'page');
+    sidebar.appendChild(anchor);
+  }
+  document.body.appendChild(sidebar);
+  const topbar = document.querySelector('.navbar');
+  const updateDesktop = () => {
+    document.body.classList.toggle('taller-desktop', desktop.matches);
+    sidebar.hidden = !desktop.matches;
+    if (topbar) document.body.style.setProperty('--taller-header-height', topbar.getBoundingClientRect().height + 'px');
+  };
+  desktop.addEventListener('change', updateDesktop);
+  if (topbar && window.ResizeObserver) new ResizeObserver(updateDesktop).observe(topbar);
+  updateDesktop();
   const grid = document.querySelector('.module-grid');
   if (!grid) return;
   const previousTitle = grid.previousElementSibling;

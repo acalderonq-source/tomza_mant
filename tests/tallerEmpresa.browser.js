@@ -25,6 +25,13 @@ const { chromium } = require('playwright');
     await page.waitForLoadState('networkidle');
     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,route+' '+width);
     assert.equal(await page.locator('body.taller-empresa').count(),1);
+    assert.equal(await page.locator('.taller-desktop-sidebar').isVisible(),width>=1100);
+    if(width>=1100) {
+      assert.equal(await page.locator('.taller-desktop-sidebar a[href="/dashboard"]').count(),1);
+      const navBox = await page.locator('.taller-desktop-sidebar').boundingBox();
+      const mainBox = await page.locator('main, body > .container-fluid').first().boundingBox();
+      assert.ok(mainBox.x >= navBox.x + navBox.width, 'El menu no debe tapar el contenido');
+    }
     if(route==='/dashboard') {
      const search=page.getByRole('searchbox',{name:'Buscar aplicación de Taller'});
      await search.fill('mantenimiento');
