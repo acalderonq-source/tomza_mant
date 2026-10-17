@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="es">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title><%= titulo %> - Gas Tomza</title><link rel="stylesheet" href="/css/control-empresa.css"></head>
+<body>
+<header><a href="/dashboard">Gas Tomza</a><strong><%= titulo %></strong><a href="/logout">Cerrar sesion</a></header>
+<main>
+<nav><a href="/control-empresa/unidades">Expediente por placa</a><a href="/compras/ordenes">Ordenes</a><a href="/compras/facturas">Facturas y pagos</a><a href="/dashboard/resumen-ejecutivo">Presupuesto y gasto</a></nav>
+<% if (titulo === 'Centro de control') { %>
+<section><h1>Control de Taller V1</h1><div class="estado"><strong>Respaldo:</strong> <%= modelo.respaldo.estado %> <%= modelo.respaldo.fecha || '' %></div>
+<p>La verificacion de integridad no reemplaza una prueba de restauracion. El registro de solicitudes no confirma por si solo un pago.</p>
+<a href="/control-empresa/auditoria/excel">Descargar bitacora Excel</a></section>
+<% } else { %>
+<section><h1>Expediente por placa</h1><form method="get"><label for="placa">Placa</label><input id="placa" name="placa" value="<%= placa %>" maxlength="20" required><button type="submit">Consultar</button></form>
+<% if (unidad) { %><h2><%= unidad.placa %> · <%= unidad.sede %></h2><p><%= unidad.marca || '' %> <%= unidad.modelo || '' %> <%= unidad.anio || '' %> · <%= Number(unidad.activa) ? 'Activa' : 'Inactiva' %> · <%= Number(unidad.varada) ? 'Varada' : 'No varada' %></p><% } %></section>
+<% } %>
+<% for (const seccion of modelo.secciones) { %>
+<section><h2><%= seccion.titulo %></h2>
+<% if (seccion.error) { %><p role="alert" class="error"><%= seccion.error %></p>
+<% } else if (!seccion.filas.length) { %><p>Sin registros.</p>
+<% } else { const columnas = Object.keys(seccion.filas[0]); %>
+<div class="tabla"><table><thead><tr><% columnas.forEach(c => { %><th><%= c.replace(/_/g,' ') %></th><% }); %></tr></thead>
+<tbody><% seccion.filas.forEach(f => { %><tr><% columnas.forEach(c => { const v = f[c]; %><td>
+<% if (c === 'antes' || c === 'despues') { %><details><summary>Ver datos</summary><pre><%= typeof v === 'string' ? v : JSON.stringify(v, null, 2) %></pre></details>
+<% } else if (v instanceof Date) { %><%= v.toLocaleString('es-CR', { timeZone: 'America/Costa_Rica' }) %>
+<% } else { %><%= v == null ? '—' : v %><% } %></td><% }); %></tr><% }); %></tbody></table></div><% } %></section>
+<% } %>
+<footer>Version <%= version %> · Revision <%= release.slice(0,12) %></footer>
+</main></body></html>

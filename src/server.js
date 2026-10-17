@@ -1,5 +1,6 @@
 require("dotenv").config();
-require("./cronJobs");
+require('./utils/entornoEmpresa').verificarEntorno();
+if (process.env.APP_ENV !== 'staging') require("./cronJobs");
 const express = require("express");
 const path = require("path");
 const session = require("express-session");
@@ -18,6 +19,8 @@ const { verificarColumnasRequeridas, COLUMNAS_ESENCIALES_TALLER } = require("./u
 
 // Inicializar app
 const app = express();
+const { alertar, programarRespaldo } = require('./utils/alertasEmpresa');
+programarRespaldo();
 app.disable("x-powered-by");
 app.use(securityHeaders);
 const isProduction = process.env.NODE_ENV === "production";
@@ -54,6 +57,7 @@ process.on("unhandledRejection", error => {
   }
 
   console.error("Promesa rechazada sin manejar:", error);
+  void alertar('TAREA_NO_CONTROLADA');
 });
 
 process.on("uncaughtException", error => {
@@ -92,11 +96,13 @@ app.get("/ready", async (_req, res) => {
     await pool.query("SELECT 1");
     const esquema = await verificarColumnasRequeridas((sql, params) => pool.query(sql, params), COLUMNAS_ESENCIALES_TALLER);
     if (!esquema.listo) {
+      void alertar('ESQUEMA_INCOMPLETO');
       console.error("Readiness check: faltan columnas esenciales:", esquema.faltantes);
       return res.status(503).json({ status: "not_ready", database: "connected", schema: "incomplete", release });
     }
     const almacenamiento = verificarAlmacenamientoUploads();
     if (!almacenamiento.listo || !estadoCargaAdjuntos.listo) {
+      void alertar('ADJUNTOS_NO_DISPONIBLES');
       const motivo = almacenamiento.motivo || estadoCargaAdjuntos.motivo;
       console.error("Readiness check: almacenamiento de adjuntos no disponible:", motivo);
       return res.status(503).json({
@@ -111,6 +117,7 @@ app.get("/ready", async (_req, res) => {
     res.status(200).json({ status: "ready", database: "connected", database_tls:Boolean(tls[0]?.Value), schema: "ready", uploads: "ready", release });
   } catch (error) {
     console.error("Readiness check fallo:", error.code || error.message);
+    void alertar('BASE_DATOS_NO_DISPONIBLE');
     res.status(503).json({ status: "not_ready", database: "unavailable", release });
   }
 });
@@ -242,6 +249,7 @@ app.use(async (req, _res, next) => {
 
 app.use(controlarAccesoPorDepartamento);
 app.use(require("./utils/usuariosPantalla").restringirCuentaPantalla);
+app.use(require('./utils/operacionesEmpresa').protegerOperaciones(pool));
 
 function esUsuarioMecanicoLimitado(user) {
   const usuario = String(user?.usuario || "").trim().toLowerCase();
@@ -323,6 +331,7 @@ function injectPageAssets(html, csrfToken) {
   }
 
   output = injectSecurityAssets(output, csrfToken);
+  output = output.replace('</body>', '<script src="/js/operaciones-empresa.js?v=1" defer></script></body>');
 
   return output;
 }
@@ -405,6 +414,7 @@ app.use('/administracion/portal-proveedores',portalProveedores.administracion);
 app.use("/", adminRoutes);
 app.use("/", carnetsRoutes);
 app.use("/dashboard", dashboardRoutes);
+app.use('/control-empresa', require('./routes/controlEmpresa.routes'));
 app.use("/agenda", agendaRoutes);
 app.use("/mantenimientos/semana", preventivosSemanalesRoutes);
 app.use("/mantenimientos", mantenimientosRoutes);
@@ -463,6 +473,7 @@ ensurePushTables().catch(error => {
 });
 
 cron.schedule("0 7 * * *", async () => {
+  if (process.env.APP_ENV === 'staging') return;
   const hoy = new Date().getDate();
   if (hoy === 1 || hoy === 15) {
     console.log("📧 Enviando alertas DEKRA...");
@@ -471,6 +482,7 @@ cron.schedule("0 7 * * *", async () => {
 });
 
 cron.schedule("0 8 * * *", async () => {
+  if (process.env.APP_ENV === 'staging') return;
   try {
     for (const diasAntes of [15, 2]) {
       for (const slot of ["primera", "segunda"]) {
@@ -480,16 +492,19 @@ cron.schedule("0 8 * * *", async () => {
     }
   } catch (error) {
     console.error("Error enviando recordatorios de citas DEKRA:", error);
+    void alertar('RECORDATORIOS_DEKRA_FALLIDOS');
   }
 }, { timezone: "America/Costa_Rica" });
 
 cron.schedule("0 8 * * *", async () => {
+  if (process.env.APP_ENV === 'staging') return;
   try {
     console.log("🔔 Enviando recordatorios de mantenimientos de mañana...");
     const resultado = await enviarRecordatoriosMantenimientos();
     console.log("🔔 Resultado notificaciones:", resultado);
   } catch (error) {
     console.error("Error enviando notificaciones de mantenimientos:", error);
+    void alertar('RECORDATORIOS_MANTENIMIENTO_FALLIDOS');
   }
 });
 

@@ -20,6 +20,7 @@ function obtenerConfiguracion(perfil = "default") {
 }
 
 function estaConfigurado(perfil = "default") {
+  if (process.env.MAIL_ENABLED === 'false' || process.env.APP_ENV === 'staging') return false;
   const { user, pass } = obtenerConfiguracion(perfil);
   return Boolean(user && pass);
 }
@@ -42,6 +43,7 @@ function obtenerTransporter(perfil) {
 }
 
 async function enviarCorreo(to, subject, html, opciones = {}) {
+  if (process.env.MAIL_ENABLED === 'false' || process.env.APP_ENV === 'staging') throw Object.assign(new Error('Envio de correos desactivado en este ambiente.'), { code: 'MAIL_DISABLED' });
   const perfil = opciones.perfil || "default";
   const config = obtenerConfiguracion(perfil);
   const { perfil: _perfil, ...opcionesMensaje } = opciones;

@@ -4,6 +4,7 @@ sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
 // Función genérica para enviar correo (con o sin nombre de destinatario)
 async function enviarCorreo(destinatario, asunto, cuerpoHTML) {
+  if (process.env.MAIL_ENABLED === 'false' || process.env.APP_ENV === 'staging') return false;
   if (!destinatario) return;
   const msg = {
     to: destinatario,

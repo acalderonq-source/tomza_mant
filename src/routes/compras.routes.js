@@ -2,6 +2,7 @@ const {facturasDeOrden}=require('../utils/portalFacturaOrden');
 const express = require("express");
 const router = express.Router();
 const pool = require("../db");
+const { prepararAuditoria, auditarOrden } = require('../utils/auditoriaOrdenes');
 const fs = require("fs");
 const path = require("path");
 const PdfPrinter = require("pdfmake");
@@ -4551,6 +4552,7 @@ router.post("/ordenes", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_
     await ensureOrdenDetalleCodigoProductoColumn();
     await ensureOrdenCotizacionColumns();
     await ensureTipoMantenimientoColumns(pool);
+    await prepararAuditoria(pool);
     connection = await pool.getConnection();
     liberarNumeracion = await require('../utils/numeroOrdenCompra').bloquearNumeroOrden(connection);
     await connection.beginTransaction();
@@ -4613,6 +4615,8 @@ router.post("/ordenes", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_
         [ordenId, linea.codigo, linea.codigo_producto || null, linea.descripcion, linea.cantidad, linea.precio_unitario, linea.subtotal]
       );
     }
+    await auditarOrden(connection, req.session.user, ordenId, null,
+      { proveedor_id, moneda, placa_unidad: placaOrden, ...totalesOrden, lineas: lineasOrden });
     await connection.commit();
     res.redirect(`/compras/ordenes/${ordenId}/detalle?descargar=1`);
   } catch (error) {
@@ -4801,6 +4805,7 @@ router.post("/ordenes/:id/editar", requireAuth, allowRoles("ADMIN", "TALLER", "P
     await ensureOrdenDetalleCodigoProductoColumn();
     await ensureOrdenCotizacionColumns();
     await ensureTipoMantenimientoColumns(pool);
+    await prepararAuditoria(pool);
     await connection.beginTransaction();
 
     const id = req.params.id;
@@ -4824,7 +4829,7 @@ router.post("/ordenes/:id/editar", requireAuth, allowRoles("ADMIN", "TALLER", "P
 
     const totalesOrden = calcularTotalesOrden(lineasOrden, req.body);
 
-    const [[orden]] = await connection.query("SELECT id FROM ordenes_compra WHERE id = ?", [id]);
+    const [[orden]] = await connection.query("SELECT id, proveedor_id, moneda, placa_unidad, total, subtotal, descuento, transporte, iva, observaciones FROM ordenes_compra WHERE id = ? FOR UPDATE", [id]);
     if (!orden) {
       await connection.rollback();
       return res.status(404).send("Orden no encontrada");
@@ -4884,6 +4889,8 @@ router.post("/ordenes/:id/editar", requireAuth, allowRoles("ADMIN", "TALLER", "P
       );
     }
 
+    await auditarOrden(connection, req.session.user, id, orden,
+      { proveedor_id, moneda, placa_unidad: placaOrden, ...totalesOrden, observaciones, lineas: lineasOrden });
     await connection.commit();
     res.redirect(`/compras/ordenes/${id}/detalle?descargar=1`);
   } catch (error) {

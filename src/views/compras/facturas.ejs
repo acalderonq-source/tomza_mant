@@ -1236,7 +1236,10 @@
         }
 
         let message = 'No se pudo registrar el pago ni generar la colilla.';
-        if (contentType.includes('text/html')) {
+        if (contentType.includes('application/json')) {
+          const data = await response.json();
+          message = data.error || message;
+        } else if (contentType.includes('text/html')) {
           const html = await response.text();
           const parsed = new DOMParser().parseFromString(html, 'text/html');
           const alertMessage = parsed.querySelector('.alert-danger, .alert-warning')?.textContent?.trim();

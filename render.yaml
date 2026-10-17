@@ -6,7 +6,7 @@ services:
     buildCommand: npm ci --omit=dev
     startCommand: npm run migrate && npm start
     healthCheckPath: /ready
-    autoDeployTrigger: commit
+    autoDeployTrigger: checksPass
     disk:
       name: tomza-uploads
       mountPath: /var/data/uploads

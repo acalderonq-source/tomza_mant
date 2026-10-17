@@ -8,7 +8,13 @@
     "start": "node src/server.js",
     "migrate": "node src/scripts/runMigrations.js",
     "migrate:proveeduria": "node src/scripts/prepareProveeduria.js",
-    "test": "node --test"
+    "test": "node --test",
+    "check:syntax": "node src/scripts/verificarSintaxis.js",
+    "migrate:plan": "node src/scripts/planMigraciones.js",
+    "empresa:prepare": "node src/scripts/prepararEmpresa.js",
+    "backup:create": "node src/scripts/respaldoEmpresa.js",
+    "backup:verify": "node src/scripts/respaldoEmpresa.js --verificar",
+    "backup:extract": "node src/scripts/respaldoEmpresa.js --extraer"
   },
   "dependencies": {
     "@azure/msal-node": "^7.0.0",

@@ -20,3 +20,5 @@ secrets/
 *.key
 *.p12
 *.pfx
+backups/
+*.enc
