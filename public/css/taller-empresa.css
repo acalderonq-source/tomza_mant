@@ -80,6 +80,15 @@ body.taller-empresa { --ink:#23333d; --muted:#596b75; --line:#d9e1e5; background
  .taller-desktop-sidebar a:hover { background:#355e99; }
  .taller-desktop-sidebar a[aria-current="page"] { background:#143963; border-left-color:#f5cd48; font-weight:700; }
  .taller-desktop-sidebar a:focus-visible { outline:2px solid #fff; outline-offset:-4px; }
+ .taller-sidebar-group { margin:0; border:0; }
+ .taller-sidebar-group>summary { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:12px 18px; color:#fff; font-size:13px; font-weight:600; cursor:pointer; list-style:none; border-bottom:1px solid #3c6094; }
+ .taller-sidebar-group>summary::-webkit-details-marker { display:none; }
+ .taller-sidebar-group>summary::after { content:'+'; font-size:18px; font-weight:400; }
+ .taller-sidebar-group[open]>summary::after { content:'-'; }
+ .taller-sidebar-group>summary:hover { background:#355e99; }
+ .taller-sidebar-group>summary:focus-visible { outline:2px solid #fff; outline-offset:-4px; }
+ .taller-sidebar-children { background:#1c3e70; }
+ .taller-sidebar-children a { padding:9px 16px 9px 30px; font-size:12px; font-weight:400; border-bottom-color:#2e5081; }
  .taller-desktop main.shell,.taller-desktop main.dashboard-shell,.taller-desktop>.container-fluid { margin-left:var(--taller-sidebar-width); width:calc(100% - var(--taller-sidebar-width)); max-width:none; padding:16px 20px!important; }
  .taller-desktop .page-title,.taller-desktop .hero-title { font-size:22px; font-weight:600; }
  .taller-desktop .simple-hero,.taller-desktop .hero,.taller-desktop .hero-panel { margin-bottom:16px!important; padding-bottom:14px; border-color:#bdcad5; }

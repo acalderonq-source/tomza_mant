@@ -20,11 +20,40 @@ document.addEventListener('DOMContentLoaded', () => {
     const label = anchor.querySelector('.module-title')?.textContent || anchor.textContent;
     links.set(href, label.trim());
   });
-  for (const [href, label] of links) {
+  const groups = new Map([
+    ['Unidades', []], ['Mantenimientos', []], ['Compras', []],
+    ['Bodega y suministros', []], ['Gestión', []]
+  ]);
+  const groupFor = href => {
+    if (/^\/(unidades|reportes-supervisores|lavado-unidades|revision-ruta|giras|dekra|minae)(\/|$)/.test(href)) return 'Unidades';
+    if (/^\/(compras|proveeduria|ordenes-motor|contabilidad)(\/|$)/.test(href)) return 'Compras';
+    if (/^\/(bodega|repuestos|repuestos-semanales|aceite)(\/|$)/.test(href)) return 'Bodega y suministros';
+    if (/^\/(mantenimientos|taller|kpis|logistica-taller|llantas|aires|control-cambios-aceite)(\/|$)/.test(href)) return 'Mantenimientos';
+    return 'Gestión';
+  };
+  const createLink = (href, label) => {
     const anchor = document.createElement('a');
     anchor.href = href; anchor.textContent = label;
     if (window.location.pathname === href) anchor.setAttribute('aria-current', 'page');
-    sidebar.appendChild(anchor);
+    return anchor;
+  };
+  sidebar.appendChild(createLink('/dashboard', 'Inicio'));
+  for (const [href, label] of links) {
+    if (href !== '/dashboard') groups.get(groupFor(href)).push([href, label]);
+  }
+  for (const [name, entries] of groups) {
+    if (!entries.length) continue;
+    const group = document.createElement('details');
+    group.className = 'taller-sidebar-group';
+    const summary = document.createElement('summary');
+    summary.textContent = name;
+    group.appendChild(summary);
+    const children = document.createElement('div');
+    children.className = 'taller-sidebar-children';
+    for (const [href, label] of entries) children.appendChild(createLink(href, label));
+    group.appendChild(children);
+    group.open = entries.some(([href]) => window.location.pathname === href);
+    sidebar.appendChild(group);
   }
   document.body.appendChild(sidebar);
   const topbar = document.querySelector('.navbar');

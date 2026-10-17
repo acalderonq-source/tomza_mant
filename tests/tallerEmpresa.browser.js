@@ -33,6 +33,17 @@ const { chromium } = require('playwright');
       assert.ok(mainBox.x >= navBox.x + navBox.width, 'El menu no debe tapar el contenido');
     }
     if(route==='/dashboard') {
+     if(width>=1100) {
+      const sidebar=page.locator('.taller-desktop-sidebar');
+      const units=sidebar.locator('details').filter({has:page.locator('summary',{hasText:/^Unidades$/})});
+      assert.equal(await units.locator('a[href="/unidades"]').isVisible(),false);
+      await units.locator('summary').click();
+      assert.equal(await units.locator('a[href="/unidades"]').isVisible(),true);
+      const compras=sidebar.locator('details').filter({has:page.locator('summary',{hasText:/^Compras$/})});
+      await compras.locator('summary').click();
+      assert.equal(await compras.locator('a[href="/compras/ordenes"]').isVisible(),true);
+      assert.equal(await compras.locator('a[href="/compras/facturas"]').isVisible(),true);
+     }
      const search=page.getByRole('searchbox',{name:'Buscar aplicación de Taller'});
      await search.fill('mantenimiento');
      assert.ok(await page.locator('.module-card:visible').count()>0);
