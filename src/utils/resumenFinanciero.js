@@ -33,8 +33,9 @@ function construirResumenFinanciero({ gastos = [], facturasPagadasRow = {} } = {
   const totalFacturasPagadas = Number(facturasPagadasRow.total || 0);
   const movimientosFacturasPagadas = Number(facturasPagadasRow.movimientos || facturasPagadasRow.registros || 0);
 
-  const totalOrdenesMotorPagadas = totalOrdenesMotor;
-  const movimientosOrdenesMotorPagadas = contar(gastos, esOrdenMotor);
+  const esMotorPagado = item => esOrdenMotor(item) && Number(item.pagada || 0) === 1;
+  const totalOrdenesMotorPagadas = sumar(gastos, esMotorPagado);
+  const movimientosOrdenesMotorPagadas = contar(gastos, esMotorPagado);
   const movimientosCajaChica = contar(gastos, esCajaChica);
   const totalGeneral = totalOrdenesCompra + totalOrdenesMotor + totalPagosProveedor + totalCajaChica + totalReintegrosGastos;
   const totalPagado = totalFacturasPagadas + totalOrdenesMotorPagadas + totalPagosProveedorPagados + totalCajaChica;

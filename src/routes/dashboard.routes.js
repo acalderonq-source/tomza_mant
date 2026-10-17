@@ -2687,4 +2687,5 @@ router.get("/", async (req, res) => {
 
 });
 
+router.use('/conciliacion-pagos', require('./conciliacionColillas.routes'));
 module.exports = router;

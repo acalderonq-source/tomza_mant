@@ -13,6 +13,7 @@ const DEPARTAMENTOS = [
 const DEPARTAMENTO_POR_CLAVE = new Map(DEPARTAMENTOS.map(departamento => [departamento.key, departamento]));
 const RUTAS_TALLER = [
   "/dashboard/resumen-ejecutivo",
+  "/dashboard/conciliacion-pagos",
   "/agenda",
   "/mantenimientos",
   "/unidades",
@@ -41,8 +42,9 @@ const RUTAS_TALLER = [
 ];
 
 const RUTAS_COMPARTIDAS_POR_DEPARTAMENTO = {
-  CONTABILIDAD: ["/compras/facturas", "/compras/ordenes", "/compras/consulta-departamento", "/compras/dashboard", "/aresep"],
+  CONTABILIDAD: ["/compras/facturas", "/compras/ordenes", "/compras/consulta-departamento", "/compras/dashboard", "/aresep", "/dashboard/conciliacion-pagos"],
   PROVEEDURIA: [
+    "/dashboard/conciliacion-pagos",
     "/compras/facturas",
     "/compras/ordenes",
     "/compras/proveedores",
