@@ -1,6 +1,18 @@
 const test=require('node:test');const assert=require('node:assert/strict');
 const {conciliar}=require('../src/utils/conciliacionColillas');
 const {construirResumenFinanciero}=require('../src/utils/resumenFinanciero');
+test('cotejo informa documentos ausentes, pagos no reflejados y exceso sobre neto sin modificar datos',()=>{
+ const {cotejarDocumentos}=require('../src/utils/conciliacionColillas');
+ const documentos=new Map([['orden:1',{total:100,pagada:0,abono_monto:0}],['orden:2',{total:100,nota_credito_monto:50,pagada:1}]]);
+ const antes=JSON.stringify([...documentos]);
+ const r=cotejarDocumentos([{referencia:'orden:1',centavos:1000,colilla:1},{referencia:'orden:2',centavos:10000,colilla:2},{referencia:'independiente:3',centavos:100,colilla:3}],documentos);
+ assert.equal(r.length,3);assert.equal(JSON.stringify([...documentos]),antes);
+});
+test('abonos parciales reflejados no se reportan como error ni se comparan contra todo el historico',()=>{
+ const {cotejarDocumentos}=require('../src/utils/conciliacionColillas');
+ const r=cotejarDocumentos([{referencia:'orden:1',centavos:1000,colilla:1}],new Map([['orden:1',{total:100,pagada:0,abono_monto:30}]]));
+ assert.equal(r.length,0);
+});
 test('referencias incompletas no se contabilizan aunque el importe coincida',()=>{const r=conciliar([{id:1,total_pagado:100,facturas_json:[{tipo:'independiente',monto_pago:100}]}]);assert.equal(r.alertas.length,1);assert.equal(r.totales.length,0);});
 test('acceso departamental conserva el aislamiento de Taller y comparte solo conciliacion',()=>{
  const {puedeAbrirRutaPorDepartamento:puede}=require('../src/utils/departamentos');
@@ -18,7 +30,10 @@ test('consulta exige perfil financiero y usa el mes de fecha de pago, sin escrit
   assert.equal((await fetch(base,{headers:{'x-test-role':'MECANICO'}})).status,403);assert.equal(llamadas.length,0);
   assert.equal((await fetch(base+'?periodo=2026-99')).status,400);
   assert.equal((await fetch(base+'?periodo=2026-12')).status,200);
-  assert.deepEqual(llamadas[0].params,['2026-12-01','2027-01-01']);
+  assert.deepEqual(llamadas[0].params,['actual','2026-12-01','2027-01-01']);
+  assert.equal((await fetch(base+'?periodo=2026-12&origen=ambos')).status,400);
+  assert.equal((await fetch(base+'?periodo=2026-12&origen=reconstruido')).status,200);
+  assert.equal(llamadas.at(-1).params[0],'reconstruido');
   assert.ok(llamadas.every(c=>c.sql.startsWith('SELECT')));
  }finally{pool.query=original;await new Promise(r=>server.close(r));}
 });

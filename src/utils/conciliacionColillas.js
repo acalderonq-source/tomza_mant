@@ -27,4 +27,21 @@ function conciliar(colillas, monedasOrdenes = new Map()) {
   }
   return {movimientos,alertas,totales:[...totales].map(([moneda,centavos])=>({moneda,monto:centavos/100}))};
 }
-module.exports={conciliar};
+function cotejarDocumentos(movimientos, documentos) {
+  const revisiones=[];
+  const porDocumento=new Map();
+  for(const m of movimientos){
+    if(!porDocumento.has(m.referencia))porDocumento.set(m.referencia,{centavos:0,colillas:new Set()});
+    const r=porDocumento.get(m.referencia);r.centavos+=m.centavos;r.colillas.add(m.colilla);
+  }
+  for(const [referencia,aplicado] of porDocumento){
+    const documento=documentos.get(referencia);
+    if(!documento){revisiones.push({referencia,motivo:'El documento referenciado no existe actualmente',colillas:[...aplicado.colillas]});continue;}
+    const neto=Math.max(0,Math.round(Number(documento.total||0)*100)-Math.round(Number(documento.nota_credito_monto||0)*100));
+    const abonos=Math.round(Number(documento.abono_monto||0)*100);
+    if(Number(documento.pagada)!==1&&abonos===0){revisiones.push({referencia,motivo:'Tiene colilla, pero el documento figura pendiente y sin abonos registrados',colillas:[...aplicado.colillas]});}
+    if(aplicado.centavos>neto+1){revisiones.push({referencia,motivo:'Lo documentado en este conjunto supera el importe neto actual; revisar notas de crédito, reversos y pagos',colillas:[...aplicado.colillas]});}
+  }
+  return revisiones;
+}
+module.exports={conciliar,cotejarDocumentos};

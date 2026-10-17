@@ -32,7 +32,30 @@ En octubre de 2026 se consultaron 6 colillas actuales, con 121 aplicaciones y
 CRC 8 084 449,36 en aplicaciones verificadas, sin alertas en ese conjunto.
 Esto NO significa que ese sea el total de todo lo pagado por Taller en octubre.
 
-## Pendiente antes de sustituir todos los indicadores
+## Continuacion: historicos separados
+
+La consulta permite seleccionar `actual` o `reconstruido`; no acepta sumar ambas
+fuentes. Un historico reconstruido refleja estados de la aplicacion, no evidencia
+bancaria original. Se cotejan las referencias con los documentos actuales para
+señalar documentos ausentes, documentos pendientes sin abonos y aplicaciones que
+superan el importe neto actual. Una nota de credito posterior puede explicar una
+diferencia; no se corrige ni se anula automaticamente.
+
+Revision de solo lectura de junio a octubre de 2026:
+
+| Mes | Colillas actuales | Historicos reconstruidos | Importe reconstruido CRC |
+|---|---:|---:|---:|
+| Junio | 0 | 6 | 395 047,66 |
+| Julio | 0 | 595 | 117 577 474,34 |
+| Agosto | 1 | 719 | 115 311 533,00 |
+| Septiembre | 0 | 472 | 69 925 367,07 |
+| Octubre | 6 | 7 | 6 475 762,00 |
+
+En este conjunto no se detectaron diferencias bajo las reglas del cotejo. No es
+una certificacion bancaria: los reconstruidos proceden de los mismos estados con
+que se comparan. No se modificaron documentos ni pagos.
+
+## Pendiente para conciliacion completa
 
 1. Normalizar aplicaciones de pago en tabla relacional con moneda y referencia estable.
 2. Reconciliar historicos con colillas, abonos y estados de cuenta sin duplicarlos.
