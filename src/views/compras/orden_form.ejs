@@ -533,11 +533,11 @@
     if (!(orden.lineas || []).length) addRow();
     updateTotals();
 
-    let mensaje = '<span class="text-success fw-semibold">Líneas reconocidas del PDF cargadas sin IA.</span> Compare todas las líneas, impuestos y descuentos con la cotización antes de guardar.';
+    let mensaje = 'Líneas reconocidas del PDF cargadas sin IA. Compare todas las líneas, impuestos y descuentos con la cotización antes de guardar.';
     if (!proveedorAsignado && orden.proveedor_nombre) {
-      mensaje += ` <span class="text-warning">Proveedor detectado: ${orden.proveedor_nombre}, pero no existe igual en la lista.</span>`;
+      mensaje += ` Proveedor detectado: ${orden.proveedor_nombre}, pero no existe igual en la lista.`;
     }
-    cotizacionPreview.innerHTML = mensaje;
+    cotizacionPreview.textContent = mensaje;
   }
 
   if (cotizacionInput) {
@@ -546,6 +546,8 @@
       cotizacionData.value = "";
       cotizacionNombre.value = "";
       cotizacionTipo.value = "";
+      cotizacionPreview.textContent = '';
+      analizarCotizacionBtn.disabled = true;
       if (!file) return;
 
       const tiposValidos = ["application/pdf", "image/jpeg", "image/jpg", "image/png", "image/webp"];
@@ -565,11 +567,17 @@
 
       const reader = new FileReader();
       reader.onload = event => {
+        if (cotizacionInput.files?.[0] !== file) return;
         cotizacionData.value = event.target.result;
         cotizacionNombre.value = file.name;
         cotizacionTipo.value = file.type;
-        cotizacionPreview.innerHTML = `<span class="text-success fw-semibold">Archivo listo:</span> ${file.name}`;
+        cotizacionPreview.textContent = `Archivo listo: ${file.name}`;
         analizarCotizacionBtn.disabled = false;
+      };
+      reader.onerror = () => {
+        if (cotizacionInput.files?.[0] !== file) return;
+        cotizacionPreview.textContent = 'No se pudo leer el archivo. Selecciónelo nuevamente.';
+        analizarCotizacionBtn.disabled = true;
       };
       reader.readAsDataURL(file);
     });
@@ -587,9 +595,10 @@
       }
 
       analizarCotizacionBtn.disabled = true;
+      cotizacionInput.disabled = true;
       const textoOriginal = analizarCotizacionBtn.innerHTML;
       analizarCotizacionBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Leyendo cotización...';
-      cotizacionPreview.innerHTML = '<span class="text-muted">Analizando cotización con IA...</span>';
+      cotizacionPreview.textContent = 'Leyendo PDF dentro del sistema, sin IA...';
 
       try {
         const response = await fetch("<%= proveeduria ? '/proveeduria/cotizacion/analizar' : '/compras/cotizacion/analizar' %>", {
@@ -607,8 +616,9 @@
         }
         llenarOrdenDesdeCotizacion(data.orden);
       } catch (error) {
-        cotizacionPreview.innerHTML = `<span class="text-danger fw-semibold">${error.message || 'No se pudo analizar la cotización.'}</span>`;
+        cotizacionPreview.textContent = error.message || 'No se pudo analizar la cotización.';
       } finally {
+        cotizacionInput.disabled = false;
         analizarCotizacionBtn.innerHTML = textoOriginal;
         analizarCotizacionBtn.disabled = !cotizacionData.value;
       }

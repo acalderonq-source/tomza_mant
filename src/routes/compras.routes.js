@@ -4069,11 +4069,11 @@ async function generarExcelAsientoPasivos({ facturas = [], filtros = {}, connect
 }
 
 // ===================== FUNCIÓN PARA GENERAR NÚMERO DE PO =====================
-async function generarNumeroPO() {
-  const año = new Date().getFullYear();
-  const [rows] = await pool.query(
-    "SELECT po_numero FROM ordenes_compra WHERE po_numero LIKE ? ORDER BY id DESC LIMIT 1",
-    [`${año}-%`]
+async function generarNumeroPO(db = pool) {
+  const año = Number(fechaActualCostaRica().slice(0, 4));
+  const [rows] = await db.query(
+    "SELECT po_numero FROM ordenes_compra WHERE po_numero LIKE ? AND po_numero REGEXP ? ORDER BY CAST(SUBSTRING_INDEX(po_numero, '-', -1) AS UNSIGNED) DESC LIMIT 1",
+    [`${año}-%`, `^${año}-[0-9]+$`]
   );
   let consecutivo = 1;
   if (rows.length > 0) {
@@ -4545,15 +4545,17 @@ router.get("/ordenes/:id/editar", requireAuth, allowRoles("ADMIN", "TALLER", "PR
 });
 
 router.post("/ordenes", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER"), async (req, res) => {
-  const connection = await pool.getConnection();
+  let connection, liberarNumeracion;
   try {
     await ensureOrdenPlacaColumn();
     await ensureOrdenDetalleCodigoProductoColumn();
     await ensureOrdenCotizacionColumns();
     await ensureTipoMantenimientoColumns(pool);
+    connection = await pool.getConnection();
+    liberarNumeracion = await require('../utils/numeroOrdenCompra').bloquearNumeroOrden(connection);
     await connection.beginTransaction();
 
-    const po_numero = await generarNumeroPO();
+    const po_numero = await generarNumeroPO(connection);
     const fecha = fechaActualCostaRica();
 
     const { proveedor_id, forma_pago, moneda, placa_unidad, lineas, observaciones, empresa_destino, cotizacion_data, cotizacion_nombre, cotizacion_tipo } = req.body;
@@ -4614,11 +4616,12 @@ router.post("/ordenes", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_
     await connection.commit();
     res.redirect(`/compras/ordenes/${ordenId}/detalle?descargar=1`);
   } catch (error) {
-    await connection.rollback();
+    if (connection) await connection.rollback().catch(() => {});
     console.error(error);
-    res.status(500).send("Error guardando orden");
+    res.status(error.status || 500).send(error.status === 503 ? error.message : "Error guardando orden");
   } finally {
-    connection.release();
+    if (liberarNumeracion) await liberarNumeracion();
+    if (connection) connection.release();
   }
 });
 
@@ -4646,13 +4649,14 @@ router.post("/ordenes/consignacion-consumo", requireAuth, allowRoles("ADMIN", "T
     return res.redirect(`/bodega/consignacion/orden/revisar?${params}`);
   }
 
-  const connection = await pool.getConnection();
+  let connection, liberarNumeracion;
   let transaction = false;
   try {
     await ensureOrdenPlacaColumn();
     await ensureOrdenDetalleCodigoProductoColumn();
     await ensureTipoMantenimientoColumns(pool);
 
+    connection = await pool.getConnection();
     const [proveedores] = await connection.query("SELECT id, nombre FROM proveedores ORDER BY nombre");
     const normalizarProveedor = value => normalizarTextoCompra(value).replace(/[^A-Z0-9]/g, "");
     const solicitadoNormalizado = normalizarProveedor(proveedorSolicitado);
@@ -4688,6 +4692,7 @@ router.post("/ordenes/consignacion-consumo", requireAuth, allowRoles("ADMIN", "T
       })
     ])];
 
+    liberarNumeracion = await require('../utils/numeroOrdenCompra').bloquearNumeroOrden(connection);
     await connection.beginTransaction();
     transaction = true;
     const [[existente]] = await connection.query(`
@@ -4732,7 +4737,7 @@ router.post("/ordenes/consignacion-consumo", requireAuth, allowRoles("ADMIN", "T
     if (!lineas.length) throw new Error("El período no tiene consumo neto positivo para incluir en una orden de compra.");
 
     const fecha = fechaActualCostaRica();
-    const poNumero = await generarNumeroPO();
+    const poNumero = await generarNumeroPO(connection);
     const subtotal = Math.round((lineas.reduce((sum, linea) => sum + linea.cantidad_neta * linea.precio_unitario, 0) + Number.EPSILON) * 100) / 100;
     const iva = 13;
     const montoIva = subtotal * iva / 100;
@@ -4784,7 +4789,8 @@ router.post("/ordenes/consignacion-consumo", requireAuth, allowRoles("ADMIN", "T
     if (sede) params.set("sede", sede);
     res.redirect(`/bodega/consignacion?${params}`);
   } finally {
-    connection.release();
+    if (liberarNumeracion) await liberarNumeracion();
+    if (connection) connection.release();
   }
 });
 

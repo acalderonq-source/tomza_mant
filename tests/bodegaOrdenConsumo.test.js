@@ -7,7 +7,12 @@ let rolledBack;
 const statements = [];
 const connection = {
   beginTransaction: async () => {},
-  query: async (sql, params = []) => { statements.push({ sql, params }); return query(sql, params); },
+  query: async (sql, params = []) => {
+    if (sql.includes('GET_LOCK')) return [[{adquirido:1}]];
+    if (sql.includes('RELEASE_LOCK')) return [[{liberado:1}]];
+    if (sql.startsWith('SELECT po_numero FROM ordenes_compra')) return [[]];
+    statements.push({ sql, params }); return query(sql, params);
+  },
   commit: async () => { committed = true; },
   rollback: async () => { rolledBack = true; },
   release: () => {}
