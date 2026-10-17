@@ -4612,7 +4612,7 @@ router.post("/ordenes", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_
       );
     }
     await connection.commit();
-    res.redirect("/compras/ordenes");
+    res.redirect(`/compras/ordenes/${ordenId}/detalle?descargar=1`);
   } catch (error) {
     await connection.rollback();
     console.error(error);
@@ -4879,7 +4879,7 @@ router.post("/ordenes/:id/editar", requireAuth, allowRoles("ADMIN", "TALLER", "P
     }
 
     await connection.commit();
-    res.redirect(`/compras/ordenes/${id}/detalle`);
+    res.redirect(`/compras/ordenes/${id}/detalle?descargar=1`);
   } catch (error) {
     await connection.rollback();
     console.error("Error editando orden:", error);
@@ -5431,7 +5431,7 @@ router.get("/ordenes/:id/detalle", requireAuth, allowRoles(...ROLES_VER_ORDENES)
     const [lineas] = await pool.query("SELECT * FROM ordenes_compra_detalle WHERE orden_compra_id = ?", [id]);
     const trazabilidad = await require('../utils/trazabilidadOrden').cargarTrazabilidadOrden(pool, orden, req.session.user);
     res.set('Cache-Control', 'no-store');
-    res.render("compras/orden_detalle", { orden, proveedor, lineas, trazabilidad, user: req.session.user, facturasPortal:await facturasDeOrden(pool,"COMPRAS",id) });
+    res.render("compras/orden_detalle", { orden, proveedor, lineas, trazabilidad, descargarAutomaticamente: req.query.descargar === '1', user: req.session.user, facturasPortal:await facturasDeOrden(pool,"COMPRAS",id) });
   } catch (error) {
     console.error(error);
     res.status(500).send("Error cargando detalle");
