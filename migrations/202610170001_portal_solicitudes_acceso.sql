@@ -1,0 +1,16 @@
+CREATE TABLE IF NOT EXISTS prov_portal_solicitudes (
+ id INT AUTO_INCREMENT PRIMARY KEY,
+ cedula VARCHAR(12) NOT NULL UNIQUE,
+ razon_social VARCHAR(255) NOT NULL,
+ email VARCHAR(254) NOT NULL UNIQUE,
+ contacto VARCHAR(120) NOT NULL,
+ telefono VARCHAR(30) NOT NULL,
+ direccion VARCHAR(500) NOT NULL,
+ estado ENUM('PENDIENTE','APROBADA','RECHAZADA') NOT NULL DEFAULT 'PENDIENTE',
+ cuenta_id INT NULL,
+ revisado_por INT NULL,
+ motivo VARCHAR(500) NULL,
+ creado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ revisado_en TIMESTAMP NULL,
+ INDEX solicitudes_estado (estado,creado_en)
+) ENGINE=InnoDB;
