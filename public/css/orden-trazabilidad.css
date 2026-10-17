@@ -1,0 +1,13 @@
+.order-trace { border:1px solid #c9d7e0; background:#fff; border-radius:6px; overflow:hidden; }
+.order-trace-heading { display:flex; flex-wrap:wrap; justify-content:space-between; gap:8px; padding:14px 16px; background:#edf2f5; border-bottom:1px solid #c9d7e0; }
+.order-trace-heading h2 { margin:0; font-size:16px; font-weight:600; }
+.order-trace-heading span { font-size:13px; color:#526677; }
+.order-trace-flow { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); margin:0; padding:16px; list-style:none; gap:16px; }
+.order-trace-flow li { border-left:3px solid #8aaec5; padding-left:10px; min-width:0; }
+.order-trace-flow strong,.order-trace-flow span { display:block; overflow-wrap:anywhere; }
+.order-trace-flow strong { font-size:13px; color:#243e51; }
+.order-trace-flow span { font-size:12px; color:#526677; margin-top:5px; }
+.order-trace-actions { display:flex; flex-wrap:wrap; gap:8px; padding:0 16px 16px; }
+.order-trace .table { font-size:13px; }
+.order-trace .table th { background:#f4f6f7; font-weight:600; }
+.order-trace .table td,.order-trace .table th { padding:10px 14px; }

@@ -5429,7 +5429,9 @@ router.get("/ordenes/:id/detalle", requireAuth, allowRoles(...ROLES_VER_ORDENES)
     if (!orden) return res.status(404).send("Orden no encontrada");
     const [[proveedor]] = await pool.query("SELECT * FROM proveedores WHERE id = ?", [orden.proveedor_id]);
     const [lineas] = await pool.query("SELECT * FROM ordenes_compra_detalle WHERE orden_compra_id = ?", [id]);
-    res.render("compras/orden_detalle", { orden, proveedor, lineas, user: req.session.user, facturasPortal:await facturasDeOrden(pool,"COMPRAS",id) });
+    const trazabilidad = await require('../utils/trazabilidadOrden').cargarTrazabilidadOrden(pool, orden, req.session.user);
+    res.set('Cache-Control', 'no-store');
+    res.render("compras/orden_detalle", { orden, proveedor, lineas, trazabilidad, user: req.session.user, facturasPortal:await facturasDeOrden(pool,"COMPRAS",id) });
   } catch (error) {
     console.error(error);
     res.status(500).send("Error cargando detalle");

@@ -12,6 +12,7 @@ const { chromium } = require('playwright');
  app.get('/mantenimientos',(_req,res)=>res.render('mantenimientos',{user,mantenimientos:[],correctivos:[],filtro:'',filtros:{},mecanicos:[],sedeSeleccionada:'TODAS',success:null,error:null}));
  app.get('/taller/dashboard',(_req,res)=>res.render('taller_dashboard',{user,unidades:[],ultimosCorrectivos:[],prioridades:[],prioridadesPesados:[],prioridadesMecanico:[],solicitudesRepuestos:[],resumen:{enTaller:0,disponibles:0,total:0},sedeSeleccionada:'TODAS',puedeGestionar:false,puedeGestionarPrioridades:false,success:null,error:null}));
  app.get('/mantenimientos/dashboard',(_req,res)=>res.render('mantenimientos_dashboard',{user,dashboard:{},filtros:{sede:'TODAS'},sedesFiltro:[],familias:[]}));
+ app.get('/seguimiento',(_req,res)=>res.send('<!doctype html><html><head><link rel="stylesheet" href="/css/orden-trazabilidad.css"></head><body>'+require('ejs').render(require('node:fs').readFileSync(path.resolve(__dirname,'../src/views/compras/trazabilidad_orden.ejs'),'utf8'),{orden:{po_numero:'2026-001',proveedor_id:1,factura:'123',moneda:'CRC'},trazabilidad:{financiero:true,recibida:false,facturada:true,advertencias:[],asientos:[{lote_id:1,monto_asiento:100,fecha_factura:'2026-10-17'}],pagos:[{id:1,numero:'CP-1',fecha:'2026-10-17',tipo:'abono',monto:50}]}})+'</body></html>'));
  const server = app.listen(0,'127.0.0.1'); await new Promise(r=>server.once('listening',r));
  let browser;
  try {
@@ -55,6 +56,11 @@ const { chromium } = require('playwright');
     await page.screenshot({path:path.join(os.tmpdir(),'tomza-empresa-'+route.slice(1).replaceAll('/','-')+'-'+width+'.png'),fullPage:true});
    }
   }
+  await page.goto('http://127.0.0.1:'+server.address().port+'/seguimiento');
+  assert.equal(await page.getByRole('link',{name:'Descargar colilla'}).count(),1);
+  assert.equal(await page.getByRole('link',{name:'Abrir asiento'}).count(),1);
+  assert.match(await page.locator('.order-trace-flow').textContent(),/Sin confirmación registrada/);
+  await page.screenshot({path:path.join(os.tmpdir(),'tomza-seguimiento-orden.png'),fullPage:true});
   assert.deepEqual(errors,[]); console.log('UI OK: escritorio, movil, busqueda, permisos conservados.');
  } finally {await browser?.close();await new Promise(r=>server.close(r));}
 })().catch(e=>{console.error(e);process.exitCode=1;});

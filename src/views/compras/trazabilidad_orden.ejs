@@ -1,0 +1,26 @@
+<% const fechaSeguimiento = value => {
+  if (!value) return 'Sin fecha';
+  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) return value.split('-').reverse().join('/');
+  return new Date(value).toLocaleDateString('es-CR',{timeZone:'America/Costa_Rica'});
+}; %>
+<section class="order-trace mb-4" aria-labelledby="trace-title">
+  <header class="order-trace-heading"><h2 id="trace-title">Seguimiento de la orden</h2><span><%= orden.po_numero %></span></header>
+  <ol class="order-trace-flow">
+    <li><strong>Orden de compra</strong><span><%= orden.estado || 'Registrada' %></span></li>
+    <li><strong>Recepción de productos</strong><span><%= trazabilidad.recibida ? 'Confirmada' : 'Sin confirmación registrada' %></span></li>
+    <li><strong>Factura</strong><span><%= trazabilidad.facturada ? orden.factura : 'Sin factura registrada' %></span></li>
+    <% if (trazabilidad.financiero) { %>
+    <li><strong>Pago</strong><span><%= Number(orden.pagada) === 1 ? 'Marcada como pagada' : Number(orden.abono_monto) > 0 ? 'Con abonos · saldo pendiente' : 'Sin pago confirmado' %></span></li>
+    <li><strong>Asiento de pasivos</strong><span><%= trazabilidad.advertencias.some(a=>a.includes('asientos')) ? 'Consulta no disponible' : trazabilidad.asientos.length ? 'Registrado' : 'Sin asiento vinculado' %></span></li>
+    <% } %>
+  </ol>
+  <% if (trazabilidad.financiero) { %>
+  <div class="order-trace-actions"><a href="/compras/facturas?proveedor_id=<%= orden.proveedor_id %>" class="btn btn-outline-primary btn-sm">Facturas del proveedor</a><a href="/compras/facturas/historial-pagos" class="btn btn-outline-primary btn-sm">Historial de pagos</a></div>
+  <% trazabilidad.advertencias.forEach(aviso=>{ %><p class="text-warning px-3" role="status"><%= aviso %></p><% }) %>
+  <div class="table-responsive"><table class="table table-sm mb-0"><thead><tr><th>Documento relacionado</th><th>Fecha</th><th>Importe aplicado a esta orden</th><th>Acción</th></tr></thead><tbody>
+  <% trazabilidad.pagos.forEach(p=>{ %><tr><td><%= p.numero %> · <%= p.tipo %></td><td><%= fechaSeguimiento(p.fecha) %></td><td><%= p.monto === null ? 'No determinado' : p.monto.toLocaleString('es-CR',{minimumFractionDigits:2,maximumFractionDigits:2}) %> <%= orden.moneda || 'CRC' %></td><td><a href="/compras/facturas/colillas/<%= p.id %>/descargar">Descargar colilla</a></td></tr><% }) %>
+  <% trazabilidad.asientos.forEach(a=>{ %><tr><td>Asiento #<%= a.lote_id %></td><td><%= fechaSeguimiento(a.fecha_factura) %></td><td><%= Number(a.monto_asiento).toLocaleString('es-CR',{minimumFractionDigits:2,maximumFractionDigits:2}) %> CRC</td><td><a href="/compras/facturas/asientos/<%= a.lote_id %>">Abrir asiento</a></td></tr><% }) %>
+  <% if (!trazabilidad.pagos.length && !trazabilidad.asientos.length) { %><tr><td colspan="4" class="text-muted text-center py-3"><%= trazabilidad.advertencias.length ? 'Hay consultas pendientes de resolver.' : 'No hay colillas ni asientos vinculados por identificador a esta orden.' %></td></tr><% } %>
+  </tbody></table></div>
+  <% } %>
+</section>
