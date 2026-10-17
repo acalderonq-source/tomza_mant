@@ -196,6 +196,7 @@ app.use(session({
   }
 }));
 
+app.use(require('./middleware/supplierIsolation').isolateSupplier);
 app.use(protegerSesiones(pool,sessionSecret));
 
 app.use("/uploads", require("./routes/uploads.routes"));
@@ -386,7 +387,7 @@ const carnetsRoutes = require("./routes/carnets.routes");
 
 // ===================== USAR RUTAS =====================
 const portalProveedores = require('./routes/portalProveedores.routes');
-app.use('/portal-proveedores', portalProveedores.externo);
+app.use('/portal-proveedores', portalProveedores.externo, (_req,res)=>res.sendStatus(404));
 
 app.use("/", authRoutes);
 app.use((req, res, next) => {
