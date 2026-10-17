@@ -471,8 +471,9 @@
       .actions .btn, .actions input { width: 100%; }
     }
   </style>
+  <link rel="stylesheet" href="/css/taller-empresa.css">
 </head>
-<body>
+<body class="<%= ['PANTALLA_MECANICOS', 'PANTALLA_PESADOS'].includes(user.rol) ? '' : 'taller-empresa' %>">
 <%
   const lista = Array.isArray(unidades) ? unidades : [];
   const ultimos = Array.isArray(ultimosCorrectivos) ? ultimosCorrectivos : [];

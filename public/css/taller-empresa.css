@@ -1,0 +1,71 @@
+body.taller-empresa { --ink:#23333d; --muted:#596b75; --line:#d9e1e5; background:#f4f6f7!important; color:var(--ink); font:14px/1.5 "Segoe UI",Arial,sans-serif; overflow:auto; }
+.taller-empresa main.shell { height:auto; }
+.taller-empresa .hero { display:block; }
+.taller-empresa .dashboard-layout { height:auto; min-height:480px; }
+.taller-empresa * { letter-spacing:0!important; }
+.taller-empresa .navbar { background:#fff!important; color:#23333d; border-bottom:1px solid #ccd7dd; box-shadow:none; padding:12px 24px!important; gap:12px; }
+.taller-empresa .navbar .navbar-brand,.taller-empresa .navbar .text-white,.taller-empresa .clock-box,.taller-empresa .tv-title { color:#23333d!important; }
+.taller-empresa .navbar .btn-outline-light { color:#0865aa; border-color:#adc4d4; }
+.taller-empresa .brand-box { background:#e9f2f8; color:#0865aa; border-radius:4px; }
+.taller-empresa .tv-title { font-size:20px; font-weight:600; text-align:left!important; }
+.taller-empresa .shell,.taller-empresa .dashboard-shell,.taller-empresa>.container-fluid { max-width:1600px; }
+.taller-empresa main,.taller-empresa>.container-fluid { padding:24px!important; }
+.taller-empresa .simple-hero,.taller-empresa .hero,.taller-empresa .hero-panel { background:transparent; color:#23333d; border:0; border-radius:0; box-shadow:none; padding:0 0 20px; margin-bottom:20px!important; border-bottom:1px solid #d9e1e5; }
+.taller-empresa .hero-panel::before,.taller-empresa .hero-panel::after { display:none; }
+.taller-empresa .page-title,.taller-empresa .hero-title { color:#23333d; font-size:26px; font-weight:600; line-height:1.3; margin-bottom:5px; }
+.taller-empresa .hero-subtitle,.taller-empresa .eyebrow,.taller-empresa .page-subtitle { color:#596b75; }
+.taller-empresa .hero-badge { background:#fff; border:1px solid #d9e1e5; color:#425968; border-radius:4px; }
+.taller-empresa .section-title,.taller-empresa .filter-title { color:#23333d; font-size:16px; font-weight:600; }
+.taller-empresa .plain-card { background:transparent; border:0; border-radius:0; padding:12px 0!important; }
+.taller-empresa .summary-grid,.taller-empresa .kpi-grid { gap:16px; margin-bottom:24px!important; }
+.taller-empresa .summary-card,.taller-empresa .kpi-card,.taller-empresa .stat-card { background:#fff; border:1px solid #d9e1e5!important; border-radius:6px!important; box-shadow:none!important; padding:16px 18px; min-width:0; }
+.taller-empresa .summary-label,.taller-empresa .kpi-label,.taller-empresa .stat-label { font-size:12px; text-transform:none; font-weight:600; color:#596b75; }
+.taller-empresa .summary-value,.taller-empresa .kpi-value,.taller-empresa .stat-number { color:#23333d; font-size:28px; font-weight:600; line-height:1.3; }
+.taller-empresa .summary-foot { font-size:12px; margin-top:6px; }
+.taller-empresa .btn,.taller-empresa .rounded-pill,.taller-empresa .form-control,.taller-empresa .form-select { border-radius:4px!important; box-shadow:none; font-size:13px; }
+.taller-empresa .btn { font-weight:600; white-space:normal; }
+.taller-empresa .btn-primary { background:#0865aa; border-color:#0865aa; }
+.taller-empresa .btn-outline-primary { color:#0865aa; border-color:#a4bdce; }
+.taller-empresa .btn-outline-primary:hover { background:#e8f2f8; color:#07558f; }
+.taller-empresa .sede-selector { gap:6px; }
+.taller-empresa .sede-selector .btn { padding:6px 10px; font-weight:500; }
+.taller-empresa .sede-selector .btn-dark { background:#0865aa; border-color:#0865aa; }
+.taller-empresa .module-grid { gap:14px; grid-template-columns:repeat(4,minmax(0,1fr)); }
+.taller-empresa .module-card { min-height:104px; border:1px solid #d9e1e5; border-radius:6px; padding:18px 16px; gap:14px; box-shadow:none; align-items:flex-start; }
+.taller-empresa .module-card>div { min-width:0; }
+.taller-empresa .module-card:hover { border-color:#0865aa; background:#fafdff; transform:none; }
+.taller-empresa .module-title { font-size:15px; font-weight:600; line-height:1.35; }
+.taller-empresa .module-copy { font-size:12px; line-height:1.5; margin-top:5px; }
+.taller-empresa .module-icon { width:36px; height:36px; min-width:36px; border-radius:4px; font-size:19px; }
+.taller-empresa .panel,.taller-empresa .priority-panel,.taller-empresa .surface-card,.taller-empresa .card,.taller-empresa .filter-panel,.taller-empresa .filters-card,.taller-empresa .chart-card { border:1px solid #d9e1e5!important; border-radius:6px!important; box-shadow:none!important; background:#fff; }
+.taller-empresa .tv-panel-title,.taller-empresa .priority-panel-head,.taller-empresa .chart-header,.taller-empresa .panel-header { background:#fff; color:#23333d; border-bottom:1px solid #d9e1e5; font-size:16px; font-weight:600; padding:14px 16px; }
+.taller-empresa .priority-group-title { background:#f4f6f7; color:#425968; border-bottom:1px solid #d9e1e5; }
+.taller-empresa .priority-card { border-radius:4px; box-shadow:none; }
+.taller-empresa .table { color:#23333d; font-size:13px; }
+.taller-empresa .table th { background:#f4f6f7!important; color:#425968!important; font-size:12px; font-weight:600; text-transform:none; padding:12px; }
+.taller-empresa .table td { padding:12px; border-color:#e4eaed; }
+.taller-empresa .table-hover tbody tr:hover { background:#edf5fa; }
+.taller-empresa .table-responsive { border-radius:0; }
+.taller-empresa .insight-card,.taller-empresa .node,.taller-empresa .selector-card,.taller-empresa .record-card { border:1px solid #d9e1e5; border-radius:6px; box-shadow:none; background:#fff; }
+.taller-empresa .node-header,.taller-empresa .detail-head { background:#edf2f5; color:#23333d; border-bottom:1px solid #d9e1e5; padding:16px 20px; }
+.taller-empresa .node-title,.taller-empresa .node-subtitle,.taller-empresa .insight-value { color:#23333d; font-weight:600; }
+.taller-empresa .node-chip { background:#fff; color:#425968; border:1px solid #ccd7dd; border-radius:4px; }
+.taller-empresa .node-body,.taller-empresa .selector-head,.taller-empresa .record-top { background:#fff; }
+.taller-empresa .stat-card::after { display:none; }
+.taller-empresa .hero-title { text-transform:none; }
+.taller-empresa .taller-module-toolbar { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; margin:24px 0 14px; }
+.taller-empresa .taller-module-toolbar input { width:300px; max-width:100%; }
+.taller-empresa .module-card[hidden] { display:none!important; }
+.taller-empresa .taller-module-empty { padding:24px 0; color:#596b75; }
+@media(max-width:1100px) { .taller-empresa .module-grid { grid-template-columns:repeat(3,minmax(0,1fr)); } }
+@media(max-width:800px) {
+ .taller-empresa .module-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+ .taller-empresa .navbar { flex-wrap:wrap; padding:12px!important; }
+ .taller-empresa .navbar>div { flex-wrap:wrap; }
+ .taller-empresa main,.taller-empresa>.container-fluid { padding:16px!important; }
+ .taller-empresa .summary-grid,.taller-empresa .kpi-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+ .taller-empresa .page-heading { align-items:flex-start; flex-wrap:wrap; }
+ .taller-empresa .dashboard-layout { grid-template-columns:minmax(0,1fr); }
+}
+@media(max-width:480px) { .taller-empresa .module-grid { grid-template-columns:minmax(0,1fr); } .taller-empresa .taller-module-toolbar input { width:100%; } }
+@media print { .taller-module-toolbar { display:none!important; } }
