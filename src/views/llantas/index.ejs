@@ -296,15 +296,16 @@
   const textoSeguroData = value => String(value || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   const negocioTexto = solicitud => {
     if (typeof negocioLlanta === 'function') return negocioLlanta(solicitud);
-    const sede = String(solicitud.sede || '').toUpperCase();
+    const sede = String(solicitud.sede || '').trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
     const placa = String(solicitud.placa || '').toUpperCase();
+    if (sede === 'TECNICOS') return 'Tecnicos';
     if (sede.includes('GRANEL')) return 'Granel';
     if (sede === 'TRANSPORTADORA' || /^S\d{5,6}$/.test(placa) || /^EE\d{5,6}$/.test(placa)) return 'Transportadora';
-    if (sede === 'TALLER' || sede === 'TECNICOS') return 'Otros';
+    if (sede === 'TALLER') return 'Otros';
     return 'Cilindros';
   };
   const ordenarNegocios = (a, b) => {
-    const orden = ['Cilindros', 'Granel', 'Transportadora', 'Otros'];
+    const orden = ['Cilindros', 'Granel', 'Transportadora', 'Tecnicos', 'Otros'];
     return (orden.indexOf(a.negocio) === -1 ? 99 : orden.indexOf(a.negocio)) -
       (orden.indexOf(b.negocio) === -1 ? 99 : orden.indexOf(b.negocio));
   };

@@ -4,8 +4,6 @@ const PdfPrinter = require("pdfmake");
 const pool = require("../db");
 const {
   agregarTallerParaMecanico,
-  esSedeGranel,
-  esSedeTransportadoraDetalle,
   esSedeTransporte,
   esUsuarioPesados,
   esUsuarioTodasSedes,
@@ -17,6 +15,7 @@ const {
 } = require("../utils/sedes");
 const { agregarFiltroPlacaSql } = require("../utils/placas");
 const { prepararCotizacion } = require("../utils/llantasEntrega");
+const { negocioLlanta } = require('../utils/llantasNegocio');
 
 const router = express.Router();
 
@@ -248,16 +247,6 @@ function construirFiltrosSolicitudes(sedesPermitidas, filtros = {}) {
     where: condiciones.length ? `WHERE ${condiciones.join(" AND ")}` : "",
     params
   };
-}
-
-function negocioLlanta(solicitud) {
-  const sede = String(solicitud.sede || "").trim();
-  const placa = String(solicitud.placa || "").trim().toUpperCase();
-
-  if (esSedeGranel(sede)) return "Granel";
-  if (sede.toUpperCase() === "TRANSPORTADORA" || esSedeTransportadoraDetalle(sede) || /^S\d{5,6}$/.test(placa) || /^EE\d{5,6}$/.test(placa)) return "Transportadora";
-  if (["TALLER", "TECNICOS"].includes(sede.toUpperCase())) return "Otros";
-  return "Cilindros";
 }
 
 function pdfStreamToBuffer(pdfDoc) {
