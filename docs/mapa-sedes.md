@@ -1,9 +1,8 @@
 # Mapa de sedes en el inicio empresarial
 
 Reemplaza la ilustracion por Leaflet 1.9.4 con cartografia OpenStreetMap.
-El mapa ocupa todo el espacio central bajo la barra superior, sin marco ni
-texto de bienvenida alrededor. Conserva el menu de departamentos. La ficha
-de fotos aparece superpuesta solo al seleccionar la sede, sin desplazar el mapa.
+Conserva la bienvenida y el menu de departamentos. La cartografia utiliza sus
+colores originales, sin filtros de desaturacion o escala de grises.
 Una sede inicial: Cartago, Gas Tomza de Costa Rica S.A., coordenadas del enlace
 de Bing entregado por el usuario: 9.877662658691406, -83.94295501708984.
 No se geocodifico ni se supusieron direcciones de las demas sedes.

@@ -4,9 +4,9 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
 <link rel="stylesheet" href="/css/inicio-empresa.css?v=1"><script src="/js/inicio-empresa.js?v=1" defer></script>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css">
-<link rel="stylesheet" href="/css/sedes-mapa.css?v=4">
+<link rel="stylesheet" href="/css/sedes-mapa.css?v=5">
 <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js" defer></script>
-<script src="/js/sedes-mapa.js?v=4" defer></script></head>
+<script src="/js/sedes-mapa.js?v=5" defer></script></head>
 <body class="inicio-empresa">
 <a class="skip-link" href="#contenido">Ir al contenido</a>
 <aside class="empresa-menu" id="departamentos-menu">
@@ -24,16 +24,19 @@
 <div class="empresa-workspace"><header class="empresa-topbar"><button type="button" class="menu-toggle" aria-controls="departamentos-menu" aria-expanded="false" aria-label="Abrir departamentos"><i class="bi bi-list" aria-hidden="true"></i></button>
 <strong>Sistema de Gestión Empresarial</strong><div class="empresa-search"><i class="bi bi-search" aria-hidden="true"></i><label class="sr-only" for="buscar-departamento">Buscar departamento</label><input type="search" id="buscar-departamento" placeholder="Buscar departamento…" autocomplete="off"></div>
 <div class="empresa-account"><i class="bi bi-person-circle" aria-hidden="true"></i><span><%= user ? user.nombre || user.usuario : 'Acceso interno' %><small><%= user ? user.rol.replace(/_/g,' ') : 'Gas Tomza' %></small></span></div></header>
-<main id="contenido" class="inicio-mapa">
-<section class="sedes-panel" aria-label="Sedes de Gas Tomza en Costa Rica">
+<main id="contenido"><section class="empresa-welcome"><div class="welcome-copy"><p class="eyebrow">GAS TOMZA</p><h1>Bienvenido al <br>sistema empresarial</h1><p class="welcome-subtitle"><%= user ? 'Seleccioná un departamento para comenzar.' : 'Seleccioná tu departamento para iniciar sesión.' %></p><div class="welcome-rule"></div>
+<% if(user){ %><div class="welcome-identity"><span class="identity-icon"><i class="bi bi-person-check" aria-hidden="true"></i></span><div><strong><%= user.nombre || user.usuario %></strong><span><%= departamentos.filter(d=>d.permitido).length %> departamento(s) autorizado(s)</span></div></div><% } %>
+</div>
+<section class="sedes-panel" aria-labelledby="sedes-titulo">
+<header class="sedes-header"><div><p class="eyebrow">PRESENCIA NACIONAL</p><h2 id="sedes-titulo">Conectados en Costa Rica</h2></div><span class="sedes-count"><span></span>1 sede</span></header>
 <div class="sedes-map-stage">
 <div id="sedes-mapa" aria-label="Mapa interactivo de sedes de Gas Tomza en Costa Rica"></div>
 <button type="button" id="mapa-pais" class="mapa-country" title="Ver Costa Rica completa" aria-label="Ver Costa Rica" disabled><i class="bi bi-globe-americas" aria-hidden="true"></i>Costa Rica<i class="bi bi-arrows-angle-expand" aria-hidden="true"></i></button>
 <div class="mapa-zoom" aria-label="Controles del mapa"><button type="button" id="mapa-acercar" title="Acercar mapa" aria-label="Acercar mapa" disabled><i class="bi bi-plus-lg" aria-hidden="true"></i></button><button type="button" id="mapa-alejar" title="Alejar mapa" aria-label="Alejar mapa" disabled><i class="bi bi-dash-lg" aria-hidden="true"></i></button></div>
-<p id="mapa-estado" class="mapa-estado" role="status">Cargando mapa…</p>
-<footer class="sedes-footer"><button type="button" id="mapa-cartago" title="Centrar sede Cartago" disabled><i class="bi bi-geo-alt" aria-hidden="true"></i><span>Cartago</span></button>
-<a href="https://www.bing.com/maps?cp=9.877662658691406~-83.94295501708984&amp;lvl=16&amp;sp=point.9.877662658691406_-83.94295501708984_Gas%20Tomza%20Cartago" target="_blank" rel="noopener noreferrer">Ver ubicación <i class="bi bi-arrow-up-right" aria-hidden="true"></i></a></footer>
 </div>
+<p id="mapa-estado" class="mapa-estado" role="status">Cargando mapa…</p>
+<footer class="sedes-footer"><button type="button" id="mapa-cartago" title="Centrar sede Cartago" disabled><span class="sede-symbol"><i class="bi bi-buildings" aria-hidden="true"></i></span><span><small>SEDE GAS TOMZA</small><strong>Cartago</strong><span class="sede-company">Gas Tomza de Costa Rica S.A.</span></span></button>
+<a href="https://www.bing.com/maps?cp=9.877662658691406~-83.94295501708984&amp;lvl=16&amp;sp=point.9.877662658691406_-83.94295501708984_Gas%20Tomza%20Cartago" target="_blank" rel="noopener noreferrer">Ver ubicación <i class="bi bi-arrow-up-right" aria-hidden="true"></i></a></footer>
 <section id="sede-detalle" class="sede-detalle" aria-labelledby="sede-detalle-titulo" hidden>
 <header><div><p class="eyebrow">CONOCÉ NUESTRA SEDE</p><h3 id="sede-detalle-titulo">Cartago</h3></div><button type="button" id="sede-detalle-cerrar" aria-label="Cerrar ficha de sede" title="Cerrar ficha de sede"><i class="bi bi-x-lg" aria-hidden="true"></i></button></header>
 <div class="sede-galeria"><img id="sede-foto" alt="" hidden><p id="sede-foto-estado" role="status">Todavía no se han agregado fotografías de esta sede.</p></div>
@@ -41,5 +44,5 @@
 </section>
 <noscript><p>Active JavaScript para usar el mapa interactivo. Puede abrir la ubicación con el enlace anterior.</p></noscript>
 </section>
-</main></div>
+</section><footer class="welcome-footer"><span></span>Gestión integrada en un solo lugar</footer></main></div>
 </body></html>

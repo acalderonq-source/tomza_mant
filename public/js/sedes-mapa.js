@@ -67,8 +67,5 @@ document.addEventListener('DOMContentLoaded',()=>{
   document.getElementById('mapa-cartago').addEventListener('click',()=>{
     seleccionar(sedes[0],marcadores[0]);
   });
-  const topbar=document.querySelector('.empresa-topbar');
-  const ajustar=()=>{if(topbar)container.style.setProperty('--mapa-topbar',topbar.getBoundingClientRect().height+'px');map.invalidateSize({pan:false});};
-  ajustar();
-  if(window.ResizeObserver){const observer=new ResizeObserver(ajustar);observer.observe(container);if(topbar)observer.observe(topbar);}
+  if(window.ResizeObserver)new ResizeObserver(()=>map.invalidateSize({pan:false})).observe(container);
 });
