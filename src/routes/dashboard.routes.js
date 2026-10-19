@@ -2353,6 +2353,11 @@ router.get("/", async (req, res) => {
       return res.redirect("/login");
     }
 
+    if(req.session.user.accesoPersonal){
+      const config=req.session.user.accesoPersonal;
+      const modulos=require('../utils/accesosTrabajador').MODULOS.filter(m=>config.permisos[m.id] && m.url && m.areas.includes(config.departamento));
+      return res.render('trabajadores/inicio_personal',{user:req.session.user,config,modulos});
+    }
     if (req.session.user.departamentoActivo === "ADMINISTRACION") return res.redirect("/administracion");
     if (req.session.user.departamentoActivo === 'SEGURIDAD_OCUPACIONAL') return res.redirect('/seguridad-ocupacional');
     if (req.session.user.departamentoActivo === "CARBURACION") {

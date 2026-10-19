@@ -80,6 +80,10 @@ function puedeAbrirRutaPorDepartamento(departamento, pathname, rol = "") {
 
 function controlarAccesoPorDepartamento(req, res, next) {
   const user = req.session?.user;
+  if(user?.accesoPersonal && /^acceso_\d{9,12}$/.test(user.usuario || '')){
+    if(user.departamentoActivo===user.accesoPersonal.departamento && require('./accesosTrabajador').puedeAcceder(user.accesoPersonal,req.path,req.method))return next();
+    return res.status(403).send('No tiene permiso para ingresar o realizar esta accion.');
+  }
   if (user?.esPropietarioAdministracion && coincideRuta(req.path, ['/compras/facturas/correo'])) return next();
   if (!user || puedeAbrirRutaPorDepartamento(user.departamentoActivo, req.path, user.rol)) return next();
 

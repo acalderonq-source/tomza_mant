@@ -207,6 +207,7 @@ app.use(session({
 
 app.use(require('./middleware/supplierIsolation').isolateSupplier);
 app.use(protegerSesiones(pool,sessionSecret));
+app.use(require('./utils/accesosTrabajador').controlarAccesosPersonales(pool));
 
 app.use("/uploads", require("./routes/uploads.routes"));
 // Serve public assets only after the private uploads handler has enforced access.

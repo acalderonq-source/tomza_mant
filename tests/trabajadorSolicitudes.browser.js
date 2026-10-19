@@ -49,6 +49,10 @@ const { ensureCsrfToken, injectSecurityAssets } = require('../src/middleware/sec
     await page.goto(base+'/test-admin');
     assert.equal(await page.getByRole('heading',{name:'Persona de Prueba'}).isVisible(),true);
     assert.equal(await page.getByRole('button',{name:'Aprobar y crear acceso y carnet'}).isVisible(),true);
+    assert.equal(await page.locator('[name="usuario_ids"]').count(),0);
+    await page.getByLabel('Departamento autorizado').selectOption('TALLER');
+    await page.locator('[name="permiso_MANTENIMIENTOS"]').selectOption('LECTURA');
+    assert.equal(await page.locator('[name="permiso_CARBURACION"]').isEnabled(),false);
     await page.screenshot({path:'tmp/solicitudes-trabajador-admin.png',fullPage:true});
     await page.setViewportSize({width:390,height:844});
     assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));

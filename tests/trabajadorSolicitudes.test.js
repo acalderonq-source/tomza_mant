@@ -29,6 +29,9 @@ test('solicitar no crea acceso; ADMIN verifica, asigna perfil y crea acceso y ca
     if (sql.startsWith('SELECT id FROM usuarios WHERE id IN')) return [params[0].includes(7)?[{id:7}]:[]];
     if (sql.startsWith('SELECT cedula FROM usuario_cedulas')) return [acceso?[{cedula:acceso.cedula}]:[]];
     if (sql.startsWith('SELECT id FROM usuarios WHERE cedula')) return [[]];
+    if(sql.includes('CREATE TABLE IF NOT EXISTS usuario_accesos_personales'))return [{affectedRows:0}];
+    if(sql.startsWith('INSERT INTO usuarios ('))return [{insertId:7}];
+    if(sql.startsWith('INSERT INTO usuario_departamentos') || sql.startsWith('INSERT INTO usuario_accesos_personales'))return [{affectedRows:1}];
     if (sql.startsWith('INSERT INTO usuario_cedulas')) { acceso={cedula:params[0],usuario_id:params[1],nombre:params[2],codigo:params[3],hash:params[4]}; return [{insertId:2}]; }
     if (sql.startsWith('SELECT cedula FROM carnets_trabajador')) return [carnet?[{cedula:carnet.cedula}]:[]];
     if (sql.startsWith('INSERT INTO carnets_trabajador')) { carnet={cedula:params[0],token:params[1]}; return [{insertId:1}]; }
@@ -50,7 +53,7 @@ test('solicitar no crea acceso; ADMIN verifica, asigna perfil y crea acceso y ca
     if(response.headers.get('set-cookie'))cookie=response.headers.get('set-cookie').split(';')[0];return response;
   };
   const admin='/admin/solicitudes-trabajadores';
-  const aprobar={accion:'aprobar',identidad_verificada:'1',codigo_trabajador:'2986',usuario_ids:['7']};
+  const aprobar={accion:'aprobar',identidad_verificada:'1',codigo_trabajador:'2986',departamento:'TALLER',sede_asignada:'Cartago',permiso_MANTENIMIENTOS:'GESTION'};
   try {
     token=(await(await req('/token')).json()).token;
     assert.equal((await req('/solicitar-ingreso')).status,200);
@@ -71,7 +74,7 @@ test('solicitar no crea acceso; ADMIN verifica, asigna perfil y crea acceso y ca
     assert.equal((await req(admin+'/1',aprobar)).status,409);assert.equal(commits,1);
     solicitud.estado='PENDIENTE';assert.equal((await req(admin+'/1',aprobar)).status,409,'no reemplaza un acceso existente');
     assert.equal((await req(admin+'/1',{accion:'rechazar',motivo:'No corresponde a un trabajador verificado'})).status,303);
-    assert.equal(solicitud.estado,'RECHAZADA');assert.equal(commits,2);assert.ok(rollbacks>=3);
+    assert.equal(solicitud.estado,'RECHAZADA');assert.equal(commits,2);assert.equal(rollbacks,2,'solo las solicitudes ya procesadas y duplicadas abren transaccion; los permisos invalidos se rechazan antes');
     assert.equal(consultas.filter(sql=>sql.startsWith('INSERT INTO usuario_cedulas')).length,1);
   } finally { server.closeAllConnections();await new Promise(resolve=>server.close(resolve)); }
 });

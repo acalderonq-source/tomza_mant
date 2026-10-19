@@ -1,0 +1,6 @@
+CREATE TABLE IF NOT EXISTS usuario_accesos_personales (
+  usuario_id INT NOT NULL PRIMARY KEY,
+  config_json TEXT NOT NULL,
+  asignado_por INT NOT NULL,
+  actualizado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);

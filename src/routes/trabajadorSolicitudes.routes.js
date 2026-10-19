@@ -6,6 +6,8 @@ const { normalizarCedula, cedulaValida } = require('../utils/cedula');
 const { SEDES_SOLICITUD, sedeSolicitud } = require('../utils/sedesSolicitudesTrabajadores');
 const { correoIngreso, guardarCorreoIngreso } = require('../utils/ingresosSesion');
 const { requireAdministracion } = require('../middleware/requireAdministracion');
+const {AREAS,MODULOS,validarAcceso,prepararAccesos}=require('../utils/accesosTrabajador');
+const {DEPARTAMENTOS}=require('../utils/departamentos');
 
 function fallo(mensaje, status = 400) { throw Object.assign(new Error(mensaje), { status }); }
 function texto(value, max, min = 1) {
@@ -55,10 +57,9 @@ function createRouters(db, opciones = {}) {
   privado.get('/', wrap(async (req, res) => {
     const estado = ['PENDIENTE','APROBADA','RECHAZADA'].includes(req.query.estado) ? req.query.estado : 'PENDIENTE';
     const [solicitudes] = await db.query('SELECT id,cedula,nombre_completo,puesto,sede,correo,estado,codigo_trabajador,motivo,creado_en,revisado_en FROM trabajador_solicitudes_acceso WHERE estado=? ORDER BY creado_en DESC,id DESC LIMIT 200', [estado]);
-    const [perfiles] = await db.query("SELECT id,usuario,nombre,rol,sede FROM usuarios WHERE rol NOT IN ('ADMIN','PANTALLA_MECANICOS','PANTALLA_PESADOS') ORDER BY rol,usuario");
     const mensaje = req.session.solicitudTrabajadorMensaje || '';
     delete req.session.solicitudTrabajadorMensaje;
-    res.render('trabajadores/solicitudes_ingreso', { solicitudes: solicitudes.map(s => ({ ...s, sede: sedeSolicitud(s.sede) || s.sede })), perfiles, estado, mensaje });
+    res.render('trabajadores/solicitudes_ingreso', { solicitudes: solicitudes.map(s => ({ ...s, sede: sedeSolicitud(s.sede) || s.sede })), departamentos:DEPARTAMENTOS.filter(d=>AREAS[d.key]),modulos:MODULOS,sedesAsignables:SEDES_SOLICITUD, estado, mensaje });
   }));
   privado.post('/:id', wrap(async (req, res) => {
     if (!/^[1-9]\d{0,14}$/.test(req.params.id)) fallo('Solicitud invalida.');
@@ -66,14 +67,14 @@ function createRouters(db, opciones = {}) {
     if (!aprobar && req.body.accion !== 'rechazar') fallo('Accion invalida.');
     const motivo = typeof req.body.motivo === 'string' ? req.body.motivo.trim() : '';
     if (motivo.length > 500 || (!aprobar && motivo.length < 5)) fallo('Indique un motivo de 5 a 500 caracteres.');
-    let codigo, ids, hash;
+    let codigo, ids, hash,acceso;
     if (aprobar) {
       if (req.body.identidad_verificada !== '1') fallo('Confirme que verifico la identidad y el puesto del trabajador.');
       codigo = String(req.body.codigo_trabajador || '').trim();
       if (!/^\d{1,30}$/.test(codigo)) fallo('Ingrese el codigo de trabajador.');
-      const valores = Array.isArray(req.body.usuario_ids) ? req.body.usuario_ids : [req.body.usuario_ids];
-      ids = [...new Set(valores.map(Number))];
-      if (!ids.length || ids.length > 10 || ids.some(id => !Number.isSafeInteger(id) || id < 1)) fallo('Seleccione perfiles de acceso validos.');
+      if(req.body.usuario_ids!==undefined)fallo('Use departamento y permisos; ya no se asignan perfiles de otras personas.');
+      acceso=validarAcceso(req.body);
+      await prepararAccesos(db);
       hash = await bcrypt.hash(codigo, 12);
     }
     const connection = await db.getConnection();
@@ -83,11 +84,14 @@ function createRouters(db, opciones = {}) {
       const solicitud = rows[0];
       if (!solicitud || solicitud.estado !== 'PENDIENTE') fallo('Esta solicitud ya fue revisada o no existe.', 409);
       if (aprobar) {
-        const [perfiles] = await connection.query("SELECT id FROM usuarios WHERE id IN (?) AND rol NOT IN ('ADMIN','PANTALLA_MECANICOS','PANTALLA_PESADOS') FOR UPDATE", [ids]);
-        if (perfiles.length !== ids.length) fallo('Uno de los perfiles seleccionados no esta permitido.');
         const [existentes] = await connection.query('SELECT cedula FROM usuario_cedulas WHERE cedula=? OR codigo_trabajador=? FOR UPDATE', [solicitud.cedula, codigo]);
         const [legacy] = await connection.query('SELECT id FROM usuarios WHERE cedula=? FOR UPDATE', [solicitud.cedula]);
         if (existentes.length || legacy.length) fallo('La cedula o el codigo ya tiene acceso. Revise Accesos y carnets; no se reemplazo ningun acceso.', 409);
+        const [nuevo]=await connection.query('INSERT INTO usuarios (nombre,usuario,password,rol,sede,requiere_cambio_password) VALUES (?,?,?,?,?,0)',
+          [solicitud.nombre_completo.slice(0,100),'acceso_'+solicitud.cedula,await bcrypt.hash(crypto.randomBytes(32).toString('hex'),12),AREAS[acceso.departamento],acceso.sede]);
+        ids=[nuevo.insertId];
+        await connection.query('INSERT INTO usuario_departamentos (usuario_id,departamento,es_principal) VALUES (?,?,1)',[nuevo.insertId,acceso.departamento]);
+        await connection.query('INSERT INTO usuario_accesos_personales (usuario_id,config_json,asignado_por) VALUES (?,?,?)',[nuevo.insertId,JSON.stringify(acceso),req.session.user.id]);
         for (const id of ids) await connection.query(`INSERT INTO usuario_cedulas
           (cedula,usuario_id,persona_nombre,codigo_trabajador,pin_hash,perfil_excel,requiere_cambio_pin)
           VALUES (?,?,?,?,?,?,0)`, [solicitud.cedula, id, solicitud.nombre_completo, codigo, hash, solicitud.puesto.slice(0, 80)]);
