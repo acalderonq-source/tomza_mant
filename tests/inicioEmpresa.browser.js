@@ -15,6 +15,7 @@ const {departamentosInicio}=require('../src/utils/inicioEmpresa');
   const browser=await chromium.launch({channel:'chrome',headless:true});
   try {
     const page=await browser.newPage({viewport:{width:1440,height:960}});
+    await page.route('https://tile.openstreetmap.org/**',route=>route.fulfill({contentType:'image/svg+xml',body:'<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256"><rect width="256" height="256" fill="#e7eff5"/></svg>'}));
     const base='http://127.0.0.1:'+server.address().port;
     await page.goto(base);await page.screenshot({path:path.join(__dirname,'../tmp/inicio-desktop.png'),fullPage:true});
     assert.equal(await page.locator('.department-entry form').count(),5);
