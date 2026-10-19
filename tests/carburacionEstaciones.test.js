@@ -35,12 +35,13 @@ test('rechaza ediciones con una versión vieja sin modificar el registro',async(
   try{await assert.rejects(guardarRegistro(1,{version:1},{id:34}),e=>e.status===409);assert.ok(rolledBack);assert.equal(writes,0);}finally{pool.getConnection=original;}
 });
 async function server(user,run){const app=express();app.set('views',path.join(__dirname,'../src/views'));app.set('view engine','ejs');app.use(express.urlencoded({extended:true}));app.use((req,res,next)=>{req.session={user};next();});app.use('/carburacion',routes);const s=app.listen(0,'127.0.0.1');await new Promise(r=>s.once('listening',r));try{await run(`http://127.0.0.1:${s.address().port}`);}finally{await new Promise(r=>s.close(r));}}
-test('Estaciones solo se abre en Carburación y muestra siete áreas con filtros',async()=>{
+test('Estaciones muestra seis áreas, sin Mejoras, y solo permite seleccionar clientes',async()=>{
   const original=pool.query;pool.query=async sql=>{assert.match(sql,/carburacion_/);if(sql.includes('COUNT(*)'))return [[{total:0}]];return [[]];};
   try{await server({id:34,nombre:'Emily',departamentoActivo:'CARBURACION',departamentos:['CARBURACION']},async base=>{
     const response=await fetch(`${base}/carburacion/estaciones?categoria=mantenimientos`);assert.equal(response.status,200);const html=await response.text();
     for(const c of util.CATEGORIAS)assert.ok(html.includes(c.nombre));assert.match(html,/Hoy y próximos 30 días/);assert.match(html,/Sin vincular/);assert.doesNotMatch(html,/\/taller\/|\/mantenimientos\/|PROVEEDURIA_TALLER/);
-    const nuevo=await fetch(`${base}/carburacion/estaciones/nuevo?categoria=minae`);assert.equal(nuevo.status,200);assert.match(await nuevo.text(),/Respuesta a prevención/);
+    assert.equal(util.CATEGORIAS.length,6);assert.doesNotMatch(html,/Mejoras|categoria=mejoras/);
+    const nuevo=await fetch(`${base}/carburacion/estaciones/nuevo?categoria=minae`);assert.equal(nuevo.status,200);const form=await nuevo.text();assert.match(form,/Respuesta a prevención/);assert.match(form,/select[^>]*name="cliente_id"[^>]*required/);assert.doesNotMatch(form,/name="estacion"/);
   });await server({id:2,departamentoActivo:'TALLER',departamentos:['TALLER']},async base=>{
     for(const route of ['estaciones','estaciones/1','estaciones/1/editar'])assert.equal((await fetch(`${base}/carburacion/${route}`)).status,403);
     assert.equal((await fetch(`${base}/carburacion/estaciones/1/editar`,{method:'POST'})).status,403);

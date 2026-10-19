@@ -40,9 +40,11 @@ test('importa las siete hojas sin duplicar ni perder datos y permite actualizar 
     const [[sourceCopy]]=await query('SELECT origen_json FROM carburacion_estaciones_registros WHERE id=?',[record.id]);assert.deepEqual(parseJSON(sourceCopy.origen_json).valores,source.registros.find(r=>r.categoria==='mantenimientos' && r.estacion==='Tike Tibás').valores);
     const app=express();app.set('views',path.join(__dirname,'../src/views'));app.set('view engine','ejs');app.use(express.urlencoded({extended:true}));app.use((req,res,next)=>{req.session={user:{id:34,nombre:'Emily',departamentoActivo:'CARBURACION',departamentos:['CARBURACION']}};next();});app.use('/carburacion',require('../src/routes/carburacion.routes'));
     listener=app.listen(0,'127.0.0.1');await new Promise(resolve=>listener.once('listening',resolve));const base=`http://127.0.0.1:${listener.address().port}`;
-    for(const categoria of ['seguimiento','construccion','minae','municipal','pendiente','mantenimientos','mejoras']) {
+    for(const categoria of ['seguimiento','construccion','minae','municipal','pendiente','mantenimientos']) {
       const response=await fetch(`${base}/carburacion/estaciones?categoria=${categoria}`);assert.equal(response.status,200,categoria);assert.match(await response.text(),/Nuevo registro/);
     }
+    const [[archivado]]=await query("SELECT id FROM carburacion_estaciones_registros WHERE categoria='mejoras' LIMIT 1");
+    for(const route of [`estaciones/${archivado.id}`,`estaciones/${archivado.id}/editar`])assert.equal((await fetch(`${base}/carburacion/${route}`)).status,404);
     for(const route of [`estaciones/${record.id}`,`estaciones/${record.id}/editar`,'estaciones/nuevo?categoria=minae','estaciones?categoria=mantenimientos&mantenimiento=vencidos','estaciones?categoria=seguimiento&proveedor_id=1&prioridad=ALTA'])assert.equal((await fetch(`${base}/carburacion/${route}`)).status,200,route);
     const detalle=await fetch(`${base}/carburacion/estaciones/${record.id}`);assert.match(await detalle.text(),/Avance de prueba/);
   } finally {

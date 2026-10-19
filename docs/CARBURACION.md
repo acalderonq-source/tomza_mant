@@ -26,7 +26,7 @@ El envío se solicita marcando la casilla al pagar o desde el historial. Se adju
 
 ## Estaciones
 
-`/carburacion/estaciones` organiza las siete hojas del archivo Detalle estaciones: seguimiento, construcción, trámites MINAE, permisos municipales, pendientes de iniciar, mantenimientos y mejoras. Usa sus propias tablas de Carburación; no utiliza los módulos de mantenimiento o MINAE de Taller.
+`/carburacion/estaciones` muestra seguimiento, construcción, trámites MINAE, permisos municipales, pendientes de iniciar y mantenimientos. Mejoras se retiró de las vistas y formularios; sus registros originales se conservan como archivo histórico. Usa sus propias tablas de Carburación; no utiliza los módulos de mantenimiento o MINAE de Taller. Para crear o actualizar un registro, se selecciona obligatoriamente un cliente del catálogo; el servidor toma su nombre y rechaza la escritura libre.
 
 Los registros conservan nombre original, detalle, ejecutivo, prioridad, proveedores, campos particulares y procedencia (archivo, hoja y fila). Se vinculan a un cliente únicamente si el nombre normalizado tiene una coincidencia única; los demás permanecen disponibles y se pueden vincular manualmente desde edición. Las filas repetidas se conservan como registros distintos. El literal FINALIZADO en la columna Prioridad de Seguimiento se convierte en estado Finalizado; el valor original también se conserva. Los demás estados no se deducen de textos narrativos.
 
@@ -51,6 +51,14 @@ Remove-Item Env:CARBURACION_DB_TEST
 
 Esta prueba requiere una base de desarrollo/pruebas configurada; nunca envía correos reales ni crea pagos en las tablas normales de Carburación.
 # Fichas de clientes
+
+## Incidencias y expediente del cliente
+
+La migración `202610190001_carburacion_expediente_incidencias.sql` agrega reportes de incidencias y documentos asociados por cliente. Desde la ficha se reportan incidencias con título, descripción, fecha y estado (abierta, en seguimiento o resuelta). Se conservan el reporte original y el autor; el estado admite actualización con control de versión. Los usuarios con permiso de edición de clientes pueden crear incidencias y adjuntar archivos; los demás accesos autorizados a Carburación pueden consultarlos.
+
+El expediente reúne fotos y documentos PDF, JPG, PNG o WEBP de hasta 3 MB por archivo. Los archivos se guardan en la base de datos con tipo, tamaño, hash y autor; se descargan exclusivamente mediante rutas autenticadas de Carburación y se comprueba su asociación con el cliente. Las fotos tienen vista previa; los PDF se descargan. No se publican archivos en directorios estáticos.
+
+Al registrar un representante legal se exigen los dos adjuntos: cédula jurídica y poder. Al editar, se reutilizan los documentos existentes del mismo representante; si cambia el representante, debe adjuntar ambos nuevamente. El guardado de la ficha y los adjuntos es transaccional. Los documentos anteriores permanecen en el expediente para consulta histórica. El formulario requiere JavaScript para adjuntar los archivos y respeta el límite de 10 MB del servidor, con un máximo conjunto de 6 MB binarios en el alta.
 
 El rol `CARBURACION_GESTOR` administra estaciones, clientes, proveedores y configuración de correos. Las órdenes, facturas y pagos son solo de consulta: puede filtrar y descargar PDF, adjuntos, colillas y comprobantes, pero no crear, editar, eliminar, facturar, pagar ni enviar colillas. El middleware del departamento protege los métodos de escritura y los formularios, además de ocultar las acciones en las vistas. El script `src/scripts/crearGestorCarburacion.js` da de alta la cuenta individual solicitada de José Luis, sin asignarle otros departamentos ni privilegios de administrador. Rechaza una cédula ya registrada, y crea cuenta, identidad, asignación y permiso de clientes en una transacción. Utiliza el acceso por cédula y PIN de código de trabajador existente en el sistema.
 

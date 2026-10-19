@@ -2,6 +2,7 @@ const pool=require('../db');
 const {fallo}=require('./carburacionFinanzas');
 const {cedulaValida}=require('./cedula');
 const {correoValido}=require('./pagoProveedorCorreo');
+const {leerArchivo,insertarDocumento}=require('./carburacionExpediente');
 const CAMPOS_CLIENTE=[
   {key:'nombre',label:'Nombre de la gasolinera',max:150,grupo:'identificacion',required:true},
   {key:'razon_social',label:'Razón social',max:200,grupo:'identificacion'},
@@ -39,6 +40,7 @@ async function puedeEditarClientes(user) {
 }
 async function guardarFicha(id,body,user) {
   const datos=validarFicha(body);
+  const adjuntos={CEDULA_JURIDICA:leerArchivo(body.cedula_juridica_adjunto_data,body.cedula_juridica_adjunto_nombre),PODER:leerArchivo(body.poder_adjunto_data,body.poder_adjunto_nombre)};
   const connection=await pool.getConnection();
   try {
     await connection.beginTransaction();let antes=null;
@@ -46,6 +48,12 @@ async function guardarFicha(id,body,user) {
       [[antes]]=await connection.query('SELECT * FROM carburacion_clientes WHERE id=? FOR UPDATE',[id]);
       if(!antes)throw fallo('Cliente no encontrado.',404);
       if(Number(body.version)!==antes.version)throw fallo('La ficha cambió mientras la editaba. Vuelva a abrirla antes de guardar.',409);
+    }
+    if(datos.representante_legal){
+      const [existentes]=antes && antes.representante_legal===datos.representante_legal?await connection.query("SELECT tipo FROM carburacion_cliente_documentos WHERE cliente_id=? AND representante_legal=? AND tipo IN ('CEDULA_JURIDICA','PODER')",[id,datos.representante_legal]):[[]];
+      for(const tipo of ['CEDULA_JURIDICA','PODER'])if(!adjuntos[tipo] && !existentes.some(d=>d.tipo===tipo))throw fallo('Para registrar al representante legal debe adjuntar la cédula jurídica y el poder. Si cambia el representante, adjunte ambos nuevamente.');
+    }
+    if(antes) {
       await connection.query(`UPDATE carburacion_clientes SET ${CAMPOS_CLIENTE.map(c=>`${c.key}=?`).join(',')},version=version+1,actualizado_por=?,actualizado_en=CURRENT_TIMESTAMP WHERE id=?`,
         [...CAMPOS_CLIENTE.map(c=>datos[c.key]),user.id,id]);
     } else {
@@ -53,6 +61,7 @@ async function guardarFicha(id,body,user) {
         [...CAMPOS_CLIENTE.map(c=>datos[c.key]),user.id,user.id]);
       id=result.insertId;
     }
+    for(const [tipo,archivo] of Object.entries(adjuntos))if(archivo)await insertarDocumento(connection,id,tipo,archivo,user,datos.representante_legal);
     await connection.query(`INSERT INTO carburacion_clientes_historial (cliente_id,accion,antes_json,despues_json,usuario_id,usuario_nombre) VALUES (?,?,?,?,?,?)`,
       [id,antes?'EDICION':'CREACION',antes?JSON.stringify(Object.fromEntries(CAMPOS_CLIENTE.map(c=>[c.key,antes[c.key]]))):null,JSON.stringify(datos),user.id,String(user.nombre || user.usuario || 'Carburación').slice(0,160)]);
     await connection.commit();return id;

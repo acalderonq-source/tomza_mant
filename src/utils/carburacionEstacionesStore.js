@@ -11,12 +11,11 @@ async function guardarRegistro(id,body,user) {
       if(!antes)throw fallo('Registro de estación no encontrado.',404);
       if(!Number.isInteger(Number(body.version)) || Number(body.version)!==antes.version)throw fallo('Otra persona actualizó este registro. Vuelva a abrirlo antes de guardar.',409);
     }
-    const datos=validarRegistro(body,antes?.categoria || body.categoria);
-    let clienteId=null;
-    if(body.cliente_id) {
-      const [[cliente]]=await connection.query('SELECT id FROM carburacion_clientes WHERE id=?',[body.cliente_id]);
-      if(!cliente)throw fallo('Seleccione un cliente válido de Carburación.');clienteId=cliente.id;
-    }
+    if(!/^[1-9]\d*$/.test(String(body.cliente_id || '')) || !Number.isSafeInteger(Number(body.cliente_id)))throw fallo('Seleccione una estación del catálogo de clientes.');
+    const [[cliente]]=await connection.query('SELECT id,nombre FROM carburacion_clientes WHERE id=?',[body.cliente_id]);
+    if(!cliente)throw fallo('Seleccione un cliente válido de Carburación.');
+    const clienteId=cliente.id;
+    const datos=validarRegistro({...body,estacion:cliente.nombre},antes?.categoria || body.categoria);
     const raw=Array.isArray(body.proveedor_ids)?body.proveedor_ids:body.proveedor_ids?[body.proveedor_ids]:[];
     if(raw.length>20 || raw.some(p=>!/^[1-9]\d*$/.test(String(p))))throw fallo('Seleccione proveedores válidos.');
     const proveedoresIds=[...new Set(raw.map(Number))];let proveedores=[];

@@ -62,14 +62,14 @@ router.post('/',wrap(async(req,res)=>{
 }));
 router.get('/:id/editar',wrap(async(req,res)=>{
   const [[registro]]=await pool.query('SELECT * FROM carburacion_estaciones_registros WHERE id=?',[req.params.id]);
-  if(!registro)throw fallo('Registro de estación no encontrado.',404);await formulario(req,res,registro);
+  if(!registro || !categoriaPorKey(registro.categoria))throw fallo('Registro de estación no encontrado.',404);await formulario(req,res,registro);
 }));
 router.post('/:id/editar',wrap(async(req,res)=>{
   const id=await guardarRegistro(req.params.id,req.body,req.session.user);req.session.success='Avance guardado en el historial.';res.redirect(`/carburacion/estaciones/${id}`);
 }));
 router.get('/:id',wrap(async(req,res)=>{
   const [[registro]]=await pool.query(`SELECT r.*,c.nombre cliente_nombre,${PROVEEDORES} proveedores ${FROM} WHERE r.id=?`,[req.params.id]);
-  if(!registro)throw fallo('Registro de estación no encontrado.',404);
+  if(!registro || !categoriaPorKey(registro.categoria))throw fallo('Registro de estación no encontrado.',404);
   const [historial]=await pool.query('SELECT id,accion,antes_json,despues_json,observacion,usuario_id,usuario_nombre,creado_en FROM carburacion_estaciones_historial WHERE registro_id=? ORDER BY id DESC',[registro.id]);
   res.render('carburacion/estaciones_detalle',{registro:{...registro,campos:parseJSON(registro.campos_json),origen:parseJSON(registro.origen_json)},config:categoriaPorKey(registro.categoria),historial:historial.map(h=>({...h,despues:parseJSON(h.despues_json)}))});
 }));

@@ -25,7 +25,7 @@
 <section class="mb-2">
   <h2 class="section-title">Módulos</h2><div class="module-grid">
 <% if(user.rol==='ADMIN'){ %><a class="module-card" href="/admin/carnets-trabajadores"><span class="module-icon icon-blue"><i class="bi bi-person-vcard"></i></span><div><div class="module-title">Carnets de trabajadores</div><p class="module-copy">Buscar, consultar, descargar e imprimir carnets.</p></div></a><% } %>
-<a class="module-card" href="/carburacion/estaciones"><span class="module-icon icon-amber"><i class="bi bi-buildings"></i></span><div><div class="module-title">Estaciones</div><p class="module-copy">Seguimiento, permisos, mantenimientos y mejoras.</p></div></a>
+<a class="module-card" href="/carburacion/estaciones"><span class="module-icon icon-amber"><i class="bi bi-buildings"></i></span><div><div class="module-title">Estaciones</div><p class="module-copy">Seguimiento, permisos y mantenimientos.</p></div></a>
 <a class="module-card" href="/carburacion/clientes"><span class="module-icon icon-blue"><i class="bi bi-people"></i></span><div><div class="module-title">Clientes</div><p class="module-copy">Estaciones de servicio de Carburación.</p></div></a>
     <a class="module-card" href="/carburacion/ordenes"><span class="module-icon icon-blue"><i class="bi bi-receipt"></i></span><div><div class="module-title">Órdenes de compra</div><p class="module-copy"><%= gestionarFinanzas?"Consultar, editar y descargar órdenes en PDF.":"Consultar y descargar órdenes en PDF." %></p></div></a>
     <a class="module-card" href="/carburacion/proveedores"><span class="module-icon icon-green"><i class="bi bi-building"></i></span><div><div class="module-title">Proveedores</div><p class="module-copy">Administrar los proveedores de Carburación.</p></div></a>

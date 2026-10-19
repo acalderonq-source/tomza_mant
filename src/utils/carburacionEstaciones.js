@@ -6,8 +6,7 @@ const CATEGORIAS=[
   {key:'minae',nombre:'Trámite MINAE',campos:[['fecha','Fecha de trámite','date'],['ot','OT','textarea'],['documentacion','Envío de documentación','date'],['fiscalizacion','Fiscalización','date'],['prevencion','Prevención','date'],['prorroga','Prórroga','date'],['respuesta_prevencion','Respuesta a prevención','date'],['nueva_prevencion','Nueva prevención','date']]},
   {key:'municipal',nombre:'Permiso municipal',campos:[]},
   {key:'pendiente',nombre:'Pendiente iniciar',campos:[]},
-  {key:'mantenimientos',nombre:'Mantenimientos',campos:[['ultimo_mantenimiento','Último mantenimiento','date'],['proximo_mantenimiento','Próximo mantenimiento','date'],['nota_mantenimiento','Notas de mantenimiento','textarea']]},
-  {key:'mejoras',nombre:'Mejoras',campos:[['valvula','Válvula','text'],['cantidad','Cantidad de válvulas / requerimiento','text'],['mangueras','Mangueras','text'],['material','Material','text'],['unidades','Unidades / detalle','text']]}
+  {key:'mantenimientos',nombre:'Mantenimientos',campos:[['ultimo_mantenimiento','Último mantenimiento','date'],['proximo_mantenimiento','Próximo mantenimiento','date'],['nota_mantenimiento','Notas de mantenimiento','textarea']]}
 ];
 const ESTADOS=['PENDIENTE','EN_PROCESO','EN_ESPERA','FINALIZADO'];
 const PRIORIDADES=['ALTA','MEDIA','BAJA','SIN_DEFINIR'];
@@ -27,7 +26,8 @@ function mantenimientoEstado(campos,hoy=fechaActualCostaRica()) {
   return proximo<=sumarDias(hoy,30)?'PROXIMO':'PROGRAMADO';
 }
 function desdeExcel(source) {
-  if(!categoriaPorKey(source.categoria) || !texto(source.estacion))throw fallo('Registro de estación inválido.');
+  // Los respaldos e importaciones conservan el origen de Mejoras, ya retirado de las vistas.
+  if((!categoriaPorKey(source.categoria) && source.categoria!=='mejoras') || !texto(source.estacion))throw fallo('Registro de estación inválido.');
   const v=source.valores;const registro={categoria:source.categoria,estacion:texto(source.estacion),ejecutivo:'',prioridad:'SIN_DEFINIR',estado:'PENDIENTE',detalle:'',proveedor_texto:'',campos:{}};
   if(source.categoria==='seguimiento') {
     registro.ejecutivo=texto(v[1]);registro.detalle=texto(v[3]);registro.proveedor_texto=texto(v[4]);
