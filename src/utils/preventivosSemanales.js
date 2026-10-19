@@ -1,4 +1,5 @@
 const DIA_MS = 86400000;
+const { asegurarEliminaciones } = require('./preventivosEliminacion');
 const SEDES_EXCLUIDAS = new Set([
   "ALAJUELA", "CABEZALES", "CARRETAS", "CISTERNAS", "GRANEL", "GRANELCARTAGO",
   "GRANELGUAPILES", "GRANELLACRUZ", "GRANELPEREZZELEDON", "OROTINA", "SANCARLOS",
@@ -94,6 +95,7 @@ function asegurarProgramacionSemanal(pool) {
 
 async function generarPreventivos(pool, hoy = hoyCostaRica()) {
   if (!fechaValida(hoy)) throw new Error("Fecha de generación inválida.");
+  await asegurarEliminaciones(pool);
   const [programaciones] = await pool.query(
     `SELECT p.id, p.unidad_id, u.sede FROM preventivos_programaciones p
      JOIN unidades u ON u.id = p.unidad_id
@@ -132,6 +134,8 @@ async function generarPreventivos(pool, hoy = hoyCostaRica()) {
           [regla.unidad_id, fecha, sumarDias(fecha, 1)]
         );
         if (existente) continue;
+        const [omitidos] = await connection.query('SELECT mantenimiento_id FROM preventivos_eliminados WHERE unidad_id=? AND fecha=? LIMIT 1',[regla.unidad_id,fecha]);
+        if (omitidos.length) continue;
         const [insert] = await connection.query(
           `INSERT INTO mantenimientos
            (unidad_id, sede, tipo, estado, prioridad, fecha_programada, plan, creado_por)

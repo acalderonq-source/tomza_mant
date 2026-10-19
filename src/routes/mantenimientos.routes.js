@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const pool = require("../db");
+const { eliminarPreventivo } = require('../utils/preventivosEliminacion');
 const calcularPuntos = require("../utils/puntajeCorrectivos");
 const ExcelJS = require("exceljs");
 const {
@@ -1641,6 +1642,22 @@ router.get("/", requireAuth, async (req, res) => {
   } catch (error) {
     console.error("❌ ERROR listado mantenimientos:", error);
     res.status(500).send("Error interno");
+  }
+});
+
+router.post('/:id/eliminar',requireAuth,async(req,res)=>{
+  if(!puedeReprogramarMantenimientos(req.session.user))return res.status(403).send('No autorizado.');
+  const id=Number(req.params.id);
+  if(!Number.isSafeInteger(id)||id<=0)return res.status(400).send('Mantenimiento inválido.');
+  try {
+    const permitidas=obtenerSedesFiltroUsuario(req,obtenerSedeFiltro(req));
+    await eliminarPreventivo(pool,id,req.session.user,unidad=>puedeAccederUnidadMantenimiento(req.session.user,unidad,permitidas));
+    req.session.success='Preventivo eliminado. No se regenerará para esa fecha. Las próximas semanas no cambian.';
+    return res.redirect('/mantenimientos');
+  } catch(e) {
+    if(e.status)return res.status(e.status).send(e.message);
+    console.error('Error eliminando preventivo:',e);
+    return res.status(500).send('No se pudo eliminar el preventivo.');
   }
 });
 

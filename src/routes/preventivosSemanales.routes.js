@@ -1,5 +1,6 @@
 const express = require("express");
 const pool = require("../db");
+const { asegurarEliminaciones } = require('../utils/preventivosEliminacion');
 const { getSedesPermitidas, esUsuarioTodasSedes, etiquetaSede } = require("../utils/sedes");
 const { hoyCostaRica, fechaValida, sumarDias, lunesSemana, fechasProgramadas, puedeProgramar, generarPreventivos, asegurarProgramacionSemanal, repartirUnidadesSemana, sedeAdmitePreventivos } = require("../utils/preventivosSemanales");
 const { ensureNumeroMantenimientoColumn } = require("../utils/mantenimientosNumero");
@@ -13,6 +14,7 @@ router.use((req, res, next) => {
 router.get("/", async (req, res) => {
   try {
     await asegurarProgramacionSemanal(pool);
+    await asegurarEliminaciones(pool);
     const hoy = hoyCostaRica();
     const semana = lunesSemana(fechaValida(req.query.semana) ? req.query.semana : hoy);
     const fin = sumarDias(semana, 6);
@@ -43,6 +45,8 @@ router.get("/", async (req, res) => {
       [ids, semana, sumarDias(fin, 1)]
     ) : [[]];
     const porUnidad = new Map();
+    const [eliminados]=ids.length?await pool.query('SELECT unidad_id, DATE_FORMAT(fecha,\'%Y-%m-%d\') AS fecha FROM preventivos_eliminados WHERE unidad_id IN (?) AND fecha>=? AND fecha<?',[ids,semana,sumarDias(fin,1)]):[[]];
+    const omitidos=new Set(eliminados.map(m=>`${m.unidad_id}:${m.fecha}`));
     for (const mantenimiento of mantenimientos) {
       if (!porUnidad.has(mantenimiento.unidad_id)) porUnidad.set(mantenimiento.unidad_id, []);
       porUnidad.get(mantenimiento.unidad_id).push(mantenimiento);
@@ -52,7 +56,7 @@ router.get("/", async (req, res) => {
       const previstas = unidad.programacion_activa
         ? fechasProgramadas(unidad.fecha_inicio, unidad.intervalo_semanas, semana, fin)
         : [];
-      return { ...unidad, trabajos, previstas: previstas.filter(fecha => !trabajos.some(trabajo => trabajo.fecha === fecha)) };
+      return { ...unidad, trabajos, previstas: previstas.filter(fecha => !omitidos.has(`${unidad.id}:${fecha}`) && !trabajos.some(trabajo => trabajo.fecha === fecha)) };
     });
     const resumen = {
       unidades: filas.length,

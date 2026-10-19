@@ -59,7 +59,7 @@
         <td class="fw-bold"><%= unidad.placa %></td><td><%= etiquetaSede(unidad.sede) %></td>
         <td><% if (unidad.programacion_id) { %>Cada <%= unidad.intervalo_semanas %> semana(s)<div class="small text-secondary">Desde <%= mostrarFecha(unidad.fecha_inicio) %> · <%= unidad.programacion_activa ? 'Activa' : 'Pausada' %></div><% } else { %><span class="text-secondary">Sin frecuencia</span><% } %></td>
         <td>
-          <% unidad.trabajos.forEach(trabajo => { %><div class="mb-1"><a href="/mantenimientos/<%= trabajo.id %>"><%= mostrarFecha(trabajo.fecha) %></a> <span class="badge <%= trabajo.estado === 'CERRADO' ? 'text-bg-success' : 'text-bg-warning' %>"><%= trabajo.estado %></span></div><% }) %>
+          <% unidad.trabajos.forEach(trabajo => { %><div class="mb-1"><a href="/mantenimientos/<%= trabajo.id %>"><%= mostrarFecha(trabajo.fecha) %></a> <span class="badge <%= trabajo.estado === 'CERRADO' ? 'text-bg-success' : 'text-bg-warning' %>"><%= trabajo.estado %></span><% if (puedeProgramar && trabajo.estado === 'PROGRAMADO') { %><form method="POST" action="/mantenimientos/<%= trabajo.id %>/eliminar" class="d-inline" onsubmit="return confirm('¿Eliminar este preventivo? Las próximas semanas no cambian.');"><button class="btn btn-sm btn-outline-danger" type="submit" title="Eliminar preventivo" aria-label="Eliminar preventivo"><i class="bi bi-trash"></i></button></form><% } %></div><% }) %>
           <% unidad.previstas.forEach(fecha => { %><div class="mb-1"><span class="future"><%= mostrarFecha(fecha) %> · Previsto</span></div><% }) %>
           <% if (!unidad.trabajos.length && !unidad.previstas.length) { %><span class="text-secondary">Sin preventivo esta semana</span><% } %>
         </td>
