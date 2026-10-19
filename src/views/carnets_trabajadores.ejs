@@ -34,7 +34,6 @@
       <div><h1 class="h3 mb-1">Accesos y carnets de trabajadores</h1><p class="text-secondary mb-0">Cree accesos por cédula, cargue fotos y descargue los carnets en PDF.</p></div>
       <div class="d-flex gap-2"><a href="/admin/departamentos" class="btn btn-outline-primary">Accesos por área</a><a href="/dashboard" class="btn btn-outline-secondary">Volver</a><button class="btn btn-primary" onclick="window.print()"><i class="bi bi-printer"></i> Imprimir carnets</button></div>
     </div>
-    <p class="no-print"><a href="/admin/solicitudes-trabajadores">Revisar solicitudes de ingreso de trabajadores</a> · <a href="/admin/ingresos">Registro de ingresos</a> · <a href="/admin/ingresos/correos">Correos de trabajadores</a></p>
     <% if (mensajeAcceso) { %><div class="alert alert-success no-print"><%= mensajeAcceso %></div><% } %>
     <% if (errorAcceso) { %><div class="alert alert-danger no-print"><%= errorAcceso %></div><% } %>
     <section class="card border-0 shadow-sm mb-4 no-print">

@@ -1,6 +1,7 @@
 const express = require('express');
 const { fechaActualCostaRica } = require('../utils/fechaCostaRica');
 const { guardarCorreoIngreso, perfilAvisosIngreso } = require('../utils/ingresosSesion');
+const { requireAdministracion } = require('../middleware/requireAdministracion');
 function filtrosIngreso(query = {}) {
   const hoy = new Date();
   const desde = String(query.desde || fechaActualCostaRica(new Date(hoy.getTime()-30*86400000)));
@@ -14,12 +15,7 @@ function filtrosIngreso(query = {}) {
 function crearRouter(db) {
   const router = express.Router();
   const wrap = fn => (req,res,next) => Promise.resolve(fn(req,res,next)).catch(next);
-  router.use((req,res,next)=>{
-    res.set('Cache-Control','private, no-store');
-    if (!req.session?.user) return res.status(401).send('Inicie sesion como ADMIN.');
-    if (req.session.user.rol!=='ADMIN') return res.sendStatus(403);
-    next();
-  });
+  router.use(requireAdministracion(db));
   router.get('/',wrap(async(req,res)=>{
     const filtros=filtrosIngreso(req.query);
     const [ingresos]=await db.query(`SELECT id,nombre,usuario,rol,departamento,sede,ip,dispositivo,correo_destino,correo_estado,intentos,error_codigo,creado_en,enviado_en

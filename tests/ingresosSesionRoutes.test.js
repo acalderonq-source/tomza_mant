@@ -6,6 +6,7 @@ const { crearRouter }=require('../src/routes/ingresosSesion.routes');
 test('solo ADMIN consulta ingresos o cambia correos de personas existentes',async()=>{
   const writes=[];
   const db={query:async(sql,args)=>{
+    if(sql.includes('administracion_propietario'))return [[{usuario_id:5}]];
     if(sql.includes('FROM sesion_ingresos'))return [[{nombre:'Persona <script>mal</script>',usuario:'taller',rol:'TALLER',departamento:'TALLER',sede:'Cartago',ip:'127.0.0.1',dispositivo:'Chrome',correo_estado:'SIN_CORREO',creado_en:new Date()}]];
     if(sql.startsWith('SELECT personas.'))return [[{identidad:'C:100000001',nombre:'Persona',correo:null}]];
     if(sql.startsWith('SELECT persona_nombre'))return [args[0]==='100000001'?[{persona_nombre:'Persona'}]:[]];
@@ -15,7 +16,7 @@ test('solo ADMIN consulta ingresos o cambia correos de personas existentes',asyn
     throw Error('Consulta inesperada');
   }};
   const app=express();app.set('view engine','ejs');app.set('views',path.resolve(__dirname,'../src/views'));
-  app.use(express.json());app.use((req,_res,next)=>{req.session={user:req.get('x-role')?{id:5,rol:req.get('x-role')}:null};next();});
+  app.use(express.json());app.use((req,_res,next)=>{req.session={user:req.get('x-role')?{id:5,rol:req.get('x-role'),departamentoActivo:req.get('x-departamento')||'ADMINISTRACION'}:null};next();});
   app.use('/admin/ingresos',crearRouter(db));
   const server=app.listen(0,'127.0.0.1');await new Promise(r=>server.once('listening',r));
   const base='http://127.0.0.1:'+server.address().port+'/admin/ingresos';
@@ -23,6 +24,7 @@ test('solo ADMIN consulta ingresos o cambia correos de personas existentes',asyn
   try{
     assert.equal((await req()).status,401);
     assert.equal((await req('','MECANICO')).status,403);
+    assert.equal((await fetch(base,{headers:{'x-role':'ADMIN','x-departamento':'TALLER'}})).status,403);
     assert.equal((await req('/correos','TALLER',{identidad:'C:100000001',correo:'persona@example.com'})).status,403);
     const log=await req('','ADMIN');assert.equal(log.status,200);assert.ok(!(await log.text()).includes('<script>mal</script>'));
     assert.equal((await req('/correos','ADMIN')).status,200);

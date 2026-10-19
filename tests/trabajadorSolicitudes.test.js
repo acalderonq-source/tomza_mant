@@ -19,6 +19,7 @@ test('solicitar no crea acceso; ADMIN verifica, asigna perfil y crea acceso y ca
   const consultas=[];
   const query = async (sql, params=[]) => {
     consultas.push(sql);
+    if (sql.includes('administracion_propietario')) return [[{usuario_id:99}]];
     if (sql.startsWith('INSERT INTO trabajador_solicitudes_acceso')) {
       solicitud ||= {id:1,cedula:params[0],nombre_completo:params[1],puesto:params[2],sede:params[3],correo:params[4],estado:'PENDIENTE',creado_en:new Date()};
       return [{affectedRows:1}];
@@ -38,7 +39,7 @@ test('solicitar no crea acceso; ADMIN verifica, asigna perfil y crea acceso y ca
   const db={query,getConnection:async()=>({query,beginTransaction:async()=>{},commit:async()=>{commits++;},rollback:async()=>{rollbacks++;},release:()=>{}})};
   const app=express();app.set('view engine','ejs');app.set('views',path.resolve(__dirname,'../src/views'));
   app.use(express.json());app.use(express.urlencoded({extended:false}));app.use(session({secret:'trabajadores-test-only',resave:false,saveUninitialized:false}));
-  app.get('/test-login/:rol',(req,res)=>{req.session.user={id:99,rol:req.params.rol};res.sendStatus(204);});
+  app.get('/test-login/:rol/:departamento?',(req,res)=>{req.session.user={id:99,rol:req.params.rol,departamentoActivo:req.params.departamento||'ADMINISTRACION'};res.sendStatus(204);});
   app.use(ensureCsrfToken);app.get('/token',(_req,res)=>res.json({token:res.locals.csrfToken}));
   const routers=createRouters(db,{cargarSedes:async()=>['Cartago']});
   app.use('/solicitar-ingreso',routers.publico);app.use('/admin/solicitudes-trabajadores',routers.privado);
@@ -59,6 +60,7 @@ test('solicitar no crea acceso; ADMIN verifica, asigna perfil y crea acceso y ca
     assert.equal((await req('/solicitar-ingreso',{...datos,nombre_completo:'Intento de reemplazo'})).status,202);assert.equal(solicitud.nombre_completo,datos.nombre_completo);
     assert.equal((await req(admin)).status,401);
     await req('/test-login/MECANICO');assert.equal((await req(admin+'/1',aprobar)).status,403);
+    await req('/test-login/ADMIN/TALLER');assert.equal((await req(admin)).status,403);
     await req('/test-login/ADMIN');assert.equal((await req(admin)).status,200);
     assert.equal((await req(admin+'/1',{...aprobar,identidad_verificada:'0'})).status,400);
     assert.equal((await req(admin+'/1',{...aprobar,usuario_ids:['1']})).status,400,'no acepta perfiles fuera del catalogo permitido');

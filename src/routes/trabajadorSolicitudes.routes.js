@@ -5,6 +5,7 @@ const { rateLimit } = require('express-rate-limit');
 const { normalizarCedula, cedulaValida } = require('../utils/cedula');
 const { SEDES_SOLICITUD, sedeSolicitud } = require('../utils/sedesSolicitudesTrabajadores');
 const { correoIngreso, guardarCorreoIngreso } = require('../utils/ingresosSesion');
+const { requireAdministracion } = require('../middleware/requireAdministracion');
 
 function fallo(mensaje, status = 400) { throw Object.assign(new Error(mensaje), { status }); }
 function texto(value, max, min = 1) {
@@ -50,12 +51,7 @@ function createRouters(db, opciones = {}) {
       ON DUPLICATE KEY UPDATE id=id`, [datos.cedula, datos.nombre_completo, datos.puesto, datos.sede, datos.correo]);
     return res.status(202).render('trabajadores/solicitar_ingreso', { sedes: [], datos: {}, error: null, enviado: true });
   }));
-  privado.use((req, res, next) => {
-    res.set('Cache-Control', 'private, no-store');
-    if (!req.session?.user) return res.status(401).send('Inicie sesion como ADMIN.');
-    if (req.session.user.rol !== 'ADMIN') return res.sendStatus(403);
-    next();
-  });
+  privado.use(requireAdministracion(db,opciones.comprobarPropietario));
   privado.get('/', wrap(async (req, res) => {
     const estado = ['PENDIENTE','APROBADA','RECHAZADA'].includes(req.query.estado) ? req.query.estado : 'PENDIENTE';
     const [solicitudes] = await db.query('SELECT id,cedula,nombre_completo,puesto,sede,correo,estado,codigo_trabajador,motivo,creado_en,revisado_en FROM trabajador_solicitudes_acceso WHERE estado=? ORDER BY creado_en DESC,id DESC LIMIT 200', [estado]);

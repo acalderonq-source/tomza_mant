@@ -8,6 +8,7 @@ const { ensureCsrfToken, injectSecurityAssets } = require('../src/middleware/sec
 (async () => {
   let guardadas = 0;
   const db = { query: async (sql, args) => {
+    if(sql.includes('administracion_propietario'))return [[{usuario_id:1}]];
     if (sql.startsWith('INSERT INTO trabajador_solicitudes_acceso')) { guardadas++; return [{insertId:1}]; }
     if (sql.includes('FROM trabajador_solicitudes_acceso')) return [[{id:1,cedula:'100000001',nombre_completo:'Persona de Prueba',puesto:'Asistente',sede:'Cartago',estado:'PENDIENTE',creado_en:new Date()}]];
     if (sql.includes('FROM usuarios')) return [[{id:7,usuario:'taller',nombre:'Asistente de taller',rol:'TALLER',sede:'Cartago'}]];
@@ -24,7 +25,7 @@ const { ensureCsrfToken, injectSecurityAssets } = require('../src/middleware/sec
     res.render=(vista,datos)=>render(vista,datos,(error,html)=>error?next(error):res.send(injectSecurityAssets(html,res.locals.csrfToken)));
     next();
   });
-  app.get('/test-admin',(req,res)=>{req.session.user={id:1,rol:'ADMIN'};res.redirect('/admin/solicitudes-trabajadores');});
+  app.get('/test-admin',(req,res)=>{req.session.user={id:1,rol:'ADMIN',departamentoActivo:'ADMINISTRACION'};res.redirect('/admin/solicitudes-trabajadores');});
   const routers = createRouters(db);
   app.use('/solicitar-ingreso',routers.publico);app.use('/admin/solicitudes-trabajadores',routers.privado);
   const server=app.listen(0,'127.0.0.1');await new Promise(resolve=>server.once('listening',resolve));

@@ -1,13 +1,9 @@
 const express = require('express');
 const { centroControl, expediente, consultar } = require('../utils/controlEmpresa');
+const { requireAdministracion } = require('../middleware/requireAdministracion');
 function crearRouter(db) {
   const router = express.Router();
-  router.use((req, res, next) => {
-    if (!req.session?.user) return res.redirect('/login');
-    res.set('Cache-Control', 'no-store');
-    if (!['ADMIN', 'TALLER', 'PROVEEDURIA_TALLER'].includes(req.session.user.rol)) return res.sendStatus(403);
-    next();
-  });
+  router.use(requireAdministracion(db));
   router.get('/', async (req, res, next) => {
     if (req.session.user.rol !== 'ADMIN') return res.sendStatus(403);
     try {
@@ -17,7 +13,6 @@ function crearRouter(db) {
     } catch (error) { next(error); }
   });
   router.get('/unidades', async (req, res, next) => {
-    if (req.session.user.rol !== 'ADMIN' && req.session.user.departamentoActivo !== 'TALLER') return res.sendStatus(403);
     const placa = String(req.query.placa || '').trim().toUpperCase();
     if (placa && !/^[A-Z0-9-]{3,20}$/.test(placa)) return res.status(400).send('Placa invalida.');
     try {
