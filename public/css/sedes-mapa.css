@@ -1,4 +1,37 @@
-.sedes-panel{min-width:0;width:100%;max-width:620px;justify-self:center;background:#fff;border:1px solid #d9e4ef;border-radius:8px;overflow:hidden}.sedes-header{display:flex;justify-content:space-between;align-items:center;padding:18px 20px;gap:12px}.sedes-header .eyebrow{font-size:10px;margin:0 0 5px;letter-spacing:2px}.sedes-header h2{margin:0;font-size:20px;color:#173b5d}.sedes-header button{width:36px;height:36px;border:1px solid #d9e4ef;background:white;color:#173b5d;border-radius:5px;cursor:pointer}#sedes-mapa{height:380px;width:100%;background:#e7eff5;z-index:0;font-family:'Segoe UI',Arial,sans-serif}#sedes-mapa .leaflet-control-attribution{font-size:10px}#sedes-mapa .leaflet-popup-content{font-size:13px;line-height:1.6}#sedes-mapa .leaflet-popup-content strong{display:block;color:#173b5d}#sedes-mapa .leaflet-popup-content a{color:#1261a0}.mapa-estado{font-size:12px;color:#526d83;margin:0;padding:9px 18px;border-top:1px solid #e5edf4}.mapa-estado:empty{display:none}.sedes-footer{padding:14px 18px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;border-top:1px solid #e5edf4}.sedes-footer>button{padding:0;border:0;background:none;display:flex;align-items:center;gap:10px;color:#173b5d;text-align:left;cursor:pointer}.sedes-footer strong{font-size:14px;display:block}.sedes-footer small{font-size:11px;display:block;color:#64788b;margin-top:3px}.sedes-footer>a{font-size:12px;color:#24577b;white-space:nowrap}.sede-punto{width:12px;height:12px;flex-shrink:0;background:#f5c800;border:2px solid #173b5d;border-radius:50%}.empresa-welcome{grid-template-columns:minmax(0,.95fr) minmax(0,1.2fr)}
-@media(max-width:1150px){#sedes-mapa{height:340px}.welcome-copy h1{font-size:34px}.sedes-header{padding:15px}.sedes-footer{padding:14px}}
-@media(max-width:950px){.empresa-welcome{grid-template-columns:minmax(0,1fr);gap:36px}.welcome-copy h1{max-width:600px}.sedes-panel{max-width:none}#sedes-mapa{height:380px}}
-@media(max-width:520px){#sedes-mapa{height:340px}.sedes-header h2{font-size:18px}.sedes-footer{gap:16px}.sedes-footer>a{margin-left:22px}}
+.sedes-panel{min-width:0;width:100%;max-width:680px;justify-self:center;background:transparent}
+.sedes-header{display:flex;justify-content:space-between;align-items:center;padding:0 0 22px;gap:16px}
+.sedes-header .eyebrow{font-size:10px;margin:0 0 8px;letter-spacing:2px;color:#74899c}
+.sedes-header h2{margin:0;font-size:23px;font-weight:650;color:#173b5d;line-height:1.3}
+.sedes-count{display:inline-flex;align-items:center;gap:7px;flex-shrink:0;font-size:11px;color:#41617b;border:1px solid #dce6ee;border-radius:5px;padding:7px 9px;background:#fff}
+.sedes-count>span{width:6px;height:6px;background:#148163;border-radius:50%}
+.sedes-map-stage{position:relative;border:1px solid #dce6ee;border-radius:8px;overflow:hidden;box-shadow:0 8px 28px #193e5c08;background:#e8eef2;isolation:isolate}
+#sedes-mapa{height:440px;width:100%;background:#e8eef2;z-index:0;font-family:'Segoe UI',Arial,sans-serif}
+#sedes-mapa .leaflet-tile-pane{filter:saturate(.48) contrast(.94) brightness(1.035)}
+#sedes-mapa .leaflet-control-attribution{font-size:9px;background:#ffffffdf;padding:3px 6px}
+.mapa-country,.mapa-zoom{position:absolute;z-index:2;background:#fff;box-shadow:0 3px 12px #18385016;border:1px solid #d9e3ec;border-radius:6px}
+.mapa-country{top:16px;left:16px;display:flex;align-items:center;gap:9px;padding:10px 12px;color:#274e6c;font-size:12px;font-weight:600;cursor:pointer}
+.mapa-country>.bi:first-child{font-size:17px}.mapa-country>.bi:last-child{margin-left:8px;font-size:12px;color:#7b8fa0}
+.mapa-zoom{right:16px;top:16px;display:grid;overflow:hidden}.mapa-zoom button{width:36px;height:36px;display:grid;place-items:center;border:0;background:#fff;color:#274e6c;cursor:pointer}
+.mapa-zoom button+button{border-top:1px solid #e5edf3}.mapa-zoom button:hover,.mapa-country:hover{background:#f2f7fa}.mapa-zoom button:disabled,.mapa-country:disabled{opacity:.5;cursor:wait}
+.tomza-map-marker{background:none;border:0}.tomza-pin{width:48px;height:48px;border-radius:50%;background:#fff;border:3px solid #ffd328;box-shadow:0 3px 0 #173b5d,0 8px 18px #173b5d2b;display:flex;align-items:center;justify-content:center;position:relative;transition:transform .15s}
+.tomza-pin:after{content:'';position:absolute;bottom:-9px;left:17px;width:9px;height:9px;background:#173b5d;transform:rotate(45deg);z-index:-1}
+#sedes-mapa .tomza-pin img{width:35px!important;max-width:35px!important;height:27px!important;object-fit:contain;border-radius:2px}.tomza-map-marker:hover .tomza-pin{transform:translateY(-3px)}
+.sede-abierta .mapa-country,.sede-abierta .mapa-zoom{visibility:hidden}
+#sedes-mapa .tomza-map-label{border:0;border-radius:4px;padding:5px 10px;background:#fff;color:#244b68;font-weight:650;font-size:11px;box-shadow:0 2px 8px #173b5d18}
+#sedes-mapa .tomza-map-label:before{display:none}
+#sedes-mapa .tomza-popup .leaflet-popup-content-wrapper{border-radius:8px;box-shadow:0 8px 30px #18385024;padding:1px}
+#sedes-mapa .tomza-popup .leaflet-popup-content{margin:18px 20px;font-size:12px;line-height:1.6;min-width:190px;color:#627c90}
+#sedes-mapa .tomza-popup .leaflet-popup-content strong{display:block;color:#173b5d;font-size:16px;margin-bottom:5px}
+#sedes-mapa .tomza-popup .leaflet-popup-content a{display:inline-flex;align-items:center;gap:8px;margin-top:13px;background:#173b5d;color:white;text-decoration:none;padding:7px 13px;border-radius:4px;font-size:12px}
+.mapa-estado{font-size:12px;color:#526d83;margin:0;padding:9px 0}.mapa-estado:empty{display:none}
+.sedes-footer{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:20px 0 0}
+.sedes-footer>button{padding:0;border:0;background:none;display:flex;align-items:center;gap:13px;color:#173b5d;text-align:left;cursor:pointer;min-width:0}
+.sedes-footer>button:disabled{cursor:default}.sedes-footer strong{font-size:18px;display:block;font-weight:650;margin:3px 0}
+.sedes-footer small{font-size:9px;display:block;color:#73899b;letter-spacing:1px}.sede-company{font-size:11px;color:#73899b;display:block;line-height:1.4}
+.sede-symbol{display:grid;place-items:center;flex:0 0 46px;width:46px;height:46px;border:1px solid #dce6ee;border-radius:7px;background:white;color:#315775;font-size:21px}
+.sedes-footer>a{display:inline-flex;align-items:center;gap:8px;color:#315775;text-decoration:none;font-size:12px;white-space:nowrap;padding:9px 12px;border:1px solid #d5e1ea;border-radius:5px;background:white}.sedes-footer>a:hover{background:#edf4f8}
+.empresa-welcome{grid-template-columns:minmax(0,.9fr) minmax(0,1.2fr);gap:40px}
+@media(max-width:1150px){#sedes-mapa{height:390px}.welcome-copy h1{font-size:34px}.sedes-header h2{font-size:20px}.empresa-welcome{gap:28px}.sedes-footer{gap:10px}.sede-symbol{display:none}}
+@media(max-width:950px){.empresa-welcome{grid-template-columns:minmax(0,1fr);gap:40px}.welcome-copy h1{max-width:600px}.sedes-panel{max-width:none}#sedes-mapa{height:430px}.sede-symbol{display:grid}}
+@media(max-width:520px){#sedes-mapa{height:370px}.sedes-header{padding-bottom:16px;gap:10px}.sedes-header h2{font-size:19px}.sedes-count{padding:6px;font-size:10px}.sedes-header .eyebrow{font-size:9px;letter-spacing:1px}.mapa-country{top:12px;left:12px;padding:9px;font-size:11px}.mapa-zoom{top:12px;right:12px}.sedes-footer{align-items:center;gap:12px;padding-top:16px}.sede-symbol{display:none}.sedes-footer strong{font-size:17px}.sedes-footer>a{padding:9px;font-size:11px}.sede-company{max-width:170px;font-size:10px}}
+@media(prefers-reduced-motion:reduce){.tomza-pin{transition:none}}
