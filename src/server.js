@@ -397,6 +397,9 @@ const carnetsRoutes = require("./routes/carnets.routes");
 // ===================== USAR RUTAS =====================
 const portalProveedores = require('./routes/portalProveedores.routes');
 const solicitudesPortal = require('./routes/portalSolicitudes.routes').createRouters(pool);
+const solicitudesTrabajadores = require('./routes/trabajadorSolicitudes.routes').createRouters(pool);
+app.use('/solicitar-ingreso', solicitudesTrabajadores.publico);
+app.use('/admin/solicitudes-trabajadores', solicitudesTrabajadores.privado);
 app.use('/portal-proveedores/solicitar-acceso', solicitudesPortal.publico);
 app.use('/administracion/portal-proveedores/solicitudes', solicitudesPortal.privado);
 app.use('/portal-proveedores', portalProveedores.externo, (_req,res)=>res.sendStatus(404));

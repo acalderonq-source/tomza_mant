@@ -1,0 +1,14 @@
+<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Solicitar ingreso | Gas Tomza</title><link rel="stylesheet" href="/css/solicitudes-trabajadores.css"></head><body>
+<header><a href="/"><img src="/img/logo_tomza.jpg" alt="Gas Tomza"></a><a href="/">Volver al ingreso</a></header>
+<main class="formulario"><h1>Solicitud de ingreso de trabajadores</h1>
+<% if (enviado) { %><section role="status" class="aviso"><h2>Solicitud recibida</h2><p>Administración revisará los datos antes de habilitar el acceso. Si ya envió una solicitud, no necesita repetirla.</p><p>La cédula y el puesto no otorgan permisos por sí solos. El administrador le comunicará el acceso autorizado.</p></section>
+<% } else { %>
+<p>Complete sus datos para solicitar acceso al sistema interno.</p>
+<% if (error) { %><p class="error" role="alert"><%= error %></p><% } %>
+<form method="post" action="/solicitar-ingreso">
+<label for="cedula">Número de cédula</label><input id="cedula" name="cedula" inputmode="numeric" autocomplete="off" maxlength="25" required value="<%= datos.cedula || '' %>">
+<label for="nombre">Nombre completo y apellidos</label><input id="nombre" name="nombre_completo" autocomplete="name" minlength="5" maxlength="150" required value="<%= datos.nombre_completo || '' %>">
+<label for="puesto">Puesto</label><input id="puesto" name="puesto" autocomplete="organization-title" minlength="3" maxlength="120" required value="<%= datos.puesto || '' %>">
+<label for="sede">Sede</label><select id="sede" name="sede" required><option value="">Seleccione una sede</option><% sedes.forEach(sede => { %><option value="<%= sede %>" <%= datos.sede === sede ? 'selected' : '' %>><%= sede %></option><% }); %></select>
+<div class="trampa" aria-hidden="true"><label>Sitio web<input name="sitio_web" tabindex="-1" autocomplete="off"></label></div>
+<button type="submit">Enviar solicitud</button></form><% } %></main></body></html>
