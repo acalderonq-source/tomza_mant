@@ -264,6 +264,8 @@ function mecanicoPuedeUsarRuta(pathname) {
   if(['/proveeduria/mis-solicitudes','/proveeduria/solicitudes','/proveeduria/alertas'].includes(pathname)||/^\/proveeduria\/salidas\/\d+\/aceptar$/.test(pathname))return true;
   const rutasPermitidas = [
     "/",
+    "/inicio",
+    "/departamento/activo",
     "/login",
     "/logout",
     "/dashboard",

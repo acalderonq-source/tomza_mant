@@ -103,6 +103,7 @@
 <nav class="navbar navbar-dark topbar px-3 py-2">
   <span class="navbar-brand fw-semibold"><span class="brand-box"><i class="bi bi-house"></i></span>Gas Tomza</span>
   <div class="text-white d-flex align-items-center gap-2 flex-wrap">
+    <a href="/inicio" class="btn btn-outline-light btn-sm">Inicio empresarial</a>
     <% if (Array.isArray(user.departamentos) && user.departamentos.length > 1) { %>
       <form method="POST" action="/departamento/activo" class="d-flex align-items-center gap-2">
         <label for="departamento-activo" class="small">Área</label>

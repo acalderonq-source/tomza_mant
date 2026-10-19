@@ -39,7 +39,7 @@ test('login normal funciona, un cambio de rol revoca el acceso y los intentos fa
     pin=await bcrypt.hash('NuevoPinSeguro123!',4);
     assert.equal((await perfil()).headers.get('location'),'/login?departamento=TALLER');
     assert.equal((await loginPin('NuevoPinSeguro123!')).status,200);
-    assert.equal((await perfil()).headers.get('location'),'/dashboard');
+    assert.equal((await perfil()).headers.get('location'),'/inicio');
     assert.equal((await request('/test-private')).status,200);
     assert.equal(ingresos.length,2,'la seleccion de perfil registra solo el ingreso final');
     assert.equal(ingresos[1][0],'C:'+cedula);

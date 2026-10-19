@@ -10,6 +10,7 @@ const {limitarCuenta}=require('../middleware/accountLoginLimit');
 const {selloUsuario,leerSello}=require('../middleware/sessionSecurity');
 const {sessionSecret}=require('../utils/sessionConfig');
 const { registrarIngreso, procesarAvisosIngreso } = require('../utils/ingresosSesion');
+const {departamentosInicio,destinoIngreso}=require('../utils/inicioEmpresa');
 const limiteCuenta=limitarCuenta(req=>{const id=String(req.body.cedula||req.body.usuario||'').trim();const digits=normalizarCedula(id);return /^\d{9,12}$/.test(digits)?digits:id;});
 const router = express.Router();
 const loginLimiter = rateLimit({
@@ -26,11 +27,19 @@ const loginLimiter = rateLimit({
 });
 
 router.get("/", (req, res) => {
-  if (req.session.user) return res.redirect("/dashboard");
-  res.render("portal_departamentos", {
-    departamentos: DEPARTAMENTOS,
+  if (req.session.user) return res.redirect("/inicio");
+  res.render("inicio_empresa", {
+    departamentos: departamentosInicio(null), user:null,
     next: getSafeNextUrl(req.query.next)
   });
+});
+router.get('/inicio',(req,res)=>{
+  const user=req.session.user;
+  if(!user)return res.redirect('/');
+  if(['PANTALLA_MECANICOS','PANTALLA_PESADOS'].includes(user.rol))return res.redirect('/taller/dashboard');
+  if(user.requiereCambioPassword)return res.redirect('/cambiar-clave');
+  res.set('Cache-Control','private, no-store');
+  res.render('inicio_empresa',{departamentos:departamentosInicio(user),user,next:''});
 });
 
 /**
@@ -257,9 +266,8 @@ async function iniciarSesion(req, res, user, departamento, nextUrl) {
       req.session.authenticatedAt=Date.now();
       req.session.lastActivity=Date.now();
       const esCuentaPantalla = ["PANTALLA_MECANICOS", "PANTALLA_PESADOS"].includes(String(user.rol || "").toUpperCase());
-      const destino = esCuentaPantalla
-        ? "/taller/dashboard"
-        : user.requiere_cambio_password ? "/cambiar-clave" : departamento === "CARBURACION" ? "/dashboard" : nextUrl || "/dashboard";
+      const destino = departamento === 'CARBURACION' && !esCuentaPantalla && !user.requiere_cambio_password
+        ? '/inicio' : destinoIngreso(nextUrl,user);
       const fallar = error => {
         console.error('No se pudo guardar el ingreso:', error.code || 'ERROR');
         req.session.destroy(() => res.status(503).send('No se pudo registrar el inicio de sesion. Intente nuevamente.'));
@@ -274,7 +282,7 @@ async function iniciarSesion(req, res, user, departamento, nextUrl) {
     });
 }
 
-router.post("/departamento/activo", (req, res) => {
+router.post("/departamento/activo", async (req, res) => {
   const departamento = String(req.body.departamento || "").toUpperCase();
   const user = req.session.user;
   if (user?.departamentoIngreso === "CARBURACION" && departamento !== "CARBURACION") {
@@ -282,6 +290,14 @@ router.post("/departamento/activo", (req, res) => {
   }
   if (!user || !Array.isArray(user.departamentos) || !user.departamentos.includes(departamento)) {
     return res.status(403).send("No tiene acceso a ese departamento.");
+  }
+  try {
+    const [rows]=await pool.query('SELECT departamento FROM usuario_departamentos WHERE usuario_id=?',[user.id]);
+    const permitidos=departamentosPermitidosPorRol(user.rol,rows.map(r=>r.departamento),await esPropietarioAdministracion(user,pool));
+    if(!permitidos.includes(departamento))return res.status(403).send('No tiene acceso a ese departamento.');
+  } catch(error) {
+    console.error('Cambio de departamento:',error.code || 'ERROR');
+    return res.status(503).send('No se pudo verificar el acceso. Intente nuevamente.');
   }
   user.departamentoActivo = departamento;
   res.redirect("/dashboard");

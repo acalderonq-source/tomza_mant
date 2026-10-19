@@ -9,7 +9,7 @@ function restringirCuentaPantalla(req, res, next) {
 
   const metodoLectura = req.method === "GET" || req.method === "HEAD";
   const ruta = String(req.path || "/").replace(/\/+$/, "") || "/";
-  if (metodoLectura && ["/", "/dashboard"].includes(ruta)) {
+  if (metodoLectura && ["/", "/dashboard", "/inicio"].includes(ruta)) {
     return res.redirect("/taller/dashboard");
   }
   const rutaPermitida = ["/taller/dashboard", "/taller/eventos-prioridades", "/logout"]

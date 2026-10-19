@@ -74,7 +74,7 @@ test("Carburación elige únicamente el perfil asignado y omite el selector de T
       body: new URLSearchParams({ cedula: "123456789", pin: "123", departamento: "CARBURACION", next: "/taller/dashboard" })
     });
     assert.equal(response.status, 302);
-    assert.equal(response.headers.get("location"), "/dashboard");
+    assert.equal(response.headers.get("location"), "/inicio");
   });
 });
 
@@ -111,7 +111,7 @@ test("permite ingresar con cédula normalizada y PIN del código de trabajador",
     });
 
     assert.equal(response.status, 302);
-    assert.equal(response.headers.get("location"), "/dashboard");
+    assert.equal(response.headers.get("location"), "/inicio");
     assert.equal(consultas[0].params[0], "123456789");
   });
 });
@@ -134,7 +134,7 @@ test("el PIN del código de trabajador da acceso directo sin pedir un cambio", a
       body: new URLSearchParams({ cedula: "123456789", pin: "123", departamento: "TALLER" })
     });
     assert.equal(response.status, 302);
-    assert.equal(response.headers.get("location"), "/dashboard");
+    assert.equal(response.headers.get("location"), "/inicio");
   });
 });
 
@@ -156,7 +156,7 @@ test("permite ingresar por una cédula asociada a un perfil del Excel", async ()
       body: new URLSearchParams({ cedula: "1-2345-6789", pin: "456", departamento: "TALLER" })
     });
     assert.equal(response.status, 302);
-    assert.equal(response.headers.get("location"), "/dashboard");
+    assert.equal(response.headers.get("location"), "/inicio");
     assert.equal(consultas.find(call => call.sql.includes("FROM usuario_cedulas"))?.params[0], "123456789");
   });
 });

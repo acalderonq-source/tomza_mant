@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Gas Tomza | Inicio empresarial</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+<link rel="stylesheet" href="/css/inicio-empresa.css?v=1"><script src="/js/inicio-empresa.js?v=1" defer></script></head>
+<body class="inicio-empresa">
+<a class="skip-link" href="#contenido">Ir al contenido</a>
+<aside class="empresa-menu" id="departamentos-menu">
+<a class="empresa-logo" href="<%= user ? '/inicio' : '/' %>" aria-label="Gas Tomza, inicio"><img src="/img/logo_tomza.jpg" alt="Gas Tomza"><span>SISTEMA EMPRESARIAL</span></a>
+<p class="menu-caption">DEPARTAMENTOS</p>
+<nav aria-label="Departamentos"><a class="menu-inicio" href="<%= user ? '/inicio' : '/' %>" aria-current="page"><i class="bi bi-house-door-fill" aria-hidden="true"></i><span>Inicio</span></a>
+<% departamentos.forEach(d=>{ %><div class="department-entry" data-name="<%= d.nombre %>">
+<% if(user && d.permitido){ %><form method="post" action="/departamento/activo"><input type="hidden" name="departamento" value="<%= d.key %>"><button type="submit" class="department-link"><i class="bi <%= d.icono %>" aria-hidden="true"></i><span><%= d.nombre %></span><i class="bi bi-chevron-right trail" aria-hidden="true"></i></button></form>
+<% }else if(!user){ %><a class="department-link" href="/login?departamento=<%= d.key %>&amp;next=<%= encodeURIComponent(next || '/inicio') %>"><i class="bi <%= d.icono %>" aria-hidden="true"></i><span><%= d.nombre %></span><i class="bi bi-chevron-right trail" aria-hidden="true"></i></a>
+<% }else{ %><button type="button" class="department-link" disabled title="Sin acceso asignado"><i class="bi <%= d.icono %>" aria-hidden="true"></i><span><%= d.nombre %></span><i class="bi bi-lock trail" aria-hidden="true"></i><span class="sr-only">Sin acceso asignado</span></button><% } %>
+</div><% }); %></nav>
+<p class="menu-empty" hidden>No hay departamentos con ese nombre.</p>
+<footer class="menu-footer"><% if(user){ %><a href="/logout"><i class="bi bi-box-arrow-right" aria-hidden="true"></i>Cerrar sesión</a><% }else{ %><a href="/solicitar-ingreso"><i class="bi bi-person-plus" aria-hidden="true"></i>Solicitar ingreso</a><a href="/portal-proveedores/login"><i class="bi bi-building" aria-hidden="true"></i>Portal de proveedores</a><% } %></footer>
+</aside>
+<div class="empresa-workspace"><header class="empresa-topbar"><button type="button" class="menu-toggle" aria-controls="departamentos-menu" aria-expanded="false" aria-label="Abrir departamentos"><i class="bi bi-list" aria-hidden="true"></i></button>
+<strong>Sistema de Gestión Empresarial</strong><div class="empresa-search"><i class="bi bi-search" aria-hidden="true"></i><label class="sr-only" for="buscar-departamento">Buscar departamento</label><input type="search" id="buscar-departamento" placeholder="Buscar departamento…" autocomplete="off"></div>
+<div class="empresa-account"><i class="bi bi-person-circle" aria-hidden="true"></i><span><%= user ? user.nombre || user.usuario : 'Acceso interno' %><small><%= user ? user.rol.replace(/_/g,' ') : 'Gas Tomza' %></small></span></div></header>
+<main id="contenido"><section class="empresa-welcome"><div class="welcome-copy"><p class="eyebrow">GAS TOMZA</p><h1>Bienvenido al <br>sistema empresarial</h1><p class="welcome-subtitle"><%= user ? 'Seleccioná un departamento para comenzar.' : 'Seleccioná tu departamento para iniciar sesión.' %></p><div class="welcome-rule"></div>
+<% if(user){ %><div class="welcome-identity"><span class="identity-icon"><i class="bi bi-person-check" aria-hidden="true"></i></span><div><strong><%= user.nombre || user.usuario %></strong><span><%= departamentos.filter(d=>d.permitido).length %> departamento(s) autorizado(s)</span></div></div><% } %>
+</div>
+<div class="empresa-diagram" role="img" aria-label="Departamentos conectados en Gas Tomza"><svg viewBox="0 0 500 440" aria-hidden="true"><path d="M250 220 L105 105 M250 220 L390 100 M250 220 L100 345 M250 220 L400 345" fill="none" stroke="#b9cbdc" stroke-width="2"/><circle cx="177" cy="162" r="5" fill="#f7c900"/><circle cx="320" cy="160" r="5" fill="#f7c900"/><circle cx="175" cy="282" r="5" fill="#f7c900"/><circle cx="325" cy="282" r="5" fill="#f7c900"/></svg>
+<div class="diagram-node node-people"><i class="bi bi-people" aria-hidden="true"></i><span>Personas</span></div><div class="diagram-node node-tools"><i class="bi bi-gear" aria-hidden="true"></i><span>Procesos</span></div><div class="diagram-node node-truck"><i class="bi bi-truck" aria-hidden="true"></i><span>Operaciones</span></div><div class="diagram-node node-box"><i class="bi bi-box-seam" aria-hidden="true"></i><span>Recursos</span></div><div class="diagram-center"><i class="bi bi-grid-1x2-fill" aria-hidden="true"></i><strong>GAS TOMZA</strong></div></div>
+</section><footer class="welcome-footer"><span></span>Gestión integrada en un solo lugar</footer></main></div>
+</body></html>

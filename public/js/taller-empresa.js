@@ -37,7 +37,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (window.location.pathname === href) anchor.setAttribute('aria-current', 'page');
     return anchor;
   };
-  sidebar.appendChild(createLink('/dashboard', 'Inicio'));
+  sidebar.appendChild(createLink('/inicio', 'Inicio empresarial'));
+  sidebar.appendChild(createLink('/dashboard', 'Inicio del departamento'));
   for (const [href, label] of links) {
     if (href !== '/dashboard') groups.get(groupFor(href)).push([href, label]);
   }
