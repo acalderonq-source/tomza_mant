@@ -25,7 +25,7 @@ const { ensureCsrfToken, injectSecurityAssets } = require('../src/middleware/sec
     next();
   });
   app.get('/test-admin',(req,res)=>{req.session.user={id:1,rol:'ADMIN'};res.redirect('/admin/solicitudes-trabajadores');});
-  const routers = createRouters(db,{cargarSedes:async()=>['Cartago','Alajuela','Transportadora']});
+  const routers = createRouters(db);
   app.use('/solicitar-ingreso',routers.publico);app.use('/admin/solicitudes-trabajadores',routers.privado);
   const server=app.listen(0,'127.0.0.1');await new Promise(resolve=>server.once('listening',resolve));
   let browser;
@@ -34,6 +34,8 @@ const { ensureCsrfToken, injectSecurityAssets } = require('../src/middleware/sec
     const page=await browser.newPage({viewport:{width:1440,height:1000}});
     const base='http://127.0.0.1:'+server.address().port;
     await page.goto(base+'/solicitar-ingreso');
+    assert.equal(await page.locator('[name="codigo_trabajador"]').count(),0);
+    assert.equal(await page.locator('#sede option[value="granel_cartago"], #sede option[value="Taller"], #sede option[value="Tecnicos"]').count(),0);
     await page.getByLabel('Número de cédula').fill('100000001');
     await page.getByLabel('Nombre completo y apellidos').fill('Persona de Prueba');
     await page.getByLabel('Puesto',{exact:true}).fill('Asistente');

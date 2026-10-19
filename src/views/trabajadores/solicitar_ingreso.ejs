@@ -3,7 +3,7 @@
 <main class="formulario"><h1>Solicitud de ingreso de trabajadores</h1>
 <% if (enviado) { %><section role="status" class="aviso"><h2>Solicitud recibida</h2><p>Administración revisará los datos antes de habilitar el acceso. Si ya envió una solicitud, no necesita repetirla.</p><p>La cédula y el puesto no otorgan permisos por sí solos. El administrador le comunicará el acceso autorizado.</p></section>
 <% } else { %>
-<p>Complete sus datos para solicitar acceso al sistema interno.</p>
+<p>Complete sus datos para solicitar acceso al sistema interno. El código de trabajador lo asigna únicamente ADMIN al aprobar su ingreso.</p>
 <% if (error) { %><p class="error" role="alert"><%= error %></p><% } %>
 <form method="post" action="/solicitar-ingreso">
 <label for="cedula">Número de cédula</label><input id="cedula" name="cedula" inputmode="numeric" autocomplete="off" maxlength="25" required value="<%= datos.cedula || '' %>">

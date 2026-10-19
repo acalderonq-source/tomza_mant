@@ -3,7 +3,7 @@ const bcrypt = require('bcryptjs');
 const crypto = require('node:crypto');
 const { rateLimit } = require('express-rate-limit');
 const { normalizarCedula, cedulaValida } = require('../utils/cedula');
-const { obtenerTodasSedes } = require('../utils/sedes');
+const { SEDES_SOLICITUD, sedeSolicitud } = require('../utils/sedesSolicitudesTrabajadores');
 
 function fallo(mensaje, status = 400) { throw Object.assign(new Error(mensaje), { status }); }
 function texto(value, max, min = 1) {
@@ -19,13 +19,13 @@ function validarSolicitud(body, sedes) {
   if (!cedulaValida(raw) || !/^\d{9,12}$/.test(cedula)) fallo('Ingrese una cedula valida de 9 a 12 digitos.');
   const nombre_completo = texto(body.nombre_completo, 150, 5);
   if (nombre_completo.split(' ').length < 2 || !/\p{L}/u.test(nombre_completo)) fallo('Ingrese su nombre completo y apellidos.');
-  const puesto = texto(body.puesto, 120, 3), sede = texto(body.sede, 100);
+  const puesto = texto(body.puesto, 120, 3), sede = sedeSolicitud(texto(body.sede, 100));
   if (!sedes.includes(sede)) fallo('Seleccione una sede del listado.');
   return { cedula, nombre_completo, puesto, sede };
 }
 function createRouters(db, opciones = {}) {
   const publico = express.Router(), privado = express.Router();
-  const cargarSedes = opciones.cargarSedes || (async () => [...new Set([...await obtenerTodasSedes(db), 'Corporacion'])]);
+  const cargarSedes = opciones.cargarSedes || (async () => [...SEDES_SOLICITUD]);
   const wrap = fn => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
   const limite = rateLimit({ windowMs: 3600000, limit: 60, standardHeaders: true, legacyHeaders: false,
     message: 'Demasiadas solicitudes. Intente nuevamente mas tarde.' });
@@ -61,7 +61,7 @@ function createRouters(db, opciones = {}) {
     const [perfiles] = await db.query("SELECT id,usuario,nombre,rol,sede FROM usuarios WHERE rol NOT IN ('ADMIN','PANTALLA_MECANICOS','PANTALLA_PESADOS') ORDER BY rol,usuario");
     const mensaje = req.session.solicitudTrabajadorMensaje || '';
     delete req.session.solicitudTrabajadorMensaje;
-    res.render('trabajadores/solicitudes_ingreso', { solicitudes, perfiles, estado, mensaje });
+    res.render('trabajadores/solicitudes_ingreso', { solicitudes: solicitudes.map(s => ({ ...s, sede: sedeSolicitud(s.sede) || s.sede })), perfiles, estado, mensaje });
   }));
   privado.post('/:id', wrap(async (req, res) => {
     if (!/^[1-9]\d{0,14}$/.test(req.params.id)) fallo('Solicitud invalida.');
