@@ -13,7 +13,7 @@ test('inventario usa las existencias propias, filtra grupos, limita sedes y expo
   pool.query=async(sql,args)=>{assert.doesNotMatch(sql,/\bbodega_articulos\b|\bbodega_movimientos\b/);if(sql.includes('FROM prov_inventario i')){assert.deepEqual(args,['Cartago']);return [structuredClone(rows)];}return [[]];};
   try{await server(async base=>{
     const r=await fetch(base+'/inventario?grupo=SUMINISTRO');assert.equal(r.status,200);const html=await r.text();assert.match(html,/Centro de control de inventario/);assert.match(html,/Papel/);assert.doesNotMatch(html,/<strong>Herramienta<\/strong>/);assert.match(html,/Stock bajo/);assert.match(html,/A-01/);
-    assert.equal((await fetch(base+'/inventario?sede=NoAutorizada')).status,403);
+    assert.equal((await fetch(base+'/inventario?sede=La%20Cruz')).status,200);
     const x=await fetch(base+'/inventario/exportar.xlsx?grupo=SUMINISTRO');assert.equal(x.status,200);const w=new ExcelJS.Workbook();await w.xlsx.load(Buffer.from(await x.arrayBuffer()));assert.equal(w.worksheets[0].getCell('G2').value,2.5);assert.equal(w.worksheets[0].rowCount,2);
   });}finally{pool.query=original;}
 });
@@ -33,6 +33,6 @@ test('ajuste físico conserva saldos y motivo, evita duplicados y revierte el st
     fallar=true;assert.equal((await fetch(base+'/inventario/ajuste',post({...body,cantidad:1}))).status,500);assert.equal(cantidad,2);assert.equal(logs.length,1);
     assert.equal((await fetch(base+'/inventario/ajuste',post({...body,cantidad:-1}))).status,400);
     assert.equal((await fetch(base+'/inventario/ajuste',post({...body,motivo:''}))).status,400);
-    assert.equal((await fetch(base+'/inventario/ajuste',post({...body,sede:'NoAutorizada'}))).status,403);
+    assert.equal((await fetch(base+'/inventario/ajuste',post({...body,sede:'La Cruz',cantidad:2}))).status,400);
   });}finally{pool.query=originalQuery;pool.getConnection=originalConnection;}
 });

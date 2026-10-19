@@ -19,6 +19,8 @@ const {resumenRecepcion,leerRecepcion,validarPendientes}=require('../utils/prove
 const { exigir, numero, lineasCompra, totales, totalesConAjustes, compararFactura, saldo, hash, adjunto, conciliarEstado } = require('../utils/proveeduria');
 const gestion = u => ['ADMIN','PROVEEDURIA','PROVEEDURIA_TALLER','BODEGA','BODEGUERO'].includes(u?.rol);
 const contabilidad = u => ['ADMIN','CONTABILIDAD'].includes(u?.rol);
+// Clave historica del almacen general; no representa la sede de entrega del pedido.
+const ALMACEN_GENERAL = 'Cartago';
 const datos = row => { if (typeof row.datos === 'string') row.datos = JSON.parse(row.datos); row.sede=sedeInventarioCompartido(row.sede); return row; };
 const wrap = fn => (req,res,next) => Promise.resolve(fn(req,res,next)).catch(next);
 const error = (status, mensaje) => Object.assign(new Error(mensaje), { status });
@@ -98,7 +100,7 @@ router.get('/mis-solicitudes',wrap(async(req,res)=>{
   const [alertas]=await pool.query('SELECT * FROM prov_alertas WHERE usuario_id=? ORDER BY id DESC LIMIT 40',[u.id]);
   const sedesPermitidas=await sedesOrden(req);
   const actual=sedeInventarioCompartido(req.session.sedeSeleccionada||u.sede);
-  const [articulos]=sedesPermitidas.length?await pool.query(`SELECT i.sede,i.codigo,i.descripcion,COALESCE(f.unidad,'UND') AS unidad FROM prov_inventario i LEFT JOIN prov_inventario_fichas f ON f.sede=i.sede AND f.codigo=i.codigo WHERE i.sede IN (${sedesPermitidas.map(()=>'?').join(',')}) ORDER BY i.descripcion,i.codigo`,sedesPermitidas):[[]];
+  const [articulos]=await pool.query(`SELECT i.sede,i.codigo,i.descripcion,COALESCE(f.unidad,'UND') AS unidad FROM prov_inventario i LEFT JOIN prov_inventario_fichas f ON f.sede=i.sede AND f.codigo=i.codigo WHERE i.sede IN (?) ORDER BY i.descripcion,i.codigo`,[ALMACEN_GENERAL]);
   res.set('Cache-Control','no-store');
   res.render('proveeduria/mis_solicitudes',{user:u,docs:rows.map(datos),alertas,sedesPermitidas,articulos,sedeActual:sedesPermitidas.includes(actual)?actual:''});
 }));
@@ -130,17 +132,16 @@ router.get('/alertas',wrap(async(req,res) => {
   res.json(rows);
 }));
 async function cargarInventario(req){
-  const sedesPermitidas=await sedesOrden(req);
-  const filtros={sede:sedeInventarioCompartido(req.query.sede||req.session.sedeSeleccionada||req.session.user.sede||'TODAS'),q:String(req.query.q||'').trim(),grupo:String(req.query.grupo||''),estado:String(req.query.estado||''),pagina:req.query.vista==='movimientos'?'movimientos':'inventario'};
-  if(filtros.sede!=='TODAS'&&!sedesPermitidas.includes(filtros.sede))throw error(403,'No tiene acceso a esa sede');
-  const sedes=filtros.sede==='TODAS'?sedesPermitidas:[filtros.sede];
+  const sedesPermitidas=['GENERAL'];
+  const filtros={sede:'GENERAL',q:String(req.query.q||'').trim(),grupo:String(req.query.grupo||''),estado:String(req.query.estado||''),pagina:req.query.vista==='movimientos'?'movimientos':'inventario'};
+  const sedes=[ALMACEN_GENERAL];
   if(!sedes.length)return {inventario:[],movimientos:[],sedesPermitidas,filtros};
   const where=sedes.map(()=>'?').join(',');
   const [rows]=await pool.query(`SELECT i.*,COALESCE(f.grupo,'INVENTARIO') AS grupo,COALESCE(f.tipo,'OTRO') AS tipo,COALESCE(f.categoria,'') AS categoria,COALESCE(f.unidad,'UND') AS unidad,COALESCE(f.ubicacion,'') AS ubicacion,COALESCE(f.stock_minimo,0) AS stock_minimo,COALESCE(f.stock_maximo,0) AS stock_maximo,COALESCE(f.proveedor,'') AS proveedor FROM prov_inventario i LEFT JOIN prov_inventario_fichas f ON f.sede=i.sede AND f.codigo=i.codigo WHERE i.sede IN (${where}) ORDER BY i.descripcion,i.sede`,sedes);
   const normal=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
   const inventario=rows.filter(a=>(!filtros.grupo||a.grupo===filtros.grupo)&&(!filtros.estado||estadoStock(a)===filtros.estado)&&(!filtros.q||normal([a.codigo,a.descripcion,a.categoria,a.ubicacion,a.proveedor,a.sede].join(' ')).includes(normal(filtros.q))));
   const [movimientos]=await pool.query(`SELECT * FROM prov_inventario_movimientos WHERE sede IN (${where}) ${filtros.q?'AND (codigo LIKE ? OR descripcion LIKE ? OR motivo LIKE ?)':''} ORDER BY id DESC LIMIT 200`,[...sedes,...filtros.q?Array(3).fill('%'+filtros.q+'%'):[]]);
-  return {inventario,movimientos,sedesPermitidas,filtros};
+  return {inventario:inventario.map(a=>({...a,sede:'GENERAL'})),movimientos:movimientos.map(m=>({...m,sede:'GENERAL'})),sedesPermitidas,filtros};
 }
 router.get('/inventario',wrap(async(req,res)=>{
   if(!gestion(req.session.user)&&!contabilidad(req.session.user))throw error(403,'No autorizado');
@@ -157,7 +158,7 @@ router.get('/inventario/exportar.xlsx',wrap(async(req,res)=>{
 }));
 router.post('/inventario/articulos',wrap(async(req,res)=>{
   if(!gestion(req.session.user))throw error(403,'No autorizado');
-  const sedeArticulo=await sedeFormulario(req),d=fichaInventario(req.body),cantidad=cantidadInventario(req.body.cantidad??0,'Stock inicial');
+  const sedeArticulo=ALMACEN_GENERAL,d=fichaInventario(req.body),cantidad=cantidadInventario(req.body.cantidad??0,'Stock inicial');
   const codigo=String(req.body.codigo||'').trim()||'PV-'+crypto.randomBytes(4).toString('hex').toUpperCase();exigir(codigo.length<=80,'Código demasiado largo');
   await transaccion(async db=>{
     const [existe]=await db.query('SELECT codigo FROM prov_inventario WHERE sede=? AND codigo=? FOR UPDATE',[sedeArticulo,codigo]);exigir(!existe.length,'El código ya existe en esta sede. Edite su ficha o ajuste la existencia');
@@ -168,7 +169,7 @@ router.post('/inventario/articulos',wrap(async(req,res)=>{
 }));
 router.post('/inventario/ficha',wrap(async(req,res)=>{
   if(!gestion(req.session.user))throw error(403,'No autorizado');
-  const sedeArticulo=await sedeFormulario(req),codigo=String(req.body.codigo||''),d=fichaInventario(req.body);
+  const sedeArticulo=ALMACEN_GENERAL,codigo=String(req.body.codigo||''),d=fichaInventario(req.body);
   await transaccion(async db=>{
     const [rows]=await db.query('SELECT codigo FROM prov_inventario WHERE sede=? AND codigo=? FOR UPDATE',[sedeArticulo,codigo]);exigir(rows.length,'Artículo no encontrado');
     await db.query('UPDATE prov_inventario SET descripcion=?,iva=? WHERE sede=? AND codigo=?',[d.descripcion,d.iva,sedeArticulo,codigo]);await guardarFichaInventario(db,sedeArticulo,codigo,d);
@@ -176,7 +177,7 @@ router.post('/inventario/ficha',wrap(async(req,res)=>{
 }));
 router.post('/inventario/ajuste',wrap(async(req,res)=>{
   if(!gestion(req.session.user))throw error(403,'No autorizado');
-  const sedeArticulo=await sedeFormulario(req),codigo=String(req.body.codigo||''),cantidad=cantidadInventario(req.body.cantidad,'Existencia física'),motivo=String(req.body.motivo||'').trim();
+  const sedeArticulo=ALMACEN_GENERAL,codigo=String(req.body.codigo||''),cantidad=cantidadInventario(req.body.cantidad,'Existencia física'),motivo=String(req.body.motivo||'').trim();
   exigir(motivo&&motivo.length<=500,'Indique el motivo del ajuste (máximo 500 caracteres)');
   await transaccion(async db=>{
     const [rows]=await db.query('SELECT cantidad FROM prov_inventario WHERE sede=? AND codigo=? FOR UPDATE',[sedeArticulo,codigo]);exigir(rows.length,'Artículo no encontrado');
@@ -307,11 +308,11 @@ router.post('/solicitudes',wrap(async(req,res) => {
   const u=req.session.user;
   exigir(esDepartamentoValido(u.departamentoActivo),'Seleccione su departamento antes de crear una solicitud');
   const id = await transaccion(async db=>{
-    const [articulos]=await db.query(`SELECT codigo,descripcion,iva FROM prov_inventario WHERE sede=? AND codigo IN (${codigos.map(()=>'?').join(',')})`,[sedeSolicitud,...codigos]);
+    const [articulos]=await db.query(`SELECT codigo,descripcion,iva FROM prov_inventario WHERE sede=? AND codigo IN (${codigos.map(()=>'?').join(',')})`,[ALMACEN_GENERAL,...codigos]);
     const catalogo=new Map(articulos.map(a=>[a.codigo,a]));
     const lineas=lineasCompra(solicitadas.map((l,i)=>{
       const a=catalogo.get(codigos[i]);
-      exigir(a,`El artículo ${codigos[i]} no está en el inventario de Proveeduría de esta sede. Actualice la página y seleccione otro artículo`);
+      exigir(a,`El artículo ${codigos[i]} no está en el inventario general de Proveeduría. Actualice la página y seleccione otro artículo`);
       return {codigo:a.codigo,descripcion:a.descripcion,iva:Number(a.iva),cantidad:l.cantidad};
     }));
     const [r]=await db.query("INSERT INTO prov_documentos (tipo,usuario_id,sede,datos) VALUES ('solicitud',?,?,?)",[u.id,sedeSolicitud,JSON.stringify({lineas,estado:'PENDIENTE',departamento:u.departamentoActivo,solicitante:u.nombre||u.usuario,motivo:String(req.body.motivo||'').trim().slice(0,2000)})]);
@@ -414,9 +415,9 @@ router.post('/ordenes/:id/recibir',wrap(async(req,res)=>{
     validarPendientes(resumen,recibo);
     const lineas=recibo.lineas.filter(l=>l.cantidad>0).map(l=>({...resumen.lineas.find(x=>x.codigo===l.codigo),cantidad:l.cantidad}));
     for(const l of lineas){
-      await db.query('INSERT INTO prov_inventario (sede,codigo,descripcion,iva,cantidad) VALUES (?,?,?,?,?) ON DUPLICATE KEY UPDATE cantidad = cantidad + VALUES(cantidad), descripcion = VALUES(descripcion), iva = VALUES(iva)',[row.sede,l.codigo,l.descripcion,l.iva,l.cantidad]);
-      await db.query('INSERT INTO prov_inventario_fichas (sede,codigo,proveedor) VALUES (?,?,?) ON DUPLICATE KEY UPDATE proveedor=VALUES(proveedor)',[row.sede,l.codigo,row.datos.proveedor||'']);
-      await registrarMovimientoInventario(db,{sede:row.sede,codigo:l.codigo,tipo:'ENTRADA_OC',cantidad:l.cantidad,documento_id:row.id,usuario_id:req.session.user.id,motivo:`Recepción de OC PR-${row.id} · ${recibo.referencia}`});
+      await db.query('INSERT INTO prov_inventario (sede,codigo,descripcion,iva,cantidad) VALUES (?,?,?,?,?) ON DUPLICATE KEY UPDATE cantidad = cantidad + VALUES(cantidad), descripcion = VALUES(descripcion), iva = VALUES(iva)',[ALMACEN_GENERAL,l.codigo,l.descripcion,l.iva,l.cantidad]);
+      await db.query('INSERT INTO prov_inventario_fichas (sede,codigo,proveedor) VALUES (?,?,?) ON DUPLICATE KEY UPDATE proveedor=VALUES(proveedor)',[ALMACEN_GENERAL,l.codigo,row.datos.proveedor||'']);
+      await registrarMovimientoInventario(db,{sede:ALMACEN_GENERAL,codigo:l.codigo,tipo:'ENTRADA_OC',cantidad:l.cantidad,documento_id:row.id,usuario_id:req.session.user.id,motivo:`Recepción de OC PR-${row.id} · ${recibo.referencia} · Destino: ${row.sede}`});
     }
     const fecha=new Date().toISOString();
     row.datos.recepciones=[...resumen.historial,{id:recibo.id,huella:recibo.huella,fecha,usuario_id:req.session.user.id,recibido_por:req.session.user.nombre||req.session.user.usuario,referencia:recibo.referencia,observaciones:recibo.observaciones,lineas:lineas.map(l=>({codigo:l.codigo,descripcion:l.descripcion,cantidad:l.cantidad}))}];
@@ -436,12 +437,12 @@ router.post('/salidas',wrap(async(req,res)=>{
     if(solicitud.datos.oc_id){const oc=await documento(db,solicitud.datos.oc_id,'oc',true);exigir(oc.datos.estado==='RECIBIDA','Primero registre la recepción de la mercadería');}
     const lineas=[];
     for(const l of [...solicitud.datos.lineas].sort((a,b)=>a.codigo.localeCompare(b.codigo))){
-      const [stock]=await db.query('SELECT * FROM prov_inventario WHERE sede=? AND codigo=? FOR UPDATE',[solicitud.sede,l.codigo]);
+      const [stock]=await db.query('SELECT * FROM prov_inventario WHERE sede=? AND codigo=? FOR UPDATE',[ALMACEN_GENERAL,l.codigo]);
       exigir(stock[0] && Number(stock[0].cantidad)>=l.cantidad,`Inventario insuficiente: ${l.codigo}`);
-      await db.query('UPDATE prov_inventario SET cantidad=cantidad-? WHERE sede=? AND codigo=?',[l.cantidad,solicitud.sede,l.codigo]);lineas.push(l);
+      await db.query('UPDATE prov_inventario SET cantidad=cantidad-? WHERE sede=? AND codigo=?',[l.cantidad,ALMACEN_GENERAL,l.codigo]);lineas.push(l);
     }
     const [r]=await db.query("INSERT INTO prov_documentos (tipo,usuario_id,sede,datos) VALUES ('salida',?,?,?)",[solicitud.usuario_id,solicitud.sede,JSON.stringify({lineas,solicitud_id:solicitud.id,estado:'ALISTANDO'})]);
-    for(const l of lineas)await registrarMovimientoInventario(db,{sede:solicitud.sede,codigo:l.codigo,tipo:'SALIDA_PEDIDO',cantidad:-l.cantidad,documento_id:r.insertId,usuario_id:req.session.user.id,motivo:`Entrega de solicitud PR-${solicitud.id}`});
+    for(const l of lineas)await registrarMovimientoInventario(db,{sede:ALMACEN_GENERAL,codigo:l.codigo,tipo:'SALIDA_PEDIDO',cantidad:-l.cantidad,documento_id:r.insertId,usuario_id:req.session.user.id,motivo:`Entrega de solicitud PR-${solicitud.id} · Destino: ${solicitud.sede}`});
     solicitud.datos.salida_id=r.insertId;solicitud.datos.estado='ALISTANDO';await guardar(db,solicitud,req.session.user.id,'Salida de inventario');await alerta(db,r.insertId,'Su pedido se está alistando',solicitud.usuario_id);return r.insertId;
   });res.json({id});
 }));

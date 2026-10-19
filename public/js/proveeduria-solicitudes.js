@@ -2,7 +2,6 @@
   const form = document.querySelector('[data-solicitud-inventario]');
   if (!form) return;
   const { articulos = [] } = JSON.parse(document.getElementById('prov-datos').textContent);
-  const sede = form.elements.sede;
   const body = form.querySelector('tbody');
   const agregar = form.querySelector('[data-agregar-articulo]');
   const enviar = form.querySelector('button:not([type]),button[type="submit"]');
@@ -39,16 +38,13 @@
   }
 
   function actualizarSede() {
-    catalogo = articulos.filter(a => a.sede === sede.value);
+    catalogo = articulos;
     body.replaceChildren();
     agregar.disabled = enviar.disabled = !catalogo.length;
     aviso.hidden = catalogo.length > 0;
-    aviso.textContent = sede.value
-      ? 'Esta sede todavía no tiene artículos registrados en el inventario de Proveeduría. Solicite a Proveeduría que los registre.'
-      : 'Seleccione una sede para ver sus productos de Proveeduría.';
+    aviso.textContent = 'Todavía no hay artículos registrados en el inventario general de Proveeduría.';
     if (catalogo.length) fila();
   }
-  sede.addEventListener('change', actualizarSede);
   agregar.addEventListener('click', fila);
   actualizarSede();
 })();

@@ -31,6 +31,11 @@ test('todos los departamentos solicitan del inventario comun de su sede geografi
         assert.equal(ajena.status,403);
       });
     }
+    await server({...requester,sede:'La Cruz'},async base=>{
+      const pagina=await fetch(base+'/mis-solicitudes');assert.equal(pagina.status,200);assert.match(await pagina.text(),/Papel/);
+      const post=await fetch(base+'/solicitudes',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sede:'La Cruz',lineas:[{codigo:'PAPEL',cantidad:1}]})});
+      assert.equal(post.status,200);assert.equal(guardadas.at(-1)[1],'La Cruz');
+    });
   }finally{pool.query=originalQuery;pool.getConnection=originalConnection;}
 });
 async function server(user,fn){
@@ -54,6 +59,7 @@ test('departamento solicitante solo puede consultar sus pedidos y no gestionar c
 });
 test('flujo completo: solicitud de otro departamento, cotización, OC, recepción y entrega confirmada',async()=>{
   const originalQuery=pool.query,originalConnection=pool.getConnection;
+  const regional={...requester,sede:'La Cruz'};
   const docs=new Map(),stock=new Map(),alerts=[];let nextId=1;
   async function query(sql,args=[]){
     if(sql.includes('FROM prov_proveedores'))return [[]];
@@ -61,14 +67,14 @@ test('flujo completo: solicitud de otro departamento, cotización, OC, recepció
     if(sql.startsWith('SELECT datos FROM prov_documentos'))return [[...docs.values()].filter(d=>d.tipo==='oc').map(d=>({datos:d.datos}))];
     if(sql.startsWith('SELECT * FROM prov_documentos')){let rows=[...docs.values()];if(sql.includes("tipo='solicitud'"))rows=rows.filter(r=>r.tipo==='solicitud');if(sql.includes('usuario_id=?'))rows=rows.filter(r=>r.usuario_id===args[0]&&['solicitud','salida'].includes(r.tipo));return [structuredClone(rows)];}
     if(sql.includes('FROM usuarios_sedes'))return [[]];
-    if(sql.startsWith('SELECT codigo,descripcion,iva FROM prov_inventario'))return [[{codigo:'PAPEL',descripcion:'Papel',iva:13}]];
+    if(sql.startsWith('SELECT codigo,descripcion,iva FROM prov_inventario')){assert.equal(args[0],'Cartago');return [[{codigo:'PAPEL',descripcion:'Papel',iva:13}]];}
     if(sql.includes('FROM prov_inventario i'))return [[{sede:'Cartago',codigo:'PAPEL',descripcion:'Papel',unidad:'UND'}]];
     if(sql.startsWith('SELECT')&&sql.includes('FROM prov_inventario'))return [stock.has(args[1])?[{cantidad:stock.get(args[1])}]:[]];
     if(sql.startsWith('SELECT')&&sql.includes('FROM prov_alertas'))return [alerts.filter(a=>a.usuario_id===args[0])];
     if(sql.startsWith('INSERT INTO prov_documentos')){const tipo=sql.match(/VALUES \('(\w+)'/)[1],id=nextId++;docs.set(id,{id,tipo,usuario_id:args[0],sede:args[1],datos:JSON.parse(args[2]),creado_en:new Date()});return [{insertId:id}];}
     if(sql.startsWith('UPDATE prov_documentos')){docs.get(Number(args[1])).datos=JSON.parse(args[0]);return [{affectedRows:1}];}
-    if(sql.startsWith('INSERT INTO prov_inventario ('))stock.set(args[1],(stock.get(args[1])||0)+args[4]);
-    if(sql.startsWith('UPDATE prov_inventario'))stock.set(args[2],stock.get(args[2])-args[0]);
+    if(sql.startsWith('INSERT INTO prov_inventario (')){assert.equal(args[0],'Cartago');stock.set(args[1],(stock.get(args[1])||0)+args[4]);}
+    if(sql.startsWith('UPDATE prov_inventario')){assert.equal(args[1],'Cartago');stock.set(args[2],stock.get(args[2])-args[0]);}
     if(sql.startsWith('INSERT INTO prov_alertas'))alerts.push({id:alerts.length+1,usuario_id:args[0],grupo:args[1],mensaje:args[2],documento_id:args[3]});
     return [{affectedRows:1}];
   }
@@ -76,7 +82,7 @@ test('flujo completo: solicitud de otro departamento, cotización, OC, recepció
   const json=body=>({method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
   const form=()=>new URLSearchParams({origen_formulario:'taller',solicitud_id:'1',proveedor:'Proveedor',email:'proveedor@example.com',empresa_destino:'GAS TOMZA',credito:'30',forma_pago:'Crédito',entrega:'5 días',moneda:'CRC',iva:'13','lineas[0][codigo_producto]':'PAPEL','lineas[0][descripcion]':'Papel','lineas[0][cantidad]':'2','lineas[0][precio_unitario]':'100'});
   try{
-    await server(requester,async base=>{
+    await server(regional,async base=>{
       const r=await fetch(base+'/solicitudes',json({departamento:'PROVEEDURIA',lineas:[{codigo:'PAPEL',descripcion:'Papel',cantidad:2,iva:99}],motivo:'Para la oficina'}));assert.equal(r.status,200);assert.equal(docs.get(1).datos.departamento,'OPERACIONES');assert.equal(docs.get(1).datos.solicitante,requester.nombre);assert.equal(docs.get(1).datos.lineas[0].iva,13);assert.equal(alerts[0].grupo,'PROVEEDURIA');
     });
     await server(manager,async base=>{
@@ -92,7 +98,7 @@ test('flujo completo: solicitud de otro departamento, cotización, OC, recepció
       assert.equal((await fetch(base+'/salidas',json({solicitud_id:1}))).status,200);assert.equal(docs.get(1).datos.estado,'ALISTANDO');assert.equal(stock.get('PAPEL'),0);
       assert.equal((await fetch(base+'/salidas/3/enviar',{method:'POST'})).status,200);assert.equal(docs.get(1).datos.estado,'EN_CAMINO');
     });
-    await server(requester,async base=>{
+    await server(regional,async base=>{
       const pedidos=await fetch(base+'/mis-solicitudes');assert.equal(pedidos.status,200);assert.match(await pedidos.text(),/Confirmar que recibí los productos/);
       assert.equal((await fetch(base+'/salidas/3/aceptar',{method:'POST'})).status,200);assert.equal(docs.get(1).datos.estado,'ENTREGADA');assert.equal(docs.get(3).datos.estado,'RECIBIDA');
     });
