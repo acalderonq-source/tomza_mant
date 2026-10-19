@@ -180,7 +180,8 @@ test("excluye sedes con sus variantes de acentos y nombres internos", async () =
   for (const sede of ["Alajuela", "Cabezales", "Carretas", "Cisternas", "Granel", "granel_cartago", "Granel Guápiles", "granel_la_cruz", "granel_perez_zeledon", "Orotina", "San Carlos", "Taller", "Tándem", "Tamden", "Técnicos", "Transportadora"]) {
     assert.equal(sedeAdmitePreventivos(sede), false, sede);
   }
-  for (const sede of ["Cartago", "Guapiles", "La Cruz", "Nicoya", "Rio Claro", "Perez Zeledon", "granel_alajuela"]) {
+  for (const sede of ["granel_alajuela", "Granel Alajuela", "GRANEL-ALAJUELA"]) assert.equal(sedeAdmitePreventivos(sede),false,sede);
+  for (const sede of ["Cartago", "Guapiles", "La Cruz", "Nicoya", "Rio Claro", "Perez Zeledon"]) {
     assert.equal(sedeAdmitePreventivos(sede), true, sede);
   }
   const db = baseGenerador();
