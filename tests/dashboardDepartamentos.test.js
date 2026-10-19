@@ -62,6 +62,19 @@ test("el dashboard de Taller conserva los accesos operativos historicos para ADM
   }
 });
 
+test("Seguridad Ocupacional muestra Solicitud de suministros como primer módulo con formato de Taller", async () => {
+  for (const rol of ["ADMIN", "SUPERVISOR"]) {
+    const html = await renderDashboard("SEGURIDAD_OCUPACIONAL", rol);
+    const grid = html.match(/<div class="module-grid">([\s\S]*?)<\/section>/);
+    assert.ok(grid, "El área debe mostrar la misma cuadrícula de módulos de Taller");
+    assert.match(grid[1], /class="module-card"/);
+    assert.match(grid[1], /class="module-title">Solicitud de suministros<\/div>/);
+    assert.equal([...grid[1].matchAll(/href="([^"]+)"/g)][0][1], "/proveeduria/mis-solicitudes");
+    assert.doesNotMatch(html, /Área en preparación|Solicitudes a Proveeduría/);
+    assert.doesNotMatch(html, /href="\/mantenimientos"/);
+  }
+});
+
 test("el rol TALLER conserva sus accesos de trabajo al seleccionar Taller", async () => {
   const html = await renderDashboard("TALLER", "TALLER", "taller");
   for (const href of [

@@ -135,7 +135,9 @@
     </div>
   </section>
 
-  <%- include('partials/solicitudes_proveeduria_acceso') %>
+  <% if (departamentoActivo !== 'SEGURIDAD_OCUPACIONAL') { %>
+    <%- include('partials/solicitudes_proveeduria_acceso') %>
+  <% } %>
   <% if (!esBodegaDashboard && !esMecanicoLimitado && (usuarioTodasSedes || sedes.length > 1) && sedes.length) { %>
     <section class="plain-card p-2 mb-2">
       <h2 class="section-title">Cambiar sede</h2>
@@ -214,6 +216,18 @@
       </div>
 
     </section>
+  <% } %>
+
+  <% if (departamentoActivo === 'SEGURIDAD_OCUPACIONAL') { %>
+  <section class="mb-2">
+    <h2 class="section-title legacy-modules-title">Módulos</h2>
+    <div class="module-grid">
+      <a href="/proveeduria/mis-solicitudes" class="module-card">
+        <span class="module-icon icon-blue"><i class="bi bi-cart-plus"></i></span>
+        <div><div class="module-title">Solicitud de suministros</div><p class="module-copy">Solicite equipo de protección personal, materiales y suministros a Proveeduría. Consulte sus pedidos y confirme la entrega.</p></div>
+      </a>
+    </div>
+  </section>
   <% } %>
 
   <% if (areaTaller || areaContabilidad || areaProveeduria) { %>
@@ -441,12 +455,6 @@
             <span class="module-icon icon-blue"><i class="bi bi-bar-chart"></i></span>
             <div><div class="module-title">Compras</div><p class="module-copy">Resumen del área.</p></div>
           </a>
-      <% } %>
-      <% if (departamentoActivo === 'SEGURIDAD_OCUPACIONAL') { %>
-        <a href="/proveeduria/mis-solicitudes" class="module-card">
-          <span class="module-icon icon-blue"><i class="bi bi-cart-plus"></i></span>
-          <div><div class="module-title">Solicitudes a Proveeduría</div><p class="module-copy">Solicite equipo de protección personal, materiales y suministros para Seguridad Ocupacional. Consulte el avance de sus pedidos y confirme la entrega.</p></div>
-        </a>
       <% } %>
       <% if (['LOGISTICA', 'RECURSOS_HUMANOS', 'CARBURACION'].includes(departamentoActivo)) { %>
         <div class="module-card">
