@@ -21,6 +21,7 @@ const { verificarColumnasRequeridas, COLUMNAS_ESENCIALES_TALLER } = require("./u
 const app = express();
 const { alertar, programarRespaldo } = require('./utils/alertasEmpresa');
 programarRespaldo();
+require('./utils/ingresosSesion').iniciarAvisosIngreso(pool);
 app.disable("x-powered-by");
 app.use(securityHeaders);
 const isProduction = process.env.NODE_ENV === "production";
@@ -400,6 +401,7 @@ const solicitudesPortal = require('./routes/portalSolicitudes.routes').createRou
 const solicitudesTrabajadores = require('./routes/trabajadorSolicitudes.routes').createRouters(pool);
 app.use('/solicitar-ingreso', solicitudesTrabajadores.publico);
 app.use('/admin/solicitudes-trabajadores', solicitudesTrabajadores.privado);
+app.use('/admin/ingresos', require('./routes/ingresosSesion.routes').crearRouter(pool));
 app.use('/portal-proveedores/solicitar-acceso', solicitudesPortal.publico);
 app.use('/administracion/portal-proveedores/solicitudes', solicitudesPortal.privado);
 app.use('/portal-proveedores', portalProveedores.externo, (_req,res)=>res.sendStatus(404));

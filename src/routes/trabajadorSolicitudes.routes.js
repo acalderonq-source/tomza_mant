@@ -4,6 +4,7 @@ const crypto = require('node:crypto');
 const { rateLimit } = require('express-rate-limit');
 const { normalizarCedula, cedulaValida } = require('../utils/cedula');
 const { SEDES_SOLICITUD, sedeSolicitud } = require('../utils/sedesSolicitudesTrabajadores');
+const { correoIngreso, guardarCorreoIngreso } = require('../utils/ingresosSesion');
 
 function fallo(mensaje, status = 400) { throw Object.assign(new Error(mensaje), { status }); }
 function texto(value, max, min = 1) {
@@ -21,7 +22,7 @@ function validarSolicitud(body, sedes) {
   if (nombre_completo.split(' ').length < 2 || !/\p{L}/u.test(nombre_completo)) fallo('Ingrese su nombre completo y apellidos.');
   const puesto = texto(body.puesto, 120, 3), sede = sedeSolicitud(texto(body.sede, 100));
   if (!sedes.includes(sede)) fallo('Seleccione una sede del listado.');
-  return { cedula, nombre_completo, puesto, sede };
+  return { cedula, nombre_completo, puesto, sede, correo:correoIngreso(body.correo,true) };
 }
 function createRouters(db, opciones = {}) {
   const publico = express.Router(), privado = express.Router();
@@ -39,14 +40,14 @@ function createRouters(db, opciones = {}) {
     try { datos = validarSolicitud(req.body, sedes); }
     catch (error) {
       if (!error.status) throw error;
-      const datosFormulario = Object.fromEntries(Object.entries({ cedula:25, nombre_completo:150, puesto:120, sede:100 })
+      const datosFormulario = Object.fromEntries(Object.entries({ cedula:25, nombre_completo:150, puesto:120, sede:100, correo:254 })
         .map(([key,max]) => [key, typeof req.body?.[key] === 'string' ? req.body[key].slice(0,max) : '']));
       return res.status(400).render('trabajadores/solicitar_ingreso', { sedes, datos: datosFormulario, error: error.message, enviado: false });
     }
     // Igual respuesta para duplicados y accesos existentes. No crear usuarios aqui.
     if (!req.body.sitio_web) await db.query(`INSERT INTO trabajador_solicitudes_acceso
-      (cedula,nombre_completo,puesto,sede) VALUES (?,?,?,?)
-      ON DUPLICATE KEY UPDATE id=id`, [datos.cedula, datos.nombre_completo, datos.puesto, datos.sede]);
+      (cedula,nombre_completo,puesto,sede,correo) VALUES (?,?,?,?,?)
+      ON DUPLICATE KEY UPDATE id=id`, [datos.cedula, datos.nombre_completo, datos.puesto, datos.sede, datos.correo]);
     return res.status(202).render('trabajadores/solicitar_ingreso', { sedes: [], datos: {}, error: null, enviado: true });
   }));
   privado.use((req, res, next) => {
@@ -57,7 +58,7 @@ function createRouters(db, opciones = {}) {
   });
   privado.get('/', wrap(async (req, res) => {
     const estado = ['PENDIENTE','APROBADA','RECHAZADA'].includes(req.query.estado) ? req.query.estado : 'PENDIENTE';
-    const [solicitudes] = await db.query('SELECT id,cedula,nombre_completo,puesto,sede,estado,codigo_trabajador,motivo,creado_en,revisado_en FROM trabajador_solicitudes_acceso WHERE estado=? ORDER BY creado_en DESC,id DESC LIMIT 200', [estado]);
+    const [solicitudes] = await db.query('SELECT id,cedula,nombre_completo,puesto,sede,correo,estado,codigo_trabajador,motivo,creado_en,revisado_en FROM trabajador_solicitudes_acceso WHERE estado=? ORDER BY creado_en DESC,id DESC LIMIT 200', [estado]);
     const [perfiles] = await db.query("SELECT id,usuario,nombre,rol,sede FROM usuarios WHERE rol NOT IN ('ADMIN','PANTALLA_MECANICOS','PANTALLA_PESADOS') ORDER BY rol,usuario");
     const mensaje = req.session.solicitudTrabajadorMensaje || '';
     delete req.session.solicitudTrabajadorMensaje;
@@ -96,6 +97,8 @@ function createRouters(db, opciones = {}) {
           VALUES (?,?,?,?,?,?,0)`, [solicitud.cedula, id, solicitud.nombre_completo, codigo, hash, solicitud.puesto.slice(0, 80)]);
         const [carnets] = await connection.query('SELECT cedula FROM carnets_trabajador WHERE cedula=? FOR UPDATE', [solicitud.cedula]);
         if (!carnets.length) await connection.query('INSERT INTO carnets_trabajador (cedula,qr_token) VALUES (?,?)', [solicitud.cedula, crypto.randomBytes(32).toString('hex')]);
+        const correo=correoIngreso(req.body.correo !== undefined ? req.body.correo : solicitud.correo);
+        if (correo) await guardarCorreoIngreso(connection,'C:'+solicitud.cedula,correo,req.session.user.id);
       }
       await connection.query('UPDATE trabajador_solicitudes_acceso SET estado=?,codigo_trabajador=?,perfiles_json=?,revisado_por=?,motivo=?,revisado_en=CURRENT_TIMESTAMP WHERE id=?',
         [aprobar ? 'APROBADA' : 'RECHAZADA', codigo || null, ids ? JSON.stringify(ids) : null, req.session.user.id, motivo || null, solicitud.id]);

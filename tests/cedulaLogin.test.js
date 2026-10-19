@@ -18,7 +18,12 @@ test("normaliza cédulas escritas con espacios o guiones y valida identificadore
 
 async function withLoginServer(queryHandler, run, initialUser = null) {
   const originalQuery = pool.query;
-  pool.query = queryHandler;
+  pool.query = async (sql,params) => {
+    if (sql.startsWith('SELECT correo FROM ingreso_correos')) return [[]];
+    if (sql.startsWith('INSERT INTO sesion_ingresos')) return [{insertId:1}];
+    if (sql.includes('sesion_ingresos')) return [[]];
+    return queryHandler(sql,params);
+  };
 
   const app = express();
   app.set("views", path.join(__dirname, "..", "src", "views"));
@@ -28,7 +33,7 @@ async function withLoginServer(queryHandler, run, initialUser = null) {
     req.session = {
       user: initialUser,
       regenerate(callback) {
-        req.session = {};
+        req.session = { save: cb=>cb(null), destroy: cb=>{req.session={};cb(null);} };
         callback(null);
       },
       destroy(callback) {
@@ -46,6 +51,7 @@ async function withLoginServer(queryHandler, run, initialUser = null) {
   try {
     await run(`http://127.0.0.1:${server.address().port}`);
   } finally {
+    await new Promise(resolve=>setImmediate(resolve));
     pool.query = originalQuery;
     await new Promise(resolve => server.close(resolve));
   }

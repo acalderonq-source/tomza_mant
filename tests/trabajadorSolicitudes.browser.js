@@ -39,6 +39,7 @@ const { ensureCsrfToken, injectSecurityAssets } = require('../src/middleware/sec
     await page.getByLabel('Número de cédula').fill('100000001');
     await page.getByLabel('Nombre completo y apellidos').fill('Persona de Prueba');
     await page.getByLabel('Puesto',{exact:true}).fill('Asistente');
+    await page.getByLabel('Correo para avisos de inicio de sesión').fill('persona@example.invalid');
     await page.getByLabel('Sede',{exact:true}).selectOption('Cartago');
     await page.screenshot({path:'tmp/solicitud-trabajador-desktop.png',fullPage:true});
     await page.getByRole('button',{name:'Enviar solicitud'}).click();

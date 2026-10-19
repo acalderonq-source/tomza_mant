@@ -22,6 +22,8 @@ async function verificarColumnasRequeridas(query, columnasRequeridas) {
 }
 
 const COLUMNAS_ESENCIALES_TALLER = {
+  ingreso_correos: ['identidad','correo','actualizado_por','actualizado_en'],
+  sesion_ingresos: ['id','identidad','usuario_id','usuario','nombre','rol','departamento','sede','ip','dispositivo','correo_destino','correo_estado','intentos','ultimo_intento','enviado_en','error_codigo','creado_en'],
   unidades: ["id", "placa", "sede", "activa", "varada", "comodin"],
   mantenimientos: ["id", "unidad_id", "fecha_programada", "tipo", "prioridad", "estado", "plan", "ejecucion", "pendiente"],
   mantenimiento_mecanicos: ["mantenimiento_id", "mecanico_id"],

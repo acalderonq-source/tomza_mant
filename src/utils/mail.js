@@ -36,6 +36,7 @@ function obtenerTransporter(perfil) {
       port: config.port,
       secure: config.secure,
       requireTLS: config.requireTLS,
+      ...(perfil === 'seguridad' ? { connectionTimeout:15000, greetingTimeout:15000, socketTimeout:60000 } : {}),
       auth: { user: config.user, pass: config.pass }
     }));
   }

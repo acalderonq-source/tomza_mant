@@ -9,6 +9,7 @@ const { esPropietarioAdministracion } = require('../utils/administracionPrivada'
 const {limitarCuenta}=require('../middleware/accountLoginLimit');
 const {selloUsuario,leerSello}=require('../middleware/sessionSecurity');
 const {sessionSecret}=require('../utils/sessionConfig');
+const { registrarIngreso, procesarAvisosIngreso } = require('../utils/ingresosSesion');
 const limiteCuenta=limitarCuenta(req=>{const id=String(req.body.cedula||req.body.usuario||'').trim();const digits=normalizarCedula(id);return /^\d{9,12}$/.test(digits)?digits:id;});
 const router = express.Router();
 const loginLimiter = rateLimit({
@@ -259,7 +260,17 @@ async function iniciarSesion(req, res, user, departamento, nextUrl) {
       const destino = esCuentaPantalla
         ? "/taller/dashboard"
         : user.requiere_cambio_password ? "/cambiar-clave" : departamento === "CARBURACION" ? "/dashboard" : nextUrl || "/dashboard";
-      res.redirect(destino);
+      const fallar = error => {
+        console.error('No se pudo guardar el ingreso:', error.code || 'ERROR');
+        req.session.destroy(() => res.status(503).send('No se pudo registrar el inicio de sesion. Intente nuevamente.'));
+      };
+      req.session.save(error => {
+        if (error) return fallar(error);
+        registrarIngreso(pool, sessionUser, req).then(() => {
+          res.redirect(destino);
+          setImmediate(() => procesarAvisosIngreso(pool).catch(error => console.error('Aviso de ingreso pendiente:', error.code || 'ERROR')));
+        }).catch(fallar);
+      });
     });
 }
 

@@ -6,7 +6,7 @@ const path = require('node:path');
 const bcrypt = require('bcryptjs');
 const { createRouters, validarSolicitud } = require('../src/routes/trabajadorSolicitudes.routes');
 const { ensureCsrfToken, injectSecurityAssets } = require('../src/middleware/security');
-const datos = { cedula: '3-0527-0365', nombre_completo: 'Persona Apellido de Prueba', puesto: 'Asistente de taller', sede: 'Cartago' };
+const datos = { cedula: '3-0527-0365', nombre_completo: 'Persona Apellido de Prueba', puesto: 'Asistente de taller', sede: 'Cartago', correo:'persona@example.invalid' };
 
 test('solicitud valida exactamente cedula, nombre completo, puesto y sede permitida', () => {
   assert.equal(validarSolicitud(datos, ['Cartago']).cedula, '305270365');
@@ -20,7 +20,7 @@ test('solicitar no crea acceso; ADMIN verifica, asigna perfil y crea acceso y ca
   const query = async (sql, params=[]) => {
     consultas.push(sql);
     if (sql.startsWith('INSERT INTO trabajador_solicitudes_acceso')) {
-      solicitud ||= {id:1,cedula:params[0],nombre_completo:params[1],puesto:params[2],sede:params[3],estado:'PENDIENTE',creado_en:new Date()};
+      solicitud ||= {id:1,cedula:params[0],nombre_completo:params[1],puesto:params[2],sede:params[3],correo:params[4],estado:'PENDIENTE',creado_en:new Date()};
       return [{affectedRows:1}];
     }
     if (sql.includes('FROM trabajador_solicitudes_acceso')) return [[solicitud].filter(Boolean)];
@@ -31,6 +31,7 @@ test('solicitar no crea acceso; ADMIN verifica, asigna perfil y crea acceso y ca
     if (sql.startsWith('INSERT INTO usuario_cedulas')) { acceso={cedula:params[0],usuario_id:params[1],nombre:params[2],codigo:params[3],hash:params[4]}; return [{insertId:2}]; }
     if (sql.startsWith('SELECT cedula FROM carnets_trabajador')) return [carnet?[{cedula:carnet.cedula}]:[]];
     if (sql.startsWith('INSERT INTO carnets_trabajador')) { carnet={cedula:params[0],token:params[1]}; return [{insertId:1}]; }
+    if (sql.startsWith('INSERT INTO ingreso_correos')) return [{affectedRows:1}];
     if (sql.startsWith('UPDATE trabajador_solicitudes_acceso')) { Object.assign(solicitud,{estado:params[0],codigo_trabajador:params[1],perfiles_json:params[2],revisado_por:params[3]}); return [{affectedRows:1}]; }
     throw Error('SQL inesperado: '+sql);
   };

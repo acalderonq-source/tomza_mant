@@ -11,7 +11,7 @@ test('agrupa sedes generales sin exponer divisiones de Taller en el ingreso', ()
   assert.equal(sedeSolicitud('Inventada'),null);
 });
 test('solicitud conserva solo datos publicos; codigo y permisos los asigna ADMIN', () => {
-  const datos=validarSolicitud({cedula:'100000001',nombre_completo:'Persona de Prueba',puesto:'Asistente',sede:'granel_cartago',codigo_trabajador:'1234',pin:'1234',usuario_ids:['1']},SEDES_SOLICITUD);
-  assert.deepEqual(Object.keys(datos).sort(),['cedula','nombre_completo','puesto','sede']);
+  const datos=validarSolicitud({cedula:'100000001',nombre_completo:'Persona de Prueba',puesto:'Asistente',sede:'granel_cartago',correo:'persona@example.invalid',codigo_trabajador:'1234',pin:'1234',usuario_ids:['1']},SEDES_SOLICITUD);
+  assert.deepEqual(Object.keys(datos).sort(),['cedula','correo','nombre_completo','puesto','sede']);
   assert.equal(datos.sede,'Cartago');
 });

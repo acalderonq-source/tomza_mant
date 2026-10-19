@@ -7,8 +7,11 @@ test('destinos del login no permiten redirecciones externas por barras invertida
 test('login normal funciona, un cambio de rol revoca el acceso y los intentos fallidos se limitan',async()=>{
   const original=pool.query,hash=await bcrypt.hash('PruebaSegura123!',4);
   const user={id:501,usuario:'prueba-seguridad',rol:'TALLER',sede:'CENTRAL',password:hash,requiere_cambio_password:0};
-  const cedula='3101000001';let pin=hash;
+  const cedula='3101000001';let pin=hash;let fallarRegistro=false;const ingresos=[];
   pool.query=async(sql,args)=>{
+    if(sql.startsWith('SELECT correo FROM ingreso_correos'))return [[]];
+    if(sql.startsWith('INSERT INTO sesion_ingresos')){if(fallarRegistro)throw Object.assign(Error('DB no disponible'),{code:'ECONNRESET'});ingresos.push(args);return [{insertId:ingresos.length}];}
+    if(sql.includes('sesion_ingresos'))return [[]];
     if(sql.includes('FROM usuario_cedulas uc')&&sql.includes('JOIN usuarios u'))return [[{...user,pin_hash:pin,cedula_persona:cedula},{...user,id:502,usuario:'prueba-seguridad2',pin_hash:pin,cedula_persona:cedula}]];
     if(sql.includes('FROM usuarios'))return [[{...user,...(sql.includes('uc.pin_hash')?{pin_hash:args?.[0]===cedula?pin:null,...(args?.[0]===cedula?{cedula_persona:cedula}:{})}:{})}]];
     if(sql.includes('FROM usuario_departamentos'))return [[{departamento:'TALLER',es_principal:1}]];
@@ -23,11 +26,13 @@ test('login normal funciona, un cambio de rol revoca el acceso y los intentos fa
   try{
     token=(await(await request('/test-token')).json()).token;
     assert.equal((await login('PruebaSegura123!')).status,302);
+    assert.equal(ingresos.length,1);
     assert.equal((await request('/test-private')).status,200);
     user.rol='BODEGUERO';assert.equal((await request('/test-private')).status,302);
     user.rol='TALLER';token=(await(await request('/test-token')).json()).token;
     for(let i=0;i<10;i++)assert.equal((await login('Incorrecta123!')).status,200);
     assert.equal((await login('Incorrecta123!')).status,429);
+    assert.equal(ingresos.length,1,'los intentos fallidos no se cuentan como sesiones iniciadas');
     const loginPin=async(value)=>request('/login',{method:'POST',headers:{'content-type':'application/json','x-csrf-token':token},body:JSON.stringify({cedula,pin:value,departamento:'TALLER'})});
     const perfil=async()=>request('/login/perfil',{method:'POST',headers:{'content-type':'application/json','x-csrf-token':token},body:JSON.stringify({usuarioId:501})});
     assert.equal((await loginPin('PruebaSegura123!')).status,200);
@@ -36,6 +41,13 @@ test('login normal funciona, un cambio de rol revoca el acceso y los intentos fa
     assert.equal((await loginPin('NuevoPinSeguro123!')).status,200);
     assert.equal((await perfil()).headers.get('location'),'/dashboard');
     assert.equal((await request('/test-private')).status,200);
+    assert.equal(ingresos.length,2,'la seleccion de perfil registra solo el ingreso final');
+    assert.equal(ingresos[1][0],'C:'+cedula);
+    token=(await(await request('/test-token')).json()).token;
+    assert.equal((await loginPin('NuevoPinSeguro123!')).status,200);
+    fallarRegistro=true;
+    assert.equal((await perfil()).status,503,'no deja una sesion activa sin poder registrar el ingreso');
+    assert.equal((await request('/test-private')).status,401);
 
   }finally{pool.query=original;server.closeAllConnections();await new Promise(r=>server.close(r));}
 });

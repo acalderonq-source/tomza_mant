@@ -220,6 +220,7 @@
     <% if(user.rol === "CONTABILIDAD" || (user.rol === "ADMIN" && departamentoActivo === "CONTABILIDAD")){ %><%- include("partials/contabilidad_inicio") %><% } %>
     <h2 class="section-title legacy-modules-title">Módulos</h2>
     <div class="module-grid">
+      <% if (user.rol === 'ADMIN') { %><a href="/admin/ingresos" class="module-card"><span class="module-icon icon-blue"><i class="bi bi-clock-history"></i></span><div><div class="module-title">Registro de ingresos</div><p class="module-copy">Inicios de sesión y avisos por correo.</p></div></a><% } %>
       <% if (user.rol === 'ADMIN') { %><a href="/admin/solicitudes-trabajadores" class="module-card"><span class="module-icon icon-blue"><i class="bi bi-person-check"></i></span><div><div class="module-title">Solicitudes de trabajadores</div><p class="module-copy">Revisar y autorizar nuevos ingresos.</p></div></a><% } %>
       <% if (user.rol === 'ADMIN') { %><a href="/control-empresa" class="module-card"><span class="module-icon icon-blue"><i class="bi bi-shield-check"></i></span><div><div class="module-title">Centro de control</div><p class="module-copy">Bitacora, alertas y respaldos.</p></div></a><% } %>
       <% if (areaTaller && ['ADMIN','TALLER','PROVEEDURIA_TALLER'].includes(user.rol)) { %><a href="/control-empresa/unidades" class="module-card"><span class="module-icon icon-blue"><i class="bi bi-truck"></i></span><div><div class="module-title">Expediente por placa</div><p class="module-copy">Historial consolidado de la unidad.</p></div></a><% } %>

@@ -11,9 +11,10 @@
 <dl><dt>Cédula</dt><dd><%= s.cedula %></dd><dt>Puesto solicitado</dt><dd><%= s.puesto %></dd><dt>Sede declarada</dt><dd><%= s.sede %></dd><dt>Recibida</dt><dd><%= new Date(s.creado_en).toLocaleString('es-CR', { timeZone:'America/Costa_Rica' }) %></dd></dl>
 <% if (s.estado === 'PENDIENTE') { %>
 <form method="post" action="/admin/solicitudes-trabajadores/<%= s.id %>"><input type="hidden" name="accion" value="aprobar">
+<label for="correo-<%= s.id %>">Correo verificado para avisos de ingreso</label><input id="correo-<%= s.id %>" name="correo" type="email" maxlength="254" value="<%= s.correo || '' %>">
 <div class="campos"><div><label for="codigo-<%= s.id %>">Código de trabajador / PIN</label><input id="codigo-<%= s.id %>" name="codigo_trabajador" inputmode="numeric" pattern="[0-9]{1,30}" maxlength="30" required></div>
 <div><label for="perfiles-<%= s.id %>">Perfiles de acceso autorizados</label><select id="perfiles-<%= s.id %>" name="usuario_ids" multiple size="5" required><% perfiles.forEach(p => { %><option value="<%= p.id %>"><%= p.usuario %> · <%= p.nombre || p.rol %> · <%= p.sede || 'Sin sede' %></option><% }); %></select></div></div>
-<label class="confirmacion"><input type="checkbox" name="identidad_verificada" value="1" required> Verifiqué la identidad, el puesto y que los perfiles corresponden a la sede y funciones autorizadas.</label>
+<label class="confirmacion"><input type="checkbox" name="identidad_verificada" value="1" required> Verifiqué la identidad, el correo, el puesto y que los perfiles corresponden a la sede y funciones autorizadas.</label>
 <button type="submit">Aprobar y crear acceso y carnet</button></form>
 <details><summary>Rechazar solicitud</summary><form method="post" action="/admin/solicitudes-trabajadores/<%= s.id %>"><input type="hidden" name="accion" value="rechazar"><label for="motivo-<%= s.id %>">Motivo</label><textarea id="motivo-<%= s.id %>" name="motivo" minlength="5" maxlength="500" required></textarea><button type="submit" class="peligro">Rechazar</button></form></details>
 <% } else { %><p><%= s.motivo || 'Revisión completada.' %><% if (s.codigo_trabajador) { %> · Código: <%= s.codigo_trabajador %><% } %></p><% } %></section><% }); %>
