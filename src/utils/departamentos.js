@@ -66,6 +66,10 @@ function rutaPerteneceATaller(pathname) {
 }
 
 function puedeAbrirRutaPorDepartamento(departamento, pathname, rol = "") {
+  if(String(rol).toUpperCase()==='SEGURIDAD_OCUP') {
+    return String(departamento).toUpperCase()==='SEGURIDAD_OCUPACIONAL' && coincideRuta(pathname,
+      ['/','/inicio','/dashboard','/login','/logout','/cambiar-clave','/departamento/activo','/seguridad-ocupacional']);
+  }
   if (!rutaPerteneceATaller(pathname)) return true;
 
   const area = String(departamento || "TALLER").toUpperCase();
@@ -99,6 +103,7 @@ function departamentosInicialesPorRol(rol, usuario = "") {
     CONTABILIDAD: ["CONTABILIDAD"],
     PROVEEDURIA: ["PROVEEDURIA"],
     CARBURACION_GESTOR: ["CARBURACION"],
+    SEGURIDAD_OCUP: ["SEGURIDAD_OCUPACIONAL"],
     PROVEEDURIA_TALLER: ["PROVEEDURIA", "TALLER"],
     BODEGA: ["PROVEEDURIA", "TALLER"],
     BODEGUERO: ["PROVEEDURIA", "TALLER"],
@@ -111,6 +116,7 @@ function departamentosInicialesPorRol(rol, usuario = "") {
 }
 
 function departamentosPermitidosPorRol(rol, asignados = [], propietario = false) {
+  if(String(rol || '').toUpperCase()==='SEGURIDAD_OCUP')return asignados.filter(d=>d==='SEGURIDAD_OCUPACIONAL');
   if (String(rol || "").toUpperCase() === "ADMIN") {
     return DEPARTAMENTOS.filter(d=>d.key!=='ADMINISTRACION'||propietario).map(({ key }) => key);
   }
