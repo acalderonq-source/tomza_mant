@@ -1,6 +1,6 @@
 const express = require('express');
 const { fechaActualCostaRica } = require('../utils/fechaCostaRica');
-const { guardarCorreoIngreso } = require('../utils/ingresosSesion');
+const { guardarCorreoIngreso, perfilAvisosIngreso } = require('../utils/ingresosSesion');
 function filtrosIngreso(query = {}) {
   const hoy = new Date();
   const desde = String(query.desde || fechaActualCostaRica(new Date(hoy.getTime()-30*86400000)));
@@ -22,10 +22,20 @@ function crearRouter(db) {
   });
   router.get('/',wrap(async(req,res)=>{
     const filtros=filtrosIngreso(req.query);
-    const [ingresos]=await db.query(`SELECT nombre,usuario,rol,departamento,sede,ip,dispositivo,correo_destino,correo_estado,intentos,error_codigo,creado_en,enviado_en
+    const [ingresos]=await db.query(`SELECT id,nombre,usuario,rol,departamento,sede,ip,dispositivo,correo_destino,correo_estado,intentos,error_codigo,creado_en,enviado_en
       FROM sesion_ingresos WHERE creado_en>=? AND creado_en<DATE_ADD(?,INTERVAL 1 DAY)
       AND (nombre LIKE ? OR usuario LIKE ?) ORDER BY creado_en DESC,id DESC LIMIT 200`,[filtros.desde,filtros.hasta,'%'+filtros.buscar+'%','%'+filtros.buscar+'%']);
-    res.render('trabajadores/ingresos',{ingresos,filtros,correoConfigurado:require('../utils/mail').estaConfigurado('seguridad')});
+    const mail=require('../utils/mail'),perfil=perfilAvisosIngreso(mail);
+    const mensaje=req.session.ingresoMensaje || '';delete req.session.ingresoMensaje;
+    res.render('trabajadores/ingresos',{ingresos,filtros,correoConfigurado:Boolean(perfil),remitente:perfil?mail.obtenerRemitente(perfil):'',mensaje});
+  }));
+  router.post('/:id/reintentar',wrap(async(req,res)=>{
+    if (!/^[1-9]\d{0,14}$/.test(req.params.id)) throw Object.assign(Error('Ingreso invalido.'),{status:400});
+    const [resultado]=await db.query(`UPDATE sesion_ingresos s JOIN ingreso_correos c ON c.identidad=s.identidad
+      SET s.correo_destino=c.correo,s.correo_estado='PENDIENTE',s.intentos=0,s.ultimo_intento=NULL,s.error_codigo=NULL
+      WHERE s.id=? AND s.correo_estado IN ('ERROR','SIN_CORREO')`,[req.params.id]);
+    req.session.ingresoMensaje=resultado.affectedRows?'Aviso puesto en cola. Se enviara al correo verificado del trabajador.':'No se reenvio: el aviso ya fue enviado, esta en proceso o falta registrar el correo.';
+    res.redirect(303,'/admin/ingresos');
   }));
   router.get('/correos',wrap(async(req,res)=>{
     const buscar=String(req.query.buscar || '').trim().slice(0,100);

@@ -39,6 +39,12 @@ function mensajeIngreso(ingreso) {
   };
 }
 const ejecutando = new WeakSet();
+function perfilAvisosIngreso(enviar = require('./mail')) {
+  if (typeof enviar.estaConfigurado !== 'function') return 'seguridad';
+  if (enviar.estaConfigurado('seguridad')) return 'seguridad';
+  if (enviar.estaConfigurado('facturas')) return 'facturas';
+  return null;
+}
 async function procesarAvisosIngreso(db, enviar = require('./mail'), env = process.env) {
   if (env.APP_ENV === 'staging' || env.MAIL_ENABLED === 'false' || ejecutando.has(db)) return;
   ejecutando.add(db);
@@ -52,7 +58,9 @@ async function procesarAvisosIngreso(db, enviar = require('./mail'), env = proce
       if (!claim.affectedRows) continue;
       try {
         const mensaje = mensajeIngreso(row);
-        await enviar(correoIngreso(row.correo_destino, true), mensaje.asunto, mensaje.html, { perfil:'seguridad', text:mensaje.text });
+        const perfil=perfilAvisosIngreso(enviar);
+        if (!perfil) throw Object.assign(Error('No hay remitente configurado para los avisos.'),{code:'REMITENTE_NO_CONFIGURADO'});
+        await enviar(correoIngreso(row.correo_destino, true), mensaje.asunto, mensaje.html, { perfil, text:mensaje.text });
         await db.query("UPDATE sesion_ingresos SET correo_estado='ENVIADO',enviado_en=NOW(),error_codigo=NULL WHERE id=? AND correo_estado='ENVIANDO' AND intentos=?", [row.id,row.intentos+1]);
       } catch (error) {
         const codigo = String(error.code || 'ENVIO_FALLIDO').replace(/[^A-Z0-9_]/gi,'').slice(0,80);
@@ -66,4 +74,4 @@ function iniciarAvisosIngreso(db) {
   const timer = setInterval(ejecutar,60000); timer.unref();
   return timer;
 }
-module.exports = { correoIngreso, identidadIngreso, guardarCorreoIngreso, registrarIngreso, mensajeIngreso, procesarAvisosIngreso, iniciarAvisosIngreso };
+module.exports = { correoIngreso, identidadIngreso, guardarCorreoIngreso, registrarIngreso, mensajeIngreso, procesarAvisosIngreso, iniciarAvisosIngreso, perfilAvisosIngreso };

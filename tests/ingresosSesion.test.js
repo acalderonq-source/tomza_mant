@@ -1,6 +1,6 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { registrarIngreso, mensajeIngreso, correoIngreso, identidadIngreso, procesarAvisosIngreso } = require('../src/utils/ingresosSesion');
+const { registrarIngreso, mensajeIngreso, correoIngreso, identidadIngreso, procesarAvisosIngreso, perfilAvisosIngreso } = require('../src/utils/ingresosSesion');
 const { filtrosIngreso } = require('../src/routes/ingresosSesion.routes');
 test('contacto e identidad son individuales por cedula, no por perfil compartido',()=>{
   assert.equal(identidadIngreso({id:2,cedula:'100000001'}),'C:100000001');
@@ -58,4 +58,20 @@ test('filtros rechazan fechas invalidas y rangos sin limite',()=>{
   assert.throws(()=>filtrosIngreso({desde:'2026-02-31',hasta:'2026-03-10'}));
   assert.throws(()=>filtrosIngreso({desde:'2020-01-01',hasta:'2026-01-01'}));
   assert.equal(filtrosIngreso({desde:'2026-10-01',hasta:'2026-10-19'}).hasta,'2026-10-19');
+});
+test('avisos priorizan seguridad y reutilizan facturas solo cuando no hay remitente general',()=>{
+  assert.equal(perfilAvisosIngreso({estaConfigurado:p=>p==='seguridad'}),'seguridad');
+  assert.equal(perfilAvisosIngreso({estaConfigurado:p=>p==='facturas'}),'facturas');
+  assert.equal(perfilAvisosIngreso({estaConfigurado:()=>false}),null);
+});
+test('falta de remitente queda identificada en el log sin exponer configuracion privada',async()=>{
+  let codigo;
+  const db={query:async(sql,args)=>{
+    if(sql.startsWith('SELECT'))return [[{id:1,intentos:0,correo_estado:'PENDIENTE',creado_en:new Date()}]];
+    if(sql.includes("correo_estado='ERROR',error_codigo=?"))codigo=args[0];
+    return [{affectedRows:1}];
+  }};
+  const enviar=()=>assert.fail();enviar.estaConfigurado=()=>false;
+  await procesarAvisosIngreso(db,enviar,{});
+  assert.equal(codigo,'REMITENTE_NO_CONFIGURADO');
 });

@@ -11,6 +11,7 @@ test('solo ADMIN consulta ingresos o cambia correos de personas existentes',asyn
     if(sql.startsWith('SELECT persona_nombre'))return [args[0]==='100000001'?[{persona_nombre:'Persona'}]:[]];
     if(sql.startsWith('SELECT id FROM usuarios'))return [[]];
     if(sql.startsWith('INSERT INTO ingreso_correos')){writes.push(args);return [{affectedRows:1}];}
+    if(sql.startsWith('UPDATE sesion_ingresos s JOIN')){assert.ok(sql.includes("IN ('ERROR','SIN_CORREO')"));return [{affectedRows:1}];}
     throw Error('Consulta inesperada');
   }};
   const app=express();app.set('view engine','ejs');app.set('views',path.resolve(__dirname,'../src/views'));
@@ -30,5 +31,7 @@ test('solo ADMIN consulta ingresos o cambia correos de personas existentes',asyn
     assert.equal((await req('/correos','ADMIN',{identidad:'C:100000002',correo:'otra@example.com'})).status,404);
     assert.equal((await req('/correos','ADMIN',{identidad:'C:100000001',correo:'correo-invalido'})).status,400);
     assert.equal(writes.length,1);
+    assert.equal((await req('/1/reintentar','MECANICO',{})).status,403);
+    assert.equal((await req('/1/reintentar','ADMIN',{})).status,303);
   }finally{server.closeAllConnections();await new Promise(r=>server.close(r));}
 });
