@@ -5,6 +5,13 @@ Una sede inicial: Cartago, Gas Tomza de Costa Rica S.A., coordenadas del enlace
 de Bing entregado por el usuario: 9.877662658691406, -83.94295501708984.
 No se geocodifico ni se supusieron direcciones de las demas sedes.
 
+Al tocar el marcador o la sede, flyTo acerca al punto en 1.5 segundos y abre la
+ficha con galeria. Respeta prefers-reduced-motion. Fotos en sedes[].fotos con
+src local y alt descriptivo; inicialmente vacio porque el usuario aun no ha
+entregado fotografias de Cartago. No se usan fotos generadas ni de otra sede.
+Controles anterior/siguiente, error de imagen y cierre disponibles. La prueba
+de galeria usa imagen de marca solo como fixture, no como foto de la sede.
+
 Zoom y desplazamiento, vista pais, boton para centrar Cartago, popup y enlace
 Como llegar. La lista ampliable esta en public/js/sedes-mapa.js. El mapa no
 otorga acceso a modulos ni expone datos operativos; los permisos no cambian.

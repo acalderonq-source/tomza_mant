@@ -4,9 +4,9 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
 <link rel="stylesheet" href="/css/inicio-empresa.css?v=1"><script src="/js/inicio-empresa.js?v=1" defer></script>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css">
-<link rel="stylesheet" href="/css/sedes-mapa.css?v=2">
+<link rel="stylesheet" href="/css/sedes-mapa.css?v=3">
 <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js" defer></script>
-<script src="/js/sedes-mapa.js?v=2" defer></script></head>
+<script src="/js/sedes-mapa.js?v=3" defer></script></head>
 <body class="inicio-empresa">
 <a class="skip-link" href="#contenido">Ir al contenido</a>
 <aside class="empresa-menu" id="departamentos-menu">
@@ -37,6 +37,11 @@
 <p id="mapa-estado" class="mapa-estado" role="status">Cargando mapa…</p>
 <footer class="sedes-footer"><button type="button" id="mapa-cartago" title="Centrar sede Cartago" disabled><span class="sede-symbol"><i class="bi bi-buildings" aria-hidden="true"></i></span><span><small>SEDE GAS TOMZA</small><strong>Cartago</strong><span class="sede-company">Gas Tomza de Costa Rica S.A.</span></span></button>
 <a href="https://www.bing.com/maps?cp=9.877662658691406~-83.94295501708984&amp;lvl=16&amp;sp=point.9.877662658691406_-83.94295501708984_Gas%20Tomza%20Cartago" target="_blank" rel="noopener noreferrer">Ver ubicación <i class="bi bi-arrow-up-right" aria-hidden="true"></i></a></footer>
+<section id="sede-detalle" class="sede-detalle" aria-labelledby="sede-detalle-titulo" hidden>
+<header><div><p class="eyebrow">CONOCÉ NUESTRA SEDE</p><h3 id="sede-detalle-titulo">Cartago</h3></div><button type="button" id="sede-detalle-cerrar" aria-label="Cerrar ficha de sede" title="Cerrar ficha de sede"><i class="bi bi-x-lg" aria-hidden="true"></i></button></header>
+<div class="sede-galeria"><img id="sede-foto" alt="" hidden><p id="sede-foto-estado" role="status">Todavía no se han agregado fotografías de esta sede.</p></div>
+<div class="sede-fotos-controles" hidden><button type="button" id="sede-foto-anterior" aria-label="Foto anterior" title="Foto anterior"><i class="bi bi-chevron-left" aria-hidden="true"></i></button><span id="sede-foto-contador" aria-live="polite"></span><button type="button" id="sede-foto-siguiente" aria-label="Foto siguiente" title="Foto siguiente"><i class="bi bi-chevron-right" aria-hidden="true"></i></button></div>
+</section>
 <noscript><p>Active JavaScript para usar el mapa interactivo. Puede abrir la ubicación con el enlace anterior.</p></noscript>
 </section>
 </section><footer class="welcome-footer"><span></span>Gestión integrada en un solo lugar</footer></main></div>
