@@ -4,7 +4,7 @@ const transporters = new Map();
 
 function obtenerConfiguracion(perfil = "default") {
   const sufijo = String(perfil).toUpperCase();
-  const usaRemitenteGeneral = !["facturas", "carburacion"].includes(perfil);
+  const usaRemitenteGeneral = !["facturas", "carburacion", "seguridad"].includes(perfil);
   const user = process.env[`EMAIL_USER_${sufijo}`] || (usaRemitenteGeneral ? process.env.EMAIL_USER : "");
   const pass = process.env[`EMAIL_PASS_${sufijo}`] || (usaRemitenteGeneral ? process.env.EMAIL_PASS : "");
   const port = Number(process.env[`EMAIL_PORT_${sufijo}`] || process.env.EMAIL_PORT || 587);

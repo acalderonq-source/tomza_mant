@@ -59,9 +59,9 @@ test('filtros rechazan fechas invalidas y rangos sin limite',()=>{
   assert.throws(()=>filtrosIngreso({desde:'2020-01-01',hasta:'2026-01-01'}));
   assert.equal(filtrosIngreso({desde:'2026-10-01',hasta:'2026-10-19'}).hasta,'2026-10-19');
 });
-test('avisos priorizan seguridad y reutilizan facturas solo cuando no hay remitente general',()=>{
+test('avisos usan solo seguridad aunque exista remitente de facturas',()=>{
   assert.equal(perfilAvisosIngreso({estaConfigurado:p=>p==='seguridad'}),'seguridad');
-  assert.equal(perfilAvisosIngreso({estaConfigurado:p=>p==='facturas'}),'facturas');
+  assert.equal(perfilAvisosIngreso({estaConfigurado:p=>p==='facturas'}),null);
   assert.equal(perfilAvisosIngreso({estaConfigurado:()=>false}),null);
 });
 test('falta de remitente queda identificada en el log sin exponer configuracion privada',async()=>{

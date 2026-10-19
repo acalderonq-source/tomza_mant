@@ -3,7 +3,7 @@
 <nav><a href="/dashboard">Inicio</a><a href="/admin/ingresos/correos">Correos de trabajadores</a><a href="/admin/solicitudes-trabajadores">Solicitudes de ingreso</a></nav>
 <h1>Inicios de sesión del sistema interno</h1>
 <% if (mensaje) { %><p class="aviso" role="status"><%= mensaje %></p><% } %>
-<% if (!correoConfigurado) { %><p class="error" role="alert">No hay remitente habilitado para los avisos. Configure EMAIL_USER_SEGURIDAD y EMAIL_PASS_SEGURIDAD en Render, o el remitente general o de facturas.</p><% } else { %><p>Remitente de avisos: <strong><%= remitente %></strong></p><% } %>
+<% if (!correoConfigurado) { %><p class="error" role="alert">Configure o habilite EMAIL_USER_SEGURIDAD y EMAIL_PASS_SEGURIDAD en Render. Los avisos de ingreso usan exclusivamente esa cuenta; no se enviarán desde facturas ni desde el remitente general.</p><% } else { %><p>Remitente de avisos: <strong><%= remitente %></strong></p><% } %>
 <form method="get" class="filtro"><label for="desde">Desde</label><input id="desde" name="desde" type="date" value="<%= filtros.desde %>" required><label for="hasta">Hasta</label><input id="hasta" name="hasta" type="date" value="<%= filtros.hasta %>" required><label for="buscar">Nombre o perfil</label><input id="buscar" name="buscar" maxlength="100" value="<%= filtros.buscar %>"><button type="submit">Filtrar</button></form>
 <p>Últimos 200 ingresos del período. Se registran a partir de habilitar esta función. Los avisos pendientes se procesan en segundo plano; un error de correo no cancela el acceso.</p>
 <% if (!ingresos.length) { %><p>Sin ingresos registrados en este período.</p><% } else { const estados={SIN_CORREO:'Sin correo registrado',PENDIENTE:'En cola',ENVIANDO:'Enviando',ENVIADO:'Enviado',ERROR:'Error de envío'}; %>
