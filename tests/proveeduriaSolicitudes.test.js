@@ -6,6 +6,33 @@ const pool=require('../src/db');
 const routes=require('../src/routes/proveeduria.routes');
 const requester={id:71,usuario:'operaciones',nombre:'Solicitante Operaciones',rol:'SUPERVISOR',sede:'Cartago',departamentoActivo:'OPERACIONES',departamentos:['OPERACIONES']};
 const manager={id:72,usuario:'compras',rol:'PROVEEDURIA',sede:'Cartago',departamentoActivo:'PROVEEDURIA',departamentos:['PROVEEDURIA']};
+test('todos los departamentos solicitan del inventario comun de su sede geografica',async()=>{
+  const originalQuery=pool.query,originalConnection=pool.getConnection;
+  const guardadas=[];
+  async function query(sql,args=[]){
+    if(sql.includes('FROM usuarios_sedes'))return [[{sede:'granel_cartago'},{sede:'Tecnicos'},{sede:'Taller'}]];
+    if(sql.includes('FROM prov_inventario i')){assert.deepEqual(args,['Cartago']);return [[{sede:'Cartago',codigo:'PAPEL',descripcion:'Papel',unidad:'UND'}]];}
+    if(sql.startsWith('SELECT codigo,descripcion,iva FROM prov_inventario')){assert.equal(args[0],'Cartago');return [[{codigo:'PAPEL',descripcion:'Papel',iva:13}]];}
+    if(sql.startsWith('INSERT INTO prov_documentos')){guardadas.push(args);return [{insertId:guardadas.length}];}
+    return [[]];
+  }
+  pool.query=query;pool.getConnection=async()=>({query,beginTransaction:async()=>{},commit:async()=>{},rollback:async()=>{},release(){}});
+  try{
+    for(const departamento of ['OPERACIONES','TALLER','CONTABILIDAD','SEGURIDAD_OCUPACIONAL','LOGISTICA','RECURSOS_HUMANOS','CARBURACION','ADMINISTRACION','PROVEEDURIA']){
+      await server({...requester,sede:'granel_cartago',departamentoActivo:departamento,departamentos:[departamento]},async base=>{
+        const r=await fetch(base+'/mis-solicitudes');assert.equal(r.status,200);const html=await r.text();
+        assert.equal((html.match(/<option value="Cartago"/g)||[]).length,1);
+        assert.doesNotMatch(html,/<option value="(?:granel_cartago|Taller|Tecnicos)"/);
+        assert.match(html,/value="Cartago" selected/);
+        const post=await fetch(base+'/solicitudes',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sede:'granel_cartago',lineas:[{codigo:'PAPEL',cantidad:1}]})});
+        assert.equal(post.status,200);assert.equal(guardadas.at(-1)[1],'Cartago');
+        assert.equal(JSON.parse(guardadas.at(-1)[2]).departamento,departamento);
+        const ajena=await fetch(base+'/solicitudes',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sede:'granel_la_cruz',lineas:[{codigo:'PAPEL',cantidad:1}]})});
+        assert.equal(ajena.status,403);
+      });
+    }
+  }finally{pool.query=originalQuery;pool.getConnection=originalConnection;}
+});
 async function server(user,fn){
   const app=express();app.set('view engine','ejs');app.set('views',path.join(__dirname,'../src/views'));app.use(express.json());app.use(express.urlencoded({extended:true}));app.use((req,res,next)=>{req.session={user};next();});app.use('/proveeduria',routes);
   const s=app.listen(0,'127.0.0.1');await new Promise(r=>s.once('listening',r));

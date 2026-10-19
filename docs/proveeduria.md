@@ -50,6 +50,8 @@ Contabilidad registra pagos contra facturas conciliadas con referencia, importe,
 
 ## Alcance y verificaciones pendientes
 
+El inventario de Proveeduria es compartido por sede geografica entre departamentos: Cartago incluye Granel Cartago, Taller y Tecnicos; Alajuela, Guapiles, La Cruz y Perez Zeledon incluyen sus divisiones de Granel. Las divisiones de Limon se agrupan en Limon y Cabezales/Cisternas/Carretas/Gruas/Tandem en Transportadora. Se normalizan tanto los permisos de sede como los formularios, filtros, recepciones y salidas; las solicitudes conservan departamento y solicitante. Esto no cambia los catalogos operativos ni los inventarios propios de Taller, aceites o llantas. El 19 de octubre se verifico que las existencias, fichas y movimientos de `prov_inventario` estaban solo en Cartago: no fue necesario migrar ni sumar existencias. Una base distinta con inventario en sedes antiguas requiere revisar y consolidar sus codigos antes de activar esta version; no se fusionan productos automaticamente por descripcion.
+
 - La recepción y salida implementadas son completas por solicitud/OC; no hay recepciones parciales ni devolución de inventario.
 - Los estados generales requieren referencia a OC y factura por partida. Notas de crédito y depósitos no asignados necesitan revisión y asignación manual; no se inventan correspondencias.
 - Los datos de lectura automática requieren revisión humana. Cargos, descuentos o documentos que no se puedan representar en las líneas requieren corrección antes de guardar.

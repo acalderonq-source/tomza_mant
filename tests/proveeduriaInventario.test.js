@@ -29,6 +29,7 @@ test('ajuste físico conserva saldos y motivo, evita duplicados y revierte el st
     const body={sede:'Cartago',codigo:'P1',cantidad:2,motivo:'Conteo físico'};
     assert.equal((await fetch(base+'/inventario/ajuste',post(body))).status,200);assert.deepEqual(logs,[{tipo:'AJUSTE',cantidad:-3,anterior:5,nuevo:2,motivo:'Conteo físico',usuario:10}]);
     assert.equal((await fetch(base+'/inventario/ajuste',post(body))).status,400);assert.equal(logs.length,1);
+    assert.equal((await fetch(base+'/inventario/ajuste',post({...body,sede:'granel_cartago'}))).status,400);assert.equal(logs.length,1);assert.equal(cantidad,2);
     fallar=true;assert.equal((await fetch(base+'/inventario/ajuste',post({...body,cantidad:1}))).status,500);assert.equal(cantidad,2);assert.equal(logs.length,1);
     assert.equal((await fetch(base+'/inventario/ajuste',post({...body,cantidad:-1}))).status,400);
     assert.equal((await fetch(base+'/inventario/ajuste',post({...body,motivo:''}))).status,400);

@@ -12,13 +12,14 @@ const { generarPDFOrden } = require('../utils/pdfOrdenCompra');
 const { leerDocumento } = require('../utils/proveeduriaLectura');
 const { esUsuarioTodasSedes, obtenerTodasSedes, sedeCanonicaVisible } = require('../utils/sedes');
 const { esDepartamentoValido } = require('../utils/departamentos');
+const { sedeInventarioCompartido, sedesInventarioCompartido } = require('../utils/sedesInventarioCompartido');
 const { correosValidos,leerCorreosJSON } = require('../utils/proveeduriaProveedores');
 const {GRUPOS,TIPOS,cantidadInventario,fichaInventario,estadoStock,guardarFichaInventario,registrarMovimientoInventario}=require('../utils/proveeduriaInventario');
 const {resumenRecepcion,leerRecepcion,validarPendientes}=require('../utils/proveeduriaRecepciones');
 const { exigir, numero, lineasCompra, totales, totalesConAjustes, compararFactura, saldo, hash, adjunto, conciliarEstado } = require('../utils/proveeduria');
 const gestion = u => ['ADMIN','PROVEEDURIA','PROVEEDURIA_TALLER','BODEGA','BODEGUERO'].includes(u?.rol);
 const contabilidad = u => ['ADMIN','CONTABILIDAD'].includes(u?.rol);
-const datos = row => { if (typeof row.datos === 'string') row.datos = JSON.parse(row.datos); return row; };
+const datos = row => { if (typeof row.datos === 'string') row.datos = JSON.parse(row.datos); row.sede=sedeInventarioCompartido(row.sede); return row; };
 const wrap = fn => (req,res,next) => Promise.resolve(fn(req,res,next)).catch(next);
 const error = (status, mensaje) => Object.assign(new Error(mensaje), { status });
 const limitarLectura=rateLimit({windowMs:3600000,limit:20,standardHeaders:true,legacyHeaders:false,handler:(_req,res)=>res.status(429).json({error:'Límite de lectura automática alcanzado. Intente después o ingrese los datos manualmente.'})});
@@ -46,16 +47,15 @@ async function transaccion(fn) {
 function visible(req,row) {
   if (!gestion(req.session.user) && !contabilidad(req.session.user) && row.usuario_id !== req.session.user.id) throw error(403,'No autorizado');
 }
-function sede(req) { const s = req.session.sedeSeleccionada || req.session.user.sede; exigir(s && s !== 'TODAS','Seleccione una sede específica desde el inicio'); return s; }
+function sede(req) { const s = req.session.sedeSeleccionada || req.session.user.sede; exigir(s && s !== 'TODAS','Seleccione una sede específica desde el inicio'); return sedeInventarioCompartido(s); }
 async function sedesOrden(req) {
   const u=req.session.user;
-  if(esUsuarioTodasSedes(u))return (await obtenerTodasSedes(pool)).filter(s=>s&&s!=='TODAS');
+  if(esUsuarioTodasSedes(u))return sedesInventarioCompartido(await obtenerTodasSedes(pool));
   const [extras]=await pool.query('SELECT sede FROM usuarios_sedes WHERE usuario_id=?',[u.id]);
-  return [...new Set([u.sede,...extras.map(r=>r.sede)].filter(s=>s&&s!=='TODAS').map(sedeCanonicaVisible))];
+  return sedesInventarioCompartido([u.sede,...extras.map(r=>r.sede)].map(sedeCanonicaVisible));
 }
 async function sedeFormulario(req) {
-  if(!req.body.sede)return sede(req);
-  const elegida=sedeCanonicaVisible(String(req.body.sede).trim());
+  const elegida=sedeInventarioCompartido(req.body.sede ? sedeCanonicaVisible(String(req.body.sede).trim()) : sede(req));
   if(!(await sedesOrden(req)).includes(elegida))throw error(403,'No tiene acceso a la sede seleccionada');
   return elegida;
 }
@@ -97,7 +97,7 @@ router.get('/mis-solicitudes',wrap(async(req,res)=>{
   const [rows]=await pool.query("SELECT * FROM prov_documentos WHERE usuario_id=? AND tipo IN ('solicitud','salida') ORDER BY id DESC LIMIT 500",[u.id]);
   const [alertas]=await pool.query('SELECT * FROM prov_alertas WHERE usuario_id=? ORDER BY id DESC LIMIT 40',[u.id]);
   const sedesPermitidas=await sedesOrden(req);
-  const actual=req.session.sedeSeleccionada||u.sede;
+  const actual=sedeInventarioCompartido(req.session.sedeSeleccionada||u.sede);
   const [articulos]=sedesPermitidas.length?await pool.query(`SELECT i.sede,i.codigo,i.descripcion,COALESCE(f.unidad,'UND') AS unidad FROM prov_inventario i LEFT JOIN prov_inventario_fichas f ON f.sede=i.sede AND f.codigo=i.codigo WHERE i.sede IN (${sedesPermitidas.map(()=>'?').join(',')}) ORDER BY i.descripcion,i.codigo`,sedesPermitidas):[[]];
   res.set('Cache-Control','no-store');
   res.render('proveeduria/mis_solicitudes',{user:u,docs:rows.map(datos),alertas,sedesPermitidas,articulos,sedeActual:sedesPermitidas.includes(actual)?actual:''});
@@ -119,7 +119,7 @@ router.get(['/', '/salidas', '/facturas', '/pagos', '/conciliacion', '/avisos'],
   const [historicas]=faltantes.length?await pool.query(`SELECT * FROM prov_documentos WHERE tipo='oc' AND id IN (${faltantes.map(()=>'?').join(',')})`,faltantes):[[]];
   const ordenesConciliacion=[...docs,...historicas.map(datos)].filter(d=>d.tipo==='oc');
   if(historicas.length)await adjuntarFacturas(pool,ordenesConciliacion);
-  const sedeActual=req.session.sedeSeleccionada || u.sede || 'TODAS';
+  const sedeActual=sedeInventarioCompartido(req.session.sedeSeleccionada || u.sede || 'TODAS');
   const [alertas] = await pool.query('SELECT * FROM prov_alertas WHERE usuario_id = ? OR grupo = ? ORDER BY id DESC LIMIT 40',[u.id,gestion(u) ? 'PROVEEDURIA' : contabilidad(u) ? 'CONTABILIDAD' : 'USUARIO']);
   const modulo=req.path.slice(1),titulos={salidas:'Salidas de inventario',facturas:'Facturas',pagos:'Pagos y comprobantes',conciliacion:'Conciliación',avisos:'Alertas'};
   res.render(req.path==='/'?'proveeduria/dashboard':'proveeduria/modulo',{user:u,sedeActual,docs,alertas,puedeGestion:gestion(u),puedeContabilidad:contabilidad(u),saldo,conciliarEstado,ordenesConciliacion,modulo,titulo:titulos[modulo]});
@@ -131,7 +131,7 @@ router.get('/alertas',wrap(async(req,res) => {
 }));
 async function cargarInventario(req){
   const sedesPermitidas=await sedesOrden(req);
-  const filtros={sede:String(req.query.sede||req.session.sedeSeleccionada||req.session.user.sede||'TODAS'),q:String(req.query.q||'').trim(),grupo:String(req.query.grupo||''),estado:String(req.query.estado||''),pagina:req.query.vista==='movimientos'?'movimientos':'inventario'};
+  const filtros={sede:sedeInventarioCompartido(req.query.sede||req.session.sedeSeleccionada||req.session.user.sede||'TODAS'),q:String(req.query.q||'').trim(),grupo:String(req.query.grupo||''),estado:String(req.query.estado||''),pagina:req.query.vista==='movimientos'?'movimientos':'inventario'};
   if(filtros.sede!=='TODAS'&&!sedesPermitidas.includes(filtros.sede))throw error(403,'No tiene acceso a esa sede');
   const sedes=filtros.sede==='TODAS'?sedesPermitidas:[filtros.sede];
   if(!sedes.length)return {inventario:[],movimientos:[],sedesPermitidas,filtros};
@@ -246,7 +246,7 @@ router.post('/ordenes/:id/eliminar',wrap(async(req,res)=>{
 router.get('/recepciones',wrap(async(req,res)=>{
   if(!gestion(req.session.user)&&!contabilidad(req.session.user))throw error(403,'No autorizado');
   const sedesPermitidas=await sedesOrden(req);
-  const filtros={sede:String(req.query.sede||req.session.sedeSeleccionada||req.session.user.sede||'TODAS'),estado:String(req.query.estado||'PENDIENTE'),q:String(req.query.q||'').trim()};
+  const filtros={sede:sedeInventarioCompartido(req.query.sede||req.session.sedeSeleccionada||req.session.user.sede||'TODAS'),estado:String(req.query.estado||'PENDIENTE'),q:String(req.query.q||'').trim()};
   if(filtros.sede!=='TODAS'&&!sedesPermitidas.includes(filtros.sede))throw error(403,'No tiene acceso a esa sede');
   const sedes=filtros.sede==='TODAS'?sedesPermitidas:[filtros.sede];
   const [rows]=sedes.length?await pool.query(`SELECT * FROM prov_documentos WHERE tipo='oc' AND sede IN (${sedes.map(()=>'?').join(',')}) ORDER BY id DESC`,sedes):[[]];
@@ -279,7 +279,7 @@ router.get(['/ordenes/nueva','/solicitudes/:id/cotizacion'],wrap(async(req,res)=
   if(solicitud)exigir(!solicitud.datos.oc_id&&!solicitud.datos.salida_id,'Esta solicitud ya tiene OC o fue despachada');
   if(solicitud&&!esCotizacion&&!solicitud.datos.cotizacion)return res.redirect(`/proveeduria/solicitudes/${solicitud.id}/cotizacion`);
   const sedesPermitidas=solicitud?[solicitud.sede]:await sedesOrden(req);
-  const seleccionada=solicitud?.sede||req.session.sedeSeleccionada||req.session.user.sede;
+  const seleccionada=sedeInventarioCompartido(solicitud?.sede||req.session.sedeSeleccionada||req.session.user.sede);
   const sedeActual=sedesPermitidas.includes(seleccionada)?seleccionada:'';
   const cotizacion=solicitud?.datos.cotizacion;
   const precarga=cotizacion?{...cotizacion,cotizacion_archivo:cotizacion.cotizacion_archivo?`/proveeduria/solicitudes/${solicitud.id}/cotizacion/archivo`:null}:null;
