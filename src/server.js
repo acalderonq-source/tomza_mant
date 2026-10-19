@@ -303,7 +303,7 @@ app.set("view engine", "ejs");
 app.set("views", path.join(__dirname, "views"));
 
 // ===================== PWA / APP INSTALABLE =====================
-function injectPageAssets(html, csrfToken) {
+function injectPageAssets(html, csrfToken, user) {
   if (typeof html !== "string") return html;
 
   let output = html;
@@ -337,7 +337,7 @@ function injectPageAssets(html, csrfToken) {
   output = injectSecurityAssets(output, csrfToken);
   output = output.replace('</body>', '<script src="/js/operaciones-empresa.js?v=1" defer></script></body>');
 
-  return output;
+  return require('./utils/navegacionInicio').agregarNavegacionInicio(output,user);
 }
 
 app.use((req, res, next) => {
@@ -352,9 +352,9 @@ app.use((req, res, next) => {
     preventAuthenticatedHtmlCaching(req, res);
 
     originalRender(view, options, (err, html) => {
-      if (callback) return callback(err, err ? html : injectPageAssets(html, res.locals.csrfToken));
+      if (callback) return callback(err, err ? html : injectPageAssets(html, res.locals.csrfToken,req.session?.user));
       if (err) return next(err);
-      res.send(injectPageAssets(html, res.locals.csrfToken));
+      res.send(injectPageAssets(html, res.locals.csrfToken,req.session?.user));
     });
   };
 
