@@ -2,6 +2,7 @@ const crypto=require('node:crypto');
 const {exigir,lineasCompra,totalesConAjustes,hash}=require('./proveeduria');
 const {ivaArticulo,condicionesOrden}=require('./proveeduriaCatalogo');
 const {correosValidos}=require('./proveeduriaProveedores');
+const {articuloSolicitudDescripcion}=require('./proveeduriaSolicitable');
 function motivoBloqueoOrden(d){
   if(['PARCIAL','RECIBIDA'].includes(d.estado)||d.recibida_en||d.recepciones?.length)return 'La orden ya tiene mercadería recibida';
   if(d.factura||d.factura_historial?.length||d.facturas_vinculadas?.length||d.pagos?.length)return 'La orden ya tiene facturas o pagos asociados';
@@ -17,7 +18,7 @@ function cambiosOrden(b,solicitud){
   const empresas={'GAS TOMZA':'GAS TOMZA DE COSTA RICA S.A.','SUPER GAS':'ENVASADORA SUPER GAS GLP S.A.'};
   exigir(empresas[b.empresa_destino],'Empresa destinataria inválida');
   exigir(b.origen_formulario==='taller','Use el formulario de edición de la orden');
-  let lineas=lineasCompra(Object.values(b.lineas||{}).map(l=>({...l,referencia:l.codigo,codigo:String(l.codigo_producto||'').trim()||'ART-'+crypto.createHash('sha256').update(String(l.descripcion||'')).digest('hex').slice(0,12),iva:ivaArticulo(l.descripcion)})),true);
+  let lineas=lineasCompra(Object.values(b.lineas||{}).map(l=>({...l,referencia:l.codigo,codigo:String(l.codigo_producto||'').trim()||articuloSolicitudDescripcion(l.descripcion)?.codigo||'ART-'+crypto.createHash('sha256').update(String(l.descripcion||'')).digest('hex').slice(0,12),iva:ivaArticulo(l.descripcion)})),true);
   if(solicitud?.datos.departamento){
     const pedidas=solicitud.datos.lineas;
     exigir(lineas.length===pedidas.length&&pedidas.every(p=>lineas.some(l=>l.codigo===p.codigo&&l.cantidad===p.cantidad&&l.descripcion===p.descripcion)),'Conserve los artículos y cantidades de la solicitud del departamento');

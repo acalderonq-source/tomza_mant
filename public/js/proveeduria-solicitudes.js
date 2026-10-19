@@ -15,16 +15,22 @@
 
   function fila() {
     const tr = document.createElement('tr');
-    tr.innerHTML = '<td><select class="form-select" aria-label="Producto de inventario" data-campo="codigo" required><option value="">Seleccione un producto</option></select></td><td><input class="form-control codigo" aria-label="Código automático" placeholder="Automático" readonly></td><td><input class="form-control cantidad" aria-label="Cantidad solicitada" data-campo="cantidad" type="number" min="0.001" step="0.001" value="1" required></td><td><button class="btn btn-outline-danger" type="button" aria-label="Quitar artículo">×</button></td>';
+    tr.innerHTML = '<td><select class="form-select" aria-label="Producto a solicitar" data-campo="codigo" required><option value="">Seleccione un producto</option></select><small class="text-muted" data-origen-producto></small></td><td><input class="form-control codigo" aria-label="Código automático" placeholder="Automático" readonly></td><td><input class="form-control cantidad" aria-label="Cantidad solicitada" data-campo="cantidad" type="number" min="0.001" step="0.001" value="1" required></td><td><button class="btn btn-outline-danger" type="button" aria-label="Quitar artículo">×</button></td>';
     const select = tr.querySelector('select');
-    for (const a of catalogo) {
-      const option = document.createElement('option');
-      option.value = a.codigo;
-      option.textContent = `${a.descripcion} · ${a.codigo} (${a.unidad})`;
-      select.append(option);
+    for (const [label, fueraInventario] of [['Inventario general', false], ['Compra por solicitud', true]]) {
+      const grupo = document.createElement('optgroup');
+      grupo.label = label;
+      for (const a of catalogo.filter(a => (a.inventariable === false) === fueraInventario)) {
+        const option = document.createElement('option');
+        option.value = a.codigo;
+        option.textContent = `${a.descripcion} · ${a.codigo} (${a.unidad})`;
+        grupo.append(option);
+      }
+      if (grupo.children.length) select.append(grupo);
     }
     select.addEventListener('change', () => {
       tr.querySelector('.codigo').value = select.value;
+      tr.querySelector('[data-origen-producto]').textContent = catalogo.find(a => a.codigo === select.value)?.inventariable === false ? 'Compra por solicitud · Sin control de inventario' : '';
       validarRepetidos();
     });
     tr.querySelector('button').addEventListener('click', () => {
@@ -42,7 +48,7 @@
     body.replaceChildren();
     agregar.disabled = enviar.disabled = !catalogo.length;
     aviso.hidden = catalogo.length > 0;
-    aviso.textContent = 'Todavía no hay artículos registrados en el inventario general de Proveeduría.';
+    aviso.textContent = 'Todavía no hay artículos disponibles para solicitar a Proveeduría.';
     if (catalogo.length) fila();
   }
   agregar.addEventListener('click', fila);

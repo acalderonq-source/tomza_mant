@@ -1,0 +1,2172 @@
+{
+  "archivo": "Texto pegado.txt",
+  "sha256": "8c758d36e9c0e67c299ecbda2eb9b8f8378e81fc7d215b032dde168354a54e97",
+  "filas_origen": 261,
+  "articulos": [
+    {
+      "codigo": "SOL-910C657135D1",
+      "descripcion": "Calca TOMZA para tanque estacionario.",
+      "precio_unitario": null,
+      "iva": null,
+      "filas_origen": [
+        1
+      ]
+    },
+    {
+      "codigo": "SOL-EF003AD7CCBF",
+      "descripcion": "Rombo Códigos para tanque estacionario.",
+      "precio_unitario": null,
+      "iva": null,
+      "filas_origen": [
+        2
+      ]
+    },
+    {
+      "codigo": "SOL-6C83032F045D",
+      "descripcion": "Rombo Flama para tanque estacionario.",
+      "precio_unitario": null,
+      "iva": null,
+      "filas_origen": [
+        3
+      ]
+    },
+    {
+      "codigo": "SOL-020A891ED21B",
+      "descripcion": "Flechas de flujo izquierdas.",
+      "precio_unitario": null,
+      "iva": null,
+      "filas_origen": [
+        4
+      ]
+    },
+    {
+      "codigo": "SOL-5DA5ED896CBC",
+      "descripcion": "Flechas de flujo derechas.",
+      "precio_unitario": null,
+      "iva": null,
+      "filas_origen": [
+        5
+      ]
+    },
+    {
+      "codigo": "SOL-C1661F94712E",
+      "descripcion": "Rótulos PVC Peligro.",
+      "precio_unitario": null,
+      "iva": null,
+      "filas_origen": [
+        6
+      ]
+    },
+    {
+      "codigo": "SOL-73E1268A2181",
+      "descripcion": "Calca Litraje configurable.",
+      "precio_unitario": null,
+      "iva": null,
+      "filas_origen": [
+        7,
+        18
+      ]
+    },
+    {
+      "codigo": "SOL-0D83C2FAAF44",
+      "descripcion": "Calca TOMZA dispensador",
+      "precio_unitario": null,
+      "iva": null,
+      "filas_origen": [
+        8
+      ]
+    },
+    {
+      "codigo": "SOL-B87E9B310CA9",
+      "descripcion": "Cintillo GAS VEHICULAR dispensador.",
+      "precio_unitario": null,
+      "iva": null,
+      "filas_origen": [
+        9
+      ]
+    },
+    {
+      "codigo": "SOL-6E67532A4FF2",
+      "descripcion": "Calca PROHIBIDO CARGAR dispensador.",
+      "precio_unitario": null,
+      "iva": null,
+      "filas_origen": [
+        10
+      ]
+    },
+    {
+      "codigo": "SOL-A6245933E20B",
+      "descripcion": "Rótulo PVC PROHIBIDO",
+      "precio_unitario": null,
+      "iva": null,
+      "filas_origen": [
+        11
+      ]
+    },
+    {
+      "codigo": "SOL-E04C02D10E02",
+      "descripcion": "Calca TOMZA tanque Gas Vehicular.",
+      "precio_unitario": null,
+      "iva": null,
+      "filas_origen": [
+        12
+      ]
+    },
+    {
+      "codigo": "SOL-D23108AEC3B6",
+      "descripcion": "Rombo Códigos tanque Gas Vehicular.",
+      "precio_unitario": null,
+      "iva": null,
+      "filas_origen": [
+        13
+      ]
+    },
+    {
+      "codigo": "SOL-05C87C171A43",
+      "descripcion": "Rombo Flama tanque Gas Vehicular.",
+      "precio_unitario": null,
+      "iva": null,
+      "filas_origen": [
+        14
+      ]
+    },
+    {
+      "codigo": "SOL-80B6A759E8A1",
+      "descripcion": "Texto GAS VEHICULAR para tanque vetical.",
+      "precio_unitario": null,
+      "iva": null,
+      "filas_origen": [
+        15
+      ]
+    },
+    {
+      "codigo": "SOL-CC87BABFE5DA",
+      "descripcion": "Texto GAS VEHICULAR para tanque horizontal.",
+      "precio_unitario": null,
+      "iva": null,
+      "filas_origen": [
+        16
+      ]
+    },
+    {
+      "codigo": "SOL-BF89F3BE28FC",
+      "descripcion": "Rótulo PVC Protocolo Carga y Descarga.",
+      "precio_unitario": null,
+      "iva": null,
+      "filas_origen": [
+        17
+      ]
+    },
+    {
+      "codigo": "SOL-D46E3D9901D4",
+      "descripcion": "Sellos azules (pequeño - presión)",
+      "precio_unitario": 0.026,
+      "iva": 13,
+      "filas_origen": [
+        20
+      ]
+    },
+    {
+      "codigo": "SOL-50A933290232",
+      "descripcion": "Sellos blancos (pequeño - presión super gas)",
+      "precio_unitario": 0.026,
+      "iva": 13,
+      "filas_origen": [
+        21
+      ]
+    },
+    {
+      "codigo": "SOL-0E4B1A90EB91",
+      "descripcion": "Sellos blancos (grande - rosca)",
+      "precio_unitario": 0.0402,
+      "iva": 13,
+      "filas_origen": [
+        22
+      ]
+    },
+    {
+      "codigo": "SOL-4D85A86FFFDE",
+      "descripcion": "Sellos naranja (grande - rosca)",
+      "precio_unitario": 0.0402,
+      "iva": 13,
+      "filas_origen": [
+        23
+      ]
+    },
+    {
+      "codigo": "SOL-9CA7CCA9B65D",
+      "descripcion": "Pintura Azul Tomza",
+      "precio_unitario": 37611,
+      "iva": 13,
+      "filas_origen": [
+        24
+      ]
+    },
+    {
+      "codigo": "SOL-BC2AF27FD6CC",
+      "descripcion": "Thinner",
+      "precio_unitario": 22124,
+      "iva": 13,
+      "filas_origen": [
+        25,
+        247
+      ]
+    },
+    {
+      "codigo": "SOL-14061CB4C218",
+      "descripcion": "Orings punta pol",
+      "precio_unitario": 350,
+      "iva": 13,
+      "filas_origen": [
+        26
+      ]
+    },
+    {
+      "codigo": "SOL-00BBB3FB5A93",
+      "descripcion": "Orings pequeños",
+      "precio_unitario": 71,
+      "iva": 13,
+      "filas_origen": [
+        27
+      ]
+    },
+    {
+      "codigo": "SOL-7F9A61F47C95",
+      "descripcion": "Orings grandes",
+      "precio_unitario": 86,
+      "iva": 13,
+      "filas_origen": [
+        28
+      ]
+    },
+    {
+      "codigo": "SOL-72C93295F411",
+      "descripcion": "Mazo de hule",
+      "precio_unitario": 25000,
+      "iva": 13,
+      "filas_origen": [
+        29
+      ]
+    },
+    {
+      "codigo": "SOL-2BBB6C4F9278",
+      "descripcion": "Pintura Minio Galon",
+      "precio_unitario": 8800,
+      "iva": 13,
+      "filas_origen": [
+        30
+      ]
+    },
+    {
+      "codigo": "SOL-4D8E3F336406",
+      "descripcion": "Pintura Fast Dry Amarilla Galón",
+      "precio_unitario": 16000,
+      "iva": 13,
+      "filas_origen": [
+        31
+      ]
+    },
+    {
+      "codigo": "SOL-6ECDD8883E8F",
+      "descripcion": "Pintura Fast Dry Café 1/4\"",
+      "precio_unitario": 6095,
+      "iva": 13,
+      "filas_origen": [
+        32
+      ]
+    },
+    {
+      "codigo": "SOL-CCEFDB689E2E",
+      "descripcion": "Pintura Fast Dry Galon Blanca",
+      "precio_unitario": 16000,
+      "iva": 13,
+      "filas_origen": [
+        33
+      ]
+    },
+    {
+      "codigo": "SOL-5AF6144CC4DA",
+      "descripcion": "Pintura Fast Dry Galon Rojo",
+      "precio_unitario": 16000,
+      "iva": 13,
+      "filas_origen": [
+        34
+      ]
+    },
+    {
+      "codigo": "SOL-38BF0DBB9D11",
+      "descripcion": "Pintura Fast Dry Negro Galón",
+      "precio_unitario": 16000,
+      "iva": 13,
+      "filas_origen": [
+        35
+      ]
+    },
+    {
+      "codigo": "SOL-793F3C0E3C12",
+      "descripcion": "Thiner industrial",
+      "precio_unitario": 5191,
+      "iva": 13,
+      "filas_origen": [
+        36
+      ]
+    },
+    {
+      "codigo": "SOL-4A6F2E4228E5",
+      "descripcion": "Algodon",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        37
+      ]
+    },
+    {
+      "codigo": "SOL-5DC8D0AFB4CA",
+      "descripcion": "Anclaje 90 cm",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        38
+      ]
+    },
+    {
+      "codigo": "SOL-5547AB99239A",
+      "descripcion": "Ansell Traje Alphatec Talla L",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        39
+      ]
+    },
+    {
+      "codigo": "SOL-EC00562A1731",
+      "descripcion": "Ansell Traje Alphatec Talla M",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        40
+      ]
+    },
+    {
+      "codigo": "SOL-B55DC962568D",
+      "descripcion": "Aplicadores 100",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        41
+      ]
+    },
+    {
+      "codigo": "SOL-EE337E4B3ADB",
+      "descripcion": "Aposito de 10 x 10 envoltura individual",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        42
+      ]
+    },
+    {
+      "codigo": "SOL-DCF2B3BC279B",
+      "descripcion": "Arnes 3 argollas MOD 10208271",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        43
+      ]
+    },
+    {
+      "codigo": "SOL-C64747D856E0",
+      "descripcion": "Baja lenguas",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        44
+      ]
+    },
+    {
+      "codigo": "SOL-B5AC0DFF9EAF",
+      "descripcion": "Bloqueador solar",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        45
+      ]
+    },
+    {
+      "codigo": "SOL-BE1EC04E6E84",
+      "descripcion": "Bolsas rojas",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        46
+      ]
+    },
+    {
+      "codigo": "SOL-9942787B079C",
+      "descripcion": "Bota PVC Negra Workman Safety N°37",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        47
+      ]
+    },
+    {
+      "codigo": "SOL-70913478167D",
+      "descripcion": "Bota PVC Negra Workman Safety N°45",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        48
+      ]
+    },
+    {
+      "codigo": "SOL-45D2155C4602",
+      "descripcion": "Botiquin TSD Basico anaranjado",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        49
+      ]
+    },
+    {
+      "codigo": "SOL-C102D9255D5D",
+      "descripcion": "Calzas",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        50
+      ]
+    },
+    {
+      "codigo": "SOL-9603994C774D",
+      "descripcion": "Capa 2 piezas",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        51
+      ]
+    },
+    {
+      "codigo": "SOL-26463A53DAD6",
+      "descripcion": "Capa Amarilla larga 2XL",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        52
+      ]
+    },
+    {
+      "codigo": "SOL-8E10C5AFF2FD",
+      "descripcion": "Capa Amarilla larga L",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        53
+      ]
+    },
+    {
+      "codigo": "SOL-55FE3B0691AF",
+      "descripcion": "Capa Amarilla larga M",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        54
+      ]
+    },
+    {
+      "codigo": "SOL-1423910FAD7D",
+      "descripcion": "Capa Amarilla larga S",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        55
+      ]
+    },
+    {
+      "codigo": "SOL-656CBC090DD8",
+      "descripcion": "Capa Amarilla larga XL",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        56
+      ]
+    },
+    {
+      "codigo": "SOL-309CA0C0B484",
+      "descripcion": "Capa larga (capote)",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        57
+      ]
+    },
+    {
+      "codigo": "SOL-A79FC70BFC6D",
+      "descripcion": "Caretas",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        58
+      ]
+    },
+    {
+      "codigo": "SOL-4443F9174C3A",
+      "descripcion": "Casco seguridad ERB americana Anaranjado",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        59
+      ]
+    },
+    {
+      "codigo": "SOL-7FE637BCF591",
+      "descripcion": "Casco seguridad ERB americana Azul",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        60
+      ]
+    },
+    {
+      "codigo": "SOL-420EB3539B19",
+      "descripcion": "Casco seguridad ERB americana Gris",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        61
+      ]
+    },
+    {
+      "codigo": "SOL-8CBDBC4F3923",
+      "descripcion": "Cauchas cabeza mezclilla",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        62
+      ]
+    },
+    {
+      "codigo": "SOL-6F93615636A3",
+      "descripcion": "Chaleco tipo ingeniero L",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        63
+      ]
+    },
+    {
+      "codigo": "SOL-148134819357",
+      "descripcion": "Chaleco tipo ingeniero M",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        64
+      ]
+    },
+    {
+      "codigo": "SOL-F59D763E181F",
+      "descripcion": "Chaqueta resistente flama MOD 7040 Talla L",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        65
+      ]
+    },
+    {
+      "codigo": "SOL-F598A82F26F3",
+      "descripcion": "Chaqueta resistente flama MOD 7040 Talla M",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        66
+      ]
+    },
+    {
+      "codigo": "SOL-4BB8BE65340C",
+      "descripcion": "Chaqueta resistente flama MOD 7040 Talla S",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        67
+      ]
+    },
+    {
+      "codigo": "SOL-92345BD15B24",
+      "descripcion": "Cinta amarilla - Precaucion",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        68
+      ]
+    },
+    {
+      "codigo": "SOL-56FEA891CAE3",
+      "descripcion": "Cinta antideslizante",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        69
+      ]
+    },
+    {
+      "codigo": "SOL-EA6D5D79A0C4",
+      "descripcion": "CINTA DOBLE ADHESIVO (3M) 1\" X 33MTRS/",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        70
+      ]
+    },
+    {
+      "codigo": "SOL-F39B02FB2949",
+      "descripcion": "CINTA REFLECTIVA 2\" X 45,7 MTS ROJ/BLA",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        71
+      ]
+    },
+    {
+      "codigo": "SOL-4B80092F4B1D",
+      "descripcion": "Cinta roja precaución",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        72
+      ]
+    },
+    {
+      "codigo": "SOL-F350C0FB6D08",
+      "descripcion": "Cinturon araña",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        73
+      ]
+    },
+    {
+      "codigo": "SOL-F8F9162A20ED",
+      "descripcion": "Cloro",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        74
+      ]
+    },
+    {
+      "codigo": "SOL-410287BF2D37",
+      "descripcion": "Compresas",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        75
+      ]
+    },
+    {
+      "codigo": "SOL-BD982991B18F",
+      "descripcion": "Conjunto (2 piezas)",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        76
+      ]
+    },
+    {
+      "codigo": "SOL-39BEFAF5D1F4",
+      "descripcion": "Cono grande",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        77
+      ]
+    },
+    {
+      "codigo": "SOL-083256B0AAB5",
+      "descripcion": "Cono pequeño",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        78
+      ]
+    },
+    {
+      "codigo": "SOL-23C66634D267",
+      "descripcion": "Convertidor de Oxido Galón",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        79
+      ]
+    },
+    {
+      "codigo": "SOL-D018E77F3354",
+      "descripcion": "Cortina para soldar de vinil 1,74 x 2,34 mts",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        80
+      ]
+    },
+    {
+      "codigo": "SOL-526BFF16C770",
+      "descripcion": "Curitas",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        81
+      ]
+    },
+    {
+      "codigo": "SOL-B923A818B4D6",
+      "descripcion": "Delantal amarillo plastico",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        82
+      ]
+    },
+    {
+      "codigo": "SOL-20DEBAEF6FA7",
+      "descripcion": "Delantal de cuero soldador",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        83
+      ]
+    },
+    {
+      "codigo": "SOL-500D2137B868",
+      "descripcion": "DISPENSADOR JABON NIQUELADO 800 ML",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        84
+      ]
+    },
+    {
+      "codigo": "SOL-4008CD0D095F",
+      "descripcion": "Espadrapo",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        85
+      ]
+    },
+    {
+      "codigo": "SOL-A65709FBF6F8",
+      "descripcion": "Estuche para férula larga",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        86
+      ]
+    },
+    {
+      "codigo": "SOL-04324C0F60BF",
+      "descripcion": "Extensión para pintar Grande",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        87
+      ]
+    },
+    {
+      "codigo": "SOL-0823325B7C25",
+      "descripcion": "Extensión para pintar pequeña",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        88
+      ]
+    },
+    {
+      "codigo": "SOL-CDA7467D838F",
+      "descripcion": "Extintores A agua",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        89
+      ]
+    },
+    {
+      "codigo": "SOL-7F3F6DCEE9CA",
+      "descripcion": "Extintores ABC pequeño",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        90
+      ]
+    },
+    {
+      "codigo": "SOL-62FA55A22BD5",
+      "descripcion": "Faja sujeta barbilla de algodón",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        91
+      ]
+    },
+    {
+      "codigo": "SOL-D680E3716391",
+      "descripcion": "Filtros para polvo (rosado)",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        92
+      ]
+    },
+    {
+      "codigo": "SOL-4A0598D57E7B",
+      "descripcion": "Gafas de protección",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        93
+      ]
+    },
+    {
+      "codigo": "SOL-ADCBE75E07F8",
+      "descripcion": "Gasa 2x10 yardas",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        94
+      ]
+    },
+    {
+      "codigo": "SOL-FB11C34D68CE",
+      "descripcion": "Gasa 4x10 yardas",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        95
+      ]
+    },
+    {
+      "codigo": "SOL-F95B0B0B94C2",
+      "descripcion": "Gasa 6x10 yardas",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        96
+      ]
+    },
+    {
+      "codigo": "SOL-E484833AF933",
+      "descripcion": "Gasa esterilizada 10x10",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        97
+      ]
+    },
+    {
+      "codigo": "SOL-03060AF068D6",
+      "descripcion": "Gorros tipo chavo",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        98
+      ]
+    },
+    {
+      "codigo": "SOL-76ECF6119AE0",
+      "descripcion": "Guante ansell revestido de nitrilo MOD 11-840 negro",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        99
+      ]
+    },
+    {
+      "codigo": "SOL-3ED4341AF073",
+      "descripcion": "Guante anticorte",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        100
+      ]
+    },
+    {
+      "codigo": "SOL-DD72AC30DB3E",
+      "descripcion": "GUANTE CUERO SOLDADOR AZUL HILO DE KEVLAR",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        101
+      ]
+    },
+    {
+      "codigo": "SOL-317BF5937838",
+      "descripcion": "GUANTE LATEX TALLA S",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        102
+      ]
+    },
+    {
+      "codigo": "SOL-3F9A270C5B11",
+      "descripcion": "GUANTE NITRILO FLEXTRIL SATINADO talla M",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        103
+      ]
+    },
+    {
+      "codigo": "SOL-3604883C53AD",
+      "descripcion": "GUANTE NITRILO LARGO PROTEK talla L",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        104
+      ]
+    },
+    {
+      "codigo": "SOL-282B1DE19794",
+      "descripcion": "GUANTE TEJIDO RECUBIERTO LATEX AZUL TALLA L",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        105
+      ]
+    },
+    {
+      "codigo": "SOL-79DCF238DB50",
+      "descripcion": "GUANTE TOWA ACTIVGRIP ADVANCE talla L",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        106
+      ]
+    },
+    {
+      "codigo": "SOL-C64000A77F60",
+      "descripcion": "GUANTE TOWA ACTIVGRIP ADVANCE talla M",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        107
+      ]
+    },
+    {
+      "codigo": "SOL-DB542EB192F5",
+      "descripcion": "Guantes cabrito borde azul talla XL",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        108
+      ]
+    },
+    {
+      "codigo": "SOL-A88FB303EF93",
+      "descripcion": "Guantes cabrito borde café talla L",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        109
+      ]
+    },
+    {
+      "codigo": "SOL-0861921DE838",
+      "descripcion": "Guantes cabrito borde rojo talla S",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        110
+      ]
+    },
+    {
+      "codigo": "SOL-BC403148E8B7",
+      "descripcion": "Guantes cabrito borde verde talla M",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        111
+      ]
+    },
+    {
+      "codigo": "SOL-B2147C14143C",
+      "descripcion": "Guantes látex azules",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        112
+      ]
+    },
+    {
+      "codigo": "SOL-FC08931C98A0",
+      "descripcion": "Guantes látex sin polvo safina Talla L",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        113
+      ]
+    },
+    {
+      "codigo": "SOL-C4B891773879",
+      "descripcion": "Guantes látex sin polvo safina Talla M",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        114
+      ]
+    },
+    {
+      "codigo": "SOL-39F4859464C0",
+      "descripcion": "Guantes latex talla S",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        115
+      ]
+    },
+    {
+      "codigo": "SOL-124FFB130A00",
+      "descripcion": "Inmovilizador de cabeza",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        116
+      ]
+    },
+    {
+      "codigo": "SOL-88597BBFDA8C",
+      "descripcion": "Jabón antibacterial",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        117
+      ]
+    },
+    {
+      "codigo": "SOL-D3A9F94EFD35",
+      "descripcion": "Jabón antiséptico",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        118
+      ]
+    },
+    {
+      "codigo": "SOL-25B54E538EF8",
+      "descripcion": "Juego férulas rígidas para extremidades con cabestrillo",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        119
+      ]
+    },
+    {
+      "codigo": "SOL-658C1C315AFD",
+      "descripcion": "Lentes claros graduable CLARO PROTEK",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        120
+      ]
+    },
+    {
+      "codigo": "SOL-CFE1533D1EE8",
+      "descripcion": "Lentes de protección para kits antiderrame",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        121
+      ]
+    },
+    {
+      "codigo": "SOL-A3CF3EF21494",
+      "descripcion": "Lentes oscuros graduable OSCURO PROTEK",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        122
+      ]
+    },
+    {
+      "codigo": "SOL-0CB1C3FF9E16",
+      "descripcion": "Linea de vida ajustable MOD 10201456",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        123
+      ]
+    },
+    {
+      "codigo": "SOL-BE763B5DC8AF",
+      "descripcion": "Linea de vida T9111W-Z7/6FTAF MOD TITAN",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        124
+      ]
+    },
+    {
+      "codigo": "SOL-6A97C386F527",
+      "descripcion": "MADERA 3 pulg grueso X 6,5 pulg ancho X 15 mts largo",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        125
+      ]
+    },
+    {
+      "codigo": "SOL-057F9AA6F6CC",
+      "descripcion": "Malla anaranjada",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        126
+      ]
+    },
+    {
+      "codigo": "SOL-B7F36B7FBDE9",
+      "descripcion": "Mangas de cuero",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        127
+      ]
+    },
+    {
+      "codigo": "SOL-D1B0E354CD71",
+      "descripcion": "Mangas de tela talla L",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        128
+      ]
+    },
+    {
+      "codigo": "SOL-39FE21465A2D",
+      "descripcion": "Manguera 1 1/2\"",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        129
+      ]
+    },
+    {
+      "codigo": "SOL-17D32F9DD93D",
+      "descripcion": "Manguera 2 1/2\"",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        130
+      ]
+    },
+    {
+      "codigo": "SOL-4C8DEEAA8E54",
+      "descripcion": "Manta de Soldadura de Fibra de Vidrio 4x6 pies",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        131
+      ]
+    },
+    {
+      "codigo": "SOL-51FC807171BD",
+      "descripcion": "Manta térmica",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        132
+      ]
+    },
+    {
+      "codigo": "SOL-4C9680DC4D84",
+      "descripcion": "MARCADOR DE NUMEROS 10 MM KORFF",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        133
+      ]
+    },
+    {
+      "codigo": "SOL-1709196FCBF1",
+      "descripcion": "Marco para cortina soldar 1,8 x 2,4 mts",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        134
+      ]
+    },
+    {
+      "codigo": "SOL-05A08609FB03",
+      "descripcion": "mascara para soldar",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        135
+      ]
+    },
+    {
+      "codigo": "SOL-78A29B9EE182",
+      "descripcion": "Mascarilla quirúrgica",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        136
+      ]
+    },
+    {
+      "codigo": "SOL-00913ECF80E4",
+      "descripcion": "Master lock bloqueo valvula gas",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        137
+      ]
+    },
+    {
+      "codigo": "SOL-B6692DC5D9C7",
+      "descripcion": "Moldex - Cartucho MOD 7100 Vapores organicos",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        138
+      ]
+    },
+    {
+      "codigo": "SOL-407EC9C92837",
+      "descripcion": "Moldex - Respirador Moldex 7002 Talla M",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        139
+      ]
+    },
+    {
+      "codigo": "SOL-50440DE3E3A9",
+      "descripcion": "Monogafas antiempañante",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        140
+      ]
+    },
+    {
+      "codigo": "SOL-864AFF59B0AA",
+      "descripcion": "Orejera diadema",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        141
+      ]
+    },
+    {
+      "codigo": "SOL-B51AFEB49704",
+      "descripcion": "Orejeras para casco",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        142
+      ]
+    },
+    {
+      "codigo": "SOL-F1C3CD8D71E5",
+      "descripcion": "Pantalla oxicorte",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        143
+      ]
+    },
+    {
+      "codigo": "SOL-ADA61C628226",
+      "descripcion": "Pantalla repuesto para careta esmerilar",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        144
+      ]
+    },
+    {
+      "codigo": "SOL-526D4874E669",
+      "descripcion": "Pantallas largas",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        145
+      ]
+    },
+    {
+      "codigo": "SOL-DA4E851F1B32",
+      "descripcion": "Pañuelo Beige",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        146
+      ]
+    },
+    {
+      "codigo": "SOL-ED55846B6DC1",
+      "descripcion": "Pañuelo primeros auxilios",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        147
+      ]
+    },
+    {
+      "codigo": "SOL-C6956AF4C371",
+      "descripcion": "Polainas de cuero",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        148
+      ]
+    },
+    {
+      "codigo": "SOL-6397981A7EAE",
+      "descripcion": "Protectores pasticos para filtros",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        149
+      ]
+    },
+    {
+      "codigo": "SOL-6AF11DCF71CF",
+      "descripcion": "Pruebas Actúa 6+",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        150
+      ]
+    },
+    {
+      "codigo": "SOL-39FBB649F060",
+      "descripcion": "Punto de anclaje de 0,90 mts Skold",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        151
+      ]
+    },
+    {
+      "codigo": "SOL-56543536ADA7",
+      "descripcion": "Recarga de extintores",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        152
+      ]
+    },
+    {
+      "codigo": "SOL-7AA66416FB7F",
+      "descripcion": "Respirador desechable 3M",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        153
+      ]
+    },
+    {
+      "codigo": "SOL-6A1049FD2609",
+      "descripcion": "Respirador N95 para particulas",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        154
+      ]
+    },
+    {
+      "codigo": "SOL-02CA62D92E2E",
+      "descripcion": "Respiradores de silicon",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        155
+      ]
+    },
+    {
+      "codigo": "SOL-BBDF9E9AB5D4",
+      "descripcion": "Saniquat",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        156
+      ]
+    },
+    {
+      "codigo": "SOL-0798E9D039B9",
+      "descripcion": "Servicios ambientales ordinarios",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        157
+      ]
+    },
+    {
+      "codigo": "SOL-E1E5D6AA7971",
+      "descripcion": "Servicios ambientales peligrosos",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        158
+      ]
+    },
+    {
+      "codigo": "SOL-6ED3B7D12945",
+      "descripcion": "Solución alcalina",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        159
+      ]
+    },
+    {
+      "codigo": "SOL-C7AF4E41EA2F",
+      "descripcion": "Suero Fisiologico 250 mL",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        160
+      ]
+    },
+    {
+      "codigo": "SOL-C08CC8D0C73B",
+      "descripcion": "SWSI 36307 CORTINA PROTECTORA ROJA PARA SOLDADURA 1.72X2.55M",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        161
+      ]
+    },
+    {
+      "codigo": "SOL-08AC097CF887",
+      "descripcion": "Tapones para oidos",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        162
+      ]
+    },
+    {
+      "codigo": "SOL-99246EFB449E",
+      "descripcion": "Tijeras punta romana",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        163
+      ]
+    },
+    {
+      "codigo": "SOL-B5A57797369D",
+      "descripcion": "TORN CARROCERIA 3/8 X 6",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        164
+      ]
+    },
+    {
+      "codigo": "SOL-84A6B375F9E3",
+      "descripcion": "TORN OJO 3/8 X 3 C/TUERCA",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        165
+      ]
+    },
+    {
+      "codigo": "SOL-2FE0F3BF2040",
+      "descripcion": "Venda elastica 4 pulg",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        166
+      ]
+    },
+    {
+      "codigo": "SOL-41F3DB22FC50",
+      "descripcion": "3M - 6200 Pieza facial media cara",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        167
+      ]
+    },
+    {
+      "codigo": "SOL-A68BF5B66418",
+      "descripcion": "3M - 5P71 Filtro P95",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        168
+      ]
+    },
+    {
+      "codigo": "SOL-A3C43C0B57A7",
+      "descripcion": "3M - 501 Retenedor prefiltro serie 6000",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        169
+      ]
+    },
+    {
+      "codigo": "SOL-648EEBC01780",
+      "descripcion": "Soldadura 6013 x 1/8 hilco punto rojo",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        170,
+        231
+      ]
+    },
+    {
+      "codigo": "SOL-2B04960BA7F0",
+      "descripcion": "Disco corte de 9\" corte fino para metal",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        171,
+        232
+      ]
+    },
+    {
+      "codigo": "SOL-CD9B0AD0035F",
+      "descripcion": "Disco flat grano 80",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        172,
+        233
+      ]
+    },
+    {
+      "codigo": "SOL-652F96F5FCC8",
+      "descripcion": "Disco de 4 1/2 corte fino para metal",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        173,
+        234
+      ]
+    },
+    {
+      "codigo": "SOL-F9F00C4924F6",
+      "descripcion": "Disco de esmerilar de 4 1/2",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        174,
+        235
+      ]
+    },
+    {
+      "codigo": "SOL-9B6F366863CC",
+      "descripcion": "Platinas de 2\" x 1/8",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        175,
+        236
+      ]
+    },
+    {
+      "codigo": "SOL-1BD3BE347810",
+      "descripcion": "Tubos redondo de cañeria 1/2",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        176,
+        237
+      ]
+    },
+    {
+      "codigo": "SOL-666F91145389",
+      "descripcion": "Platina de 3/8\" x 3\"",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        177,
+        238
+      ]
+    },
+    {
+      "codigo": "SOL-DF2612D1E64A",
+      "descripcion": "Platina de 1/4\" x 2\"",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        178,
+        180,
+        239,
+        241
+      ]
+    },
+    {
+      "codigo": "SOL-896BF0163520",
+      "descripcion": "Platina de 3/8\" x 2\"",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        179,
+        240
+      ]
+    },
+    {
+      "codigo": "SOL-27EF2AB1E8B9",
+      "descripcion": "Angulares de 1/4 x 2\"",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        181,
+        242
+      ]
+    },
+    {
+      "codigo": "SOL-4DE8AC8CD2A3",
+      "descripcion": "Angulares de 1/8 x 2\"",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        182,
+        243
+      ]
+    },
+    {
+      "codigo": "SOL-ED42B6E7C623",
+      "descripcion": "Pintura negra fast dry",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        183,
+        244
+      ]
+    },
+    {
+      "codigo": "SOL-471F09F07A9E",
+      "descripcion": "Pintura blanca fast dry",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        184,
+        245
+      ]
+    },
+    {
+      "codigo": "SOL-B2E29EF71A9F",
+      "descripcion": "Varsol",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        185,
+        246
+      ]
+    },
+    {
+      "codigo": "SOL-43102F9F0309",
+      "descripcion": "Thiner",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        186
+      ]
+    },
+    {
+      "codigo": "SOL-3B8E40E744E6",
+      "descripcion": "Soldadura 7018 hilco",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        187,
+        248
+      ]
+    },
+    {
+      "codigo": "SOL-DBB8B01CE61A",
+      "descripcion": "Soldadura acero inox 308 de 1/8",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        188,
+        249
+      ]
+    },
+    {
+      "codigo": "SOL-399B2CAB108B",
+      "descripcion": "Soldaduda acero inox 308 de 3/32",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        189,
+        250
+      ]
+    },
+    {
+      "codigo": "SOL-D786B4AA7FD4",
+      "descripcion": "CILINDRO DE MONTACARGAS DE 10 LBS PARA GAS LICUADO",
+      "precio_unitario": 28,
+      "iva": 0,
+      "filas_origen": [
+        190
+      ]
+    },
+    {
+      "codigo": "SOL-3032F0CDA625",
+      "descripcion": "CILINDRO DE 20 LBS PARA GAS LICUADO PRESIÓN / FISHER",
+      "precio_unitario": 28,
+      "iva": 0,
+      "filas_origen": [
+        191
+      ]
+    },
+    {
+      "codigo": "SOL-E81A932E2A99",
+      "descripcion": "CILINDRO DE 35 LBS PARA GAS LICUADO PRESIÓN / FISHER",
+      "precio_unitario": 47,
+      "iva": 0,
+      "filas_origen": [
+        192
+      ]
+    },
+    {
+      "codigo": "SOL-73797936B97D",
+      "descripcion": "CILINDRO DE 50 LBS PARA GAS LICUADO PRESIÓN / FISHER",
+      "precio_unitario": 55,
+      "iva": 0,
+      "filas_origen": [
+        193
+      ]
+    },
+    {
+      "codigo": "SOL-1E5AC5484675",
+      "descripcion": "CILINDRO DE 25 LBS PARA GAS LICUADO PRESIÓN / FISHER",
+      "precio_unitario": 31,
+      "iva": 0,
+      "filas_origen": [
+        194
+      ]
+    },
+    {
+      "codigo": "SOL-92C443D4864A",
+      "descripcion": "CILINDRO DE 10 LBS PARA GAS LICUADO ROSCA / VALVULA POL",
+      "precio_unitario": 28,
+      "iva": 0,
+      "filas_origen": [
+        195
+      ]
+    },
+    {
+      "codigo": "SOL-04126A4BFDE9",
+      "descripcion": "CILINDRO DE 20 LBS PARA GAS LICUADO ROSCA / VALVULA POL",
+      "precio_unitario": 28,
+      "iva": 0,
+      "filas_origen": [
+        196
+      ]
+    },
+    {
+      "codigo": "SOL-1D39A6F9688A",
+      "descripcion": "CILINDRO DE 35 LBS PARA GAS LICUADO ROSCA / VALVULA POL",
+      "precio_unitario": 47,
+      "iva": 0,
+      "filas_origen": [
+        197,
+        198
+      ]
+    },
+    {
+      "codigo": "SOL-58A7111FD236",
+      "descripcion": "CILINDRO DE 50 LBS PARA GAS LICUADO ROSCA / VALVULA POL",
+      "precio_unitario": 55,
+      "iva": 0,
+      "filas_origen": [
+        199
+      ]
+    },
+    {
+      "codigo": "SOL-B4360FD835D5",
+      "descripcion": "CILINDRO DE 100 LBS PARA GAS LICUADO ROSCA / VALVULA POL",
+      "precio_unitario": 90,
+      "iva": 0,
+      "filas_origen": [
+        200
+      ]
+    },
+    {
+      "codigo": "SOL-C68D3C6B5DAF",
+      "descripcion": "CILINDRO DE 25 LBS PARA GAS LICUADO ROSCA / VALVULA POL",
+      "precio_unitario": 31,
+      "iva": 0,
+      "filas_origen": [
+        201
+      ]
+    },
+    {
+      "codigo": "SOL-5E17E676B849",
+      "descripcion": "VALVULAS CON PERILLA ALUMINIO CON ACOPLE PARA MONTACARGAS",
+      "precio_unitario": 40,
+      "iva": 0,
+      "filas_origen": [
+        202
+      ]
+    },
+    {
+      "codigo": "SOL-EC6252BA8402",
+      "descripcion": "TANQUE DE 10 GLS PARA GAS LICUADO",
+      "precio_unitario": 200,
+      "iva": 0,
+      "filas_origen": [
+        203
+      ]
+    },
+    {
+      "codigo": "SOL-F68313F0437F",
+      "descripcion": "TANQUE DE 120 GLS PARA GAS LICUADO",
+      "precio_unitario": 360,
+      "iva": 0,
+      "filas_origen": [
+        204
+      ]
+    },
+    {
+      "codigo": "SOL-2D266BDDB478",
+      "descripcion": "TANQUE DE 132 GLS PARA GAS LICUADO",
+      "precio_unitario": 430,
+      "iva": 0,
+      "filas_origen": [
+        205
+      ]
+    },
+    {
+      "codigo": "SOL-B91F2FD6E117",
+      "descripcion": "TANQUE DE 264 GLS PARA GAS LICUADO",
+      "precio_unitario": 700,
+      "iva": 0,
+      "filas_origen": [
+        206
+      ]
+    },
+    {
+      "codigo": "SOL-69B05503B1A6",
+      "descripcion": "TANQUE DE 500 GLS PARA GAS LICUADO",
+      "precio_unitario": 1200,
+      "iva": 0,
+      "filas_origen": [
+        207
+      ]
+    },
+    {
+      "codigo": "SOL-0646C2F32657",
+      "descripcion": "TANQUE DE 991 GLS PARA GAS LICUADO",
+      "precio_unitario": 2200,
+      "iva": 0,
+      "filas_origen": [
+        208
+      ]
+    },
+    {
+      "codigo": "SOL-366390CAF32F",
+      "descripcion": "TANQUE DE 1321 GLS PARA GAS LICUADO HORIZONTAL",
+      "precio_unitario": 2900,
+      "iva": 0,
+      "filas_origen": [
+        209
+      ]
+    },
+    {
+      "codigo": "SOL-E849126ED5CE",
+      "descripcion": "TANQUE DE 1321 GLS PARA GAS LICUADO VERTICAL",
+      "precio_unitario": 3500,
+      "iva": 0,
+      "filas_origen": [
+        210
+      ]
+    },
+    {
+      "codigo": "SOL-5B2ECEF631A7",
+      "descripcion": "Servicio de recoleccion de residuos ordinarios",
+      "precio_unitario": 172300,
+      "iva": 13,
+      "filas_origen": [
+        211
+      ]
+    },
+    {
+      "codigo": "SOL-0902A29FAE8D",
+      "descripcion": "Varios",
+      "precio_unitario": null,
+      "iva": 13,
+      "filas_origen": [
+        212
+      ]
+    },
+    {
+      "codigo": "SOL-1D6B9E3B5EDF",
+      "descripcion": "REPORTE DIARIO DE GAS A GRANEL",
+      "precio_unitario": 6450,
+      "iva": 13,
+      "filas_origen": [
+        213
+      ]
+    },
+    {
+      "codigo": "SOL-9F6308190DF4",
+      "descripcion": "BOLETA DE LIQUIDACIÓN CILINDRO",
+      "precio_unitario": 1773,
+      "iva": 13,
+      "filas_origen": [
+        214
+      ]
+    },
+    {
+      "codigo": "SOL-2124CE41BBF4",
+      "descripcion": "REMESAS DE CILINDROS",
+      "precio_unitario": 2700,
+      "iva": 13,
+      "filas_origen": [
+        215
+      ]
+    },
+    {
+      "codigo": "SOL-D4E3A273712F",
+      "descripcion": "BOLETA CONTEO DE CAMIONES",
+      "precio_unitario": 2400,
+      "iva": 13,
+      "filas_origen": [
+        216
+      ]
+    },
+    {
+      "codigo": "SOL-2951EE312BB5",
+      "descripcion": "CUIDO DE CAMIONES",
+      "precio_unitario": 2905,
+      "iva": 13,
+      "filas_origen": [
+        217
+      ]
+    },
+    {
+      "codigo": "SOL-9D643B7B183E",
+      "descripcion": "LIQUIDACION DE RUTAS GRANEL",
+      "precio_unitario": 4900,
+      "iva": 13,
+      "filas_origen": [
+        218
+      ]
+    },
+    {
+      "codigo": "SOL-92841F485901",
+      "descripcion": "ORDEN COMBUSTIBLE GT",
+      "precio_unitario": 2580,
+      "iva": 13,
+      "filas_origen": [
+        219
+      ]
+    },
+    {
+      "codigo": "SOL-A7A39327C64A",
+      "descripcion": "ORDEN COMBUSTIBLE SG",
+      "precio_unitario": 2580,
+      "iva": 13,
+      "filas_origen": [
+        220
+      ]
+    },
+    {
+      "codigo": "SOL-CE3FBEC2D054",
+      "descripcion": "REQUISICION DE MATERIALES",
+      "precio_unitario": 1910,
+      "iva": 13,
+      "filas_origen": [
+        221
+      ]
+    },
+    {
+      "codigo": "SOL-D5E71A29174F",
+      "descripcion": "REVISION GAS PAR",
+      "precio_unitario": 7000,
+      "iva": 13,
+      "filas_origen": [
+        222
+      ]
+    },
+    {
+      "codigo": "SOL-243C9E8B2E89",
+      "descripcion": "SOLICITUD COMBUSTIBLE RECOPE GT COD 701544",
+      "precio_unitario": 2050,
+      "iva": 13,
+      "filas_origen": [
+        223
+      ]
+    },
+    {
+      "codigo": "SOL-10EE86492CCD",
+      "descripcion": "SOLICITUD COMBUSTIBLE RECOPE SG sin codigo",
+      "precio_unitario": 2050,
+      "iva": 13,
+      "filas_origen": [
+        224
+      ]
+    },
+    {
+      "codigo": "SOL-32E3D713F479",
+      "descripcion": "RECIBOS DE DINERO GAS TOMZA",
+      "precio_unitario": 5500,
+      "iva": 13,
+      "filas_origen": [
+        225
+      ]
+    },
+    {
+      "codigo": "SOL-1D332B295085",
+      "descripcion": "TRASLADO DE TANQUE",
+      "precio_unitario": 4967,
+      "iva": 13,
+      "filas_origen": [
+        226
+      ]
+    },
+    {
+      "codigo": "SOL-92BA9EAE2DF9",
+      "descripcion": "TRÁMITE DE FACTURAS",
+      "precio_unitario": 6000,
+      "iva": 13,
+      "filas_origen": [
+        227
+      ]
+    },
+    {
+      "codigo": "SOL-7642DB9D68AF",
+      "descripcion": "TARJETAS DE PRESENTACIÓN GT",
+      "precio_unitario": 120,
+      "iva": 13,
+      "filas_origen": [
+        228
+      ]
+    },
+    {
+      "codigo": "SOL-84FE0FCF3039",
+      "descripcion": "Laptop Lenovo IdeaPad Slim 3 - Ryzen 3 7320U - 8GB RAM - 512GB SSD - 15.6\" FHD Abyss Blue - 82XQ00PQGJ",
+      "precio_unitario": 193805,
+      "iva": 13,
+      "filas_origen": [
+        229
+      ]
+    },
+    {
+      "codigo": "SOL-F3F49FB031E2",
+      "descripcion": "Monitor Dahua 21,45\" DHI-LM22-A220 - 1ms- 144Hz - 1920x1080 - FHD 1.0.99.12.10982-9003",
+      "precio_unitario": 28319,
+      "iva": 13,
+      "filas_origen": [
+        230
+      ]
+    },
+    {
+      "codigo": "SOL-1F6436DE7F36",
+      "descripcion": "DETECTOR MULTIGAS ALTAIR 5X (LEL - O2 - CO - H2S) MOD 10116928 con linea y sonda",
+      "precio_unitario": 1989994,
+      "iva": 13,
+      "filas_origen": [
+        251
+      ]
+    },
+    {
+      "codigo": "SOL-5A3D51FD8B23",
+      "descripcion": "Camisa tipo columbia azul Navi mujer talla XS",
+      "precio_unitario": 13900,
+      "iva": 13,
+      "filas_origen": [
+        252
+      ]
+    },
+    {
+      "codigo": "SOL-10018310185F",
+      "descripcion": "Camisa tipo columbia azul Navi mujer talla S",
+      "precio_unitario": 13900,
+      "iva": 13,
+      "filas_origen": [
+        253
+      ]
+    },
+    {
+      "codigo": "SOL-560066009BD4",
+      "descripcion": "Camisa tipo columbia azul Navi mujer talla M",
+      "precio_unitario": 13900,
+      "iva": 13,
+      "filas_origen": [
+        254
+      ]
+    },
+    {
+      "codigo": "SOL-1C79C5A57510",
+      "descripcion": "Camisa tipo columbia azul Navi mujer talla L",
+      "precio_unitario": 13900,
+      "iva": 13,
+      "filas_origen": [
+        255
+      ]
+    },
+    {
+      "codigo": "SOL-014D6A2746FC",
+      "descripcion": "Camisa tipo columbia azul Navi mujer talla XL",
+      "precio_unitario": 13900,
+      "iva": 13,
+      "filas_origen": [
+        256
+      ]
+    },
+    {
+      "codigo": "SOL-A2F032368F7E",
+      "descripcion": "Camisa tipo columbia azul Navi hombre talla XS",
+      "precio_unitario": 13900,
+      "iva": 13,
+      "filas_origen": [
+        257
+      ]
+    },
+    {
+      "codigo": "SOL-6ACACBB93254",
+      "descripcion": "Camisa tipo columbia azul Navi hombre talla S",
+      "precio_unitario": 13900,
+      "iva": 13,
+      "filas_origen": [
+        258
+      ]
+    },
+    {
+      "codigo": "SOL-804B552B0970",
+      "descripcion": "Camisa tipo columbia azul Navi hombre talla M",
+      "precio_unitario": 13900,
+      "iva": 13,
+      "filas_origen": [
+        259
+      ]
+    },
+    {
+      "codigo": "SOL-15FB2BC8E711",
+      "descripcion": "Camisa tipo columbia azul Navi hombre talla L",
+      "precio_unitario": 13900,
+      "iva": 13,
+      "filas_origen": [
+        260
+      ]
+    },
+    {
+      "codigo": "SOL-B513D13FED80",
+      "descripcion": "Camisa tipo columbia azul Navi hombre talla XL",
+      "precio_unitario": 13900,
+      "iva": 13,
+      "filas_origen": [
+        261
+      ]
+    },
+    {
+      "codigo": "SOL-E6A9B11C2AD2",
+      "descripcion": "Camisa tipo columbia azul Navi hombre talla XXL",
+      "precio_unitario": 13900,
+      "iva": 13,
+      "filas_origen": [
+        262
+      ]
+    }
+  ]
+}

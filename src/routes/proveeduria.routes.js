@@ -2,6 +2,7 @@ const router = require('express').Router();
 const {facturasDeOrden,vincularOrden,adjuntarFacturas}=require('../utils/portalFacturaOrden');
 const {articulosExcel,articuloExcel,ivaArticulo,condicionesOrden}=require('../utils/proveeduriaCatalogo');
 const {motivoBloqueoOrden,versionOrden,cambiosOrden}=require('../utils/proveeduriaOrdenEdicion');
+const {articulosSolicitud,articuloSolicitud,articuloSolicitudDescripcion,esNoInventariable,catalogoParaOrden}=require('../utils/proveeduriaSolicitable');
 const { leerFacturaXML, consultarHacienda, aprobable, vencimiento } = require('../utils/proveedorHacienda');
 const { rateLimit } = require('express-rate-limit');
 const pool = require('../db');
@@ -102,7 +103,8 @@ router.get('/mis-solicitudes',wrap(async(req,res)=>{
   const actual=sedeInventarioCompartido(req.session.sedeSeleccionada||u.sede);
   const [articulos]=await pool.query(`SELECT i.sede,i.codigo,i.descripcion,COALESCE(f.unidad,'UND') AS unidad FROM prov_inventario i LEFT JOIN prov_inventario_fichas f ON f.sede=i.sede AND f.codigo=i.codigo WHERE i.sede IN (?) ORDER BY i.descripcion,i.codigo`,[ALMACEN_GENERAL]);
   res.set('Cache-Control','no-store');
-  res.render('proveeduria/mis_solicitudes',{user:u,docs:rows.map(datos),alertas,sedesPermitidas,articulos,sedeActual:sedesPermitidas.includes(actual)?actual:''});
+  const catalogo=[...articulos,...articulosSolicitud.map(({codigo,descripcion,unidad,inventariable})=>({codigo,descripcion,unidad,inventariable}))];
+  res.render('proveeduria/mis_solicitudes',{user:u,docs:rows.map(datos),alertas,sedesPermitidas,articulos:catalogo,sedeActual:sedesPermitidas.includes(actual)?actual:''});
 }));
 router.get('/solicitudes',wrap(async(req,res)=>{
   if(!gestion(req.session.user))throw error(403,'Solo Proveeduría puede gestionar solicitudes');
@@ -160,6 +162,7 @@ router.post('/inventario/articulos',wrap(async(req,res)=>{
   if(!gestion(req.session.user))throw error(403,'No autorizado');
   const sedeArticulo=ALMACEN_GENERAL,d=fichaInventario(req.body),cantidad=cantidadInventario(req.body.cantidad??0,'Stock inicial');
   const codigo=String(req.body.codigo||'').trim()||'PV-'+crypto.randomBytes(4).toString('hex').toUpperCase();exigir(codigo.length<=80,'Código demasiado largo');
+  exigir(!articuloSolicitud(codigo),'Este código pertenece al catálogo de compra por solicitud y no se registra en inventario');
   await transaccion(async db=>{
     const [existe]=await db.query('SELECT codigo FROM prov_inventario WHERE sede=? AND codigo=? FOR UPDATE',[sedeArticulo,codigo]);exigir(!existe.length,'El código ya existe en esta sede. Edite su ficha o ajuste la existencia');
     await db.query('INSERT INTO prov_inventario (sede,codigo,descripcion,iva,cantidad) VALUES (?,?,?,?,?)',[sedeArticulo,codigo,d.descripcion,d.iva,cantidad]);
@@ -206,7 +209,7 @@ router.get('/ordenes/:id/editar',wrap(async(req,res)=>{
   const [proveedores]=await pool.query('SELECT p.nombre,c.telefono,c.correos,c.correo_original,c.direccion,c.condicion_pago FROM prov_proveedores p LEFT JOIN prov_proveedor_contactos c ON c.clave=p.clave WHERE p.activo=1 ORDER BY p.nombre');proveedores.forEach(p=>{p.correos=leerCorreosJSON(p.correos);});
   const orden={...row.datos,id:row.id,fecha:row.creado_en,cotizacion_archivo:row.datos.cotizacion_archivo?`/proveeduria/adjunto/${row.id}/cotizacion`:null};
   res.set('Cache-Control','no-store');
-  res.render('compras/orden_form',{orden,esNuevaOrden:false,solicitudId:solicitud?.datos.departamento?solicitud.id:'',lineas:row.datos.lineas.map(l=>({...l,codigo:l.referencia||'',codigo_producto:l.codigo})),proveedores,siguientePO:`PR-${row.id}`,esProveeduria:true,sedesPermitidas,sedeActual:row.sede,articulosExcel,versionEdicion:versionOrden(row),tituloOrden:`Editar orden PR-${row.id}`,textoGuardar:'Actualizar orden',subtituloOrden:'Proveeduría · Actualice los datos de esta orden de compra.',volverUrl:`/proveeduria/ordenes/${row.id}`,cancelarUrl:`/proveeduria/ordenes/${row.id}`,formAction:`/proveeduria/ordenes/${row.id}/editar`});
+  res.render('compras/orden_form',{orden,esNuevaOrden:false,solicitudId:solicitud?.datos.departamento?solicitud.id:'',lineas:row.datos.lineas.map(l=>({...l,codigo:l.referencia||'',codigo_producto:l.codigo})),proveedores,siguientePO:`PR-${row.id}`,esProveeduria:true,sedesPermitidas,sedeActual:row.sede,articulosExcel:catalogoParaOrden(articulosExcel),versionEdicion:versionOrden(row),tituloOrden:`Editar orden PR-${row.id}`,textoGuardar:'Actualizar orden',subtituloOrden:'Proveeduría · Actualice los datos de esta orden de compra.',volverUrl:`/proveeduria/ordenes/${row.id}`,cancelarUrl:`/proveeduria/ordenes/${row.id}`,formAction:`/proveeduria/ordenes/${row.id}/editar`});
 }));
 router.post('/ordenes/:id/editar',wrap(async(req,res)=>{
   if(!gestion(req.session.user))throw error(403,'No autorizado');
@@ -262,7 +265,7 @@ router.get('/ordenes/:id/recepcion',wrap(async(req,res)=>{
   const row=await documento(pool,req.params.id,'oc');
   if(!(await sedesOrden(req)).includes(row.sede))throw error(403,'No tiene acceso a la sede de esta OC');
   res.set('Cache-Control','no-store');
-  res.render('proveeduria/recepcion',{user:req.session.user,row,resumen:resumenRecepcion(row.datos),token:crypto.randomBytes(16).toString('hex'),puedeGestion:gestion(req.session.user)});
+  res.render('proveeduria/recepcion',{esNoInventariable,user:req.session.user,row,resumen:resumenRecepcion(row.datos),token:crypto.randomBytes(16).toString('hex'),puedeGestion:gestion(req.session.user)});
 }));
 router.get('/proveedores',wrap(async(req,res)=>{
   if(!gestion(req.session.user)&&!contabilidad(req.session.user))throw error(403,'No autorizado');
@@ -284,7 +287,7 @@ router.get(['/ordenes/nueva','/solicitudes/:id/cotizacion'],wrap(async(req,res)=
   const sedeActual=sedesPermitidas.includes(seleccionada)?seleccionada:'';
   const cotizacion=solicitud?.datos.cotizacion;
   const precarga=cotizacion?{...cotizacion,cotizacion_archivo:cotizacion.cotizacion_archivo?`/proveeduria/solicitudes/${solicitud.id}/cotizacion/archivo`:null}:null;
-  res.render('compras/orden_form',{orden:precarga,esNuevaOrden:true,solicitudId:solicitud?.id||'',lineas:solicitud?solicitud.datos.lineas.map(l=>({...l,codigo:'',codigo_producto:l.codigo,iva:ivaArticulo(l.descripcion,l.iva),precio_unitario:cotizacion?.lineas.find(x=>x.codigo===l.codigo)?.precio_unitario??articuloExcel(l.descripcion)?.precio_unitario??'',subtotal:cotizacion?.lineas.find(x=>x.codigo===l.codigo)?.subtotal??0})):[],proveedores,siguientePO:esCotizacion?'Cotización · Sin OC':'Se asigna al guardar',esProveeduria:true,sedesPermitidas,sedeActual,articulosExcel,tituloOrden:esCotizacion?'Cotizar solicitud PR-'+solicitud.id:'Nueva orden de compra',textoGuardar:esCotizacion?'Guardar cotización':'Guardar orden',subtituloOrden:esCotizacion?`Solicitud de ${solicitud.datos.departamento||'departamento solicitante'} · ${solicitud.datos.solicitante||'Usuario '+solicitud.usuario_id}`:'Departamento de Proveeduría · Complete el encabezado, líneas y totales de la orden.',volverUrl:esCotizacion?'/proveeduria/solicitudes':'/proveeduria/ordenes',cancelarUrl:'/proveeduria/solicitudes',formAction:esCotizacion?`/proveeduria/solicitudes/${solicitud.id}/cotizacion`:'/proveeduria/ordenes'});
+  res.render('compras/orden_form',{orden:precarga,esNuevaOrden:true,solicitudId:solicitud?.id||'',lineas:solicitud?solicitud.datos.lineas.map(l=>({...l,codigo:'',codigo_producto:l.codigo,iva:articuloSolicitud(l.codigo)?.iva??ivaArticulo(l.descripcion,l.iva),precio_unitario:cotizacion?.lineas.find(x=>x.codigo===l.codigo)?.precio_unitario??articuloSolicitud(l.codigo)?.precio_unitario??articuloExcel(l.descripcion)?.precio_unitario??'',subtotal:cotizacion?.lineas.find(x=>x.codigo===l.codigo)?.subtotal??0})):[],proveedores,siguientePO:esCotizacion?'Cotización · Sin OC':'Se asigna al guardar',esProveeduria:true,sedesPermitidas,sedeActual,articulosExcel:catalogoParaOrden(articulosExcel),tituloOrden:esCotizacion?'Cotizar solicitud PR-'+solicitud.id:'Nueva orden de compra',textoGuardar:esCotizacion?'Guardar cotización':'Guardar orden',subtituloOrden:esCotizacion?`Solicitud de ${solicitud.datos.departamento||'departamento solicitante'} · ${solicitud.datos.solicitante||'Usuario '+solicitud.usuario_id}`:'Departamento de Proveeduría · Complete el encabezado, líneas y totales de la orden.',volverUrl:esCotizacion?'/proveeduria/solicitudes':'/proveeduria/ordenes',cancelarUrl:'/proveeduria/solicitudes',formAction:esCotizacion?`/proveeduria/solicitudes/${solicitud.id}/cotizacion`:'/proveeduria/ordenes'});
 }));
 router.get('/solicitudes/:id/cotizacion/archivo',wrap(async(req,res)=>{
   if(!gestion(req.session.user))throw error(403,'No autorizado');
@@ -301,18 +304,19 @@ router.post('/cotizacion/analizar',limitarLectura,wrap(async(req,res)=>{
 }));
 router.post('/solicitudes',wrap(async(req,res) => {
   const solicitadas=req.body.lineas;
-  exigir(Array.isArray(solicitadas)&&solicitadas.length>0&&solicitadas.length<=200,'Agregue entre 1 y 200 artículos del inventario');
+  exigir(Array.isArray(solicitadas)&&solicitadas.length>0&&solicitadas.length<=200,'Agregue entre 1 y 200 artículos del catálogo de solicitudes');
   const codigos=solicitadas.map(l=>String(l?.codigo||'').trim());
-  exigir(codigos.every(c=>c&&c.length<=80)&&new Set(codigos).size===codigos.length,'Seleccione artículos del inventario sin repetirlos');
+  exigir(codigos.every(c=>c&&c.length<=80)&&new Set(codigos).size===codigos.length,'Seleccione artículos del catálogo sin repetirlos');
   const sedeSolicitud=await sedeFormulario(req);
   const u=req.session.user;
   exigir(esDepartamentoValido(u.departamentoActivo),'Seleccione su departamento antes de crear una solicitud');
   const id = await transaccion(async db=>{
-    const [articulos]=await db.query(`SELECT codigo,descripcion,iva FROM prov_inventario WHERE sede=? AND codigo IN (${codigos.map(()=>'?').join(',')})`,[ALMACEN_GENERAL,...codigos]);
-    const catalogo=new Map(articulos.map(a=>[a.codigo,a]));
+    const codigosStock=codigos.filter(c=>!articuloSolicitud(c));
+    const [articulos]=codigosStock.length?await db.query(`SELECT codigo,descripcion,iva FROM prov_inventario WHERE sede=? AND codigo IN (${codigosStock.map(()=>'?').join(',')})`,[ALMACEN_GENERAL,...codigosStock]):[[]];
+    const catalogo=new Map([...articulos,...articulosSolicitud].map(a=>[a.codigo,a]));
     const lineas=lineasCompra(solicitadas.map((l,i)=>{
       const a=catalogo.get(codigos[i]);
-      exigir(a,`El artículo ${codigos[i]} no está en el inventario general de Proveeduría. Actualice la página y seleccione otro artículo`);
+      exigir(a,`El artículo ${codigos[i]} no está en el catálogo de Proveeduría. Actualice la página y seleccione otro artículo`);
       return {codigo:a.codigo,descripcion:a.descripcion,iva:Number(a.iva),cantidad:l.cantidad};
     }));
     const [r]=await db.query("INSERT INTO prov_documentos (tipo,usuario_id,sede,datos) VALUES ('solicitud',?,?,?)",[u.id,sedeSolicitud,JSON.stringify({lineas,estado:'PENDIENTE',departamento:u.departamentoActivo,solicitante:u.nombre||u.usuario,motivo:String(req.body.motivo||'').trim().slice(0,2000)})]);
@@ -343,7 +347,7 @@ router.post(['/ordenes','/solicitudes/:id/cotizacion'],wrap(async(req,res)=>{
   if(compartido){
     const b=req.body; const empresas={'GAS TOMZA':'GAS TOMZA DE COSTA RICA S.A.','SUPER GAS':'ENVASADORA SUPER GAS GLP S.A.'};
     exigir(empresas[b.empresa_destino],'Empresa destinataria inválida');
-    b.lineas=Object.values(b.lineas||{}).map(l=>({...l,referencia:l.codigo,codigo:String(l.codigo_producto||'').trim()||'ART-'+crypto.createHash('sha256').update(String(l.descripcion||'')).digest('hex').slice(0,12),iva:ivaArticulo(l.descripcion)}));
+    b.lineas=Object.values(b.lineas||{}).map(l=>({...l,referencia:l.codigo,codigo:String(l.codigo_producto||'').trim()||articuloSolicitudDescripcion(l.descripcion)?.codigo||'ART-'+crypto.createHash('sha256').update(String(l.descripcion||'')).digest('hex').slice(0,12),iva:ivaArticulo(l.descripcion)}));
     b.precios=Object.fromEntries(b.lineas.map(l=>[l.codigo,l.precio_unitario]));
     b.iva_global=false;b.iva=13;
     b.razon_social=empresas[b.empresa_destino];b.condicion=Number(b.credito)?'CREDITO':'CONTADO';b.modo=b.solicitud_id?'manual':'cotizacion';
@@ -414,7 +418,7 @@ router.post('/ordenes/:id/recibir',wrap(async(req,res)=>{
     if(existente){exigir(existente.huella===recibo.huella,'Esta recepción ya fue registrada con otros datos. Actualice la página');return {ok:true,repetida:true,estado:row.datos.estado,recepcion_id:existente.id};}
     validarPendientes(resumen,recibo);
     const lineas=recibo.lineas.filter(l=>l.cantidad>0).map(l=>({...resumen.lineas.find(x=>x.codigo===l.codigo),cantidad:l.cantidad}));
-    for(const l of lineas){
+    for(const l of lineas.filter(l=>!esNoInventariable(l))){
       await db.query('INSERT INTO prov_inventario (sede,codigo,descripcion,iva,cantidad) VALUES (?,?,?,?,?) ON DUPLICATE KEY UPDATE cantidad = cantidad + VALUES(cantidad), descripcion = VALUES(descripcion), iva = VALUES(iva)',[ALMACEN_GENERAL,l.codigo,l.descripcion,l.iva,l.cantidad]);
       await db.query('INSERT INTO prov_inventario_fichas (sede,codigo,proveedor) VALUES (?,?,?) ON DUPLICATE KEY UPDATE proveedor=VALUES(proveedor)',[ALMACEN_GENERAL,l.codigo,row.datos.proveedor||'']);
       await registrarMovimientoInventario(db,{sede:ALMACEN_GENERAL,codigo:l.codigo,tipo:'ENTRADA_OC',cantidad:l.cantidad,documento_id:row.id,usuario_id:req.session.user.id,motivo:`Recepción de OC PR-${row.id} · ${recibo.referencia} · Destino: ${row.sede}`});
@@ -437,12 +441,13 @@ router.post('/salidas',wrap(async(req,res)=>{
     if(solicitud.datos.oc_id){const oc=await documento(db,solicitud.datos.oc_id,'oc',true);exigir(oc.datos.estado==='RECIBIDA','Primero registre la recepción de la mercadería');}
     const lineas=[];
     for(const l of [...solicitud.datos.lineas].sort((a,b)=>a.codigo.localeCompare(b.codigo))){
+      if(esNoInventariable(l)){exigir(solicitud.datos.oc_id,'Primero genere y reciba la OC de los artículos de compra por solicitud');lineas.push(l);continue;}
       const [stock]=await db.query('SELECT * FROM prov_inventario WHERE sede=? AND codigo=? FOR UPDATE',[ALMACEN_GENERAL,l.codigo]);
       exigir(stock[0] && Number(stock[0].cantidad)>=l.cantidad,`Inventario insuficiente: ${l.codigo}`);
       await db.query('UPDATE prov_inventario SET cantidad=cantidad-? WHERE sede=? AND codigo=?',[l.cantidad,ALMACEN_GENERAL,l.codigo]);lineas.push(l);
     }
     const [r]=await db.query("INSERT INTO prov_documentos (tipo,usuario_id,sede,datos) VALUES ('salida',?,?,?)",[solicitud.usuario_id,solicitud.sede,JSON.stringify({lineas,solicitud_id:solicitud.id,estado:'ALISTANDO'})]);
-    for(const l of lineas)await registrarMovimientoInventario(db,{sede:ALMACEN_GENERAL,codigo:l.codigo,tipo:'SALIDA_PEDIDO',cantidad:-l.cantidad,documento_id:r.insertId,usuario_id:req.session.user.id,motivo:`Entrega de solicitud PR-${solicitud.id} · Destino: ${solicitud.sede}`});
+    for(const l of lineas.filter(l=>!esNoInventariable(l)))await registrarMovimientoInventario(db,{sede:ALMACEN_GENERAL,codigo:l.codigo,tipo:'SALIDA_PEDIDO',cantidad:-l.cantidad,documento_id:r.insertId,usuario_id:req.session.user.id,motivo:`Entrega de solicitud PR-${solicitud.id} · Destino: ${solicitud.sede}`});
     solicitud.datos.salida_id=r.insertId;solicitud.datos.estado='ALISTANDO';await guardar(db,solicitud,req.session.user.id,'Salida de inventario');await alerta(db,r.insertId,'Su pedido se está alistando',solicitud.usuario_id);return r.insertId;
   });res.json({id});
 }));
@@ -458,7 +463,7 @@ router.post('/salidas/:id/:accion',wrap(async(req,res)=>{
     if(row.datos.solicitud_id){const s=await documento(db,row.datos.solicitud_id,'solicitud',true);s.datos.estado=req.params.accion==='aceptar'?'ENTREGADA':'EN_CAMINO';await guardar(db,s,req.session.user.id,'Seguimiento de entrega');}
   });res.json({ok:true});
 }));
-router.get('/salidas/:id/imprimir',wrap(async(req,res)=>{const row=await documento(pool,req.params.id,'salida');visible(req,row);res.render('proveeduria/salida',{row});}));
+router.get('/salidas/:id/imprimir',wrap(async(req,res)=>{const row=await documento(pool,req.params.id,'salida');visible(req,row);res.render('proveeduria/salida',{row,esNoInventariable});}));
 router.get('/cuentas-por-pagar',wrap(async(req,res)=>{
   if(!contabilidad(req.session.user))throw error(403,'Solo Contabilidad');
   const [rows]=await pool.query("SELECT * FROM prov_documentos WHERE tipo IN ('oc','factura_portal') AND JSON_TYPE(JSON_EXTRACT(datos,'$.factura')) = 'OBJECT' ORDER BY id DESC");

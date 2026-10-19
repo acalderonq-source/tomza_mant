@@ -20,7 +20,7 @@
       const r=await fetch(form.action,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
       if(r.redirected){throw Error('Su sesión terminó. Inicie sesión nuevamente antes de confirmar la recepción.');}
       const resultado=await r.json();if(!r.ok)throw Error(resultado.error||'No se pudo registrar la recepción');
-      estado.className='alert alert-success';estado.textContent='Recepción guardada. Inventario actualizado.';
+      estado.className='alert alert-success';estado.textContent='Recepción guardada correctamente.';
       location.reload();
     }catch(e){estado.className='alert alert-danger';estado.textContent=e.message;estado.tabIndex=-1;estado.focus();guardando=false;boton.disabled=false;}
   });
