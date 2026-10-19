@@ -442,7 +442,13 @@
             <div><div class="module-title">Compras</div><p class="module-copy">Resumen del área.</p></div>
           </a>
       <% } %>
-      <% if (['SEGURIDAD_OCUPACIONAL', 'LOGISTICA', 'RECURSOS_HUMANOS', 'CARBURACION'].includes(departamentoActivo)) { %>
+      <% if (departamentoActivo === 'SEGURIDAD_OCUPACIONAL') { %>
+        <a href="/proveeduria/mis-solicitudes" class="module-card">
+          <span class="module-icon icon-blue"><i class="bi bi-cart-plus"></i></span>
+          <div><div class="module-title">Solicitudes a Proveeduría</div><p class="module-copy">Solicite equipo de protección personal, materiales y suministros para Seguridad Ocupacional. Consulte el avance de sus pedidos y confirme la entrega.</p></div>
+        </a>
+      <% } %>
+      <% if (['LOGISTICA', 'RECURSOS_HUMANOS', 'CARBURACION'].includes(departamentoActivo)) { %>
         <div class="module-card">
           <span class="module-icon icon-blue"><i class="bi bi-cone-striped"></i></span>
           <div><div class="module-title">Área en preparación</div><p class="module-copy">El acceso ya está organizado. Los módulos de este departamento se habilitarán conforme se incorporen sus procesos y permisos.</p></div>
