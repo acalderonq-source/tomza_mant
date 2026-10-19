@@ -4,9 +4,9 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
 <link rel="stylesheet" href="/css/inicio-empresa.css?v=1"><script src="/js/inicio-empresa.js?v=1" defer></script>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css">
-<link rel="stylesheet" href="/css/sedes-mapa.css?v=5">
+<link rel="stylesheet" href="/css/sedes-mapa.css?v=6">
 <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js" defer></script>
-<script src="/js/sedes-mapa.js?v=5" defer></script></head>
+<script src="/js/sedes-mapa.js?v=6" defer></script></head>
 <body class="inicio-empresa">
 <a class="skip-link" href="#contenido">Ir al contenido</a>
 <aside class="empresa-menu" id="departamentos-menu">
@@ -28,11 +28,12 @@
 <% if(user){ %><div class="welcome-identity"><span class="identity-icon"><i class="bi bi-person-check" aria-hidden="true"></i></span><div><strong><%= user.nombre || user.usuario %></strong><span><%= departamentos.filter(d=>d.permitido).length %> departamento(s) autorizado(s)</span></div></div><% } %>
 </div>
 <section class="sedes-panel" aria-labelledby="sedes-titulo">
-<header class="sedes-header"><div><p class="eyebrow">PRESENCIA NACIONAL</p><h2 id="sedes-titulo">Conectados en Costa Rica</h2></div><span class="sedes-count"><span></span>1 sede</span></header>
+<header class="sedes-header"><div><h2 id="sedes-titulo" class="mapa-country-title">COSTA RICA</h2><span class="mapa-bandera" aria-hidden="true"></span></div></header>
 <div class="sedes-map-stage">
 <div id="sedes-mapa" aria-label="Mapa interactivo de sedes de Gas Tomza en Costa Rica"></div>
 <button type="button" id="mapa-pais" class="mapa-country" title="Ver Costa Rica completa" aria-label="Ver Costa Rica" disabled><i class="bi bi-globe-americas" aria-hidden="true"></i>Costa Rica<i class="bi bi-arrows-angle-expand" aria-hidden="true"></i></button>
 <div class="mapa-zoom" aria-label="Controles del mapa"><button type="button" id="mapa-acercar" title="Acercar mapa" aria-label="Acercar mapa" disabled><i class="bi bi-plus-lg" aria-hidden="true"></i></button><button type="button" id="mapa-alejar" title="Alejar mapa" aria-label="Alejar mapa" disabled><i class="bi bi-dash-lg" aria-hidden="true"></i></button></div>
+<div class="mapa-leyenda"><span><i class="punto-sedes" aria-hidden="true"></i>Sedes</span><span><i class="punto-seleccionada" aria-hidden="true"></i>Seleccionada</span></div>
 </div>
 <p id="mapa-estado" class="mapa-estado" role="status">Cargando mapa…</p>
 <footer class="sedes-footer"><button type="button" id="mapa-cartago" title="Centrar sede Cartago" disabled><span class="sede-symbol"><i class="bi bi-buildings" aria-hidden="true"></i></span><span><small>SEDE GAS TOMZA</small><strong>Cartago</strong><span class="sede-company">Gas Tomza de Costa Rica S.A.</span></span></button>

@@ -1,8 +1,9 @@
 # Mapa de sedes en el inicio empresarial
 
-Reemplaza la ilustracion por Leaflet 1.9.4 con cartografia OpenStreetMap.
-Conserva la bienvenida y el menu de departamentos. La cartografia utiliza sus
-colores originales, sin filtros de desaturacion o escala de grises.
+Mapa vectorial ilustrado con Leaflet 1.9.4 y geometria local geoBoundaries.
+Conserva la bienvenida y el menu de departamentos. Silueta azul, divisiones
+provinciales, fondo claro y punto seleccionado naranja con anillos, siguiendo
+la referencia del usuario. No utiliza mosaicos de calles ni imagen estatica.
 Una sede inicial: Cartago, Gas Tomza de Costa Rica S.A., coordenadas del enlace
 de Bing entregado por el usuario: 9.877662658691406, -83.94295501708984.
 No se geocodifico ni se supusieron direcciones de las demas sedes.
@@ -19,14 +20,14 @@ Como llegar. La lista ampliable esta en public/js/sedes-mapa.js. El mapa no
 otorga acceso a modulos ni expone datos operativos; los permisos no cambian.
 No usa geolocalizacion del dispositivo ni requiere claves o tarjeta de mapas.
 
-El fondo requiere internet, CDN de Leaflet y disponibilidad de OSM (sin SLA).
-Fallback: enlace publico a Bing incluso si falla CDN, tiles o JavaScript.
-Atribucion OSM visible; cada tile envia solo origen como Referer, sin modificar
-la politica global de seguridad. Sin precarga, descarga offline ni proxy de tiles.
-El service worker existente no almacena estas URLs externas.
-Revisar proveedor cartografico y sus limites si aumenta el volumen de uso.
+Geometria: public/data/mapa-sedes/costa-rica-provincias.geojson, siete provincias,
+fuente geoBoundaries/OpenStreetMap bajo ODbL. Procedencia y licencia junto al
+archivo. No se modifican geometrias. El viewport inicial muestra el territorio
+continental; las islas remotas originales se conservan en los datos.
+Requiere CDN de Leaflet y el servidor de la aplicacion para cargar GeoJSON;
+no solicita tiles a proveedores externos. Atribucion visible. El enlace a Bing
+sigue disponible si falla la geometria, CDN o JavaScript.
 
 Referencias: https://leafletjs.com/examples/quick-start/
-https://operations.osmfoundation.org/policies/tiles/
-Prueba navegador tests/sedesMapa.browser.js intercepta tiles para no descargar
-mapas de OSM mediante automatizacion. Capturas de QA con tiles simulados.
+https://www.geoboundaries.org/api/current/gbOpen/CRI/ADM1/
+Prueba navegador tests/sedesMapa.browser.js utiliza la geometria local real.
