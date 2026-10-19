@@ -8,6 +8,7 @@ const path = require("path");
 const PdfPrinter = require("pdfmake");
 const ExcelJS = require("exceljs");
 const { generarPDFOrden } = require('../utils/pdfOrdenCompra');
+const ordenesCorreo = require('../utils/ordenesCorreo');
 const { fechaActualCostaRica } = require("../utils/fechaCostaRica");
 const { agregarFiltroPlacaSql, normalizarPlaca: normalizarPlacaSistema } = require("../utils/placas");
 const { ensureTipoMantenimientoColumns, normalizarTipoMantenimiento, detectarTipoMantenimiento } = require("../utils/tipoMantenimiento");
@@ -4553,6 +4554,7 @@ router.post("/ordenes", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_
     await ensureOrdenCotizacionColumns();
     await ensureTipoMantenimientoColumns(pool);
     await prepararAuditoria(pool);
+    await ordenesCorreo.preparar(pool);
     connection = await pool.getConnection();
     liberarNumeracion = await require('../utils/numeroOrdenCompra').bloquearNumeroOrden(connection);
     await connection.beginTransaction();
@@ -4617,6 +4619,7 @@ router.post("/ordenes", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_
     }
     await auditarOrden(connection, req.session.user, ordenId, null,
       { proveedor_id, moneda, placa_unidad: placaOrden, ...totalesOrden, lineas: lineasOrden });
+    await ordenesCorreo.encolar(connection, ordenId);
     await connection.commit();
     res.redirect(`/compras/ordenes/${ordenId}/detalle?descargar=1`);
   } catch (error) {
@@ -4659,6 +4662,7 @@ router.post("/ordenes/consignacion-consumo", requireAuth, allowRoles("ADMIN", "T
     await ensureOrdenPlacaColumn();
     await ensureOrdenDetalleCodigoProductoColumn();
     await ensureTipoMantenimientoColumns(pool);
+    await ordenesCorreo.preparar(pool);
 
     connection = await pool.getConnection();
     const [proveedores] = await connection.query("SELECT id, nombre FROM proveedores ORDER BY nombre");
@@ -4779,6 +4783,7 @@ router.post("/ordenes/consignacion-consumo", requireAuth, allowRoles("ADMIN", "T
       }
     }
 
+    await ordenesCorreo.encolar(connection, ordenId);
     await connection.commit();
     transaction = false;
     req.session.success = `Orden ${poNumero} creada como borrador con ${lineas.length} línea(s) y ${movimientos.length} movimiento(s) de consumo.`;
@@ -5444,13 +5449,20 @@ router.get("/ordenes/:id/detalle", requireAuth, allowRoles(...ROLES_VER_ORDENES)
     const [lineas] = await pool.query("SELECT * FROM ordenes_compra_detalle WHERE orden_compra_id = ?", [id]);
     const trazabilidad = await require('../utils/trazabilidadOrden').cargarTrazabilidadOrden(pool, orden, req.session.user);
     res.set('Cache-Control', 'no-store');
-    res.render("compras/orden_detalle", { orden, proveedor, lineas, trazabilidad, descargarAutomaticamente: req.query.descargar === '1', user: req.session.user, facturasPortal:await facturasDeOrden(pool,"COMPRAS",id) });
+    res.render("compras/orden_detalle", { orden, proveedor, lineas, trazabilidad, envioCorreo:await ordenesCorreo.estado(pool,id), descargarAutomaticamente: req.query.descargar === '1', user: req.session.user, facturasPortal:await facturasDeOrden(pool,"COMPRAS",id) });
   } catch (error) {
     console.error(error);
     res.status(500).send("Error cargando detalle");
   }
 });
 
+router.post('/ordenes/:id/correo/reintentar',requireAuth,allowRoles('ADMIN','TALLER','PROVEEDURIA_TALLER'),async(req,res)=>{
+  try {
+    if(!/^[1-9]\d{0,10}$/.test(req.params.id)) return res.status(400).send('Orden invalida');
+    await ordenesCorreo.reintentar(pool,req.params.id);
+    res.redirect(303,`/compras/ordenes/${req.params.id}/detalle`);
+  } catch(error) { console.error('Reintento correo orden:',error.code || 'ERROR'); res.status(503).send('No se pudo reintentar el envio.'); }
+});
 router.get("/ordenes/:id/pdf", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER", "CONTABILIDAD", "BODEGUERO"), async (req, res) => {
   try {
     await ensureOrdenPlacaColumn();

@@ -11,7 +11,11 @@ const connection = {
     if (sql.includes('GET_LOCK')) return [[{adquirido:1}]];
     if (sql.includes('RELEASE_LOCK')) return [[{liberado:1}]];
     if (sql.startsWith('SELECT po_numero FROM ordenes_compra')) return [[]];
-    statements.push({ sql, params }); return query(sql, params);
+    statements.push({ sql, params });
+    if (sql.startsWith('SELECT * FROM ordenes_compra WHERE')) return [[{id:params[0],proveedor_id:5,po_numero:'2026-001'}]];
+    if (sql.startsWith('SELECT * FROM proveedores WHERE')) return [[{id:5,nombre:'MAXI REPUESTOS SRL',email:'proveedor@example.com'}]];
+    if (sql.startsWith('SELECT * FROM ordenes_compra_detalle WHERE')) return [[{descripcion:'Filtro',cantidad:1}]];
+    return query(sql, params);
   },
   commit: async () => { committed = true; },
   rollback: async () => { rolledBack = true; },
@@ -23,6 +27,7 @@ require.cache[dbPath] = { id: dbPath, filename: dbPath, loaded: true, exports: {
   query: async (sql, params = []) => {
     if (/INFORMATION_SCHEMA/i.test(sql)) return [[{ count: 1 }]];
     if (/SELECT po_numero FROM ordenes_compra/.test(sql)) return [[]];
+    if (sql.includes('CREATE TABLE IF NOT EXISTS ordenes_correo_envios')) return [{affectedRows:0}];
     statements.push({ sql, params });
     return query(sql, params);
   }
@@ -88,6 +93,9 @@ test("consumption creates a regular draft PO with net per-plate lines and locks 
   const confirmed = statements.find(item => /INSERT INTO bodega_ordenes_consumo\s/.test(item.sql));
   assert.deepEqual(confirmed.params, [30, 5, "2026-09-21", "2026-09-27", "Cartago", "María Proveedor", "WhatsApp 123", 7, 7]);
   assert.deepEqual(statements.filter(item => /INSERT INTO bodega_ordenes_consumo_movimientos/.test(item.sql)).map(item => item.params[0]), [101, 102]);
+  const envio=statements.find(item=>item.sql.includes('INSERT INTO ordenes_correo_envios'));
+  assert.equal(envio.params[0],30);
+  assert.equal(envio.params[2],'proveedor@example.com');
 });
 
 test("general and blank-plate consumption is ordered under General Taller", async () => {

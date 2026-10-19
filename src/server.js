@@ -22,6 +22,7 @@ const app = express();
 const { alertar, programarRespaldo } = require('./utils/alertasEmpresa');
 programarRespaldo();
 require('./utils/ingresosSesion').iniciarAvisosIngreso(pool);
+require('./utils/ordenesCorreo').iniciar(pool);
 app.disable("x-powered-by");
 app.use(securityHeaders);
 const isProduction = process.env.NODE_ENV === "production";

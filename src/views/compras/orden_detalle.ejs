@@ -26,6 +26,15 @@
 </nav>
 
 <div class="container mt-4">
+<% if(typeof envioCorreo !== 'undefined' && envioCorreo){ %>
+<div class="alert alert-info" role="status"><strong>Correo al proveedor:</strong>
+<%= ({PENDIENTE:'En cola',ENVIANDO:'Enviando',ENVIADO:'Aceptado por Microsoft',SIN_CORREO:'Falta un correo valido del proveedor',ERROR:'Error de envio',REVISION:'Envio incierto: revise Enviados de Outlook antes de reintentar'})[envioCorreo.estado] || envioCorreo.estado %>
+<span><%= envioCorreo.correo || '' %></span>
+<% if(envioCorreo.error_codigo){ %><span> · <%= envioCorreo.error_codigo %></span><% } %>
+<% if(['ADMIN','TALLER','PROVEEDURIA_TALLER'].includes(user.rol) && ['ERROR','SIN_CORREO','REVISION'].includes(envioCorreo.estado)){ %>
+<form method="post" action="/compras/ordenes/<%= orden.id %>/correo/reintentar" class="mt-2"><button class="btn btn-outline-primary btn-sm" type="submit">Reintentar envio del PDF original</button></form>
+<% } %><small class="d-block">Se envia la version original guardada. Editar la orden no vuelve a enviarla automaticamente.</small></div>
+<% } %>
   <%
     const puedeModificarCompras = ['ADMIN', 'TALLER', 'PROVEEDURIA_TALLER'].includes(user.rol);
     const esMensajero = ['MENSAJERO', 'MENSAJERIA', 'MENSAJERO_FACTURAS'].includes(user.rol);

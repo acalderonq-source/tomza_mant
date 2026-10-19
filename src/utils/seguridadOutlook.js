@@ -61,7 +61,12 @@ async function conectar(db, auth, code, fetcher = fetch) {
   [correo, token.account.homeAccountId, cifrar(client.getTokenCache().serialize())]);
   return correo;
 }
-async function enviar(db, to, subject, html, fetcher = fetch) {
+async function enviar(db, to, subject, html, fetcher = fetch, attachments = []) {
+  const adjuntos = attachments.map(a => {
+    if (!Buffer.isBuffer(a.content) || a.content.length > 2500000) throw fallo('OUTLOOK_ADJUNTO_INVALIDO');
+    return { '@odata.type':'#microsoft.graph.fileAttachment', name:a.filename,
+      contentType:a.contentType || 'application/pdf', contentBytes:a.content.toString('base64') };
+  });
   let row;
   try { const [rows] = await db.query('SELECT * FROM seguridad_outlook_conexion WHERE id=1'); row = rows[0]; }
   catch (e) { if (e.code === 'ER_NO_SUCH_TABLE') throw fallo('OUTLOOK_NO_VINCULADO'); throw e; }
@@ -80,7 +85,7 @@ async function enviar(db, to, subject, html, fetcher = fetch) {
   const response = await fetcher('https://graph.microsoft.com/v1.0/me/sendMail', { method: 'POST',
     headers: { Authorization: 'Bearer '+token.accessToken, 'Content-Type': 'application/json' },
     body: JSON.stringify({ message: { subject, body: { contentType: 'HTML', content: html },
-      toRecipients: [{ emailAddress: { address: to } }] }, saveToSentItems: true }), signal: AbortSignal.timeout(20000) });
+      toRecipients: [{ emailAddress: { address: to } }], ...(adjuntos.length ? { attachments:adjuntos } : {}) }, saveToSentItems: true }), signal: AbortSignal.timeout(20000) });
   if (response.status !== 202) throw fallo(response.status === 401 ? 'OUTLOOK_REVINCULAR' : response.status === 403 ? 'OUTLOOK_PERMISO_DENEGADO' : 'OUTLOOK_ENVIO_RECHAZADO');
 }
 module.exports = { configurado, esperado, estado, iniciar, consumirEstado, conectar, enviar, cifrar, descifrar, validarCuenta };
