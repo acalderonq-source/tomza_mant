@@ -65,10 +65,10 @@ function rutaPerteneceATaller(pathname) {
   return coincideRuta(pathname, RUTAS_TALLER);
 }
 
-function puedeAbrirRutaPorDepartamento(departamento, pathname, rol = "") {
+function puedeAbrirRutaPorDepartamento(departamento, pathname, rol = "", metodo = "GET") {
   if(String(rol).toUpperCase()==='SEGURIDAD_OCUP') {
-    return String(departamento).toUpperCase()==='SEGURIDAD_OCUPACIONAL' && coincideRuta(pathname,
-      ['/','/inicio','/dashboard','/login','/logout','/cambiar-clave','/departamento/activo','/seguridad-ocupacional']);
+    return String(departamento).toUpperCase()==='SEGURIDAD_OCUPACIONAL' && (require('./accesosTrabajador').esRutaSuministrosSeguridad(pathname,metodo) || coincideRuta(pathname,
+      ['/','/inicio','/dashboard','/login','/logout','/cambiar-clave','/departamento/activo','/seguridad-ocupacional']));
   }
   if (!rutaPerteneceATaller(pathname)) return true;
 
@@ -85,7 +85,7 @@ function controlarAccesoPorDepartamento(req, res, next) {
     return res.status(403).send('No tiene permiso para ingresar o realizar esta accion.');
   }
   if (user?.esPropietarioAdministracion && coincideRuta(req.path, ['/compras/facturas/correo'])) return next();
-  if (!user || puedeAbrirRutaPorDepartamento(user.departamentoActivo, req.path, user.rol)) return next();
+  if (!user || puedeAbrirRutaPorDepartamento(user.departamentoActivo, req.path, user.rol, req.method)) return next();
 
   const mensaje = "Este modulo pertenece a Taller. Cambie el area activa a Taller para continuar.";
   if (req.xhr || req.headers.accept?.includes("application/json")) {

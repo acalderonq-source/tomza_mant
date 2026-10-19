@@ -42,7 +42,15 @@ async function prepararAccesos(db){await db.query(`CREATE TABLE IF NOT EXISTS us
   usuario_id INT NOT NULL PRIMARY KEY,config_json TEXT NOT NULL,asignado_por INT NOT NULL,
   actualizado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP)`);}
 function coincide(ruta,prefijo){return ruta===prefijo || ruta.startsWith(prefijo+'/');}
+function esRutaSuministrosSeguridad(ruta,metodo='GET'){
+  return (['GET','HEAD'].includes(metodo) && ['/proveeduria/mis-solicitudes','/proveeduria/alertas'].includes(ruta))
+    || (metodo==='POST' && (ruta==='/proveeduria/solicitudes' || /^\/proveeduria\/salidas\/\d+\/aceptar$/.test(ruta)));
+}
 function puedeAcceder(config,ruta,metodo){
+  if(config.departamento==='SEGURIDAD_OCUPACIONAL' && esRutaSuministrosSeguridad(ruta,metodo)){
+    const permiso=config.permisos.SEGURIDAD;
+    return permiso==='GESTION' || (permiso==='LECTURA' && ['GET','HEAD'].includes(metodo));
+  }
   if(['/','/inicio','/dashboard','/logout','/login','/login/perfil','/cambiar-clave','/departamento/activo','/cambiar-sede'].includes(ruta))return true;
   let elegido=null,longitud=0;
   for(const m of MODULOS)for(const p of m.rutas)if(coincide(ruta,p) && p.length>longitud){elegido=m;longitud=p.length;}
@@ -64,4 +72,4 @@ function controlarAccesosPersonales(db){return async(req,res,next)=>{
     return next();
   }catch(e){console.error('Permisos personales:',e.code || 'ERROR');return res.status(503).send('No se pudieron verificar sus permisos. Intente nuevamente.');}
 };}
-module.exports={AREAS,MODULOS,validarAcceso,prepararAccesos,puedeAcceder,controlarAccesosPersonales};
+module.exports={esRutaSuministrosSeguridad,AREAS,MODULOS,validarAcceso,prepararAccesos,puedeAcceder,controlarAccesosPersonales};
