@@ -14,10 +14,11 @@ async function server(user,fn){
 test('departamento solicitante solo puede consultar sus pedidos y no gestionar compras',async()=>{
   const original=pool.query;pool.query=async(sql,args)=>{
     if(sql.includes('FROM prov_documentos')){assert.match(sql,/usuario_id=\?/);assert.deepEqual(args,[71]);return [[{id:1,tipo:'solicitud',sede:'Cartago',datos:{departamento:'OPERACIONES',estado:'PENDIENTE',lineas:[{descripcion:'Papel',cantidad:2}]}}]];}
+    if(sql.includes('FROM prov_inventario i')){assert.deepEqual(args,['Cartago']);assert.match(sql,/WHERE i.sede IN/);assert.doesNotMatch(sql,/cantidad\s*>/);return [[{sede:'Cartago',codigo:'PAPEL',descripcion:'Papel',unidad:'RESMA'}]];}
     if(sql.includes('FROM prov_alertas'))assert.deepEqual(args,[71]);return [[]];
   };
   try{await server(requester,async base=>{
-    const r=await fetch(base+'/mis-solicitudes');assert.equal(r.status,200);const html=await r.text();assert.match(html,/Nueva solicitud · OPERACIONES/);assert.match(html,/Papel/);assert.doesNotMatch(html,/precio_unitario|factura\/conciliar/);
+    const r=await fetch(base+'/mis-solicitudes');assert.equal(r.status,200);const html=await r.text();assert.match(html,/Nueva solicitud · OPERACIONES/);assert.match(html,/Papel/);assert.doesNotMatch(html,/precio_unitario|factura\/conciliar/);assert.doesNotMatch(html,/name="departamento"/);assert.match(html,/Código automático/);assert.match(html,/proveeduria-solicitudes.js/);assert.match(html,/"codigo":"PAPEL"/);assert.equal(r.headers.get('cache-control'),'no-store');
     for(const p of ['/gestion','/solicitudes','/ordenes/nueva'])assert.equal((await fetch(base+p)).status,403);
     assert.equal((await fetch(base+'/ordenes',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'})).status,403);
   });
@@ -33,6 +34,8 @@ test('flujo completo: solicitud de otro departamento, cotización, OC, recepció
     if(sql.startsWith('SELECT datos FROM prov_documentos'))return [[...docs.values()].filter(d=>d.tipo==='oc').map(d=>({datos:d.datos}))];
     if(sql.startsWith('SELECT * FROM prov_documentos')){let rows=[...docs.values()];if(sql.includes("tipo='solicitud'"))rows=rows.filter(r=>r.tipo==='solicitud');if(sql.includes('usuario_id=?'))rows=rows.filter(r=>r.usuario_id===args[0]&&['solicitud','salida'].includes(r.tipo));return [structuredClone(rows)];}
     if(sql.includes('FROM usuarios_sedes'))return [[]];
+    if(sql.startsWith('SELECT codigo,descripcion,iva FROM prov_inventario'))return [[{codigo:'PAPEL',descripcion:'Papel',iva:13}]];
+    if(sql.includes('FROM prov_inventario i'))return [[{sede:'Cartago',codigo:'PAPEL',descripcion:'Papel',unidad:'UND'}]];
     if(sql.startsWith('SELECT')&&sql.includes('FROM prov_inventario'))return [stock.has(args[1])?[{cantidad:stock.get(args[1])}]:[]];
     if(sql.startsWith('SELECT')&&sql.includes('FROM prov_alertas'))return [alerts.filter(a=>a.usuario_id===args[0])];
     if(sql.startsWith('INSERT INTO prov_documentos')){const tipo=sql.match(/VALUES \('(\w+)'/)[1],id=nextId++;docs.set(id,{id,tipo,usuario_id:args[0],sede:args[1],datos:JSON.parse(args[2]),creado_en:new Date()});return [{insertId:id}];}
@@ -67,4 +70,32 @@ test('flujo completo: solicitud de otro departamento, cotización, OC, recepció
       assert.equal((await fetch(base+'/salidas/3/aceptar',{method:'POST'})).status,200);assert.equal(docs.get(1).datos.estado,'ENTREGADA');assert.equal(docs.get(3).datos.estado,'RECIBIDA');
     });
   }finally{pool.query=originalQuery;pool.getConnection=originalConnection;}
+});
+
+test('solicitudes solo admiten artículos existentes de la sede y toman sus datos del inventario y de la sesión',async()=>{
+  const originalQuery=pool.query,originalConnection=pool.getConnection;
+  const guardadas=[],alertas=[];
+  async function query(sql,args=[]){
+    if(sql.includes('FROM usuarios_sedes'))return [[]];
+    if(sql.startsWith('SELECT codigo,descripcion,iva FROM prov_inventario')){
+      assert.equal(args[0],'Cartago');
+      return [[...args.slice(1).filter(c=>['PAPEL','CAFE'].includes(c)).map(c=>({codigo:c,descripcion:c==='PAPEL'?'Papel oficial':'Café',iva:c==='PAPEL'?13:1}))]];
+    }
+    if(sql.startsWith('INSERT INTO prov_documentos')){guardadas.push({usuario:args[0],sede:args[1],datos:JSON.parse(args[2])});return [{insertId:guardadas.length}];}
+    if(sql.startsWith('INSERT INTO prov_alertas'))alertas.push(args);
+    return [[]];
+  }
+  pool.query=query;pool.getConnection=async()=>({query,beginTransaction:async()=>{},commit:async()=>{},rollback:async()=>{},release(){}});
+  const post=body=>({method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  try{await server(requester,async base=>{
+    const r=await fetch(base+'/solicitudes',post({sede:'Cartago',departamento:'CONTABILIDAD',solicitante:'Otro usuario',lineas:[{codigo:'PAPEL',cantidad:2,descripcion:'Texto alterado',iva:99,precio_unitario:999},{codigo:'CAFE',cantidad:1.125}]}));
+    assert.equal(r.status,200);assert.equal(guardadas[0].usuario,71);assert.equal(guardadas[0].datos.departamento,'OPERACIONES');assert.equal(guardadas[0].datos.solicitante,requester.nombre);
+    assert.deepEqual(guardadas[0].datos.lineas.map(l=>[l.codigo,l.descripcion,l.cantidad,l.iva,l.precio_unitario]),[['PAPEL','Papel oficial',2,13,0],['CAFE','Café',1.125,1,0]]);
+    assert.equal(alertas.length,1);
+    for(const lineas of [[],[{descripcion:'Producto libre',cantidad:1}],[{codigo:'NO-EXISTE',cantidad:1}],[{codigo:'PAPEL',cantidad:1},{codigo:'PAPEL',cantidad:2}],[{codigo:'PAPEL',cantidad:0}],[{codigo:'PAPEL',cantidad:1.0001}],[null],Array.from({length:201},(_,i)=>({codigo:`A${i}`,cantidad:1}))]){
+      const bad=await fetch(base+'/solicitudes',post({sede:'Cartago',lineas}));assert.equal(bad.status,400,JSON.stringify(lineas).slice(0,150));
+    }
+    const fuera=await fetch(base+'/solicitudes',post({sede:'Liberia',lineas:[{codigo:'PAPEL',cantidad:1}]}));assert.equal(fuera.status,403);
+    assert.equal(guardadas.length,1);assert.equal(alertas.length,1);
+  });}finally{pool.query=originalQuery;pool.getConnection=originalConnection;}
 });

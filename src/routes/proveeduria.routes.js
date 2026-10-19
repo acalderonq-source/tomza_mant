@@ -98,7 +98,9 @@ router.get('/mis-solicitudes',wrap(async(req,res)=>{
   const [alertas]=await pool.query('SELECT * FROM prov_alertas WHERE usuario_id=? ORDER BY id DESC LIMIT 40',[u.id]);
   const sedesPermitidas=await sedesOrden(req);
   const actual=req.session.sedeSeleccionada||u.sede;
-  res.render('proveeduria/mis_solicitudes',{user:u,docs:rows.map(datos),alertas,sedesPermitidas,sedeActual:sedesPermitidas.includes(actual)?actual:''});
+  const [articulos]=sedesPermitidas.length?await pool.query(`SELECT i.sede,i.codigo,i.descripcion,COALESCE(f.unidad,'UND') AS unidad FROM prov_inventario i LEFT JOIN prov_inventario_fichas f ON f.sede=i.sede AND f.codigo=i.codigo WHERE i.sede IN (${sedesPermitidas.map(()=>'?').join(',')}) ORDER BY i.descripcion,i.codigo`,sedesPermitidas):[[]];
+  res.set('Cache-Control','no-store');
+  res.render('proveeduria/mis_solicitudes',{user:u,docs:rows.map(datos),alertas,sedesPermitidas,articulos,sedeActual:sedesPermitidas.includes(actual)?actual:''});
 }));
 router.get('/solicitudes',wrap(async(req,res)=>{
   if(!gestion(req.session.user))throw error(403,'Solo Proveeduría puede gestionar solicitudes');
@@ -297,13 +299,21 @@ router.post('/cotizacion/analizar',limitarLectura,wrap(async(req,res)=>{
   res.json({ok:true,orden});
 }));
 router.post('/solicitudes',wrap(async(req,res) => {
-  exigir(Array.isArray(req.body.lineas),'Agregue los artículos solicitados');
-  const lineas = lineasCompra((req.body.lineas||[]).map(l=>({...l,codigo:String(l.codigo||'').trim()||'ART-'+crypto.createHash('sha256').update(String(l.descripcion||'').trim().toUpperCase()).digest('hex').slice(0,12),iva:ivaArticulo(l.descripcion)})));
+  const solicitadas=req.body.lineas;
+  exigir(Array.isArray(solicitadas)&&solicitadas.length>0&&solicitadas.length<=200,'Agregue entre 1 y 200 artículos del inventario');
+  const codigos=solicitadas.map(l=>String(l?.codigo||'').trim());
+  exigir(codigos.every(c=>c&&c.length<=80)&&new Set(codigos).size===codigos.length,'Seleccione artículos del inventario sin repetirlos');
   const sedeSolicitud=await sedeFormulario(req);
   const u=req.session.user;
   exigir(esDepartamentoValido(u.departamentoActivo),'Seleccione su departamento antes de crear una solicitud');
   const id = await transaccion(async db=>{
-    for(const l of lineas){const [stock]=await db.query('SELECT descripcion,iva FROM prov_inventario WHERE sede=? AND codigo=?',[sedeSolicitud,l.codigo]);if(stock[0]){l.descripcion=stock[0].descripcion;l.iva=Number(stock[0].iva);}}
+    const [articulos]=await db.query(`SELECT codigo,descripcion,iva FROM prov_inventario WHERE sede=? AND codigo IN (${codigos.map(()=>'?').join(',')})`,[sedeSolicitud,...codigos]);
+    const catalogo=new Map(articulos.map(a=>[a.codigo,a]));
+    const lineas=lineasCompra(solicitadas.map((l,i)=>{
+      const a=catalogo.get(codigos[i]);
+      exigir(a,`El artículo ${codigos[i]} no está en el inventario de Proveeduría de esta sede. Actualice la página y seleccione otro artículo`);
+      return {codigo:a.codigo,descripcion:a.descripcion,iva:Number(a.iva),cantidad:l.cantidad};
+    }));
     const [r]=await db.query("INSERT INTO prov_documentos (tipo,usuario_id,sede,datos) VALUES ('solicitud',?,?,?)",[u.id,sedeSolicitud,JSON.stringify({lineas,estado:'PENDIENTE',departamento:u.departamentoActivo,solicitante:u.nombre||u.usuario,motivo:String(req.body.motivo||'').trim().slice(0,2000)})]);
     await alerta(db,r.insertId,`Nueva solicitud PR-${r.insertId} de ${u.departamentoActivo} · ${u.nombre||u.usuario}`); return r.insertId;
   }); res.json({id});
