@@ -6,6 +6,7 @@ const {departamentosInicio}=require('../src/utils/inicioEmpresa');
 (async()=>{
   const app=express();app.set('view engine','ejs');app.set('views',path.join(__dirname,'../src/views'));
   app.use(express.static(path.join(__dirname,'../public')));
+  app.get('/login',(req,res)=>res.render('login',{error:null,next:'',departamento:'',departamentoNombre:''}));
   app.get('/',(req,res)=>{
     const user=req.query.perfil==='publico'?null:{nombre:'Alexandro Calderon',rol:'ADMIN',departamentos:req.query.perfil==='mecanico'?['TALLER']:['TALLER','OPERACIONES','CONTABILIDAD','ADMINISTRACION','PROVEEDURIA']};
     res.render('inicio_empresa',{user,departamentos:departamentosInicio(user),next:''});
@@ -29,6 +30,14 @@ const {departamentosInicio}=require('../src/utils/inicioEmpresa');
     await page.keyboard.press('Escape');assert.equal(await page.locator('.menu-toggle').getAttribute('aria-expanded'),'false');
     await page.goto(base+'/?perfil=publico');assert.equal(await page.locator('.department-entry form').count(),0);
     assert.ok(await page.locator('.department-entry a[href^="/login?"]').count()>0);
+    await page.setViewportSize({width:1440,height:960});await page.goto(base+'/login');
+    assert.equal(await page.locator('form[action="/login"]').first().locator('input[name="departamento"]').count(),0);
+    assert.equal(await page.getByText('Cambiar departamento').count(),0);
+    await page.locator('[data-toggle-password]').click();assert.equal(await page.locator('#login-clave').getAttribute('type'),'text');
+    await page.screenshot({path:path.join(__dirname,'../tmp/login-unico-desktop.png'),fullPage:true});
+    await page.setViewportSize({width:390,height:844});await page.goto(base+'/login');
+    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+    await page.screenshot({path:path.join(__dirname,'../tmp/login-unico-mobile.png'),fullPage:true});
     console.log('Inicio empresarial: desktop, movil, busqueda y permisos verificados.');
   } finally {await browser.close();await new Promise(resolve=>server.close(resolve));}
 })().catch(e=>{console.error(e);process.exitCode=1;});

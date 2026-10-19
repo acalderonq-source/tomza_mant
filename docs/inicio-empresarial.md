@@ -1,7 +1,9 @@
 # Inicio empresarial
 
-La entrada publica `/` presenta departamentos en barra lateral y abre el login
-del departamento elegido. Al autenticar, el destino normal es `/inicio`, no el
+La entrada publica `/` y `/login` muestran un unico login sin departamento previo.
+El formulario comun no envia ni requiere departamento; el servidor selecciona
+un area ya asignada al perfil, conservando la prioridad de base de datos.
+Al autenticar, el destino normal es `/inicio`, no el
 dashboard del ultimo departamento. Los enlaces profundos de trabajo mantienen
 su destino. Pantallas de TV siguen directamente al tablero; cambio obligatorio
 de clave mantiene prioridad. Carburacion conserva su sesion limitada a esa area.

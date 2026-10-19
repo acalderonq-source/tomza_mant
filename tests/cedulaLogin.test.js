@@ -16,6 +16,35 @@ test("normaliza cédulas escritas con espacios o guiones y valida identificadore
   assert.equal(cedulaValida(""), true);
 });
 
+test('el primer acceso es el login comun sin seleccion previa de departamento',async()=>{
+  await withLoginServer(async()=>[[]],async base=>{
+    for(const url of ['/', '/login', '/login?departamento=CONTABILIDAD']) {
+      const response=await fetch(base+url,{redirect:'manual'});
+      assert.equal(response.status,200);
+      const html=await response.text();
+      assert.ok(html.includes('Ingresá para acceder a tus departamentos autorizados.'));
+      assert.ok(!html.includes('Cambiar departamento'));
+      assert.ok(!html.includes('Departamento:'));
+      const form=html.split('action="/login"')[1].split('</form>')[0];
+      assert.ok(!form.includes('name="departamento"'));
+    }
+  });
+});
+
+test('login sin departamento solo utiliza un area previamente asignada',async()=>{
+  const pin_hash=await bcrypt.hash('123',4);
+  const user={id:31,usuario:'persona',rol:'TALLER',nombre:'Persona',sede:'Cartago',pin_hash};
+  let asignadas=[{departamento:'TALLER',es_principal:1}];
+  await withLoginServer(async sql=>sql.includes('FROM usuario_cedulas')?[[user]]:sql.includes('FROM usuario_departamentos')?[asignadas]:[[]],async base=>{
+    const login=()=>fetch(base+'/login',{method:'POST',redirect:'manual',body:new URLSearchParams({cedula:'123456789',pin:'123'})});
+    assert.equal((await login()).headers.get('location'),'/inicio');
+    asignadas=[];
+    const denied=await login();
+    assert.equal(denied.status,403);
+    assert.ok((await denied.text()).includes('Su cuenta no tiene acceso'));
+  });
+});
+
 async function withLoginServer(queryHandler, run, initialUser = null) {
   const originalQuery = pool.query;
   pool.query = async (sql,params) => {

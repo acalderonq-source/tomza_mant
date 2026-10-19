@@ -28,10 +28,7 @@ const loginLimiter = rateLimit({
 
 router.get("/", (req, res) => {
   if (req.session.user) return res.redirect("/inicio");
-  res.render("inicio_empresa", {
-    departamentos: departamentosInicio(null), user:null,
-    next: getSafeNextUrl(req.query.next)
-  });
+  res.render('login',{error:null,departamento:'',departamentoNombre:'',next:getSafeNextUrl(req.query.next)});
 });
 router.get('/inicio',(req,res)=>{
   const user=req.session.user;
@@ -46,11 +43,9 @@ router.get('/inicio',(req,res)=>{
  * MOSTRAR LOGIN
  */
 router.get("/login", (req, res) => {
-  const departamento = String(req.query.departamento || "").toUpperCase();
+  if(req.session.user)return res.redirect('/inicio');
+  const departamento = '';
   const next = getSafeNextUrl(req.query.next);
-  if (!esDepartamentoValido(departamento)) {
-    return res.redirect(`/?next=${encodeURIComponent(next)}`);
-  }
   res.render("login", {
     error: null,
     next,
@@ -71,8 +66,8 @@ router.post("/login", loginLimiter, limiteCuenta, async (req, res) => {
     const departamento = String(req.body.departamento || "").toUpperCase();
     const nextUrl = getSafeNextUrl(req.body.next);
 
-    if (!esDepartamentoValido(departamento)) {
-      return res.redirect(`/?next=${encodeURIComponent(nextUrl)}`);
+    if (departamento && !esDepartamentoValido(departamento)) {
+      return res.status(400).render('login',{error:'Departamento invalido.',next:nextUrl,departamento:'',departamentoNombre:''});
     }
 
     // Validación básica
@@ -231,6 +226,8 @@ async function iniciarSesion(req, res, user, departamento, nextUrl) {
       departmentRows.map(row => row.departamento),
       await esPropietarioAdministracion(user,pool)
     );
+    // El ingreso comun elige un area ya asignada; nunca concede permisos nuevos.
+    if(!departamento)departamento=departamentosPermitidos.find(esDepartamentoValido) || '';
     if (!departamentosPermitidos.includes(departamento)) {
       return res.status(403).render("login", {
         error: "Su cuenta no tiene acceso a ese departamento. Solicite la asignación a un administrador.",

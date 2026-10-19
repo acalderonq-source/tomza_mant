@@ -26,7 +26,7 @@
     </p>
 
     <div class="feature-row">
-      <span class="feature-pill"><%= departamentoNombre %></span>
+      <span class="feature-pill">Acceso interno</span>
       <span class="feature-pill">Herramientas de tu departamento</span>
       <span class="feature-pill">Gas Tomza</span>
     </div>
@@ -35,8 +35,7 @@
   <section class="login-card">
     <div class="login-card-header">
       <div class="access-label">ACCESO INTERNO</div><h2 class="login-title">Bienvenido de nuevo</h2>
-      <p class="login-subtitle">Departamento: <strong><%= departamentoNombre %></strong></p>
-      <a class="small" href="/?next=<%= encodeURIComponent(next || '') %>">Cambiar departamento</a>
+      <p class="login-subtitle">Ingresá para acceder a tus departamentos autorizados.</p>
     </div>
 
     <div class="login-card-body">
@@ -46,7 +45,6 @@
 
       <form method="POST" action="/login" class="d-grid gap-3">
         <input type="hidden" name="next" value="<%= typeof next !== 'undefined' ? next : '' %>">
-        <input type="hidden" name="departamento" value="<%= departamento %>">
         <div>
           <label class="form-label" for="login-identidad"><%= departamento==='ADMINISTRACION'?'Usuario':'Cédula o usuario' %></label>
           <input class="form-control" id="login-identidad" name="cedula" placeholder="<%= departamento==='ADMINISTRACION'?'Ingrese su usuario':'Ingrese su cédula o usuario' %>" autocomplete="username" required>
@@ -58,7 +56,7 @@
         <button class="btn btn-login">Ingresar al sistema <span aria-hidden="true">→</span></button>
       </form>
       <p class="mt-3"><a href="/solicitar-ingreso">Soy trabajador y necesito solicitar ingreso</a></p>
-      <% if (departamento === 'TALLER') { %>
+      <% if (!departamento || departamento === 'TALLER') { %>
         <details class="screen-access"><summary>Acceso para pantallas de taller</summary><div class="my-4 d-flex align-items-center gap-3 text-secondary" aria-hidden="true">
           <hr class="flex-grow-1 my-0"><span class="small">o</span><hr class="flex-grow-1 my-0">
         </div>
