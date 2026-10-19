@@ -1,0 +1,10 @@
+<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Correo de seguridad | Gas Tomza</title><link rel="stylesheet" href="/css/solicitudes-trabajadores.css"></head><body>
+<header><a href="/administracion">Administracion</a><strong>Correo de seguridad</strong><a href="/logout">Cerrar sesion</a></header><main>
+<nav><a href="/admin/ingresos">Registro de ingresos</a></nav><h1>Outlook para avisos de ingreso</h1>
+<% if(mensaje){ %><p class="aviso" role="status"><%= mensaje %></p><% } %>
+<p>Cuenta autorizada: <strong><%= esperado %></strong></p>
+<% if(!configurado){ %><p class="error">Configure MS_SEGURIDAD_CLIENT_ID y MS_SEGURIDAD_CLIENT_SECRET en Render.</p><% } else { %>
+<p><%= conectado ? 'Vinculado: '+conectado : 'Pendiente de autorizar en Microsoft.' %></p>
+<form method="post" action="/admin/ingresos/correo/conectar"><button type="submit"><%= conectado ? 'Volver a autorizar Outlook' : 'Vincular Outlook de seguridad' %></button></form>
+<p>Los avisos se envian automaticamente despues de autorizar. Facturas y DEKRA conservan sus remitentes.</p>
+<% } %></main></body></html>

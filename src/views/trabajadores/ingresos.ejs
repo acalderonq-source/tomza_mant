@@ -2,6 +2,8 @@
 <header><a href="/dashboard">Gas Tomza</a><strong>Registro de ingresos</strong><a href="/logout">Cerrar sesión</a></header><main>
 <nav><a href="/dashboard">Inicio</a><a href="/admin/ingresos/correos">Correos de trabajadores</a><a href="/admin/solicitudes-trabajadores">Solicitudes de ingreso</a></nav>
 <h1>Inicios de sesión del sistema interno</h1>
+<p><a href="/admin/ingresos/correo">Vincular Outlook de seguridad</a></p>
+<p>Con Outlook personal, autorice la cuenta en el enlace anterior. Si aparece OUTLOOK_NO_VINCULADO o OUTLOOK_REVINCULAR, vuelva a autorizar. OUTLOOK_PERMISO_DENEGADO indica que Microsoft no permite el envio.</p>
 <% if (mensaje) { %><p class="aviso" role="status"><%= mensaje %></p><% } %>
 <% if (!correoConfigurado) { %><p class="error" role="alert">Configure o habilite EMAIL_USER_SEGURIDAD y EMAIL_PASS_SEGURIDAD en Render. Los avisos de ingreso usan exclusivamente esa cuenta; no se enviarán desde facturas ni desde el remitente general.</p><% } else { %><p>Remitente de avisos: <strong><%= remitente %></strong></p><% } %>
 <form method="get" class="filtro"><label for="desde">Desde</label><input id="desde" name="desde" type="date" value="<%= filtros.desde %>" required><label for="hasta">Hasta</label><input id="hasta" name="hasta" type="date" value="<%= filtros.hasta %>" required><label for="buscar">Nombre o perfil</label><input id="buscar" name="buscar" maxlength="100" value="<%= filtros.buscar %>"><button type="submit">Filtrar</button></form>

@@ -16,6 +16,29 @@ function crearRouter(db) {
   const router = express.Router();
   const wrap = fn => (req,res,next) => Promise.resolve(fn(req,res,next)).catch(next);
   router.use(requireAdministracion(db));
+  const outlook = require('../utils/seguridadOutlook');
+  router.get('/correo',wrap(async(req,res)=>{
+    const conectado = outlook.configurado() ? await outlook.estado(db) : '';
+    const mensaje=req.session.ingresoMensaje || ''; delete req.session.ingresoMensaje;
+    res.render('trabajadores/seguridad_outlook',{configurado:outlook.configurado(),conectado,esperado:outlook.esperado(),mensaje});
+  }));
+  router.post('/correo/conectar',wrap(async(req,res)=>{
+    const url = await outlook.iniciar(req.session);
+    await new Promise((resolve,reject)=>req.session.save(e=>e?reject(e):resolve()));
+    res.redirect(303,url);
+  }));
+  router.get('/correo/callback',wrap(async(req,res)=>{
+    try {
+      const auth = outlook.consumirEstado(req.session,req.query.state);
+      await new Promise((resolve,reject)=>req.session.save(e=>e?reject(e):resolve()));
+      await outlook.conectar(db,auth,req.query.code);
+      req.session.ingresoMensaje='Outlook vinculado. Los siguientes avisos se enviaran automaticamente; puede reintentar los anteriores desde el registro.';
+    } catch (error) {
+      console.error('Vinculacion Outlook seguridad:', /^[A-Z_]+$/.test(error.code || '') ? error.code : 'AUTORIZACION_FALLIDA');
+      req.session.ingresoMensaje='No se pudo vincular. Inicie sesion con '+outlook.esperado()+', acepte Mail.Send y revise el secreto y la URI de retorno en Azure y Render.';
+    }
+    res.redirect(303,'/admin/ingresos/correo');
+  }));
   router.get('/',wrap(async(req,res)=>{
     const filtros=filtrosIngreso(req.query);
     const [ingresos]=await db.query(`SELECT id,nombre,usuario,rol,departamento,sede,ip,dispositivo,correo_destino,correo_estado,intentos,error_codigo,creado_en,enviado_en
