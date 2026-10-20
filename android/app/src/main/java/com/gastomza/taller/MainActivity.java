@@ -1,6 +1,9 @@
 package com.gastomza.taller;
 
 import android.app.Activity;
+import android.Manifest;
+import android.content.pm.PackageManager;
+import android.webkit.PermissionRequest;
 import android.content.ActivityNotFoundException;
 import android.content.Intent;
 import android.graphics.Bitmap;
@@ -28,6 +31,8 @@ import java.util.Locale;
 
 public class MainActivity extends Activity {
     private static final int FILE_CHOOSER_REQUEST = 20;
+    private static final int CAMERA_PERMISSION_REQUEST = 21;
+    private PermissionRequest pendingCameraRequest;
 
     private WebView webView;
     private ProgressBar progressBar;
@@ -69,6 +74,10 @@ public class MainActivity extends Activity {
 
             @Override
             public void onPageStarted(WebView view, String url, Bitmap favicon) {
+                if (pendingCameraRequest != null) {
+                    pendingCameraRequest.deny();
+                    pendingCameraRequest = null;
+                }
                 progressBar.setVisibility(View.VISIBLE);
             }
 
@@ -79,6 +88,31 @@ public class MainActivity extends Activity {
         });
 
         webView.setWebChromeClient(new WebChromeClient() {
+            @Override
+            public void onPermissionRequest(PermissionRequest request) {
+                if (!isTrustedCameraOrigin(request.getOrigin()) ||
+                    request.getResources().length != 1 ||
+                    !PermissionRequest.RESOURCE_VIDEO_CAPTURE.equals(request.getResources()[0])) {
+                    request.deny();
+                    return;
+                }
+                if (pendingCameraRequest != null) {
+                    request.deny();
+                    return;
+                }
+                if (checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
+                    request.grant(new String[]{PermissionRequest.RESOURCE_VIDEO_CAPTURE});
+                } else {
+                    pendingCameraRequest = request;
+                    requestPermissions(new String[]{Manifest.permission.CAMERA}, CAMERA_PERMISSION_REQUEST);
+                }
+            }
+
+            @Override
+            public void onPermissionRequestCanceled(PermissionRequest request) {
+                if (pendingCameraRequest == request) pendingCameraRequest = null;
+            }
+
             @Override
             public boolean onShowFileChooser(WebView view, ValueCallback<Uri[]> filePathCallback, FileChooserParams fileChooserParams) {
                 if (uploadCallback != null) {
@@ -106,6 +140,36 @@ public class MainActivity extends Activity {
         return true;
     }
 
+    private boolean isTrustedCameraOrigin(Uri origin) {
+        return origin != null && "https".equals(origin.getScheme()) &&
+            "tomza-mant.onrender.com".equals(origin.getHost()) &&
+            (origin.getPort() == -1 || origin.getPort() == 443);
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode != CAMERA_PERMISSION_REQUEST || pendingCameraRequest == null) return;
+        PermissionRequest request = pendingCameraRequest;
+        pendingCameraRequest = null;
+        if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED &&
+            isTrustedCameraOrigin(request.getOrigin()) &&
+            isTrustedCameraOrigin(Uri.parse(webView.getUrl() == null ? "" : webView.getUrl()))) {
+            request.grant(new String[]{PermissionRequest.RESOURCE_VIDEO_CAPTURE});
+        } else {
+            request.deny();
+        }
+    }
+
+    @Override
+    protected void onDestroy() {
+        if (pendingCameraRequest != null) {
+            pendingCameraRequest.deny();
+            pendingCameraRequest = null;
+        }
+        super.onDestroy();
+    }
+
     private void openFileChooser(WebChromeClient.FileChooserParams params) {
         Intent contentIntent = params.createIntent();
         Intent cameraIntent = null;
@@ -124,7 +188,7 @@ public class MainActivity extends Activity {
         Intent chooser = new Intent(Intent.ACTION_CHOOSER);
         chooser.putExtra(Intent.EXTRA_INTENT, contentIntent);
         chooser.putExtra(Intent.EXTRA_TITLE, "Seleccionar archivo");
-        if (cameraIntent != null) {
+        if (cameraIntent != null && checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
             chooser.putExtra(Intent.EXTRA_INITIAL_INTENTS, new Intent[]{cameraIntent});
         }
 

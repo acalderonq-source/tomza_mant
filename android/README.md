@@ -2,6 +2,14 @@
 
 ## APK para celulares
 
+La version movil 1.1.0 solicita permiso CAMERA de Android al iniciar la camara
+en vivo. WebView autoriza unicamente VIDEO_CAPTURE desde el origen HTTPS
+tomza-mant.onrender.com, nunca microfono ni otros dominios. Cancelar, navegar
+o destruir la actividad descarta solicitudes pendientes.
+Instale GasTomza-Android-v1.1.apk sobre la version anterior. Los cambios nativos
+no llegan mediante Render. Si Android ya bloqueo el permiso, habilite Camara
+desde Ajustes > Aplicaciones > Gas Tomza > Permisos y vuelva a intentar.
+
 La variante `movil` se instala como Gas Tomza, con paquete
 `com.gastomza.taller.movil`, independiente de Tomza Pantalla. Abre el
 dashboard del servidor y permite la orientacion del dispositivo.
