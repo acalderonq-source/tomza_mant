@@ -45,10 +45,10 @@ test("administra carnets y no expone el hash del PIN", async () => {
     assert.match(html, /PIN \/ código de trabajador/);
     assert.match(html, /data:image\/png;base64,/);
     assert.match(html, new RegExp(`data-token="${token}"`));
-    assert.match(html, /Crear acceso y carnet/);
+    assert.match(html, /Crear carnet con acceso existente/);
     assert.match(html, /Ver carnet/);
     assert.match(html, /Buscar por nombre, cédula o código de trabajador/);
-    assert.match(html, /Jefatura de Taller/);
+    assert.doesNotMatch(html, /Jefatura de Taller|name="usuario_ids"/);
     assert.doesNotMatch(html, /pin_hash/i);
   });
 });
