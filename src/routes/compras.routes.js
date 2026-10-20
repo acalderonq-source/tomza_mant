@@ -39,6 +39,7 @@ function allowRoles(...roles) {
   return (req, res, next) => {
     if (!req.session.user) return res.redirect("/login");
     if (roles.includes(req.session.user.rol)) return next();
+    if (require('../utils/permisosPorDepartamento').consultaTaller(req.session.user) && require('../utils/permisosPorDepartamento').consultaCompras(req.originalUrl.split('?')[0],req.method)) return next();
     return res.status(403).send("No autorizado");
   };
 }

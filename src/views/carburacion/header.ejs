@@ -4,7 +4,7 @@
 <body class="bg-light">
 <%
 const currentPath=typeof carburacionPath==='string'?carburacionPath:'';
-const enlaces=[['Inicio','/carburacion/dashboard'],['Estaciones','/carburacion/estaciones'],['Órdenes','/carburacion/ordenes'],['Proveedores','/carburacion/proveedores'],['Clientes','/carburacion/clientes'],['Facturas','/carburacion/facturas'],['Historial de pagos','/carburacion/facturas/historial-pagos']];
+const enlaces=[['Inicio','/carburacion/dashboard'],['Estaciones','/carburacion/estaciones'],['Órdenes','/carburacion/ordenes'],['Proveedores','/carburacion/proveedores'],['Clientes','/carburacion/clientes'],['Facturas','/carburacion/facturas'],['Historial de pagos','/carburacion/facturas/historial-pagos']].filter(([,url])=>user.accesoPersonal?.perfil!=='CARBURACION_SIN_FINANZAS' || !/^\/carburacion\/(ordenes|facturas)(\/|$)/.test(url));
 if(typeof user!=='undefined' && user.rol==='ADMIN')enlaces.push(['Carnets','/admin/carnets-trabajadores']);
 const activo=url=>url==='/carburacion/facturas'?currentPath.startsWith(url) && !currentPath.startsWith('/carburacion/facturas/historial-pagos'):currentPath===url || currentPath.startsWith(url+'/');
 %>

@@ -49,6 +49,7 @@ function esRutaSuministrosSeguridad(ruta,metodo='GET'){
     || (metodo==='POST' && (ruta==='/proveeduria/solicitudes' || /^\/proveeduria\/salidas\/\d+\/aceptar$/.test(ruta)));
 }
 function puedeAcceder(config,ruta,metodo){
+  if(config.perfil==='CARBURACION_SIN_FINANZAS' && esRutaSuministrosSeguridad(ruta,metodo))return true;
   if (config.departamento==='TALLER' && coincide(ruta,'/marcas-ingreso')) return true; // El modulo exige ademas su lista privada de cuentas.
   if (['GET','HEAD'].includes(metodo) && (ruta==='/inicio/noticias' || /^\/inicio\/noticias\/[1-9]\d*\/imagen$/.test(ruta))) return true;
   if(['SEGURIDAD_OCUPACIONAL','RECURSOS_HUMANOS','OPERACIONES'].includes(config.departamento) && esRutaSuministrosSeguridad(ruta,metodo)){
@@ -56,6 +57,8 @@ function puedeAcceder(config,ruta,metodo){
     return permiso==='GESTION' || (permiso==='LECTURA' && ['GET','HEAD'].includes(metodo));
   }
   if(['/','/inicio','/dashboard','/logout','/login','/login/perfil','/cambiar-clave','/departamento/activo','/cambiar-sede'].includes(ruta))return true;
+  const especial=require('./permisosPorDepartamento').permisoEspecial(config,ruta,metodo);
+  if(especial!==null)return especial;
   let elegido=null,longitud=0;
   for(const m of MODULOS)for(const p of m.rutas)if(coincide(ruta,p) && p.length>longitud){elegido=m;longitud=p.length;}
   if(!elegido || !elegido.areas.includes(config.departamento))return false;
@@ -72,9 +75,16 @@ function controlarAccesosPersonales(db){return async(req,res,next)=>{
       if(!/^acceso_\d{9,12}$/.test(user.usuario || '')){delete user.accesoPersonal;return next();}
       return res.status(403).send('Este acceso no tiene permisos configurados. Contacte a Administracion.');
     }
-    const config=JSON.parse(rows[0].config_json);
+    const raiz=JSON.parse(rows[0].config_json);
+    const {areasConfiguradas,configDepartamento}=require('./permisosPorDepartamento');
+    const areas=areasConfiguradas(raiz);
+    if(areas.some(a=>!AREAS[a]))throw Error('CONFIG_INVALIDA');
+    const config=configDepartamento(raiz,user.departamentoActivo);
+    if(!config)return res.status(403).send('No tiene permiso para ingresar a este departamento.');
     if(!AREAS[config.departamento] || !config.permisos || typeof config.permisos!=='object')throw Error('CONFIG_INVALIDA');
-    user.accesoPersonal=config;user.departamentos=[config.departamento];
+    user.departamentos=areas;
+    if(config.conservarPerfil===true){delete user.accesoPersonal;return next();}
+    user.accesoPersonal=config;
     if(user.departamentoActivo!==config.departamento || !puedeAcceder(config,req.path,req.method))return res.status(403).send('No tiene permiso para ingresar o realizar esta accion.');
     return next();
   }catch(e){console.error('Permisos personales:',e.code || 'ERROR');return res.status(503).send('No se pudieron verificar sus permisos. Intente nuevamente.');}

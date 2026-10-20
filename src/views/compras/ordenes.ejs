@@ -23,10 +23,11 @@
   <%
     const rolesGestionCompras = ['ADMIN', 'TALLER', 'PROVEEDURIA_TALLER'];
     const rolesMensajeroFacturas = ['MENSAJERO', 'MENSAJERIA', 'MENSAJERO_FACTURAS'];
-    const puedeModificarCompras = rolesGestionCompras.includes(user.rol);
+    const consultaLimitada=user.accesoPersonal?.perfil==='TALLER_COMPRAS_LECTURA';
+    const puedeModificarCompras = !consultaLimitada && rolesGestionCompras.includes(user.rol);
     const esMensajero = rolesMensajeroFacturas.includes(user.rol);
     const puedeRegistrarFacturaOrden = puedeModificarCompras || esMensajero;
-    const puedeVerFacturas = ['ADMIN', 'TALLER', 'PROVEEDURIA_TALLER', 'CONTABILIDAD'].includes(user.rol);
+    const puedeVerFacturas = consultaLimitada || ['ADMIN', 'TALLER', 'PROVEEDURIA_TALLER', 'CONTABILIDAD'].includes(user.rol);
     const puedeDescargarReporte = !esMensajero;
     const reporteParams = new URLSearchParams();
     if (filtros.proveedor_id) reporteParams.set('proveedor_id', filtros.proveedor_id);

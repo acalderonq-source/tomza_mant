@@ -44,7 +44,7 @@ function canViewUploads(user, urlPath) {
 
   return Boolean(
     access &&
-    access.roles.has(role) &&
+    (access.roles.has(role) || require('../utils/permisosPorDepartamento').consultaTaller(user)) &&
     puedeAbrirRutaPorDepartamento(department, access.route)
   );
 }

@@ -21,9 +21,13 @@ router.use('/clientes',require('./carburacionClientes.routes'));
 router.use(require('./carburacionFacturas.routes'));
 
 router.get('/', (_req, res) => res.redirect('/carburacion/dashboard'));
-router.get('/dashboard', wrap(async (_req, res) => {
+router.get('/dashboard', wrap(async (req, res) => {
   const hoy = fechaActualCostaRica();
   const inicioMes = `${hoy.slice(0, 7)}-01`;
+  if(require('../utils/permisosPorDepartamento').carburacionOperativa(req.session.user)) {
+    const [[proveedores]]=await pool.query('SELECT COUNT(*) total FROM carburacion_proveedores');
+    return res.render('carburacion/dashboard',{resumen:{},cantidadProveedores:proveedores.total,montos:[],recientes:[],hoy});
+  }
   const [resumen, proveedores, montos, recientes] = await Promise.all([
     pool.query(`SELECT COUNT(*) total, COALESCE(SUM(fecha BETWEEN ? AND ?),0) mes,
       COALESCE(SUM(estado='BORRADOR'),0) borradores FROM carburacion_ordenes WHERE eliminado_en IS NULL`, [inicioMes,hoy]),

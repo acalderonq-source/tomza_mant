@@ -2356,6 +2356,7 @@ router.get("/", async (req, res) => {
     try { res.locals.marcasTaller = await require('../utils/marcasIngreso').permisosMarcas(pool, req.session.user); }
     catch (e) { res.locals.marcasTaller = { marcar: false, consultar: false }; console.warn('Acceso a marcas no disponible:', e.code || 'ERROR'); }
     if(req.session.user.accesoPersonal){
+      if(require('../utils/permisosPorDepartamento').carburacionOperativa(req.session.user))return res.redirect('/carburacion/dashboard');
       const config=req.session.user.accesoPersonal;
       const modulos=require('../utils/accesosTrabajador').MODULOS.filter(m=>config.permisos[m.id] && m.url && m.areas.includes(config.departamento));
       if (res.locals.marcasTaller.marcar || res.locals.marcasTaller.consultar) modulos.push({id:'MARCAS_INGRESO',nombre:res.locals.marcasTaller.marcar?'Marcas de ingreso':'Historial de marcas',url:'/marcas-ingreso',permiso:res.locals.marcasTaller.marcar?'Registrar entrada y salida':'Consultar marcas y fotos'});
