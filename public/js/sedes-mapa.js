@@ -3,8 +3,16 @@ document.addEventListener('DOMContentLoaded',()=>{
   if(!container)return;
   const status=document.getElementById('mapa-estado');
   if(!window.L){status.textContent='No se pudo cargar el mapa. Puede abrir la ubicacion con el enlace inferior.';return;}
-  // Coordenadas proporcionadas por el usuario en el enlace de Bing; sede confirmada como Cartago.
-  const sedes=[{nombre:'Cartago',empresa:'Gas Tomza de Costa Rica S.A.',lat:9.877662658691406,lng:-83.94295501708984,fotos:[]}];
+  // Puntos enviados por el usuario; fuentes y precision en docs/mapa-sedes.md.
+  const sedes=[
+    {nombre:'Cartago',empresa:'Gas Tomza de Costa Rica S.A.',lat:9.877662658691406,lng:-83.94295501708984,direccion:'bottom',fotos:[]},
+    {nombre:'La Cruz',empresa:'Planta La Cruz',lat:10.9556471,lng:-85.6148776,enlace:'https://maps.app.goo.gl/L9V28aBZcqjKmWNe7',fotos:[]},
+    {nombre:'Orotina',empresa:'Cedi Orotina',lat:9.8928466,lng:-84.645024,direccion:'left',enlace:'https://maps.app.goo.gl/z2LXXTwBxCKScfuN9',fotos:[]},
+    {nombre:'Alajuela',empresa:'Planta Alajuela',lat:9.9976714,lng:-84.2403176,direccion:'top',enlace:'https://maps.app.goo.gl/uQgUmrAsLabLxYTH8',fotos:[]},
+    {nombre:'Guápiles',empresa:'Cedi Guápiles',lat:10.2024713,lng:-83.77406,enlace:'https://maps.app.goo.gl/Jyk7kmjFGqFEVRuc8',fotos:[]},
+    {nombre:'Río Claro',empresa:'Cedi Río Claro',lat:8.6695875,lng:-83.060390625,enlace:'https://maps.app.goo.gl/RTwF4WoedG7FPfbRA',fotos:[]},
+    {nombre:'Nicoya',empresa:'Cedi Nicoya',lat:10.1614089,lng:-85.4533432,direccion:'left',enlace:'https://maps.app.goo.gl/efaT7b1NZMkSM9zn9',fotos:[]}
+  ];
   const map=L.map(container,{scrollWheelZoom:false,zoomControl:false,fadeAnimation:false,zoomAnimation:false,minZoom:6,maxZoom:11,zoomSnap:.25,zoomDelta:.5});
   const stage=container.closest('.sedes-map-stage');
   const detalle=document.getElementById('sede-detalle'),foto=document.getElementById('sede-foto');
@@ -26,6 +34,11 @@ document.addEventListener('DOMContentLoaded',()=>{
   document.getElementById('sede-foto-siguiente').addEventListener('click',()=>{if(seleccion?.fotos.length){indice=(indice+1)%seleccion.fotos.length;mostrarFoto();}});
   const seleccionar=(sede,marker)=>{
     cancelarAcercamiento();map.closePopup();seleccion=sede;indice=0;detalle.hidden=false;
+    marcadores.forEach((m,i)=>m.getElement()?.classList.toggle('sede-seleccionada',sedes[i]===sede));
+    document.getElementById('mapa-sede').value=String(sedes.indexOf(sede));
+    const ubicacion=document.querySelector('.sedes-footer>a');
+    ubicacion.href=sede.enlace || 'https://www.google.com/maps/dir/?api=1&destination='+sede.lat+','+sede.lng;
+    ubicacion.setAttribute('aria-label','Ver ubicación de '+sede.nombre);
     document.getElementById('sede-detalle-titulo').textContent=sede.nombre;mostrarFoto();
     if(window.matchMedia('(prefers-reduced-motion: reduce)').matches || (map.getZoom()===10 && map.getCenter().distanceTo([sede.lat,sede.lng])<5)){
       map.setView([sede.lat,sede.lng],10,{animate:false});marker.openPopup();return;
@@ -67,12 +80,18 @@ document.addEventListener('DOMContentLoaded',()=>{
     const br=document.createElement('br'),link=document.createElement('a');
     link.textContent='Como llegar';link.href='https://www.google.com/maps/dir/?api=1&destination='+sede.lat+','+sede.lng;
     link.target='_blank';link.rel='noopener noreferrer';content.append(name,company,br,link);
-    const icon=L.divIcon({className:'tomza-map-marker sede-seleccionada',html:'<span class="sede-mapa-punto"></span>',iconSize:[20,20],iconAnchor:[10,10],popupAnchor:[0,-14]});
-    const marker=L.marker([sede.lat,sede.lng],{icon,title:'Gas Tomza Cartago',alt:'Sede Gas Tomza Cartago'})
-      .addTo(map).bindTooltip(sede.nombre,{className:'tomza-map-label',permanent:true,direction:'right',offset:[22,0]}).bindPopup(content,{className:'tomza-popup',maxWidth:260});
+    const icon=L.divIcon({className:'tomza-map-marker'+(sede===sedes[0]?' sede-seleccionada':''),html:'<span class="sede-mapa-punto"></span>',iconSize:[20,20],iconAnchor:[10,10],popupAnchor:[0,-14]});
+    const direccion=sede.direccion || 'right';
+    const offset={left:[-15,0],right:[22,0],top:[0,-16],bottom:[0,14]}[direccion];
+    const marker=L.marker([sede.lat,sede.lng],{icon,title:'Gas Tomza '+sede.nombre,alt:'Sede Gas Tomza '+sede.nombre})
+      .addTo(map).bindTooltip(sede.nombre,{className:'tomza-map-label',permanent:true,direction:direccion,offset}).bindPopup(content,{className:'tomza-popup',maxWidth:260});
     marker.on('click',()=>seleccionar(sede,marker));
     return marker;
   });
+  const selector=document.getElementById('mapa-sede');
+  sedes.forEach((sede,i)=>{const option=document.createElement('option');option.value=String(i);option.textContent=sede.empresa;selector.append(option);});
+  selector.disabled=false;
+  selector.addEventListener('change',()=>{const i=Number(selector.value);if(selector.value!==''&&sedes[i])seleccionar(sedes[i],marcadores[i]);});
   ['mapa-pais','mapa-cartago','mapa-acercar','mapa-alejar'].forEach(id=>{document.getElementById(id).disabled=false;});
   document.getElementById('mapa-acercar').addEventListener('click',()=>map.zoomIn());
   document.getElementById('mapa-alejar').addEventListener('click',()=>map.zoomOut());
