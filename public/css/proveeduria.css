@@ -1,1 +1,12 @@
 body{background:#f4f6f9;color:#1f2937}.card{border:0;border-radius:14px;box-shadow:0 2px 12px #00000012}h1{font-size:2rem}h2{font-size:1.4rem}h3{font-size:1.15rem}h4{font-size:1.05rem}label{display:block;width:100%;margin-bottom:10px}.table thead th{background:#1f4e79;color:white}.prov-lineas input{min-width:85px}.prov-lineas .descripcion{min-width:210px}section{scroll-margin-top:15px}summary{list-style:none}input,select{padding:6px;border:1px solid #ccd2dc;border-radius:5px}button{white-space:normal}article p{overflow-wrap:anywhere}
+
+@media(max-width:767px){
+  [data-solicitud-inventario] .prov-lineas thead{display:none}
+  [data-solicitud-inventario] .prov-lineas tbody{display:block}
+  [data-solicitud-inventario] .prov-lineas tr{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px;margin-bottom:14px;padding:12px;border:1px solid #dbe2ea;border-radius:8px}
+  [data-solicitud-inventario] .prov-lineas td{display:block;padding:0;border:0;min-width:0}
+  [data-solicitud-inventario] .prov-lineas td:nth-child(-n+2),[data-solicitud-inventario] .prov-lineas td:last-child{grid-column:1/-1}
+  [data-solicitud-inventario] .prov-lineas td:last-child{text-align:right}
+  [data-solicitud-inventario] .prov-lineas td[data-label]::before{content:attr(data-label);display:block;font-size:.8rem;font-weight:600;margin-bottom:4px}
+  [data-solicitud-inventario] .prov-lineas input{min-width:0}
+}

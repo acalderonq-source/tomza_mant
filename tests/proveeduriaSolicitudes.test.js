@@ -132,3 +132,31 @@ test('solicitudes solo admiten artículos existentes de la sede y toman sus dato
     assert.equal(guardadas.length,1);assert.equal(alertas.length,1);
   });}finally{pool.query=originalQuery;pool.getConnection=originalConnection;}
 });
+
+
+test('categorías: admite pedidos mixtos y rechaza productos inventados o categorías ajenas sin guardar ni alertar',async()=>{
+  const {articulosSolicitud}=require('../src/utils/proveeduriaSolicitable');
+  const externo=articulosSolicitud.find(a=>a.categoria==='Técnicos');
+  const originalQuery=pool.query,originalConnection=pool.getConnection;
+  const guardadas=[],alertas=[];
+  async function query(sql,args=[]){
+    if(sql.startsWith('SELECT codigo,descripcion,iva FROM prov_inventario'))return [[...args.slice(1).filter(c=>c==='PAPEL').map(c=>({codigo:c,descripcion:'Papel oficial',iva:13}))]];
+    if(sql.startsWith('SELECT codigo,categoria FROM prov_inventario_fichas'))return [[{codigo:'PAPEL',categoria:'Oficina'}]];
+    if(sql.startsWith('INSERT INTO prov_documentos')){guardadas.push(JSON.parse(args[2]));return [{insertId:guardadas.length}];}
+    if(sql.startsWith('INSERT INTO prov_alertas'))alertas.push(args);
+    return [[]];
+  }
+  pool.query=query;pool.getConnection=async()=>({query,beginTransaction:async()=>{},commit:async()=>{},rollback:async()=>{},release(){}});
+  const post=lineas=>({method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sede:'Cartago',lineas})});
+  try{await server(requester,async base=>{
+    const lineas=[{codigo:'PAPEL',categoria:'Oficina',cantidad:1,descripcion:'Inventado'},{codigo:externo.codigo,categoria:externo.categoria,cantidad:2}];
+    assert.equal((await fetch(base+'/solicitudes',post(lineas))).status,200);
+    assert.deepEqual(guardadas[0].lineas.map(l=>[l.codigo,l.categoria]),[['PAPEL','Oficina'],[externo.codigo,'Técnicos']]);
+    assert.equal(guardadas[0].lineas[0].descripcion,'Papel oficial');
+    assert.equal(guardadas[0].lineas[1].inventariable,false);
+    for(const incorrectas of [[{codigo:'PAPEL',categoria:'Limpieza',cantidad:1}],[{codigo:externo.codigo,categoria:'Oficina',cantidad:1}],[{codigo:'PAPEL',categoria:'Nueva categoría',cantidad:1}],[{codigo:'PAPEL',categoria:'',cantidad:1}],[{codigo:'INVENTADO',categoria:'Oficina',cantidad:1}]]){
+      assert.equal((await fetch(base+'/solicitudes',post(incorrectas))).status,400);
+    }
+    assert.equal(guardadas.length,1);assert.equal(alertas.length,1);
+  });}finally{pool.query=originalQuery;pool.getConnection=originalConnection;}
+});
