@@ -55,12 +55,12 @@
   const puedeVerAires = !esMecanicoLimitado && ['ADMIN', 'TALLER', 'PROVEEDURIA_TALLER', 'MECANICO'].includes(user.rol) && areaTaller;
   const puedeVerRevisionRuta = (esMecanicoLimitado || ['ADMIN', 'TALLER', 'PROVEEDURIA_TALLER', 'MECANICO', 'SUPERVISOR', 'SUPERVISOR_PESADO'].includes(user.rol)) && (esAdminDashboard ? areaOperaciones : (areaTaller || areaOperaciones));
   const puedeVerGiras = !esMecanicoLimitado && ['ADMIN', 'TALLER', 'PROVEEDURIA_TALLER', 'MECANICO', 'SUPERVISOR', 'SUPERVISOR_PESADO'].includes(user.rol) && (esAdminDashboard ? areaOperaciones : (areaTaller || areaOperaciones));
-  const puedeVerDashboardTaller = (esMecanicoLimitado || ['ADMIN', 'TALLER', 'PROVEEDURIA_TALLER', 'MECANICO', 'SUPERVISOR', 'SUPERVISOR_PESADO'].includes(user.rol)) && areaTaller;
+  const puedeVerDashboardTaller = !esMecanicoLimitado && ['ADMIN', 'TALLER', 'PROVEEDURIA_TALLER', 'SUPERVISOR', 'SUPERVISOR_PESADO'].includes(user.rol) && areaTaller;
   const puedeVerLogisticaTaller = !esMecanicoLimitado && ['ADMIN', 'TALLER', 'MECANICO', 'PROVEEDURIA_TALLER'].includes(user.rol) && areaTaller;
-  const puedeVerLavadoUnidades = (esMecanicoLimitado || ['ADMIN', 'TALLER', 'PROVEEDURIA_TALLER', 'MECANICO', 'SUPERVISOR', 'SUPERVISOR_PESADO'].includes(user.rol)) && (esAdminDashboard ? areaOperaciones : (areaTaller || areaOperaciones));
+  const puedeVerLavadoUnidades = !esMecanicoLimitado && ['ADMIN', 'TALLER', 'PROVEEDURIA_TALLER', 'SUPERVISOR', 'SUPERVISOR_PESADO'].includes(user.rol) && (esAdminDashboard ? areaOperaciones : (areaTaller || areaOperaciones));
   const puedeVerKpisMecanicos = !esMecanicoLimitado && ['ADMIN', 'TALLER', 'PROVEEDURIA_TALLER'].includes(user.rol) && areaTaller;
   const puedeVerOrdenesMotor = !esMecanicoLimitado && ['ADMIN', 'TALLER', 'PROVEEDURIA_TALLER'].includes(user.rol) && areaTaller;
-  const puedeVerResumenEjecutivo = areaTaller && (esMecanicoLimitado || ['ADMIN', 'TALLER', 'PROVEEDURIA_TALLER'].includes(user.rol));
+  const puedeVerResumenEjecutivo = !esMecanicoLimitado && areaTaller && ['ADMIN', 'TALLER', 'PROVEEDURIA_TALLER'].includes(user.rol);
   const puedeVerRepuestos = !esMecanicoLimitado && (
     ['ADMIN', 'TALLER', 'PROVEEDURIA_TALLER', 'PROVEEDURIA', 'SUPERVISOR_PESADO', 'BODEGUERO', 'BODEGA', 'MENSAJERO', 'MENSAJERIA', 'MENSAJERO_FACTURAS'].includes(user.rol)
     || usuarioDashboardLower === 'pesados'
@@ -195,7 +195,7 @@
       <div class="priority-panel">
         <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap mb-2">
           <h2 class="section-title mb-0"><i class="bi bi-exclamation-octagon text-danger"></i> Prioridades activas de taller</h2>
-          <a href="/taller/dashboard" class="btn btn-sm btn-outline-dark py-0">Abrir panel</a>
+          <% if (puedeVerDashboardTaller) { %><a href="/taller/dashboard" class="btn btn-sm btn-outline-dark py-0">Abrir panel</a><% } %>
         </div>
         <% if (!prioridadesLista.length) { %>
           <div class="empty-state">No hay prioridades pendientes activas para hoy.</div>

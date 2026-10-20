@@ -251,6 +251,7 @@ app.use(async (req, _res, next) => {
 });
 
 app.use(controlarAccesoPorDepartamento);
+app.use(require('./middleware/modulosMecanicos').restringirModulosMecanicos);
 app.use(require("./utils/usuariosPantalla").restringirCuentaPantalla);
 app.use(require('./utils/operacionesEmpresa').protegerOperaciones(pool));
 
