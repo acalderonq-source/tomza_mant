@@ -112,8 +112,21 @@ async function getAccessToken(connection) {
   return token.accessToken;
 }
 
+async function graphResponse(url, accessToken) {
+  for(let intento=0;intento<3;intento++){
+    let response;
+    try{response=await fetch(url,{headers:{Authorization:`Bearer ${accessToken}`},signal:AbortSignal.timeout(30000)});}
+    catch(e){if(intento===2)throw e;continue;}
+    if(![429,502,503,504].includes(response.status)||intento===2)return response;
+    const segundos=Number(response.headers.get('Retry-After'));
+    const espera=Number.isFinite(segundos)&&segundos>0?segundos*1000:1000*(intento+1);
+    if(espera>5000)return response;
+    await response.arrayBuffer();
+    await new Promise(resolve=>setTimeout(resolve,espera));
+  }
+}
 async function graphGet(url, accessToken) {
-  const response = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
+  const response = await graphResponse(url,accessToken);
   if (!response.ok) {
     const detail = await response.text();
     const error = new Error(`Microsoft Graph respondió ${response.status}.`);
@@ -125,7 +138,7 @@ async function graphGet(url, accessToken) {
 }
 
 async function graphGetBytes(url, accessToken) {
-  const response = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
+  const response = await graphResponse(url,accessToken);
   if (!response.ok) {
     const error = new Error(`Microsoft Graph respondió ${response.status} al descargar un adjunto.`);
     error.status = response.status;
@@ -371,3 +384,5 @@ module.exports.encryptCache = encryptCache;
 module.exports.decryptCache = decryptCache;
 module.exports.syncInbox = syncInbox;
 module.exports.synchronizeMailbox = synchronizeMailbox;
+// Cliente compartido para las descargas de facturas de Contabilidad.
+module.exports.outlook = { configReady, getConnection, getAccessToken, graphGet, graphGetBytes };

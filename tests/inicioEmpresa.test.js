@@ -27,7 +27,7 @@ test('Cambio de departamento rechaza POST manipulado, permiso revocado y fallos 
   const original=db.query;
   db.query=async()=>{if(fallar)throw Error('offline');return [areas.map(departamento=>({departamento}))];};
   const app=express();app.use(express.urlencoded({extended:true}));
-  app.use((req,res,next)=>{req.session={user};next();});app.use(router);
+  app.use((req,res,next)=>{req.session={user,save:callback=>callback()};next();});app.use(router);
   const server=await new Promise(resolve=>{const s=app.listen(0,'127.0.0.1',()=>resolve(s));});
   const base='http://127.0.0.1:'+server.address().port;
   const post=departamento=>fetch(base+'/departamento/activo',{method:'POST',redirect:'manual',body:new URLSearchParams({departamento})});

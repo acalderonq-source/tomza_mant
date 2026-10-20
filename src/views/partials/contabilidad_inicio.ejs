@@ -4,15 +4,11 @@
 ['Visión financiera','Presupuesto y documentos de respaldo',[
 ['/contabilidad/presupuestos/resumen-ejecutivo','Resumen ejecutivo','Indicadores, empresas, rubros y evolución del presupuesto.','bi-speedometer2'],
 ['/contabilidad/presupuestos','Presupuesto y ejecución','Comparar presupuesto, compromisos y ejecución.','bi-bar-chart'],
-['/compras/ordenes','Órdenes de compra','Consultar y gestionar órdenes por departamento.','bi-cart-check'],
-['/compras/facturas','Facturas','Consultar documentos, vencimientos y pagos.','bi-receipt'],
-['/proveeduria/portal-proveedores/facturas','Facturas de proveedores','Facturas del portal, validación Hacienda y enlace a órdenes de compra.','bi-receipt-cutoff'],
-['/compras/facturas/asientos','Asientos de pasivos','Preparar asientos y consultar el historial.','bi-journal-check']]],
-...(user.rol === 'ADMIN' ? [['Personal','Personas y obligaciones salariales',[
-['/contabilidad/planilla','Planilla','Personal, empresa y salario del período.','bi-people']]]] : []),
-['Operación y gastos','Conceptos, importes confirmados y pagos',[
-['SERVICIOS','Servicios y alquileres','Servicios contratados y arrendamientos.','bi-building'],['GASTOS_GENERALES','Gastos generales','Gastos de operación por empresa.','bi-wallet2'],['COMBUSTIBLE','Combustible','Consumos e importes de combustible.','bi-fuel-pump'],['MANTENIMIENTO','Mantenimiento','Trabajos, proveedores y pagos.','bi-tools'],['IMPUESTOS','Impuestos','Obligaciones y pagos tributarios.','bi-receipt'],['EXTRAORDINARIOS','Extraordinarios','Operaciones fuera del gasto habitual.','bi-exclamation-circle']]],
-['Capital y obligaciones','Inversiones, financiamiento y reservas',[
-['INVERSIONES','Inversiones','Importes ejecutados y pagos asociados.','bi-graph-up-arrow'],['PRESTAMOS','Préstamos','Cuotas, obligaciones y saldos.','bi-bank'],['PROVISIONES','Provisiones','Reservas y pagos por concepto.','bi-piggy-bank']]]];
+['/contabilidad/documentos?tipo=orden','Todas las órdenes','Consultar órdenes de Taller, Proveeduría, Carburación y motor.','bi-cart-check'],
+['/contabilidad/documentos?tipo=factura','Todas las facturas','Consultar documentos, pagos y vencimientos de todas las fuentes.','bi-receipt'],
+['/contabilidad/documentos','Cuentas por pagar','Saldos pendientes por moneda y exportación consolidada.','bi-journal-check'],
+['/proveeduria/portal-proveedores/facturas','Revisión del portal','Aprobar o devolver facturas del portal y verificar Hacienda y órdenes.','bi-receipt-cutoff'],
+['/compras/facturas/asientos','Asientos de pasivos','Preparar asientos y consultar el historial.','bi-journal-check'],
+['/contabilidad/documentos/descargas-pdf','Descargas PDF y XML','Descargar facturas PDF y XML del correo Outlook por período.','bi-file-earmark-pdf']]]];
 grupos.forEach(([titulo,subtitulo,items])=>{ %><section class="erp-module-group"><div class="erp-group-heading"><h3><%= titulo %></h3><span><%= subtitulo %></span></div><div class="erp-tiles"><% items.forEach(([url,nombre,descripcion,icono])=>{ %><a class="erp-tile" href="<%= url.startsWith('/')?url:'/contabilidad/presupuestos/modulos/'+url %>"><i class="bi <%= icono %>" aria-hidden="true"></i><div><h4><%= nombre %></h4><p><%= descripcion %></p></div><span class="erp-tile-arrow" aria-hidden="true">›</span></a><% }) %></div></section><% }) %>
 <p id="erp-search-empty" hidden>No hay módulos con ese nombre.</p></section>

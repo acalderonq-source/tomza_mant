@@ -107,7 +107,7 @@ test('importación verifica la empresa identificada en el encabezado del Excel',
 
 
 test('entrar por módulo conserva el mes y la empresa elegidos',async()=>{
- await servidor(user,async()=>[[]],async base=>{const r=await fetch(base+'/modulos/SERVICIOS?periodo=2026-09&empresa=SUPER%20GAS&moneda=USD&sede=Cartago',{redirect:'manual'});assert.equal(r.status,302);const dest=new URL(r.headers.get('location'),'http://localhost');assert.equal(dest.searchParams.get('periodo'),'2026-09');assert.equal(dest.searchParams.get('empresa'),'SUPER GAS');assert.equal(dest.searchParams.get('moneda'),'USD');assert.equal(dest.searchParams.get('sede'),'Cartago');assert.equal((await fetch(base+'/modulos/SERVICIOS?periodo=2026-99',{redirect:'manual'})).status,400);});
+ await servidor({...user,rol:'ADMIN'},async()=>[[]],async base=>{const r=await fetch(base+'/modulos/SERVICIOS?periodo=2026-09&empresa=SUPER%20GAS&moneda=USD&sede=Cartago',{redirect:'manual'});assert.equal(r.status,302);const dest=new URL(r.headers.get('location'),'http://localhost');assert.equal(dest.searchParams.get('periodo'),'2026-09');assert.equal(dest.searchParams.get('empresa'),'SUPER GAS');assert.equal(dest.searchParams.get('moneda'),'USD');assert.equal(dest.searchParams.get('sede'),'Cartago');assert.equal((await fetch(base+'/modulos/SERVICIOS?periodo=2026-99',{redirect:'manual'})).status,400);});
 });
 test('lista de pendientes muestra el motivo sin cambiar el presupuesto total',async()=>{
  await servidor(user,async sql=>{

@@ -35,10 +35,7 @@ router.use((req,res,next)=>{
   if(!['ADMIN','CONTABILIDAD'].includes(req.session.user.rol))return res.status(403).send('Solo Contabilidad y Administración pueden gestionar presupuestos.');
   res.set('Cache-Control','no-store');next();
 });
-router.use('/planilla',(req,res,next)=>{
-  if(req.session.user.rol!=='ADMIN')return res.status(403).send('Planilla disponible solo para Administración.');
-  next();
-});
+for(const ruta of ['/planilla','/modulos','/rubros','/archivos'])router.use(ruta,require('../middleware/finanzasAdministracion'));
 router.use(wrap(async(_req,_res,next)=>{await preparar();next();}));
 router.get('/modulos/:rubro',wrap(async(req,res)=>{
   const rubro=P.RUBROS.find(r=>r.key===req.params.rubro&&r.key!=='PLANILLA');

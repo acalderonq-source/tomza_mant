@@ -423,28 +423,6 @@
         </a>
         <% if (['ADMIN', 'CONTABILIDAD'].includes(user.rol) && areaContabilidad) { %>
           <a href="/proveeduria/portal-proveedores/facturas" class="module-card"><span class="module-icon icon-blue"><i class="bi bi-receipt-cutoff"></i></span><div><div class="module-title">Facturas de proveedores</div><p class="module-copy">Facturas del portal, órdenes vinculadas y cuentas por pagar.</p></div></a>
-          <% if (user.rol === 'ADMIN') { %>
-          <a href="/contabilidad/planilla" class="module-card">
-            <span class="module-icon icon-blue"><i class="bi bi-people"></i></span>
-            <div><div class="module-title">Planilla</div><p class="module-copy">Personal, empresa y salarios. Consulta de todas las empresas.</p></div>
-          </a>
-          <% } %>
-          <% [
-            ['SERVICIOS','Servicios y alquileres','bi-building'],
-            ['GASTOS_GENERALES','Gastos generales','bi-wallet2'],
-            ['COMBUSTIBLE','Combustible','bi-fuel-pump'],
-            ['MANTENIMIENTO','Mantenimiento','bi-tools'],
-            ['IMPUESTOS','Impuestos','bi-receipt'],
-            ['EXTRAORDINARIOS','Extraordinarios','bi-exclamation-circle'],
-            ['INVERSIONES','Inversiones','bi-graph-up-arrow'],
-            ['PRESTAMOS','Préstamos','bi-bank'],
-            ['PROVISIONES','Provisiones','bi-piggy-bank']
-          ].forEach(([key,nombre,icono])=>{ %>
-          <a href="/contabilidad/presupuestos/modulos/<%= key %>" class="module-card">
-            <span class="module-icon icon-blue"><i class="bi <%= icono %>"></i></span>
-            <div><div class="module-title"><%= nombre %></div><p class="module-copy">Agregar y editar conceptos por empresa. Importes, pagos y saldos.</p></div>
-          </a>
-          <% }) %>
           <a href="/contabilidad/presupuestos" class="module-card">
             <span class="module-icon icon-blue"><i class="bi bi-calculator"></i></span>
             <div><div class="module-title">Presupuestos</div><p class="module-copy">Por empresa, sede y departamento. Órdenes, facturas y pagos.</p></div>

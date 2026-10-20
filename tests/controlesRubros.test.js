@@ -2,7 +2,7 @@ const test=require('node:test'),assert=require('node:assert/strict'),express=req
 const pool=require('../src/db'),P=require('../src/utils/presupuestosContabilidad');
 const {extraerConceptos,sincronizarConceptos,saldo,etiquetaRegistro}=require('../src/utils/controlesRubros');
 const router=require('../src/routes/presupuestos.routes');
-const user={id:1,rol:'CONTABILIDAD',usuario:'Conta'};
+const user={id:1,rol:'ADMIN',usuario:'Admin'};
 const concepto={id:7,periodo:'2026-09',empresa:'GAS TOMZA',rubro:'SERVICIOS',moneda:'CRC',sede:'General de la empresa',departamento:'GENERAL',concepto:'Electricidad',presupuesto:1000,version:1};
 async function servidor(query,run,usuario=user){
  const old=pool.query,conn=pool.getConnection;pool.query=query;let commits=0,rollbacks=0;
@@ -42,8 +42,8 @@ test('los nueve rubros abren su pantalla propia; Planilla mantiene su control es
   assert.equal((await fetch(base+'/rubros/PLANILLA')).status,404);assert.equal((await fetch(base+'/rubros/INVALIDO')).status,404);
  });
 });
-test('solo los roles financieros pueden abrir estos controles',async()=>{
- await servidor(()=>{throw new Error('No debe consultar');},async base=>assert.equal((await fetch(base+'/rubros/SERVICIOS')).status,403),{rol:'TALLER'});
+test('solo ADMIN abre los controles; Contabilidad y Taller reciben 403 antes de consultar',async()=>{
+ for(const rol of ['TALLER','CONTABILIDAD'])await servidor(()=>{throw new Error('No debe consultar');},async base=>{for(const ruta of ['/rubros/SERVICIOS','/modulos/INVERSIONES','/planilla','/archivos/1'])assert.equal((await fetch(base+ruta)).status,403);},{rol});
 });
 test('registro real valida rubro y mes y guarda su proveedor y comprobante con auditoría',async()=>{
  let inserts=[];

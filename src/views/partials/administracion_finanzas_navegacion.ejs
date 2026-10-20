@@ -1,0 +1,6 @@
+<nav class="erp-sidebar accounting-nav" aria-label="Navegación de Administración">
+<a href="/administracion" class="accounting-home">Administración</a>
+<% if(user.rol==='ADMIN'){ %>
+<a href="/contabilidad/planilla">Planilla</a>
+<% [['SERVICIOS','Servicios y alquileres'],['GASTOS_GENERALES','Gastos generales'],['COMBUSTIBLE','Combustible'],['MANTENIMIENTO','Mantenimiento'],['IMPUESTOS','Impuestos'],['EXTRAORDINARIOS','Extraordinarios'],['INVERSIONES','Inversiones'],['PRESTAMOS','Préstamos'],['PROVISIONES','Provisiones']].forEach(([key,label])=>{ %><a href="/contabilidad/presupuestos/modulos/<%= key %>"><%= label %></a><% }) %>
+<% } %></nav>

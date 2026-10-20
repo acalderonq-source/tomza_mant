@@ -39,7 +39,7 @@ test('los cuatro accesos no estan en Taller y aparecen en la vista de Administra
   assert.ok(administracion.includes("user.departamentoActivo === 'ADMINISTRACION'"));
   const ejs=require('ejs');
   for(const departamentoActivo of ['ADMINISTRACION','TALLER','OPERACIONES']){
-    const html=ejs.render(administracion,{user:{usuario:'admin',departamentoActivo,departamentos:[]},departamentos:[]});
+    const html=ejs.render(administracion,{user:{usuario:'admin',departamentoActivo,departamentos:[]},departamentos:[]},{filename:path.resolve(__dirname,'../src/views/administracion.ejs')});
     for(const ruta of ['/admin/ingresos','/admin/solicitudes-trabajadores','/control-empresa','/control-empresa/unidades'])assert.equal(html.includes('href="'+ruta+'"'),departamentoActivo==='ADMINISTRACION');
   }
 });

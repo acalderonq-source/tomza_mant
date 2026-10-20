@@ -297,7 +297,10 @@ router.post("/departamento/activo", async (req, res) => {
     return res.status(503).send('No se pudo verificar el acceso. Intente nuevamente.');
   }
   user.departamentoActivo = departamento;
-  res.redirect("/dashboard");
+  req.session.save(error => {
+    if(error){console.error('Guardar departamento:',error.code||'ERROR');return res.status(503).send('No se pudo guardar el departamento. Intente nuevamente.');}
+    res.redirect('/dashboard');
+  });
 });
 
 function getSafeNextUrl(value) {

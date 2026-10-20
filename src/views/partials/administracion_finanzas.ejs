@@ -1,0 +1,8 @@
+<% if(user.rol==='ADMIN'){ %>
+<section class="mt-4 mb-4"><h2 class="h4">Planilla</h2><a href="/contabilidad/planilla" class="card p-4 text-decoration-none text-dark"><h3 class="h5">Planilla</h3><p class="mb-0">Personal, empresas y salarios del período. Solo Administrador.</p></a></section>
+<% [
+['Operación y gastos',[['SERVICIOS','Servicios y alquileres'],['GASTOS_GENERALES','Gastos generales'],['COMBUSTIBLE','Combustible'],['MANTENIMIENTO','Mantenimiento'],['IMPUESTOS','Impuestos'],['EXTRAORDINARIOS','Extraordinarios']]],
+['Capital y obligaciones',[['INVERSIONES','Inversiones'],['PRESTAMOS','Préstamos'],['PROVISIONES','Provisiones']]]
+].forEach(([titulo,items])=>{ %>
+<section class="mt-4 mb-4"><h2 class="h4"><%= titulo %></h2><div class="row g-3"><% items.forEach(([key,label])=>{ %><div class="col-md-4"><a href="/contabilidad/presupuestos/modulos/<%= key %>" class="card p-4 h-100 text-decoration-none text-dark"><h3 class="h5"><%= label %></h3><p class="mb-0 text-secondary">Conceptos, importes, pagos y saldos. Solo Administrador.</p></a></div><% }) %></div></section>
+<% }) %><% } %>
