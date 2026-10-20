@@ -7,7 +7,8 @@ const SEDES_TRANSPORTADORA = [
   "Transportadora",
   ...SEDES_TRANSPORTADORA_DETALLE.filter(sede => !["Cisternas", "Carretas"].includes(sede))
 ];
-const SEDES_CONTROL = [...new Set([...SEDES_TRANSPORTADORA, ...SEDES_GRANEL])];
+const GRUPOS_CONTROL = { transportadora: SEDES_TRANSPORTADORA, granel: SEDES_GRANEL, cartago: ['Cartago'], tecnicos: ['Tecnicos'] };
+const SEDES_CONTROL = [...new Set(Object.values(GRUPOS_CONTROL).flat())];
 const SEDES_GRANEL_NORMALIZADAS = new Set(SEDES_GRANEL.map(valor =>
   valor.normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLowerCase()
 ));
@@ -56,6 +57,7 @@ function estadoProgramacion(fechaProximoCambio, hoy = fechaActualCostaRica()) {
 
 function grupoUnidad(sede) {
   const clave = String(sede || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLowerCase();
+  if (clave === 'cartago' || clave === 'tecnicos') return clave;
   return SEDES_GRANEL_NORMALIZADAS.has(clave) ? "granel" : "transportadora";
 }
 
@@ -86,14 +88,10 @@ router.use(autorizado);
 router.get("/", async (req, res) => {
   try {
     await asegurarTablaProgramaciones();
-    const filtro = ["transportadora", "granel"].includes(String(req.query.tipo || "").toLowerCase())
+    const filtro = Object.hasOwn(GRUPOS_CONTROL, String(req.query.tipo || "").toLowerCase())
       ? String(req.query.tipo).toLowerCase()
       : "todas";
-    const sedesFiltro = filtro === "granel"
-      ? SEDES_GRANEL
-      : filtro === "transportadora"
-        ? SEDES_TRANSPORTADORA
-        : SEDES_CONTROL;
+    const sedesFiltro = GRUPOS_CONTROL[filtro] || SEDES_CONTROL;
     const [unidades] = await pool.query(
       `SELECT u.id, u.placa, u.sede,
               p.kilometros_mes, p.intervalo_km,
@@ -139,7 +137,7 @@ router.get("/", async (req, res) => {
 
 router.post("/:unidadId", async (req, res) => {
   const { unidadId } = req.params;
-  const tipo = ["transportadora", "granel"].includes(String(req.body.tipo || "").toLowerCase())
+  const tipo = Object.hasOwn(GRUPOS_CONTROL, String(req.body.tipo || "").toLowerCase())
     ? String(req.body.tipo).toLowerCase()
     : "todas";
   const returnUrl = `/control-cambios-aceite${tipo === "todas" ? "" : `?tipo=${tipo}`}`;
