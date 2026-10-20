@@ -16,7 +16,7 @@ const MODULOS=[
   {id:'RESUMEN',nombre:'Resumen ejecutivo y conciliacion',areas:['TALLER','CONTABILIDAD','PROVEEDURIA'],rutas:['/dashboard/resumen-ejecutivo','/dashboard/conciliacion-pagos'],url:'/dashboard/resumen-ejecutivo'},
   {id:'PROVEEDORES',nombre:'Proveedores',areas:['TALLER','PROVEEDURIA'],rutas:['/compras/proveedores'],url:'/compras/proveedores'},
   {id:'TRAMITES',nombre:'ARESEP y tramites',areas:['TALLER','CONTABILIDAD','OPERACIONES','LOGISTICA'],rutas:['/aresep'],url:'/aresep'},
-  {id:'OPERACIONES',nombre:'Operaciones y solicitud de suministros',areas:['TALLER','OPERACIONES'],rutas:['/operaciones','/revision-ruta','/giras','/reportes-supervisores'],url:'/operaciones'},
+  {id:'OPERACIONES',nombre:'Operaciones, reportes a Taller y suministros',areas:['TALLER','OPERACIONES'],rutas:['/operaciones','/revision-ruta','/giras','/reportes-supervisores'],url:'/operaciones'},
   {id:'CARBURACION',nombre:'Carburacion',areas:['CARBURACION'],rutas:['/carburacion'],url:'/carburacion/dashboard'},
   {id:'SEGURIDAD',nombre:'Seguridad Ocupacional',areas:['SEGURIDAD_OCUPACIONAL'],rutas:['/seguridad-ocupacional'],url:'/seguridad-ocupacional'},
   {id:'RECURSOS_HUMANOS',nombre:'Recursos Humanos',areas:['RECURSOS_HUMANOS'],rutas:['/recursos-humanos'],url:'/recursos-humanos'},
@@ -49,6 +49,10 @@ function esRutaSuministrosSeguridad(ruta,metodo='GET'){
     || (metodo==='POST' && (ruta==='/proveeduria/solicitudes' || /^\/proveeduria\/salidas\/\d+\/aceptar$/.test(ruta)));
 }
 function puedeAcceder(config,ruta,metodo){
+  if(config.departamento==='OPERACIONES' && coincide(ruta,'/reportes-supervisores')){
+    const permiso=config.permisos?.OPERACIONES;
+    return require('./operacionesTaller').rutaReportesOperaciones(ruta,metodo) && (permiso==='GESTION' || (permiso==='LECTURA' && ['GET','HEAD'].includes(metodo)));
+  }
   if(config.perfil==='CARBURACION_SIN_FINANZAS' && esRutaSuministrosSeguridad(ruta,metodo))return true;
   if (config.departamento==='TALLER' && coincide(ruta,'/marcas-ingreso')) return true; // El modulo exige ademas su lista privada de cuentas.
   if (['GET','HEAD'].includes(metodo) && (ruta==='/inicio/noticias' || /^\/inicio\/noticias\/[1-9]\d*\/imagen$/.test(ruta))) return true;

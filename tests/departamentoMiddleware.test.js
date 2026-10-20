@@ -40,7 +40,7 @@ test("cada prefijo y subruta registrada como Taller se bloquea fuera del departa
     for (const prefix of RUTAS_TALLER) {
       for (const pathname of [prefix, `${prefix}/auditoria`]) {
         const response = await fetch(`${base}${pathname}`);
-        assert.equal(response.status, 403, `${pathname} debe pertenecer solo a Taller`);
+        assert.equal(response.status, pathname==='/reportes-supervisores'?200:403, `${pathname} debe respetar los accesos compartidos con Operaciones`);
       }
     }
   });

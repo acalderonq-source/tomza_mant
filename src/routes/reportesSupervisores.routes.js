@@ -21,6 +21,7 @@ const {
 const { agregarFiltroPlacaSql } = require("../utils/placas");
 const { normalizarTipoMantenimiento, detectarTipoMantenimiento } = require("../utils/tipoMantenimiento");
 const { ensureRutasSupervisoresTables } = require("../utils/rutasSupervisoresDb");
+const {SEDES_OPERACIONES,esOperaciones,rutaReportesOperaciones}=require('../utils/operacionesTaller');
 
 const ROLES_VER = ["ADMIN", "TALLER", "PROVEEDURIA_TALLER", "MECANICO", "SUPERVISOR", "SUPERVISOR_PESADO"];
 const ROLES_CREAR = ["ADMIN", "TALLER", "PROVEEDURIA_TALLER", "SUPERVISOR", "SUPERVISOR_PESADO"];
@@ -35,13 +36,14 @@ function requireAuth(req, res, next) {
 function allowRoles(...roles) {
   return (req, res, next) => {
     if (!req.session.user) return res.redirect("/login");
-    if (roles.includes(req.session.user.rol)) return next();
+    if (roles.includes(req.session.user.rol) || (esOperaciones(req.session.user) && roles.includes('SUPERVISOR'))) return next();
     return res.status(403).send("No autorizado");
   };
 }
 
 async function obtenerSedesPermitidas(req) {
   const user = req.session.user;
+  if(esOperaciones(user))return SEDES_OPERACIONES;
   if (["ADMIN", "TALLER", "PROVEEDURIA_TALLER"].includes(user.rol)) {
     if (req.session.sedeSeleccionada && req.session.sedeSeleccionada !== "TODAS") {
       return expandirSedesEquivalentes(req.session.sedeSeleccionada);
@@ -638,11 +640,15 @@ async function obtenerSugerenciasPendientes(sedesPermitidas, correctivoId = null
 }
 
 router.use(requireAuth);
+router.use((req,res,next)=>{
+  if(esOperaciones(req.session.user) && !rutaReportesOperaciones('/reportes-supervisores'+(req.path==='/'?'':req.path),req.method))return res.status(403).send('Operaciones puede registrar y consultar reportes; Taller gestiona su atención.');
+  next();
+});
 
 router.get("/", allowRoles(...ROLES_VER), async (req, res) => {
   try {
     await ensureReportesSupervisoresTables(pool);
-    await ensureRutasSupervisoresTables(pool);
+    if(!esOperaciones(req.session.user))await ensureRutasSupervisoresTables(pool);
     const sedesPermitidas = await obtenerSedesPermitidas(req);
     const { sede, placa, importante, correctivo_id } = req.query;
     const semana = String(req.query.semana || "").trim();
@@ -650,7 +656,7 @@ router.get("/", allowRoles(...ROLES_VER), async (req, res) => {
     const { reportes } = await consultarReportesPendientes(req, { sede, placa, importante, semana_reporte: semanaReporteFecha });
     const reportesAgrupados = agruparReportesPorPlaca(reportes);
     const unidades = await cargarUnidades(req);
-    const sugerencias = await obtenerSugerenciasPendientes(sedesPermitidas, correctivo_id || null);
+    const sugerencias = esOperaciones(req.session.user)?[]:await obtenerSugerenciasPendientes(sedesPermitidas, correctivo_id || null);
     const semanaRutasFecha = lunesDesdeSemanaInput(semanaActualRutas());
     const paramsRutas = [semanaRutasFecha];
     let sqlRutas = `SELECT COUNT(*) AS total FROM supervisor_rutas_semanales WHERE activo = 1 AND semana_inicio = ?`;
@@ -659,7 +665,7 @@ router.get("/", allowRoles(...ROLES_VER), async (req, res) => {
       sqlRutas += " AND sede IN (?)";
       paramsRutas.push(sedesRutas);
     }
-    const [[rutasSemanaRow]] = await pool.query(sqlRutas, paramsRutas);
+    const [[rutasSemanaRow]] = esOperaciones(req.session.user)?[[{total:0}]]:await pool.query(sqlRutas, paramsRutas);
     const success = req.session.success;
     const error = req.session.error;
     delete req.session.success;
@@ -668,13 +674,14 @@ router.get("/", allowRoles(...ROLES_VER), async (req, res) => {
     res.render("reportes_supervisores", {
       reportes: reportesAgrupados,
       unidades,
+      unidadSeleccionada: unidades.some(u=>String(u.id)===String(req.query.unidad_id))?String(req.query.unidad_id):'',
       sugerencias,
       user: req.session.user,
       filtros: { sede, placa, importante, correctivo_id, semana },
       semanaDefault: semanaDefaultReporte(),
       puedeElegirSemanaReporte: puedeElegirSemanaReporte(req.session.user),
-      puedeCrear: ROLES_CREAR.includes(req.session.user.rol),
-      puedeEditar: ROLES_EDITAR.includes(req.session.user.rol),
+      puedeCrear: esOperaciones(req.session.user) ? (!req.session.user.accesoPersonal || req.session.user.accesoPersonal.permisos?.OPERACIONES==='GESTION') : ROLES_CREAR.includes(req.session.user.rol),
+      puedeEditar: !esOperaciones(req.session.user) && ROLES_EDITAR.includes(req.session.user.rol),
       rutasSemanaActual: Number(rutasSemanaRow.total || 0),
       semanaRutasActual: semanaActualRutas(),
       renderReporteHtml,
@@ -1051,7 +1058,7 @@ router.get("/historial", allowRoles(...ROLES_VER), async (req, res) => {
       reportes,
       user: req.session.user,
       filtros: { sede, placa, fecha_desde, fecha_hasta },
-      puedeEditar: ROLES_EDITAR.includes(req.session.user.rol)
+      puedeEditar: !esOperaciones(req.session.user) && ROLES_EDITAR.includes(req.session.user.rol)
     });
   } catch (error) {
     console.error("Error cargando historial de reportes:", error);
@@ -1123,7 +1130,7 @@ router.post("/", allowRoles(...ROLES_CREAR), async (req, res) => {
     }
 
     const sedesPermitidas = await obtenerSedesPermitidas(req);
-    const [[unidad]] = await pool.query("SELECT id, placa, sede FROM unidades WHERE id = ?", [unidad_id]);
+    const [[unidad]] = await pool.query("SELECT id, placa, sede FROM unidades WHERE id = ?"+(esOperaciones(req.session.user)?" AND activa = 1":""), [unidad_id]);
     if (!unidad || (sedesPermitidas.length && !sedesPermitidas.includes(unidad.sede))) {
       req.session.error = "Unidad no autorizada para este usuario.";
       return res.redirect("/reportes-supervisores");

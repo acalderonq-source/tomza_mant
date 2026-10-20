@@ -18,6 +18,7 @@
   <div class="d-flex align-items-center gap-2 flex-wrap">
     <span class="text-white small"><%= user.usuario %> (<%= user.rol %>)</span>
     <a href="/reportes-supervisores" class="btn btn-outline-light btn-sm">Pendientes</a>
+    <% if(user.departamentoActivo==='OPERACIONES'){ %><a href="/operaciones" class="btn btn-outline-light btn-sm">Volver a Operaciones</a><% } %>
     <a href="/dashboard" class="btn btn-secondary btn-sm">Dashboard</a>
   </div>
 </nav>

@@ -25,11 +25,27 @@
   <section class="mb-2">
     <h2 class="section-title legacy-modules-title">Módulos</h2>
     <div class="module-grid">
+      <a href="/reportes-supervisores" class="module-card">
+        <span class="module-icon icon-red"><i class="bi bi-tools"></i></span>
+        <div><div class="module-title">Reportes de Taller</div><p class="module-copy">Reporte fallas o mantenimientos de las unidades de Técnicos y consulte su atención por Taller.</p></div>
+      </a>
+      <a href="#unidades-operaciones" class="module-card">
+        <span class="module-icon icon-blue"><i class="bi bi-truck"></i></span>
+        <div><div class="module-title">Unidades de Operaciones</div><p class="module-copy">Consulte las unidades registradas como Técnicos y seleccione la placa que necesita reportar.</p></div>
+      </a>
       <a href="/proveeduria/mis-solicitudes" class="module-card">
         <span class="module-icon icon-blue"><i class="bi bi-cart-plus"></i></span>
         <div><div class="module-title">Solicitud de suministros</div><p class="module-copy">Solicite materiales y suministros a Proveeduría. Consulte sus pedidos y confirme la entrega.</p></div>
       </a>
     </div>
+  </section>
+  <section id="unidades-operaciones" class="plain-card p-3 mt-3">
+    <h2 class="section-title">Unidades de Operaciones · Técnicos</h2>
+    <p class="small-muted">Seleccione una placa para enviar su reporte a Taller.</p>
+    <div class="table-responsive"><table class="table align-middle"><thead><tr><th>Placa</th><th>Reportar</th></tr></thead><tbody>
+    <% if(!unidades.length){ %><tr><td colspan="2" class="text-muted">No hay unidades activas registradas como Técnicos.</td></tr><% } %>
+    <% unidades.forEach(u=>{ %><tr><td><strong><%= u.placa %></strong></td><td><a class="btn btn-outline-primary btn-sm" href="/reportes-supervisores?unidad_id=<%= u.id %>#nuevo-reporte">Crear reporte de Taller</a></td></tr><% }) %>
+    </tbody></table></div>
   </section>
 </main>
 </body>

@@ -1,6 +1,6 @@
 const DEPARTAMENTOS = [
   { key: "TALLER", nombre: "Taller", icono: "bi-tools", descripcion: "Mantenimientos, repuestos y bodega del taller." },
-  { key: "OPERACIONES", nombre: "Operaciones", icono: "bi-truck", descripcion: "Solicitudes de materiales y suministros a Proveeduría." },
+  { key: "OPERACIONES", nombre: "Operaciones", icono: "bi-truck", descripcion: "Unidades de Técnicos, reportes a Taller y solicitudes a Proveeduría." },
   { key: "CONTABILIDAD", nombre: "Contabilidad", icono: "bi-journal-check", descripcion: "Facturas de proveedores, validación Hacienda, cuentas por pagar y pagos." },
   { key: "ADMINISTRACION", nombre: "Administración", icono: "bi-shield-lock", descripcion: "Acceso privado del propietario. Administración del portal de proveedores." },
   { key: "SEGURIDAD_OCUPACIONAL", nombre: "Seguridad Ocupacional", icono: "bi-shield-check", descripcion: "Área lista para incorporar sus procesos." },
@@ -67,6 +67,7 @@ function rutaPerteneceATaller(pathname) {
 }
 
 function puedeAbrirRutaPorDepartamento(departamento, pathname, rol = "", metodo = "GET") {
+  if(departamento==='OPERACIONES' && coincideRuta(pathname,['/reportes-supervisores']))return require('./operacionesTaller').rutaReportesOperaciones(pathname,metodo);
   if (rol==='ADMIN' && departamento==='ADMINISTRACION' && ['GET','HEAD'].includes(metodo) && coincideRuta(pathname,['/marcas-ingreso'])) return true;
   if(String(rol).toUpperCase()==='SEGURIDAD_OCUP') {
     return String(departamento).toUpperCase()==='SEGURIDAD_OCUPACIONAL' && (require('./accesosTrabajador').esRutaSuministrosSeguridad(pathname,metodo) || coincideRuta(pathname,
