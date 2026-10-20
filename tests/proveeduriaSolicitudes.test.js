@@ -50,7 +50,7 @@ test('departamento solicitante solo puede consultar sus pedidos y no gestionar c
     if(sql.includes('FROM prov_alertas'))assert.deepEqual(args,[71]);return [[]];
   };
   try{await server(requester,async base=>{
-    const r=await fetch(base+'/mis-solicitudes');assert.equal(r.status,200);const html=await r.text();assert.match(html,/Nueva solicitud · OPERACIONES/);assert.match(html,/Papel/);assert.doesNotMatch(html,/precio_unitario|factura\/conciliar/);assert.doesNotMatch(html,/name="departamento"/);assert.match(html,/Código automático/);assert.match(html,/proveeduria-solicitudes.js/);assert.match(html,/"codigo":"PAPEL"/);assert.equal(r.headers.get('cache-control'),'no-store');
+    const r=await fetch(base+'/mis-solicitudes');assert.equal(r.status,200);const html=await r.text();assert.match(html,/Nueva solicitud · Operaciones/);assert.match(html,/Papel/);assert.doesNotMatch(html,/precio_unitario|factura\/conciliar/);assert.doesNotMatch(html,/name="departamento"/);assert.match(html,/Código automático/);assert.match(html,/proveeduria-solicitudes.js/);assert.match(html,/"codigo":"PAPEL"/);assert.equal(r.headers.get('cache-control'),'no-store');
     for(const p of ['/gestion','/solicitudes','/ordenes/nueva'])assert.equal((await fetch(base+p)).status,403);
     assert.equal((await fetch(base+'/ordenes',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'})).status,403);
   });
