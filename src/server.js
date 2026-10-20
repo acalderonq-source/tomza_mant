@@ -413,6 +413,7 @@ app.use('/administracion/portal-proveedores/solicitudes', solicitudesPortal.priv
 app.use('/portal-proveedores', portalProveedores.externo, (_req,res)=>res.sendStatus(404));
 
 app.use("/", authRoutes);
+const noticiasInicio = require('./routes/noticiasInicio.routes').crearRouters(pool);
 app.use((req, res, next) => {
   const user = req.session.user;
   if (!user?.requiereCambioPassword) return next();
@@ -420,6 +421,8 @@ app.use((req, res, next) => {
   return res.redirect("/cambiar-clave");
 });
 app.use("/", sedeRoutes);
+app.use('/inicio/noticias', noticiasInicio.lectura);
+app.use('/admin/noticias', noticiasInicio.administracion);
 app.use('/administracion',require('./routes/administracion.routes'));
 app.use('/seguridad-ocupacional',require('./routes/seguridadOcupacional.routes'));
 app.use('/recursos-humanos',require('./routes/recursosHumanos.routes'));
