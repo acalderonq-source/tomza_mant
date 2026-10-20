@@ -57,13 +57,16 @@ function compararFactura(oc, factura) {
 function saldo(oc) {
   if(oc.facturas_vinculadas){
     const base=saldo({...oc,factura:/DEVUELTA|RECHAZADA/.test(oc.factura?.estado||'')?undefined:oc.factura,facturas_vinculadas:undefined});
-    for(const d of oc.facturas_vinculadas.filter(d=>d.factura.estado!=='RECHAZADA_INTERNA')){const s=saldo(d);base.facturado=redondear(base.facturado+s.facturado);base.pagos=redondear(base.pagos+s.pagos);base.creditos=redondear((base.creditos||0)+(s.creditos||0));base.saldo=redondear(base.saldo+s.saldo);}
+    for(const d of oc.facturas_vinculadas.filter(d=>d.factura.estado!=='RECHAZADA_INTERNA')){const s=saldo(d);base.facturado=redondear(base.facturado+s.facturado);base.pagos=redondear(base.pagos+s.pagos);base.creditos=redondear((base.creditos||0)+(s.creditos||0));if(s.aplicaciones_anteriores)base.aplicaciones_anteriores=redondear((base.aplicaciones_anteriores||0)+s.aplicaciones_anteriores);base.saldo=redondear(base.saldo+s.saldo);}
     return base;
   }
   const pagos = redondear((oc.pagos || []).reduce((s,p) => s + p.monto, 0));
   const facturado = oc.factura?.total ?? 0;
   const creditos=redondear((oc.notas_credito||[]).filter(n=>n.aplicada).reduce((s,n)=>s+Number(n.total),0));
-  return { facturado, pagos, ...(oc.notas_credito?{creditos}:{}), saldo: redondear(facturado - pagos - creditos) };
+  const importacion=oc.importacion_estado_cuenta;
+  const aplicaciones=importacion?.tipo==='ESTADO_CUENTA'?Number(importacion.aplicaciones_anteriores):0;
+  exigir(Number.isFinite(aplicaciones)&&aplicaciones>=0&&aplicaciones<=facturado,'Aplicaciones anteriores del estado de cuenta inválidas');
+  return { facturado, pagos, ...(oc.notas_credito?{creditos}:{}),...(importacion?.tipo==='ESTADO_CUENTA'?{aplicaciones_anteriores:aplicaciones}:{}), saldo: redondear(facturado - aplicaciones - pagos - creditos) };
 }
 const hash = token => crypto.createHash('sha256').update(token).digest('hex');
 function conciliarEstado(estado,ordenes) {
