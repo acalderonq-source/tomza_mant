@@ -40,6 +40,7 @@ Ubicaciones enviadas por el propietario el 19 de octubre de 2026. No se buscaron
 | Cedi Guapiles | https://maps.app.goo.gl/Jyk7kmjFGqFEVRuc8 | 10.2024713 | -83.77406 |
 | Cedi Rio Claro | https://maps.app.goo.gl/RTwF4WoedG7FPfbRA | 8.6695875 | -83.060390625 |
 | Cedi Nicoya | https://maps.app.goo.gl/efaT7b1NZMkSM9zn9 | 10.1614089 | -85.4533432 |
+| Cedi Perez Zeledon | https://maps.app.goo.gl/4RWfJFCARfidKsCr8 | 9.2809942 | -83.6422741 |
 
 Cinco enlaces se expandieron mediante su respuesta HTTP Location de Google Maps; las coordenadas proceden de los campos !3d y !4d. El punto de Guapiles se referencia como Cementos Progreso en Google, pero el nombre de sede es el indicado por el propietario.
 
