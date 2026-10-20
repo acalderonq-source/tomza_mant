@@ -22,6 +22,8 @@ const { agregarFiltroPlacaSql } = require("../utils/placas");
 const { normalizarTipoMantenimiento, detectarTipoMantenimiento } = require("../utils/tipoMantenimiento");
 const { ensureRutasSupervisoresTables } = require("../utils/rutasSupervisoresDb");
 const {SEDES_OPERACIONES,esOperaciones,rutaReportesOperaciones}=require('../utils/operacionesTaller');
+const {permiteModulo}=require('../utils/permisosOperaciones');
+const gestionReportes=user=>!user.accesoPersonal || permiteModulo(user.accesoPersonal,'REPORTES_TALLER','POST');
 
 const ROLES_VER = ["ADMIN", "TALLER", "PROVEEDURIA_TALLER", "MECANICO", "SUPERVISOR", "SUPERVISOR_PESADO"];
 const ROLES_CREAR = ["ADMIN", "TALLER", "PROVEEDURIA_TALLER", "SUPERVISOR", "SUPERVISOR_PESADO"];
@@ -680,8 +682,8 @@ router.get("/", allowRoles(...ROLES_VER), async (req, res) => {
       filtros: { sede, placa, importante, correctivo_id, semana },
       semanaDefault: semanaDefaultReporte(),
       puedeElegirSemanaReporte: puedeElegirSemanaReporte(req.session.user),
-      puedeCrear: esOperaciones(req.session.user) ? (!req.session.user.accesoPersonal || req.session.user.accesoPersonal.permisos?.OPERACIONES==='GESTION') : ROLES_CREAR.includes(req.session.user.rol),
-      puedeEditar: !esOperaciones(req.session.user) && ROLES_EDITAR.includes(req.session.user.rol),
+      puedeCrear: (esOperaciones(req.session.user) || ROLES_CREAR.includes(req.session.user.rol)) && gestionReportes(req.session.user),
+      puedeEditar: !esOperaciones(req.session.user) && ROLES_EDITAR.includes(req.session.user.rol) && gestionReportes(req.session.user),
       rutasSemanaActual: Number(rutasSemanaRow.total || 0),
       semanaRutasActual: semanaActualRutas(),
       renderReporteHtml,
@@ -1058,7 +1060,7 @@ router.get("/historial", allowRoles(...ROLES_VER), async (req, res) => {
       reportes,
       user: req.session.user,
       filtros: { sede, placa, fecha_desde, fecha_hasta },
-      puedeEditar: !esOperaciones(req.session.user) && ROLES_EDITAR.includes(req.session.user.rol)
+      puedeEditar: !esOperaciones(req.session.user) && ROLES_EDITAR.includes(req.session.user.rol) && gestionReportes(req.session.user)
     });
   } catch (error) {
     console.error("Error cargando historial de reportes:", error);

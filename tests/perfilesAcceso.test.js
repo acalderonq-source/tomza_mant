@@ -50,3 +50,21 @@ test('Proveeduria puede configurar su modulo propio sin conceder Administracion'
   assert.equal(puedeAcceder(config,'/proveeduria/inventario/articulos','POST'),false);
   assert.equal(puedeAcceder(config,'/admin/perfiles','GET'),false);
 });
+
+test('edición de permisos separa el control anterior y guarda cada opción sin volver a agruparla',async()=>{
+ const {db,perfil,eventos}=base();
+ perfil.rol='SUPERVISOR';perfil.config_json=JSON.stringify({departamento:'OPERACIONES',sede:'Cartago',permisos:{OPERACIONES:'GESTION'}});
+ await servidor(owner,db,async base=>{
+  const html=await (await fetch(base+'/8')).text();
+  for(const id of ['OPERACIONES','REPORTES_TALLER','SUMINISTROS'])assert.match(html,new RegExp('name="permiso_'+id+'"[^>]*>[\\s\\S]*?<option value="GESTION" selected'));
+  assert.doesNotMatch(html,/Operaciones, reportes a Taller y suministros/);
+  const body={nombre:perfil.nombre,modo:'personal',sede_asignada:'Cartago',version:version(perfil),departamento:'OPERACIONES',permiso_OPERACIONES:'GESTION',permiso_REPORTES_TALLER:'LECTURA',permiso_SUMINISTROS:'NINGUNO'};
+  assert.equal((await fetch(base+'/8',{method:'POST',redirect:'manual',body:new URLSearchParams(body)})).status,303);
+  const guardado=JSON.parse(eventos.find(e=>e[0]==='config')[1][1]);
+  assert.deepEqual(guardado.permisos,{OPERACIONES:'GESTION',REPORTES_TALLER:'LECTURA'});
+  assert.equal(guardado.permisosOperacionesSeparados,true);
+  perfil.config_json=JSON.stringify(guardado);
+  const recargado=await (await fetch(base+'/8')).text();
+  assert.match(recargado,/name="permiso_SUMINISTROS"[^>]*>\s*<option value="NINGUNO" selected/);
+ });
+});

@@ -2,9 +2,9 @@ function areasConfiguradas(config) {
   return [config.departamento, ...Object.keys(config.adicionales || {})];
 }
 function configDepartamento(config, area) {
-  if (area === config.departamento) { const { adicionales, ...base } = config; return base; }
+  if (area === config.departamento) { const { adicionales, ...base } = config; return require('./permisosOperaciones').separarPermisos(base); }
   const extra = config.adicionales?.[area];
-  return extra ? { ...extra, departamento: area, sede: config.sede } : null;
+  return extra ? require('./permisosOperaciones').separarPermisos({ ...extra, departamento: area, sede: config.sede }) : null;
 }
 function consultaCompras(ruta, metodo = 'GET') {
   if (!['GET', 'HEAD'].includes(metodo)) return false;

@@ -7,6 +7,7 @@ const {controlarAccesoPorDepartamento,puedeAbrirRutaPorDepartamento}=require('..
 const {puedeAcceder}=require('../src/utils/accesosTrabajador');
 const {SEDES_OPERACIONES}=require('../src/utils/operacionesTaller');
 const operador={id:81,usuario:'operaciones',nombre:'Operaciones',rol:'SUPERVISOR',sede:'Cartago',departamentoActivo:'OPERACIONES',departamentos:['OPERACIONES']};
+const {validarAcceso}=require('../src/utils/accesosTrabajador');
 
 test('Operaciones permite crear y consultar reportes, con lectura y gestión separadas',()=>{
   for(const [ruta,metodo] of [['/reportes-supervisores','GET'],['/reportes-supervisores','POST'],['/reportes-supervisores/historial','GET'],['/reportes-supervisores/reporte/excel','GET']]){
@@ -93,5 +94,30 @@ test('Operaciones mantiene Técnicos incluso con rol ADMIN o Pesados y respeta a
     cambiar({...operador,accesoPersonal:{departamento:'OPERACIONES',permisos:{OPERACIONES:'GESTION'}}});
     assert.equal((await fetch(base+'/reportes-supervisores',post({unidad_id:4,descripcion_original:'Revisar luces'}))).status,302);
     assert.equal(reportes.length,1);assert.equal(reportes[0].sede,'Técnicos');
+  });
+});
+
+test('inicio y formulario respetan por separado Operaciones, reportes y suministros',async()=>{
+  await escenario(async({base,cambiar})=>{
+    const configurar=permisos=>cambiar({...operador,accesoPersonal:validarAcceso({departamento:'OPERACIONES',sede_asignada:'Cartago',...permisos})});
+    configurar({permiso_REPORTES_TALLER:'GESTION',permiso_SUMINISTROS:'LECTURA'});
+    let inicio=await fetch(base+'/operaciones');assert.equal(inicio.status,200);let html=await inicio.text();
+    assert.match(html,/href="\/reportes-supervisores"/);assert.match(html,/href="\/proveeduria\/mis-solicitudes"/);
+    assert.doesNotMatch(html,/id="unidades-operaciones"|TEC101/);
+    assert.match(await (await fetch(base+'/reportes-supervisores')).text(),/name="descripcion_original"/);
+    assert.equal((await fetch(base+'/proveeduria/solicitudes',post({}))).status,403);
+    configurar({permiso_OPERACIONES:'GESTION'});
+    html=await (await fetch(base+'/operaciones')).text();assert.match(html,/TEC101/);
+    assert.doesNotMatch(html,/href="\/reportes-supervisores|href="\/proveeduria\/mis-solicitudes"|Crear reporte de Taller/);
+    assert.equal((await fetch(base+'/reportes-supervisores')).status,403);
+    configurar({permiso_SUMINISTROS:'GESTION'});
+    html=await (await fetch(base+'/operaciones')).text();assert.match(html,/href="\/proveeduria\/mis-solicitudes"/);
+    assert.doesNotMatch(html,/href="\/reportes-supervisores|TEC101/);
+    assert.equal((await fetch(base+'/reportes-supervisores',post({unidad_id:1,descripcion_original:'No permitido'}))).status,403);
+    configurar({permiso_REPORTES_TALLER:'LECTURA'});
+    assert.doesNotMatch(await (await fetch(base+'/reportes-supervisores')).text(),/name="descripcion_original"/);
+    cambiar({...operador,rol:'TALLER',departamentoActivo:'TALLER',departamentos:['TALLER'],accesoPersonal:validarAcceso({departamento:'TALLER',sede_asignada:'Cartago',permiso_REPORTES_TALLER:'LECTURA'})});
+    assert.doesNotMatch(await (await fetch(base+'/reportes-supervisores')).text(),/name="descripcion_original"/);
+    assert.equal((await fetch(base+'/reportes-supervisores',post({unidad_id:1,descripcion_original:'No permitido'}))).status,403);
   });
 });

@@ -27,7 +27,7 @@ function crearRouter(db,propietario){
     const [[perfil]]=await db.query(sql+' WHERE u.id=?',[req.params.id]);
     if(!perfil)throw fallo(404,'Perfil no encontrado.');
     if(protegidos.includes(perfil.rol))throw fallo(403,'Este perfil de sistema esta protegido.');
-    const config=perfil.config_json?JSON.parse(perfil.config_json):null;
+    const config=require('../utils/permisosOperaciones').separarPermisos(perfil.config_json?JSON.parse(perfil.config_json):null);
     res.render('trabajadores/perfil_editar',{perfil,config,version:version(perfil),modulos:MODULOS,departamentos:DEPARTAMENTOS.filter(d=>AREAS[d.key]),sedes:[...new Set(['TODAS',...SEDES_SOLICITUD,perfil.sede].filter(Boolean))]});
   }));
   router.post('/:id',wrap(async(req,res)=>{

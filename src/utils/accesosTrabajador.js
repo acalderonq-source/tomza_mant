@@ -1,4 +1,5 @@
 const {SEDES_SOLICITUD}=require('./sedesSolicitudesTrabajadores');
+const {separarPermisos,permiteModulo}=require('./permisosOperaciones');
 const AREAS={TALLER:'TALLER',OPERACIONES:'SUPERVISOR',CONTABILIDAD:'CONTABILIDAD',PROVEEDURIA:'PROVEEDURIA_TALLER',LOGISTICA:'TRAMITES',SEGURIDAD_OCUPACIONAL:'SEGURIDAD_OCUP',CARBURACION:'CARBURACION_GESTOR',RECURSOS_HUMANOS:'RH_GESTOR'};
 const MODULOS=[
   {id:'INICIO',nombre:'Inicio del departamento',areas:Object.keys(AREAS),rutas:['/dashboard'],url:null},
@@ -16,7 +17,9 @@ const MODULOS=[
   {id:'RESUMEN',nombre:'Resumen ejecutivo y conciliacion',areas:['TALLER','CONTABILIDAD','PROVEEDURIA'],rutas:['/dashboard/resumen-ejecutivo','/dashboard/conciliacion-pagos'],url:'/dashboard/resumen-ejecutivo'},
   {id:'PROVEEDORES',nombre:'Proveedores',areas:['TALLER','PROVEEDURIA'],rutas:['/compras/proveedores'],url:'/compras/proveedores'},
   {id:'TRAMITES',nombre:'ARESEP y tramites',areas:['TALLER','CONTABILIDAD','OPERACIONES','LOGISTICA'],rutas:['/aresep'],url:'/aresep'},
-  {id:'OPERACIONES',nombre:'Operaciones, reportes a Taller y suministros',areas:['TALLER','OPERACIONES'],rutas:['/operaciones','/revision-ruta','/giras','/reportes-supervisores'],url:'/operaciones'},
+  {id:'OPERACIONES',nombre:'Operaciones',areas:['TALLER','OPERACIONES'],rutas:['/operaciones','/revision-ruta','/giras'],url:'/operaciones'},
+  {id:'REPORTES_TALLER',nombre:'Reportes a Taller',areas:['TALLER','OPERACIONES'],rutas:['/reportes-supervisores'],url:'/reportes-supervisores'},
+  {id:'SUMINISTROS',nombre:'Solicitud de suministros',areas:['TALLER','OPERACIONES'],rutas:[],url:'/proveeduria/mis-solicitudes'},
   {id:'CARBURACION',nombre:'Carburacion',areas:['CARBURACION'],rutas:['/carburacion'],url:'/carburacion/dashboard'},
   {id:'SEGURIDAD',nombre:'Seguridad Ocupacional',areas:['SEGURIDAD_OCUPACIONAL'],rutas:['/seguridad-ocupacional'],url:'/seguridad-ocupacional'},
   {id:'RECURSOS_HUMANOS',nombre:'Recursos Humanos',areas:['RECURSOS_HUMANOS'],rutas:['/recursos-humanos'],url:'/recursos-humanos'},
@@ -38,7 +41,7 @@ function validarAcceso(body){
     permisos[id]=value;
   }
   if(!Object.keys(permisos).some(id=>id!=='DOCUMENTOS'))throw error('Asigne al menos un modulo al trabajador.');
-  return {departamento,sede,permisos};
+  return {departamento,sede,permisos,...(['TALLER','OPERACIONES'].includes(departamento)?{permisosOperacionesSeparados:true}:{})};
 }
 async function prepararAccesos(db){await db.query(`CREATE TABLE IF NOT EXISTS usuario_accesos_personales (
   usuario_id INT NOT NULL PRIMARY KEY,config_json TEXT NOT NULL,asignado_por INT NOT NULL,
@@ -49,14 +52,16 @@ function esRutaSuministrosSeguridad(ruta,metodo='GET'){
     || (metodo==='POST' && (ruta==='/proveeduria/solicitudes' || /^\/proveeduria\/salidas\/\d+\/aceptar$/.test(ruta)));
 }
 function puedeAcceder(config,ruta,metodo){
+  config=separarPermisos(config);
+  if(config.departamento==='OPERACIONES' && ['/operaciones','/operaciones/'].includes(ruta) && ['GET','HEAD'].includes(metodo))return ['OPERACIONES','REPORTES_TALLER','SUMINISTROS'].some(id=>permiteModulo(config,id,metodo));
   if(config.departamento==='OPERACIONES' && coincide(ruta,'/reportes-supervisores')){
-    const permiso=config.permisos?.OPERACIONES;
-    return require('./operacionesTaller').rutaReportesOperaciones(ruta,metodo) && (permiso==='GESTION' || (permiso==='LECTURA' && ['GET','HEAD'].includes(metodo)));
+    return require('./operacionesTaller').rutaReportesOperaciones(ruta,metodo) && permiteModulo(config,'REPORTES_TALLER',metodo);
   }
+  if(['TALLER','OPERACIONES'].includes(config.departamento) && esRutaSuministrosSeguridad(ruta,metodo))return permiteModulo(config,'SUMINISTROS',metodo);
   if(config.perfil==='CARBURACION_SIN_FINANZAS' && esRutaSuministrosSeguridad(ruta,metodo))return true;
   if (config.departamento==='TALLER' && coincide(ruta,'/marcas-ingreso')) return true; // El modulo exige ademas su lista privada de cuentas.
   if (['GET','HEAD'].includes(metodo) && (ruta==='/inicio/noticias' || /^\/inicio\/noticias\/[1-9]\d*\/imagen$/.test(ruta))) return true;
-  if(['SEGURIDAD_OCUPACIONAL','RECURSOS_HUMANOS','OPERACIONES'].includes(config.departamento) && esRutaSuministrosSeguridad(ruta,metodo)){
+  if(['SEGURIDAD_OCUPACIONAL','RECURSOS_HUMANOS'].includes(config.departamento) && esRutaSuministrosSeguridad(ruta,metodo)){
     const permiso=config.permisos[config.departamento==='SEGURIDAD_OCUPACIONAL'?'SEGURIDAD':config.departamento];
     return permiso==='GESTION' || (permiso==='LECTURA' && ['GET','HEAD'].includes(metodo));
   }
