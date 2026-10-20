@@ -19,6 +19,7 @@ const MODULOS=[
   {id:'OPERACIONES',nombre:'Revision en ruta, giras y reportes',areas:['TALLER','OPERACIONES'],rutas:['/revision-ruta','/giras','/reportes-supervisores'],url:'/revision-ruta'},
   {id:'CARBURACION',nombre:'Carburacion',areas:['CARBURACION'],rutas:['/carburacion'],url:'/carburacion/dashboard'},
   {id:'SEGURIDAD',nombre:'Seguridad Ocupacional',areas:['SEGURIDAD_OCUPACIONAL'],rutas:['/seguridad-ocupacional'],url:'/seguridad-ocupacional'},
+  {id:'RECURSOS_HUMANOS',nombre:'Recursos Humanos',areas:['RECURSOS_HUMANOS'],rutas:['/recursos-humanos'],url:'/recursos-humanos'},
   {id:'PROVEEDURIA',nombre:'Gestion de Proveeduria',areas:['PROVEEDURIA'],rutas:['/proveeduria'],url:'/proveeduria'},
   {id:'DOCUMENTOS',nombre:'Adjuntos autorizados por el sistema',areas:Object.keys(AREAS),rutas:['/uploads'],url:null}
 ];
@@ -48,8 +49,8 @@ function esRutaSuministrosSeguridad(ruta,metodo='GET'){
     || (metodo==='POST' && (ruta==='/proveeduria/solicitudes' || /^\/proveeduria\/salidas\/\d+\/aceptar$/.test(ruta)));
 }
 function puedeAcceder(config,ruta,metodo){
-  if(config.departamento==='SEGURIDAD_OCUPACIONAL' && esRutaSuministrosSeguridad(ruta,metodo)){
-    const permiso=config.permisos.SEGURIDAD;
+  if(['SEGURIDAD_OCUPACIONAL','RECURSOS_HUMANOS'].includes(config.departamento) && esRutaSuministrosSeguridad(ruta,metodo)){
+    const permiso=config.permisos[config.departamento==='RECURSOS_HUMANOS'?'RECURSOS_HUMANOS':'SEGURIDAD'];
     return permiso==='GESTION' || (permiso==='LECTURA' && ['GET','HEAD'].includes(metodo));
   }
   if(['/','/inicio','/dashboard','/logout','/login','/login/perfil','/cambiar-clave','/departamento/activo','/cambiar-sede'].includes(ruta))return true;

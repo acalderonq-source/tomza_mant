@@ -2360,6 +2360,7 @@ router.get("/", async (req, res) => {
     }
     if (req.session.user.departamentoActivo === "ADMINISTRACION") return res.redirect("/administracion");
     if (req.session.user.departamentoActivo === 'SEGURIDAD_OCUPACIONAL') return res.redirect('/seguridad-ocupacional');
+    if (req.session.user.departamentoActivo === 'RECURSOS_HUMANOS') return res.redirect('/recursos-humanos');
     if (req.session.user.departamentoActivo === "CARBURACION") {
       return res.redirect("/carburacion/dashboard");
     }
