@@ -22,6 +22,9 @@ async function verificarColumnasRequeridas(query, columnasRequeridas) {
 }
 
 const COLUMNAS_ESENCIALES_TALLER = {
+  ciberseguridad_eventos: ['id','huella','tipo','gravedad','ip','usuario','departamento','ruta','http_estado','creado_en','ultimo_en','intentos','estado','version'],
+  ciberseguridad_seguimiento: ['id','evento_id','administrador_id','estado','nota','creado_en'],
+  ciberseguridad_config: ['id','iniciado_en'],
   ingreso_correos: ['identidad','correo','actualizado_por','actualizado_en'],
   sesion_ingresos: ['id','identidad','usuario_id','usuario','nombre','rol','departamento','sede','ip','dispositivo','correo_destino','correo_estado','intentos','ultimo_intento','enviado_en','error_codigo','creado_en'],
   unidades: ["id", "placa", "sede", "activa", "varada", "comodin"],

@@ -205,6 +205,7 @@ app.use(session({
   }
 }));
 
+app.use(require('./utils/ciberseguridad').registrarSeguridad(pool));
 app.use(require('./middleware/supplierIsolation').isolateSupplier);
 app.use(protegerSesiones(pool,sessionSecret));
 app.use(require('./utils/accesosTrabajador').controlarAccesosPersonales(pool));

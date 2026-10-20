@@ -102,6 +102,7 @@ router.post("/login", loginLimiter, limiteCuenta, async (req, res) => {
 
     // Usuario no existe
     if (rows.length === 0) {
+      req.ciberLoginFallido = true;
       await bcrypt.compare(password,'$2a$12$R9h/cIPz0gi.URNNX3kh2OPST9/PgBkqquzi.Ss7KIUgO2t0jWMUW');
       return res.render("login", {
         error: esCedula ? "Cédula o PIN incorrecto. Verifique sus datos o consulte al administrador." : "Usuario o contraseña incorrecta",
@@ -118,6 +119,7 @@ router.post("/login", loginLimiter, limiteCuenta, async (req, res) => {
     }
 
     if (!usersWithValidPassword.length) {
+      req.ciberLoginFallido = true;
       return res.render("login", {
         error: esCedula ? "Cédula o PIN incorrecto. Verifique sus datos o consulte al administrador." : "Usuario o contraseña incorrecta",
         next: nextUrl,
