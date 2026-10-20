@@ -38,12 +38,12 @@ Ubicaciones enviadas por el propietario el 19 de octubre de 2026. No se buscaron
 | Cedi Orotina | https://maps.app.goo.gl/z2LXXTwBxCKScfuN9 | 9.8928466 | -84.645024 |
 | Planta Alajuela | https://maps.app.goo.gl/uQgUmrAsLabLxYTH8 | 9.9976714 | -84.2403176 |
 | Cedi Guapiles | https://maps.app.goo.gl/Jyk7kmjFGqFEVRuc8 | 10.2024713 | -83.77406 |
-| Cedi Rio Claro | https://maps.app.goo.gl/RTwF4WoedG7FPfbRA | 8.6695875 | -83.060390625 |
+| Cedi Rio Claro | https://maps.app.goo.gl/RTwF4WoedG7FPfbRA | 8.6695891 | -83.0603779 |
 | Cedi Nicoya | https://maps.app.goo.gl/efaT7b1NZMkSM9zn9 | 10.1614089 | -85.4533432 |
 | Cedi Perez Zeledon | https://maps.app.goo.gl/4RWfJFCARfidKsCr8 | 9.2809942 | -83.6422741 |
 
 Cinco enlaces se expandieron mediante su respuesta HTTP Location de Google Maps; las coordenadas proceden de los campos !3d y !4d. El punto de Guapiles se referencia como Cementos Progreso en Google, pero el nombre de sede es el indicado por el propietario.
 
-Rio Claro se referencia como Bimbo Rio Claro y no expone coordenadas en la redireccion. Se uso el codigo corto MW9Q+RRQ contenido en el enlace, recuperado como 66WRMW9Q+RRQ con Open Location Code (implementacion de Google, paquete temporal open-location-code). Referencia regional verificada en OpenStreetMap/Nominatim: pueblo Rio Claro, Guaycara, Golfito, 8.6794934,-83.0655999. Se almacena el centro del area codificada, no el centro del pueblo: limites 8.669575..8.6696 y -83.06040625..-83.060375. No se usa el centro generico de Costa Rica que devolvio la pagina HTML de Google al no resolver ese lugar.
+Rio Claro se referencia como Bimbo Rio Claro y no expone coordenadas en la redireccion HTTP. Inicialmente se uso el centro del codigo corto MW9Q+RRQ, recuperado como 66WRMW9Q+RRQ con Open Location Code y referencia regional de Rio Claro, Guaycara, Golfito, OpenStreetMap/Nominatim. Al volver a verificar el enlace en el navegador el 19 de octubre, Google Maps resolvio las coordenadas exactas !3d8.6695891!4d-83.0603779. Estas sustituyen el centro del plus code (8.6695875,-83.060390625), unos 1.4 metros de diferencia. Se conserva el nombre Cedi Rio Claro indicado por el propietario. No se usa el centro generico de Costa Rica devuelto por la pagina HTML sin resolver el lugar.
 
 La herramienta de decodificacion se uso solo para verificar el punto; no se agregaron paquetes al proyecto. El mapa conserva las siete provincias locales, seleccion unica, acercamiento animado, enlaces de indicaciones y vista de fotografias pendiente. No cambia permisos ni tablas de sedes operativas.

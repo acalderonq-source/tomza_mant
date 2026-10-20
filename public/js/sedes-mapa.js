@@ -10,7 +10,7 @@ document.addEventListener('DOMContentLoaded',()=>{
     {nombre:'Orotina',empresa:'Cedi Orotina',lat:9.8928466,lng:-84.645024,direccion:'left',enlace:'https://maps.app.goo.gl/z2LXXTwBxCKScfuN9',fotos:[]},
     {nombre:'Alajuela',empresa:'Planta Alajuela',lat:9.9976714,lng:-84.2403176,direccion:'top',enlace:'https://maps.app.goo.gl/uQgUmrAsLabLxYTH8',fotos:[]},
     {nombre:'Guápiles',empresa:'Cedi Guápiles',lat:10.2024713,lng:-83.77406,enlace:'https://maps.app.goo.gl/Jyk7kmjFGqFEVRuc8',fotos:[]},
-    {nombre:'Río Claro',empresa:'Cedi Río Claro',lat:8.6695875,lng:-83.060390625,enlace:'https://maps.app.goo.gl/RTwF4WoedG7FPfbRA',fotos:[]},
+    {nombre:'Río Claro',empresa:'Cedi Río Claro',lat:8.6695891,lng:-83.0603779,enlace:'https://maps.app.goo.gl/RTwF4WoedG7FPfbRA',fotos:[]},
     {nombre:'Nicoya',empresa:'Cedi Nicoya',lat:10.1614089,lng:-85.4533432,direccion:'left',enlace:'https://maps.app.goo.gl/efaT7b1NZMkSM9zn9',fotos:[]},
     {nombre:'Pérez Zeledón',empresa:'Cedi Pérez Zeledón',lat:9.2809942,lng:-83.6422741,direccion:'left',enlace:'https://maps.app.goo.gl/4RWfJFCARfidKsCr8',fotos:[]}
   ];

@@ -41,6 +41,7 @@ const {departamentosInicio}=require('../src/utils/inicioEmpresa');
       assert.ok((await page.locator('.sedes-footer>a').getAttribute('href')).includes(enlace));
       assert.equal(await page.locator('.sede-seleccionada').count(),1);
       if(valor==='7')assert.equal(await page.locator('.leaflet-popup-content a').getAttribute('href'),'https://www.google.com/maps/dir/?api=1&destination=9.2809942,-83.6422741');
+      if(valor==='5')assert.equal(await page.locator('.leaflet-popup-content a').getAttribute('href'),'https://www.google.com/maps/dir/?api=1&destination=8.6695891,-83.0603779');
     }
     await page.setViewportSize({width:390,height:844});await page.locator('#mapa-cartago').click();
     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
