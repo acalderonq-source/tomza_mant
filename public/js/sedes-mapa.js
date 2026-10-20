@@ -12,7 +12,8 @@ document.addEventListener('DOMContentLoaded',()=>{
     {nombre:'Guápiles',empresa:'Cedi Guápiles',lat:10.2024713,lng:-83.77406,enlace:'https://maps.app.goo.gl/Jyk7kmjFGqFEVRuc8',fotos:[]},
     {nombre:'Río Claro',empresa:'Cedi Río Claro',lat:8.6695891,lng:-83.0603779,enlace:'https://maps.app.goo.gl/RTwF4WoedG7FPfbRA',fotos:[]},
     {nombre:'Nicoya',empresa:'Cedi Nicoya',lat:10.1614089,lng:-85.4533432,direccion:'left',enlace:'https://maps.app.goo.gl/efaT7b1NZMkSM9zn9',fotos:[]},
-    {nombre:'Pérez Zeledón',empresa:'Cedi Pérez Zeledón',lat:9.2809942,lng:-83.6422741,direccion:'left',enlace:'https://maps.app.goo.gl/4RWfJFCARfidKsCr8',fotos:[]}
+    {nombre:'Pérez Zeledón',empresa:'Cedi Pérez Zeledón',lat:9.2809942,lng:-83.6422741,direccion:'left',enlace:'https://maps.app.goo.gl/4RWfJFCARfidKsCr8',fotos:[]},
+    {nombre:'San Carlos',empresa:'Cedi San Carlos',lat:10.3584225,lng:-84.4812101,direccion:'top',enlace:'https://maps.app.goo.gl/B9uDY9f1ZgYFQ1V66',fotos:[]}
   ];
   const map=L.map(container,{scrollWheelZoom:false,zoomControl:false,fadeAnimation:false,zoomAnimation:false,minZoom:6,maxZoom:11,zoomSnap:.25,zoomDelta:.5});
   const stage=container.closest('.sedes-map-stage');

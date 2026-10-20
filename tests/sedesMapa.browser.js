@@ -20,8 +20,8 @@ const {departamentosInicio}=require('../src/utils/inicioEmpresa');
     assert.equal(await page.locator('#sedes-mapa .leaflet-tile-pane').evaluate(el=>getComputedStyle(el).filter),'none');
     await page.waitForFunction(()=>document.querySelectorAll('#sedes-mapa path.leaflet-interactive').length===7);
     await page.screenshot({path:path.join(__dirname,'../tmp/mapa-inicial.png'),fullPage:true});
-    assert.equal(await page.locator('#sedes-mapa .tomza-map-marker').count(),8);
-    assert.deepEqual(await page.locator('#sedes-mapa .tomza-map-label').allTextContents(),['Cartago','La Cruz','Orotina','Alajuela','Guápiles','Río Claro','Nicoya','Pérez Zeledón']);
+    assert.equal(await page.locator('#sedes-mapa .tomza-map-marker').count(),9);
+    assert.deepEqual(await page.locator('#sedes-mapa .tomza-map-label').allTextContents(),['Cartago','La Cruz','Orotina','Alajuela','Guápiles','Río Claro','Nicoya','Pérez Zeledón','San Carlos']);
     assert.equal(await page.locator('.sede-seleccionada .sede-mapa-punto').evaluate(el=>getComputedStyle(el).backgroundColor),'rgb(255, 121, 0)');
     await page.locator('#mapa-acercar').click();await page.locator('#mapa-alejar').click();
     assert.equal(await page.locator('#sedes-mapa .leaflet-tile').count(),0);
@@ -35,13 +35,14 @@ const {departamentosInicio}=require('../src/utils/inicioEmpresa');
     await page.locator('.leaflet-popup-close-button').click();
     await page.locator('#mapa-pais').click();await page.waitForSelector('.leaflet-popup-content',{state:'detached'});
     await page.screenshot({path:path.join(__dirname,'../tmp/sedes-mapa-desktop.png'),fullPage:true});
-    for(const [valor,nombre,enlace] of [['1','La Cruz','L9V28aBZcqjKmWNe7'],['2','Orotina','z2LXXTwBxCKScfuN9'],['3','Alajuela','uQgUmrAsLabLxYTH8'],['4','Guápiles','Jyk7kmjFGqFEVRuc8'],['5','Río Claro','RTwF4WoedG7FPfbRA'],['6','Nicoya','efaT7b1NZMkSM9zn9'],['7','Pérez Zeledón','4RWfJFCARfidKsCr8']]){
+    for(const [valor,nombre,enlace] of [['1','La Cruz','L9V28aBZcqjKmWNe7'],['2','Orotina','z2LXXTwBxCKScfuN9'],['3','Alajuela','uQgUmrAsLabLxYTH8'],['4','Guápiles','Jyk7kmjFGqFEVRuc8'],['5','Río Claro','RTwF4WoedG7FPfbRA'],['6','Nicoya','efaT7b1NZMkSM9zn9'],['7','Pérez Zeledón','4RWfJFCARfidKsCr8'],['8','San Carlos','B9uDY9f1ZgYFQ1V66']]){
       await page.locator('#mapa-sede').selectOption(valor);await page.waitForSelector('.leaflet-popup-content');
       assert.equal(await page.locator('#sede-detalle-titulo').innerText(),nombre);
       assert.ok((await page.locator('.sedes-footer>a').getAttribute('href')).includes(enlace));
       assert.equal(await page.locator('.sede-seleccionada').count(),1);
       if(valor==='7')assert.equal(await page.locator('.leaflet-popup-content a').getAttribute('href'),'https://www.google.com/maps/dir/?api=1&destination=9.2809942,-83.6422741');
       if(valor==='5')assert.equal(await page.locator('.leaflet-popup-content a').getAttribute('href'),'https://www.google.com/maps/dir/?api=1&destination=8.6695891,-83.0603779');
+      if(valor==='8')assert.equal(await page.locator('.leaflet-popup-content a').getAttribute('href'),'https://www.google.com/maps/dir/?api=1&destination=10.3584225,-84.4812101');
     }
     await page.setViewportSize({width:390,height:844});await page.locator('#mapa-cartago').click();
     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
