@@ -544,6 +544,10 @@ app.get("/logout", (req, res) => {
   });
 });
 
+const respuestasFinales = require('./middleware/respuestasFinales');
+app.use(respuestasFinales.noEncontrado);
+app.use(respuestasFinales.manejarError);
+
 const PORT = process.env.PORT || 3000;
 async function startServer() {
   await ensurePortalDepartmentSchema(pool);
