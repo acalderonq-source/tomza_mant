@@ -1,7 +1,7 @@
 (() => {
   const form = document.querySelector('[data-solicitud-inventario]');
   if (!form) return;
-  const { articulos = [] } = JSON.parse(document.getElementById('prov-datos').textContent);
+  const { articulos = [], categorias = [] } = JSON.parse(document.getElementById('prov-datos').textContent);
   const body = form.querySelector('tbody');
   const agregar = form.querySelector('[data-agregar-articulo]');
   const enviar = form.querySelector('button:not([type]),button[type="submit"]');
@@ -18,7 +18,7 @@
     tr.innerHTML = '<td data-label="Categoría"><select class="form-select" aria-label="Categoría" data-campo="categoria" required><option value="">Seleccione una categoría</option></select></td><td data-label="Producto a solicitar"><select class="form-select" aria-label="Producto a solicitar" data-campo="codigo" required disabled><option value="">Seleccione primero una categoría</option></select><small class="text-muted" data-origen-producto></small></td><td data-label="Código automático"><input class="form-control codigo" aria-label="Código automático" placeholder="Automático" readonly></td><td data-label="Cantidad"><input class="form-control cantidad" aria-label="Cantidad solicitada" data-campo="cantidad" type="number" min="0.001" step="0.001" value="1" required></td><td><button class="btn btn-outline-danger" type="button" aria-label="Quitar artículo">×</button></td>';
     const categoria = tr.querySelector('[data-campo="categoria"]');
     const select = tr.querySelector('[data-campo="codigo"]');
-    for (const nombre of [...new Set(catalogo.map(a => a.categoria))].sort((a,b) => a.localeCompare(b,'es'))) {
+    for (const nombre of categorias) {
       const option = document.createElement('option');
       option.value = option.textContent = nombre;
       categoria.append(option);
@@ -32,6 +32,9 @@
       select.disabled = !categoria.value;
       tr.querySelector('.codigo').value = '';
       tr.querySelector('[data-origen-producto]').textContent = '';
+      if(categoria.value && !catalogo.some(a=>a.categoria===categoria.value)){
+        placeholder.textContent='No hay artículos en esta categoría';
+      }
       for (const [label, fueraInventario] of [['Inventario general', false], ['Compra por solicitud', true]]) {
         const grupo = document.createElement('optgroup');
         grupo.label = label;

@@ -35,7 +35,14 @@ const pool = require('../src/db');
       const categorias = page.locator('[data-campo="categoria"]');
       const productos = page.locator('[data-campo="codigo"]');
       assert.equal(await productos.isDisabled(),true);
-      await categorias.selectOption('Equipo de protección personal');
+      assert.deepEqual(await categorias.locator('option').allTextContents(),['Seleccione una categoría','Limpieza','Oficina','Operaciones','Otros','Papelería','Salud ocupacional','Servicios ambientales','Técnicos','Uniformes']);
+      const datos=JSON.parse(await page.locator('#prov-datos').textContent());
+      for(const categoria of datos.categorias){
+        await categorias.selectOption(categoria);
+        const visibles=await productos.locator('option').evaluateAll(options=>options.map(o=>o.value).filter(Boolean));
+        assert.deepEqual(visibles.sort(),datos.articulos.filter(a=>a.categoria===categoria).map(a=>a.codigo).sort());
+      }
+      await categorias.selectOption('Salud ocupacional');
       await page.waitForSelector('[data-campo="codigo"] option[value="GUANTE"]',{state:'attached'});
       assert.equal(await productos.locator('option').evaluateAll(options=>options.some(o=>/Café/.test(o.textContent))),false);
       await page.locator('[data-campo="codigo"]').selectOption('GUANTE');
@@ -47,10 +54,10 @@ const pool = require('../src/db');
       await sede.selectOption('Cartago');
       assert.equal(await page.locator('[data-campo="codigo"] option[value="GUANTE"]').count(),1);
       await page.getByRole('button',{name:'Agregar artículo'}).click();
-      await categorias.nth(1).selectOption('Equipo de protección personal');
+      await categorias.nth(1).selectOption('Salud ocupacional');
       await productos.nth(1).selectOption('GUANTE');
       assert.equal(await productos.nth(0).evaluate(el=>el.validity.customError),true);
-      await categorias.nth(1).selectOption('Cafetería');
+      await categorias.nth(1).selectOption('Otros');
       assert.equal(await productos.nth(1).inputValue(),'');
       assert.equal(await page.locator('.codigo').nth(1).inputValue(),'');
       assert.equal(await productos.nth(0).evaluate(el=>el.validity.customError),false);

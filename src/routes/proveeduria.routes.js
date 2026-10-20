@@ -3,7 +3,7 @@ const {facturasDeOrden,vincularOrden,adjuntarFacturas}=require('../utils/portalF
 const {articulosExcel,articuloExcel,ivaArticulo,condicionesOrden}=require('../utils/proveeduriaCatalogo');
 const {motivoBloqueoOrden,versionOrden,cambiosOrden}=require('../utils/proveeduriaOrdenEdicion');
 const {articulosSolicitud,articuloSolicitud,articuloSolicitudDescripcion,esNoInventariable,catalogoParaOrden}=require('../utils/proveeduriaSolicitable');
-const {categoriaArticulo,agruparArticulos}=require('../utils/proveeduriaCategorias');
+const {CATEGORIAS_SOLICITUD,categoriaArticulo,agruparArticulos}=require('../utils/proveeduriaCategorias');
 const { leerFacturaXML, consultarHacienda, aprobable, vencimiento } = require('../utils/proveedorHacienda');
 const { rateLimit } = require('express-rate-limit');
 const pool = require('../db');
@@ -105,7 +105,7 @@ router.get('/mis-solicitudes',wrap(async(req,res)=>{
   const [articulos]=await pool.query(`SELECT i.sede,i.codigo,i.descripcion,COALESCE(f.unidad,'UND') AS unidad,COALESCE(f.categoria,'') AS categoria FROM prov_inventario i LEFT JOIN prov_inventario_fichas f ON f.sede=i.sede AND f.codigo=i.codigo WHERE i.sede IN (?) ORDER BY i.descripcion,i.codigo`,[ALMACEN_GENERAL]);
   res.set('Cache-Control','no-store');
   const catalogo=[...articulos.map(a=>({...a,categoria:categoriaArticulo(a)})),...articulosSolicitud.map(({codigo,descripcion,unidad,inventariable,categoria})=>({codigo,descripcion,unidad,inventariable,categoria}))];
-  res.render('proveeduria/mis_solicitudes',{user:u,docs:rows.map(datos),alertas,sedesPermitidas,articulos:catalogo,agruparArticulos,sedeActual:sedesPermitidas.includes(actual)?actual:''});
+  res.render('proveeduria/mis_solicitudes',{user:u,docs:rows.map(datos),alertas,sedesPermitidas,articulos:catalogo,categorias:CATEGORIAS_SOLICITUD,agruparArticulos,sedeActual:sedesPermitidas.includes(actual)?actual:''});
 }));
 router.get('/solicitudes',wrap(async(req,res)=>{
   if(!gestion(req.session.user))throw error(403,'Solo Proveeduría puede gestionar solicitudes');

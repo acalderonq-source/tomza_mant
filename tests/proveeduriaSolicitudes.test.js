@@ -149,9 +149,9 @@ test('categorías: admite pedidos mixtos y rechaza productos inventados o catego
   pool.query=query;pool.getConnection=async()=>({query,beginTransaction:async()=>{},commit:async()=>{},rollback:async()=>{},release(){}});
   const post=lineas=>({method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sede:'Cartago',lineas})});
   try{await server(requester,async base=>{
-    const lineas=[{codigo:'PAPEL',categoria:'Oficina',cantidad:1,descripcion:'Inventado'},{codigo:externo.codigo,categoria:externo.categoria,cantidad:2}];
+    const lineas=[{codigo:'PAPEL',categoria:'Papelería',cantidad:1,descripcion:'Inventado'},{codigo:externo.codigo,categoria:externo.categoria,cantidad:2}];
     assert.equal((await fetch(base+'/solicitudes',post(lineas))).status,200);
-    assert.deepEqual(guardadas[0].lineas.map(l=>[l.codigo,l.categoria]),[['PAPEL','Oficina'],[externo.codigo,'Técnicos']]);
+    assert.deepEqual(guardadas[0].lineas.map(l=>[l.codigo,l.categoria]),[['PAPEL','Papelería'],[externo.codigo,'Técnicos']]);
     assert.equal(guardadas[0].lineas[0].descripcion,'Papel oficial');
     assert.equal(guardadas[0].lineas[1].inventariable,false);
     for(const incorrectas of [[{codigo:'PAPEL',categoria:'Limpieza',cantidad:1}],[{codigo:externo.codigo,categoria:'Oficina',cantidad:1}],[{codigo:'PAPEL',categoria:'Nueva categoría',cantidad:1}],[{codigo:'PAPEL',categoria:'',cantidad:1}],[{codigo:'INVENTADO',categoria:'Oficina',cantidad:1}]]){
