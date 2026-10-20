@@ -7,6 +7,7 @@ const bcrypt = require("bcryptjs");
 const crypto = require("node:crypto");
 const pool = require("../db");
 const { normalizarCedula, cedulaValida } = require("../utils/cedula");
+const {puedeConsultarCarnetsTaller,FILTRO_MECANICOS}=require('../utils/carnetsTaller');
 
 const router = express.Router();
 const pdfPrinter = new PdfPrinter({
@@ -91,10 +92,20 @@ function basePublicUrl(req) {
   return `${req.protocol}://${req.get("host")}`;
 }
 
-router.get("/admin/carnets-trabajadores", requireAdmin, async (_req, res) => {
+function requireConsulta(req,res,next){
+ if(req.path.startsWith('/admin/'))return requireAdmin(req,res,next);
+ if(!puedeConsultarCarnetsTaller(req.session?.user))return res.sendStatus(403);
+ next();
+}
+
+router.get(["/admin/carnets-trabajadores","/taller/carnets"], requireConsulta, async (_req, res) => {
   try {
     const buscar = String(_req.query.buscar || '').trim().slice(0,150);
-    const filtro = buscar ? 'WHERE (uc.persona_nombre LIKE ? OR uc.cedula LIKE ? OR uc.codigo_trabajador LIKE ?)' : '';
+    const soloLectura=_req.path.startsWith('/taller/');
+    const condiciones=[];
+    if(buscar)condiciones.push('(uc.persona_nombre LIKE ? OR uc.cedula LIKE ? OR uc.codigo_trabajador LIKE ?)');
+    if(soloLectura)condiciones.push(FILTRO_MECANICOS);
+    const filtro=condiciones.length?'WHERE '+condiciones.join(' AND '):'';
     const [rows] = await pool.query(`
       SELECT c.qr_token,
         MAX(uc.persona_nombre) AS nombre,
@@ -107,7 +118,7 @@ router.get("/admin/carnets-trabajadores", requireAdmin, async (_req, res) => {
       GROUP BY c.cedula, c.qr_token
       ORDER BY nombre
     `, buscar ? Array(3).fill(`%${buscar}%`) : []);
-    const [perfilesAcceso] = await pool.query(`
+    const [perfilesAcceso] = soloLectura?[[]]:await pool.query(`
       SELECT id, usuario, nombre, rol, sede
       FROM usuarios
       WHERE rol NOT IN ('ADMIN', 'PANTALLA_MECANICOS', 'PANTALLA_PESADOS')
@@ -124,6 +135,7 @@ router.get("/admin/carnets-trabajadores", requireAdmin, async (_req, res) => {
     })));
     res.render("carnets_trabajadores", {
       trabajadores,
+      soloLectura,
       buscar,
       perfilesAcceso,
       mensajeAcceso: _req.session.accesoCarnetMensaje || "",
@@ -216,7 +228,7 @@ router.post("/admin/carnets-trabajadores", requireAdmin, async (req, res) => {
   res.redirect("/admin/carnets-trabajadores");
 });
 
-router.get("/admin/carnets-trabajadores/:token.pdf", requireAdmin, async (req, res) => {
+router.get(["/admin/carnets-trabajadores/:token.pdf","/taller/carnets/:token.pdf"], requireConsulta, async (req, res) => {
   const token = String(req.params.token || "");
   if (!/^[a-f0-9]{64}$/.test(token)) return res.sendStatus(404);
   try {
@@ -227,7 +239,7 @@ router.get("/admin/carnets-trabajadores/:token.pdf", requireAdmin, async (req, r
         c.cedula, c.qr_token
       FROM carnets_trabajador c
       JOIN usuario_cedulas uc ON uc.cedula = c.cedula
-      WHERE c.qr_token = ?
+      WHERE c.qr_token = ? ${req.path.startsWith('/taller/')?'AND '+FILTRO_MECANICOS:''}
       GROUP BY c.cedula, c.qr_token
     `, [token]);
     if (!worker) return res.sendStatus(404);
@@ -284,7 +296,7 @@ router.get("/personal/carnet/:token/foto", requireLogin, async (req, res) => {
   if (!/^[a-f0-9]{64}$/.test(token)) return res.sendStatus(404);
   try {
     const [[row]] = await pool.query(
-      "SELECT foto_data, foto_mime FROM carnets_trabajador WHERE qr_token = ? LIMIT 1",
+      `SELECT foto_data, foto_mime FROM carnets_trabajador c WHERE qr_token = ? ${puedeConsultarCarnetsTaller(req.session.user)?'AND '+FILTRO_MECANICOS:''} LIMIT 1`,
       [token]
     );
     if (!row?.foto_data) return res.sendStatus(404);
@@ -309,7 +321,7 @@ router.get("/personal/carnet/:token", requireLogin, async (req, res) => {
         MAX(c.foto_data IS NOT NULL) AS tiene_foto
       FROM carnets_trabajador c
       JOIN usuario_cedulas uc ON uc.cedula = c.cedula
-      WHERE c.qr_token = ?
+      WHERE c.qr_token = ? ${puedeConsultarCarnetsTaller(req.session.user)?'AND '+FILTRO_MECANICOS:''}
       GROUP BY c.cedula, c.qr_token
     `, [token]);
     if (!worker) return res.sendStatus(404);

@@ -29,14 +29,15 @@
   </style>
 </head>
 <body>
+  <% const lectura = typeof soloLectura !== 'undefined' && soloLectura; const baseCarnets = lectura ? '/taller/carnets' : '/admin/carnets-trabajadores'; %>
   <main class="page">
     <div class="d-flex justify-content-between align-items-center gap-3 flex-wrap mb-4 no-print">
-      <div><h1 class="h3 mb-1">Accesos y carnets de trabajadores</h1><p class="text-secondary mb-0">Cree accesos por cédula, cargue fotos y descargue los carnets en PDF.</p></div>
-      <div class="d-flex gap-2 flex-wrap"><a href="/admin/perfiles" class="btn btn-outline-primary">Editar perfiles</a><a href="/admin/departamentos" class="btn btn-outline-primary">Accesos por área</a><a href="/dashboard" class="btn btn-outline-secondary">Volver</a><button class="btn btn-primary" onclick="window.print()"><i class="bi bi-printer"></i> Imprimir carnets</button></div>
+      <div><h1 class="h3 mb-1"><%= lectura ? 'Carnets de mecánicos' : 'Accesos y carnets de trabajadores' %></h1><% if (!lectura) { %><p class="text-secondary mb-0">Cree accesos por cédula, cargue fotos y descargue los carnets en PDF.</p><% } %></div>
+      <div class="d-flex gap-2 flex-wrap"><% if (!lectura) { %><a href="/admin/perfiles" class="btn btn-outline-primary">Editar perfiles</a><a href="/admin/departamentos" class="btn btn-outline-primary">Accesos por área</a><% } %><a href="/dashboard" class="btn btn-outline-secondary">Volver</a><button class="btn btn-primary" onclick="window.print()"><i class="bi bi-printer"></i> Imprimir carnets</button></div>
     </div>
     <% if (mensajeAcceso) { %><div class="alert alert-success no-print"><%= mensajeAcceso %></div><% } %>
     <% if (errorAcceso) { %><div class="alert alert-danger no-print"><%= errorAcceso %></div><% } %>
-    <section class="card border-0 shadow-sm mb-4 no-print">
+    <% if (!lectura) { %><section class="card border-0 shadow-sm mb-4 no-print">
       <div class="card-body p-4">
         <h2 class="h5 mb-1">Crear carnet de un trabajador con acceso</h2>
         <p class="small text-secondary">Si ya tiene acceso al sistema, indique solo su cédula. Se usarán sus datos registrados y se conservarán su PIN y permisos.</p>
@@ -46,11 +47,11 @@
         </form>
         <a class="btn btn-outline-primary" href="/admin/solicitudes-trabajadores">Solicitudes de trabajadores</a>
       </div>
-    </section>
+    </section><% } %>
     <div class="d-flex justify-content-between align-items-center mb-3 no-print"><h2 class="h5 mb-0">Carnets registrados</h2><span class="badge text-bg-secondary"><%= trabajadores.length %></span></div>
-    <form method="GET" action="/admin/carnets-trabajadores" class="row g-2 mb-4 no-print" role="search">
+    <form method="GET" action="<%= baseCarnets %>" class="row g-2 mb-4 no-print" role="search">
       <div class="col-md-8"><label class="form-label" for="buscar-carnet">Buscar por nombre, cédula o código de trabajador</label><input type="search" class="form-control" id="buscar-carnet" name="buscar" maxlength="150" value="<%= buscar %>" placeholder="Nombre, cédula o código"></div>
-      <div class="col-md-4 d-flex align-items-end gap-2"><button class="btn btn-primary" type="submit">Buscar</button><a class="btn btn-outline-secondary" href="/admin/carnets-trabajadores">Ver todos</a></div>
+      <div class="col-md-4 d-flex align-items-end gap-2"><button class="btn btn-primary" type="submit">Buscar</button><a class="btn btn-outline-secondary" href="<%= baseCarnets %>">Ver todos</a></div>
     </form>
     <% if(!trabajadores.length){ %><p class="alert alert-info">No hay carnets para mostrar<%= buscar?' con esa búsqueda':'' %>.</p><% } %>
     <div class="cards d-flex flex-wrap gap-3">
@@ -73,8 +74,8 @@
             <span class="small photo-status" aria-live="polite"><%= worker.tiene_foto ? 'Foto cargada' : 'Falta fotografía' %></span>
             <div class="d-flex gap-1">
               <a class="btn btn-sm btn-outline-primary" href="/personal/carnet/<%= worker.qr_token %>">Ver carnet</a>
-              <a class="btn btn-sm btn-outline-secondary" href="/admin/carnets-trabajadores/<%= worker.qr_token %>.pdf"><i class="bi bi-file-earmark-pdf"></i> PDF</a>
-              <label class="btn btn-sm btn-outline-primary mb-0"><i class="bi bi-camera"></i> <%= worker.tiene_foto ? 'Cambiar foto' : 'Cargar foto' %><input class="photo-input d-none" type="file" accept="image/jpeg,image/png,image/webp" data-token="<%= worker.qr_token %>"></label>
+              <a class="btn btn-sm btn-outline-secondary" href="<%= baseCarnets %>/<%= worker.qr_token %>.pdf"><i class="bi bi-file-earmark-pdf"></i> PDF</a>
+              <% if (!lectura) { %><label class="btn btn-sm btn-outline-primary mb-0"><i class="bi bi-camera"></i> <%= worker.tiene_foto ? 'Cambiar foto' : 'Cargar foto' %><input class="photo-input d-none" type="file" accept="image/jpeg,image/png,image/webp" data-token="<%= worker.qr_token %>"></label><% } %>
             </div>
           </div>
         </article>

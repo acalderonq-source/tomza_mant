@@ -302,6 +302,10 @@ app.use((req, res, next) => {
 
 // ===================== VISTAS =====================
 app.set("view engine", "ejs");
+app.use((req,res,next)=>{
+  res.locals.puedeVerCarnetsMecanicos=require('./utils/carnetsTaller').puedeConsultarCarnetsTaller(req.session?.user);
+  next();
+});
 require('./utils/vistasSeguras').configurarVistasSeguras(require('ejs'));
 app.set("views", path.join(__dirname, "views"));
 

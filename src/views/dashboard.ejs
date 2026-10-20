@@ -116,6 +116,7 @@
     <% } %>
     <span class="small"><%= user.usuario %> · <%= user.rol %></span>
     <% if (user.rol === 'ADMIN') { %><a href="/admin/departamentos" class="btn btn-outline-light btn-sm">Accesos por área</a><a href="/admin/carnets-trabajadores" class="btn btn-outline-light btn-sm">Accesos y carnets</a><% } %>
+    <% if (typeof puedeVerCarnetsMecanicos !== 'undefined' && puedeVerCarnetsMecanicos) { %><a href="/taller/carnets" class="btn btn-outline-light btn-sm">Carnets de mecánicos</a><% } %>
     <a href="/logout" class="btn btn-warning btn-sm rounded-pill px-3">Salir</a>
   </div>
 </nav>
