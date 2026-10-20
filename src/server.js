@@ -423,6 +423,7 @@ app.use("/", sedeRoutes);
 app.use('/administracion',require('./routes/administracion.routes'));
 app.use('/seguridad-ocupacional',require('./routes/seguridadOcupacional.routes'));
 app.use('/recursos-humanos',require('./routes/recursosHumanos.routes'));
+app.use('/operaciones',require('./routes/operaciones.routes'));
 app.use('/administracion/portal-proveedores',portalProveedores.administracion);
 app.use("/", adminRoutes);
 app.use("/", carnetsRoutes);

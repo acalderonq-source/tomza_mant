@@ -16,7 +16,7 @@ const MODULOS=[
   {id:'RESUMEN',nombre:'Resumen ejecutivo y conciliacion',areas:['TALLER','CONTABILIDAD','PROVEEDURIA'],rutas:['/dashboard/resumen-ejecutivo','/dashboard/conciliacion-pagos'],url:'/dashboard/resumen-ejecutivo'},
   {id:'PROVEEDORES',nombre:'Proveedores',areas:['TALLER','PROVEEDURIA'],rutas:['/compras/proveedores'],url:'/compras/proveedores'},
   {id:'TRAMITES',nombre:'ARESEP y tramites',areas:['TALLER','CONTABILIDAD','OPERACIONES','LOGISTICA'],rutas:['/aresep'],url:'/aresep'},
-  {id:'OPERACIONES',nombre:'Revision en ruta, giras y reportes',areas:['TALLER','OPERACIONES'],rutas:['/revision-ruta','/giras','/reportes-supervisores'],url:'/revision-ruta'},
+  {id:'OPERACIONES',nombre:'Operaciones y solicitud de suministros',areas:['TALLER','OPERACIONES'],rutas:['/operaciones','/revision-ruta','/giras','/reportes-supervisores'],url:'/operaciones'},
   {id:'CARBURACION',nombre:'Carburacion',areas:['CARBURACION'],rutas:['/carburacion'],url:'/carburacion/dashboard'},
   {id:'SEGURIDAD',nombre:'Seguridad Ocupacional',areas:['SEGURIDAD_OCUPACIONAL'],rutas:['/seguridad-ocupacional'],url:'/seguridad-ocupacional'},
   {id:'RECURSOS_HUMANOS',nombre:'Recursos Humanos',areas:['RECURSOS_HUMANOS'],rutas:['/recursos-humanos'],url:'/recursos-humanos'},
@@ -49,8 +49,8 @@ function esRutaSuministrosSeguridad(ruta,metodo='GET'){
     || (metodo==='POST' && (ruta==='/proveeduria/solicitudes' || /^\/proveeduria\/salidas\/\d+\/aceptar$/.test(ruta)));
 }
 function puedeAcceder(config,ruta,metodo){
-  if(['SEGURIDAD_OCUPACIONAL','RECURSOS_HUMANOS'].includes(config.departamento) && esRutaSuministrosSeguridad(ruta,metodo)){
-    const permiso=config.permisos[config.departamento==='RECURSOS_HUMANOS'?'RECURSOS_HUMANOS':'SEGURIDAD'];
+  if(['SEGURIDAD_OCUPACIONAL','RECURSOS_HUMANOS','OPERACIONES'].includes(config.departamento) && esRutaSuministrosSeguridad(ruta,metodo)){
+    const permiso=config.permisos[config.departamento==='SEGURIDAD_OCUPACIONAL'?'SEGURIDAD':config.departamento];
     return permiso==='GESTION' || (permiso==='LECTURA' && ['GET','HEAD'].includes(metodo));
   }
   if(['/','/inicio','/dashboard','/logout','/login','/login/perfil','/cambiar-clave','/departamento/activo','/cambiar-sede'].includes(ruta))return true;

@@ -1,6 +1,6 @@
 const DEPARTAMENTOS = [
   { key: "TALLER", nombre: "Taller", icono: "bi-tools", descripcion: "Mantenimientos, repuestos y bodega del taller." },
-  { key: "OPERACIONES", nombre: "Operaciones", icono: "bi-truck", descripcion: "Área en preparación; sus procesos se habilitarán en una versión posterior." },
+  { key: "OPERACIONES", nombre: "Operaciones", icono: "bi-truck", descripcion: "Solicitudes de materiales y suministros a Proveeduría." },
   { key: "CONTABILIDAD", nombre: "Contabilidad", icono: "bi-journal-check", descripcion: "Facturas de proveedores, validación Hacienda, cuentas por pagar y pagos." },
   { key: "ADMINISTRACION", nombre: "Administración", icono: "bi-shield-lock", descripcion: "Acceso privado del propietario. Administración del portal de proveedores." },
   { key: "SEGURIDAD_OCUPACIONAL", nombre: "Seguridad Ocupacional", icono: "bi-shield-check", descripcion: "Área lista para incorporar sus procesos." },
