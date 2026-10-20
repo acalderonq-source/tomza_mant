@@ -407,6 +407,7 @@ const solicitudesTrabajadores = require('./routes/trabajadorSolicitudes.routes')
 app.use('/solicitar-ingreso', solicitudesTrabajadores.publico);
 app.use('/admin/solicitudes-trabajadores', solicitudesTrabajadores.privado);
 app.use('/admin/ingresos', require('./routes/ingresosSesion.routes').crearRouter(pool));
+app.use('/admin/perfiles',require('./routes/perfilesAcceso.routes').crearRouter(pool));
 app.use('/portal-proveedores/solicitar-acceso', solicitudesPortal.publico);
 app.use('/administracion/portal-proveedores/solicitudes', solicitudesPortal.privado);
 app.use('/portal-proveedores', portalProveedores.externo, (_req,res)=>res.sendStatus(404));

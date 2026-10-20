@@ -19,6 +19,7 @@ const MODULOS=[
   {id:'OPERACIONES',nombre:'Revision en ruta, giras y reportes',areas:['TALLER','OPERACIONES'],rutas:['/revision-ruta','/giras','/reportes-supervisores'],url:'/revision-ruta'},
   {id:'CARBURACION',nombre:'Carburacion',areas:['CARBURACION'],rutas:['/carburacion'],url:'/carburacion/dashboard'},
   {id:'SEGURIDAD',nombre:'Seguridad Ocupacional',areas:['SEGURIDAD_OCUPACIONAL'],rutas:['/seguridad-ocupacional'],url:'/seguridad-ocupacional'},
+  {id:'PROVEEDURIA',nombre:'Gestion de Proveeduria',areas:['PROVEEDURIA'],rutas:['/proveeduria'],url:'/proveeduria'},
   {id:'DOCUMENTOS',nombre:'Adjuntos autorizados por el sistema',areas:Object.keys(AREAS),rutas:['/uploads'],url:null}
 ];
 function error(message){return Object.assign(Error(message),{status:400});}
@@ -60,11 +61,14 @@ function puedeAcceder(config,ruta,metodo){
 }
 function controlarAccesosPersonales(db){return async(req,res,next)=>{
   const user=req.session?.user;
-  if(!/^acceso_\d{9,12}$/.test(user?.usuario || ''))return next();
+  if(!user || ['ADMIN','PANTALLA_MECANICOS','PANTALLA_PESADOS'].includes(user.rol))return next();
   if(['GET','HEAD'].includes(req.method) && (/^\/(css|js|img|fonts)\//.test(req.path) || ['/manifest.webmanifest','/sw.js','/offline.html','/data/mapa-sedes/costa-rica-provincias.geojson'].includes(req.path)))return next();
   try{
     const [rows]=await db.query('SELECT config_json FROM usuario_accesos_personales WHERE usuario_id=?',[user.id]);
-    if(!rows.length)return res.status(403).send('Este acceso no tiene permisos configurados. Contacte a Administracion.');
+    if(!rows.length){
+      if(!/^acceso_\d{9,12}$/.test(user.usuario || '')){delete user.accesoPersonal;return next();}
+      return res.status(403).send('Este acceso no tiene permisos configurados. Contacte a Administracion.');
+    }
     const config=JSON.parse(rows[0].config_json);
     if(!AREAS[config.departamento] || !config.permisos || typeof config.permisos!=='object')throw Error('CONFIG_INVALIDA');
     user.accesoPersonal=config;user.departamentos=[config.departamento];

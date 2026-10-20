@@ -23,11 +23,11 @@ test('Aprobacion exige area, sede laboral y permisos conocidos sin Administracio
 });
 test('Permisos personales se verifican frescos, deniegan faltantes y no afectan perfiles previos',async()=>{
   let reads=0,config={departamento:'TALLER',sede:'Cartago',permisos:{MANTENIMIENTOS:'LECTURA'}};
-  const db={query:async()=>{reads++;return config?[[{config_json:JSON.stringify(config)}]]:[[]];}};
+  const db={query:async(sql,args)=>{reads++;return args[0]===7?[[]]:config?[[{config_json:JSON.stringify(config)}]]:[[]];}};
   const guard=controlarAccesosPersonales(db);
   const res=()=>({code:200,status(n){this.code=n;return this;},send(){}});
   let next=false;
-  await guard({session:{user:{id:7,usuario:'taller'}},path:'/compras',method:'GET'},res(),()=>{next=true;});assert.equal(next,true);assert.equal(reads,0);
+  await guard({session:{user:{id:7,usuario:'taller'}},path:'/compras',method:'GET'},res(),()=>{next=true;});assert.equal(next,true);assert.equal(reads,1);
   const req={session:{user:{id:100,usuario:'acceso_123456789',departamentoActivo:'TALLER'}},path:'/mantenimientos',method:'GET'};
   next=false;await guard(req,res(),()=>{next=true;});assert.equal(next,true);
   req.method='POST';let r=res();await guard(req,r,()=>assert.fail());assert.equal(r.code,403);

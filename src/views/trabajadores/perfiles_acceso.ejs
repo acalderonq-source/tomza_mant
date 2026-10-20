@@ -1,0 +1,7 @@
+<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Perfiles de acceso | Gas Tomza</title><link rel="stylesheet" href="/css/solicitudes-trabajadores.css"></head><body>
+<header><a href="/administracion">Gas Tomza</a><strong>Perfiles de acceso</strong><a href="/logout">Salir</a></header><main>
+<nav><a href="/administracion">Administración</a><a href="/admin/carnets-trabajadores">Accesos y carnets</a></nav><h1>Perfiles de acceso</h1>
+<% if(guardado){ %><p class="aviso" role="status">Perfil actualizado. No se cambiaron contraseñas ni PIN.</p><% } %>
+<label for="buscar-perfil">Buscar perfil</label><input id="buscar-perfil" type="search" placeholder="Nombre, usuario o rol">
+<% usuarios.forEach(u=>{ %><section class="solicitud" data-perfil="<%= [u.nombre,u.usuario,u.rol].join(' ').toLowerCase() %>"><h2><%= u.nombre||u.usuario %></h2><p><%= u.usuario %> · <%= u.rol %> · <%= u.sede||'Sin sede' %></p><% if(protegidos.includes(u.rol)){ %><span>Perfil de sistema protegido</span><% }else{ %><a href="/admin/perfiles/<%= u.id %>">Editar perfil</a><% } %></section><% }); %>
+</main><script src="/js/perfil-editar.js" defer></script></body></html>
