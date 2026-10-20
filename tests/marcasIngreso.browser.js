@@ -26,13 +26,24 @@ const { crearRouter } = require('../src/routes/marcasIngreso.routes');
   const base = 'http://127.0.0.1:' + server.address().port;
   fs.mkdirSync(path.join(__dirname, '../tmp/marcas'), { recursive: true });
   try {
-    const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } }); const page = await context.newPage();
+    const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
+    await context.addInitScript(() => {
+      const original = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
+      navigator.mediaDevices.getUserMedia = constraints => {
+        window.ultimaSolicitudCamara = constraints;
+        // La camara virtual de Chromium no tiene orientacion fisica.
+        const video = { ...constraints.video }; delete video.facingMode;
+        return original({ ...constraints, video });
+      };
+    });
+    const page = await context.newPage();
     await page.goto(base + '/marcas-ingreso');
     await page.getByRole('button', { name: 'Registrar entrada', exact: true }).waitFor({ state: 'visible' });
     assert.equal(await page.locator('input[type=file]').count(), 0);
     await page.getByRole('button', { name: 'Registrar entrada', exact: true }).click();
     await page.waitForFunction(() => !document.getElementById('tomar-foto').disabled);
     assert.ok(await page.locator('#camara-video').evaluate(video => video.videoWidth > 0));
+    assert.deepEqual(await page.evaluate(() => window.ultimaSolicitudCamara.video.facingMode), { exact: 'environment' });
     await page.getByRole('button', { name: 'Tomar foto', exact: true }).click();
     await page.waitForSelector('#foto-preview[src]', { timeout: 10000 }).catch(async e => { console.log(await page.locator('main').innerText()); throw e; });
     assert.ok((await page.locator('#foto-preview').getAttribute('src')).startsWith('data:image/jpeg;'));
@@ -63,6 +74,19 @@ const { crearRouter } = require('../src/routes/marcasIngreso.routes');
     await denied.goto(base + '/marcas-ingreso'); await denied.getByRole('button', { name: 'Registrar entrada', exact: true }).click();
     await denied.waitForFunction(() => document.getElementById('marca-mensaje').textContent.includes('Permita'));
     assert.equal(await denied.locator('#guardar-marca').isVisible(), false);
-    console.log('Marcas: camara en vivo, JPEG, entrada/salida, cancelacion, permiso denegado, consulta y movil verificados.');
+    const sinTrasera = await browser.newPage();
+    await sinTrasera.addInitScript(() => {
+      window.intentosCamara = 0;
+      navigator.mediaDevices.getUserMedia = async () => {
+        window.intentosCamara++;
+        throw new DOMException('Sin camara trasera', 'OverconstrainedError');
+      };
+    });
+    await sinTrasera.goto(base + '/marcas-ingreso');
+    await sinTrasera.getByRole('button', { name: 'Registrar entrada', exact: true }).click();
+    await sinTrasera.waitForFunction(() => document.getElementById('marca-mensaje').textContent.includes('camara trasera'));
+    assert.equal(await sinTrasera.evaluate(() => window.intentosCamara), 1);
+    assert.equal(await sinTrasera.locator('#guardar-marca').isVisible(), false);
+    console.log('Marcas: solicitud exclusiva de trasera, sin fallback frontal, JPEG, entrada/salida y permisos verificados.');
   } finally { await browser.close(); await new Promise(resolve => server.close(resolve)); }
 })().catch(error => { console.error(error); process.exitCode = 1; });

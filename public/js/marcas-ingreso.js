@@ -33,7 +33,7 @@ document.addEventListener('DOMContentLoaded', () => {
     iniciando = true; abrir.disabled = true; mensaje.textContent = '';
     const version = ++versionCamara;
     try {
-      const nueva = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false });
+      const nueva = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { exact: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false });
       if (version !== versionCamara || document.hidden) { nueva.getTracks().forEach(t => t.stop()); return; }
       stream = nueva;
       video.srcObject = stream; panel.hidden = false; preview.hidden = true; video.hidden = false; tomar.hidden = false; tomar.disabled = true; guardar.hidden = true; repetir.hidden = true;
@@ -46,7 +46,7 @@ document.addEventListener('DOMContentLoaded', () => {
       tomar.disabled = false; panel.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
     } catch (error) {
       cerrar();
-      const errores = { NotAllowedError: 'Permita el acceso a la camara para marcar. No se aceptan fotos de galeria.', NotFoundError: 'No se encontro una camara. Abra el sistema en un celular o equipo con camara.', NotReadableError: 'No se pudo usar la camara. Cierre otras aplicaciones que la utilicen e intente nuevamente.', OverconstrainedError: 'La camara no admite esta captura. Intente desde Chrome en su celular.' };
+      const errores = { NotAllowedError: 'Permita el acceso a la camara para marcar. No se aceptan fotos de galeria.', NotFoundError: 'No se encontro una camara trasera disponible. Use un celular con camara trasera.', NotReadableError: 'No se pudo usar la camara. Cierre otras aplicaciones que la utilicen e intente nuevamente.', OverconstrainedError: 'No se pudo abrir la camara trasera. Verifique que su dispositivo tenga una disponible.' };
       mensaje.textContent = errores[error.name] || error.message || 'No se pudo abrir la camara.';
     }
     finally { iniciando = false; }
