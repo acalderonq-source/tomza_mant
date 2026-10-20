@@ -338,6 +338,7 @@ function injectPageAssets(html, csrfToken, user) {
   output = injectSecurityAssets(output, csrfToken);
   output = output.replace('</body>', '<script src="/js/operaciones-empresa.js?v=1" defer></script></body>');
 
+  output = require('./utils/marcaTomza').agregarMarcaTomza(output);
   return require('./utils/navegacionInicio').agregarNavegacionInicio(output,user);
 }
 

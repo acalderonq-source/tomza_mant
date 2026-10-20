@@ -1,0 +1,12 @@
+img.tomza-brand-logo {
+  display: inline-block;
+  width: 126px;
+  height: 40px;
+  max-width: 35vw;
+  object-fit: contain;
+  vertical-align: middle;
+  flex-shrink: 0;
+  background: #fff;
+  padding: 3px;
+  border-radius: 3px;
+}
