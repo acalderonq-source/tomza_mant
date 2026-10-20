@@ -4,6 +4,7 @@ const RETO_MS = 120000;
 const hash = value => crypto.createHash('sha256').update(value).digest('hex');
 const error = (mensaje, status = 400) => Object.assign(new Error(mensaje), { status });
 async function permisosMarcas(db, user) {
+  if (user?.rol === 'ADMIN' && !user.requiereCambioPassword && ['TALLER','ADMINISTRACION'].includes(user.departamentoActivo)) return { marcar: false, consultar: true };
   if (!user || user.departamentoActivo !== 'TALLER' || user.requiereCambioPassword) return { marcar: false, consultar: false };
   const [[row]] = await db.query('SELECT puede_marcar,puede_consultar FROM taller_marcas_accesos WHERE usuario_id=?', [user.id]);
   return { marcar: Number(row?.puede_marcar) === 1, consultar: Number(row?.puede_consultar) === 1 };

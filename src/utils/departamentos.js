@@ -67,6 +67,7 @@ function rutaPerteneceATaller(pathname) {
 }
 
 function puedeAbrirRutaPorDepartamento(departamento, pathname, rol = "", metodo = "GET") {
+  if (rol==='ADMIN' && departamento==='ADMINISTRACION' && ['GET','HEAD'].includes(metodo) && coincideRuta(pathname,['/marcas-ingreso'])) return true;
   if(String(rol).toUpperCase()==='SEGURIDAD_OCUP') {
     return String(departamento).toUpperCase()==='SEGURIDAD_OCUPACIONAL' && (require('./accesosTrabajador').esRutaSuministrosSeguridad(pathname,metodo) || coincideRuta(pathname,
       ['/','/inicio','/dashboard','/login','/logout','/cambiar-clave','/departamento/activo','/seguridad-ocupacional']));

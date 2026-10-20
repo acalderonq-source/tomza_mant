@@ -6,6 +6,14 @@ const express = require('express');
 const marcas = require('../src/utils/marcasIngreso');
 const { crearRouter } = require('../src/routes/marcasIngreso.routes');
 const jpeg = fs.readFileSync(path.join(__dirname, '../public/img/logo_tomza.jpg'));
+test('administrador consulta desde Taller y Administracion sin permiso de marcar', async () => {
+  const db = { query: async () => { throw Error('No debe depender de la lista de trabajadores'); } };
+  for (const departamentoActivo of ['TALLER','ADMINISTRACION']) assert.deepEqual(await marcas.permisosMarcas(db, {rol:'ADMIN',departamentoActivo}), {marcar:false,consultar:true});
+  assert.deepEqual(await marcas.permisosMarcas(db, {rol:'ADMIN',departamentoActivo:'CONTABILIDAD'}), {marcar:false,consultar:false});
+  const {puedeAbrirRutaPorDepartamento:puede}=require('../src/utils/departamentos');
+  assert.equal(puede('ADMINISTRACION','/marcas-ingreso/historial','ADMIN','GET'),true);
+  assert.equal(puede('ADMINISTRACION','/marcas-ingreso/registrar','ADMIN','POST'),false);
+});
 function fotoDistinta(text) { const comentario = Buffer.from(text); const len = Buffer.alloc(2); len.writeUInt16BE(comentario.length + 2); return Buffer.concat([jpeg.subarray(0, -2), Buffer.from([0xff, 0xfe]), len, comentario, jpeg.subarray(-2)]); }
 function fixture() {
   const rows = [], permisos = new Map([[52, { puede_marcar: 1, puede_consultar: 0 }], [2, { puede_marcar: 0, puede_consultar: 1 }]]);
@@ -58,7 +66,7 @@ test('marcas HTTP: solo Saul registra; consulta restringida y fotos privadas', a
   app.use((req, _res, next) => {
     const id = Number(req.get('x-test-user'));
     if (!sesiones.has(id)) sesiones.set(id, { user: id ? { id, usuario: 'prueba', nombre: 'Persona', departamentoActivo: 'TALLER' } : null });
-    req.session = sesiones.get(id); next();
+    req.session = sesiones.get(id); if (req.session.user && id===1) req.session.user.rol='ADMIN'; next();
   });
   app.use('/marcas-ingreso', crearRouter(db));
   const server = await new Promise(resolve => { const s = app.listen(0, '127.0.0.1', () => resolve(s)); });
@@ -69,6 +77,11 @@ test('marcas HTTP: solo Saul registra; consulta restringida y fotos privadas', a
     assert.equal((await get('/', 0)).status, 401); assert.equal((await get('/', 3)).status, 403);
     const reloj = await (await get('/')).text(); assert.ok(reloj.includes('camara-video')); assert.ok(!reloj.includes('type="file"'));
     assert.equal((await get('/historial')).status, 403);
+    assert.equal((await get('/historial', 1)).status, 200);
+    assert.equal((await post('/reto', {}, 1)).status, 403);
+    sesiones.get(1).user.departamentoActivo='ADMINISTRACION';
+    assert.equal((await get('/historial', 1)).status, 200);
+    assert.equal((await post('/registrar', {tipo:'ENTRADA'}, 1)).status, 403);
     assert.equal((await post('/reto', {}, 2)).status, 403);
     assert.equal((await post('/registrar', { tipo: 'ENTRADA', foto: jpeg.toString('base64') })).status, 409);
     const r = await (await post('/reto', {})).json();
@@ -76,6 +89,7 @@ test('marcas HTTP: solo Saul registra; consulta restringida y fotos privadas', a
     assert.equal(db.rows[0].usuario_id, 52); assert.equal(db.rows[0].fecha_utc, '2026-10-20T14:30:00.000000Z');
     assert.equal((await post('/registrar', { token: r.token, tipo: 'ENTRADA', foto: jpeg.toString('base64') })).status, 409);
     const img = await get('/foto/1', 2); assert.equal(img.status, 200); assert.equal(img.headers.get('Content-Type'), 'image/jpeg'); assert.ok(img.headers.get('Cache-Control').includes('no-store'));
+    assert.equal((await get('/foto/1', 1)).status, 200);
     assert.equal((await get('/foto/1', 3)).status, 403); assert.equal((await get('/foto/1', 0)).status, 401);
     assert.equal((await get('/historial?desde=2026-10-20&hasta=2026-10-20', 2)).status, 200);
     sesiones.get(52).user.departamentoActivo = 'PROVEEDURIA'; assert.equal((await get('/estado')).status, 403);
