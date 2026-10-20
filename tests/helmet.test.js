@@ -18,7 +18,8 @@ test('Helmet protege HTML, recursos, errores y PDFs sin romper HTTP local o HTTP
    assert.equal(h.get('X-XSS-Protection'),'0');assert.equal(h.get('Strict-Transport-Security'),null);
    assert.equal(h.get('Cross-Origin-Embedder-Policy'),null);
    const csp=h.get('Content-Security-Policy');assert.match(csp,/frame-ancestors 'self'/);assert.match(csp,/base-uri 'self'/);assert.match(csp,/object-src 'none'/);
-   assert.doesNotMatch(csp,/upgrade-insecure-requests|default-src|script-src/);
+   assert.match(csp,/default-src 'self'/);assert.match(csp,/script-src 'self' 'nonce-/);assert.match(csp,/style-src-attr 'none'/);
+   assert.doesNotMatch(csp,/unsafe-inline|unsafe-eval|\*/);
   }
   const https=await fetch(base,{headers:{'X-Forwarded-Proto':'https'}});
   assert.equal(https.headers.get('Strict-Transport-Security'),'max-age=15552000');

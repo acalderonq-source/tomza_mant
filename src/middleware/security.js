@@ -5,8 +5,18 @@ const helmetHeaders = helmet({
   contentSecurityPolicy: {
     useDefaults: false,
     directives: {
-      // Preserve the existing CSP while legacy views still use inline scripts and CDNs.
-      defaultSrc: helmet.contentSecurityPolicy.dangerouslyDisableDefaultSrc,
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'",(_req,res)=>`'nonce-${res.locals.cspNonce}'`,...Object.keys(require('../data/integridadRecursos.json')).filter(url=>url.endsWith('.js'))],
+      scriptSrcAttr: ["'none'"],
+      styleSrc: ["'self'",(_req,res)=>`'nonce-${res.locals.cspNonce}'`,...Object.keys(require('../data/integridadRecursos.json')).filter(url=>url.endsWith('.css'))],
+      styleSrcAttr: ["'none'"],
+      imgSrc: ["'self'",'data:','blob:','https://www.tomzasureste.com/img/grp_tomza.png','https://encrypted-tbn0.gstatic.com','https://tomza-mant.onrender.com/img/logo_supergas.jpeg'],
+      fontSrc: ["'self'",'data:','https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/fonts/'],
+      connectSrc: ["'self'"],
+      workerSrc: ["'self'",'blob:'],
+      mediaSrc: ["'self'",'blob:'],
+      frameSrc: ["'self'",'blob:'],
+      formAction: ["'self'"],
       frameAncestors: ["'self'"],
       baseUri: ["'self'"],
       objectSrc: ["'none'"]
@@ -88,6 +98,7 @@ function hasAllowedOrigin(req){
 }
 
 function securityHeaders(req,res,next){
+  res.locals.cspNonce=crypto.randomBytes(24).toString('base64');
   helmetHeaders(req,res,error=>{
     if(error)return next(error);
     return req.secure ? helmetHttps(req,res,next) : next();
@@ -101,7 +112,7 @@ function bloquearRutaEstaticaPrivada(req,res,next){
   return next();
 }
 
-function injectSecurityAssets(html, csrfToken) {
+function injectSecurityAssets(html, csrfToken, nonce) {
   html = require('../utils/soporteWhatsApp').injectSupport(html);
   if (typeof html !== "string" || !csrfToken) return html;
 
@@ -109,7 +120,7 @@ function injectSecurityAssets(html, csrfToken) {
   const escapedToken = escapeHtml(csrfToken);
   const csrfMeta = `\n  <meta name="csrf-token" content="${escapedToken}">`;
   const csrfScript = `
-<script>
+<script${nonce ? ` nonce="${escapeHtml(nonce)}"` : ''}>
 (() => {
   const token = document.querySelector('meta[name="csrf-token"]')?.content;
   if (!token || window.__tomzaCsrfFetch) return;

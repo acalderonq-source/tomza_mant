@@ -302,10 +302,11 @@ app.use((req, res, next) => {
 
 // ===================== VISTAS =====================
 app.set("view engine", "ejs");
+require('./utils/vistasSeguras').configurarVistasSeguras(require('ejs'));
 app.set("views", path.join(__dirname, "views"));
 
 // ===================== PWA / APP INSTALABLE =====================
-function injectPageAssets(html, csrfToken, user) {
+function injectPageAssets(html, csrfToken, user, nonce) {
   if (typeof html !== "string") return html;
 
   let output = html;
@@ -336,11 +337,12 @@ function injectPageAssets(html, csrfToken, user) {
     output = output.replace("</body>", `${loadingGuardScript}\n</body>`);
   }
 
-  output = injectSecurityAssets(output, csrfToken);
+  output = injectSecurityAssets(output, csrfToken, nonce);
   output = output.replace('</body>', '<script src="/js/operaciones-empresa.js?v=1" defer></script></body>');
 
   output = require('./utils/marcaTomza').agregarMarcaTomza(output);
-  return require('./utils/navegacionInicio').agregarNavegacionInicio(output,user);
+  output = require('./utils/navegacionInicio').agregarNavegacionInicio(output,user);
+  return require('./utils/vistasSeguras').finalizarHtmlSeguro(output,nonce);
 }
 
 app.use((req, res, next) => {
@@ -355,9 +357,9 @@ app.use((req, res, next) => {
     preventAuthenticatedHtmlCaching(req, res);
 
     originalRender(view, options, (err, html) => {
-      if (callback) return callback(err, err ? html : injectPageAssets(html, res.locals.csrfToken,req.session?.user));
+      if (callback) return callback(err, err ? html : injectPageAssets(html, res.locals.csrfToken,req.session?.user,res.locals.cspNonce));
       if (err) return next(err);
-      res.send(injectPageAssets(html, res.locals.csrfToken,req.session?.user));
+      res.send(injectPageAssets(html, res.locals.csrfToken,req.session?.user,res.locals.cspNonce));
     });
   };
 

@@ -5,6 +5,7 @@ const {chromium}=require('playwright');
 const {departamentosInicio}=require('../src/utils/inicioEmpresa');
 (async()=>{
   const app=express();app.use(require('../src/middleware/security').securityHeaders);app.set('view engine','ejs');app.set('views',path.join(__dirname,'../src/views'));
+  require('./helpers/secureBrowserApp')(app);
   app.use(express.static(path.join(__dirname,'../public')));
   app.get('/',(req,res)=>{const user={nombre:'Persona de prueba',rol:'TALLER',departamentos:['TALLER']};res.render('inicio_empresa',{user,departamentos:departamentosInicio(user),next:''});});
   const server=await new Promise(resolve=>{const s=app.listen(0,'127.0.0.1',()=>resolve(s));});

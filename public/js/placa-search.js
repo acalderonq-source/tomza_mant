@@ -9,6 +9,7 @@
   function injectStyle() {
     if (document.getElementById(STYLE_ID)) return;
     const style = document.createElement("style");
+    style.nonce = document.querySelector('meta[name="csp-nonce"]')?.content || '';
     style.id = STYLE_ID;
     style.textContent = `
       .tomza-plate-search { position: relative; }
