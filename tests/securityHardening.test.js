@@ -1,7 +1,7 @@
 const test=require('node:test'),assert=require('node:assert/strict'),vm=require('node:vm');
 const {ensureCsrfToken,injectSecurityAssets,securityHeaders,bloquearRutaEstaticaPrivada}=require('../src/middleware/security');
 const {selloUsuario,protegerSesiones,IDLE_MS,ABSOLUTE_MS}=require('../src/middleware/sessionSecurity');
-function response(){return {locals:{},headers:{},statusCode:200,setHeader(k,v){this.headers[k]=v;},status(n){this.statusCode=n;return this;},send(v){this.body=v;return this;},json(v){this.body=v;return this;},sendStatus(n){this.statusCode=n;},clearCookie(){this.cleared=true;},redirect(v){this.redirected=v;}};}
+function response(){return {locals:{},headers:{},statusCode:200,setHeader(k,v){this.headers[k]=v;},removeHeader(k){delete this.headers[k];},status(n){this.statusCode=n;return this;},send(v){this.body=v;return this;},json(v){this.body=v;return this;},sendStatus(n){this.statusCode=n;},clearCookie(){this.cleared=true;},redirect(v){this.redirected=v;}};}
 function csrf(headers={},body={},method='POST'){
   const req={method,path:'/login',protocol:'https',session:{csrfToken:'abc'},body,get:k=>headers[k],query:{}},res=response();let passed=false;
   ensureCsrfToken(req,res,()=>{passed=true;});return {req,res,passed};

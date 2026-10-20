@@ -16,7 +16,7 @@ const { crearRouter } = require('../src/routes/marcasIngreso.routes');
   }
   const db = { query, async getConnection() { return { query, beginTransaction: async () => {}, commit: async () => {}, rollback: async () => {}, release() {} }; } };
   const sessions = new Map();
-  const app = express(); app.set('view engine', 'ejs'); app.set('views', path.join(__dirname, '../src/views'));
+  const app = express(); app.use(require('../src/middleware/security').securityHeaders); app.set('view engine', 'ejs'); app.set('views', path.join(__dirname, '../src/views'));
   app.use(express.static(path.join(__dirname, '../public'))); app.use(express.json({ limit: '2mb' }));
   app.use((req, _res, next) => { const id = Number(req.get('x-test-user') || 52); if (!sessions.has(id)) sessions.set(id, { user: { id, nombre: id === 52 ? 'Saul Cardenas' : 'Asistencia de Taller', rol: id === 52 ? 'MECANICO' : 'TALLER', departamentoActivo: 'TALLER' } }); req.session = sessions.get(id); next(); });
   app.use('/marcas-ingreso', crearRouter(db));

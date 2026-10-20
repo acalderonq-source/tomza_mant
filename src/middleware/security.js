@@ -1,4 +1,27 @@
 const crypto = require("crypto");
+const helmet = require("helmet");
+
+const helmetHeaders = helmet({
+  contentSecurityPolicy: {
+    useDefaults: false,
+    directives: {
+      // Preserve the existing CSP while legacy views still use inline scripts and CDNs.
+      defaultSrc: helmet.contentSecurityPolicy.dangerouslyDisableDefaultSrc,
+      frameAncestors: ["'self'"],
+      baseUri: ["'self'"],
+      objectSrc: ["'none'"]
+    }
+  },
+  crossOriginOpenerPolicy: { policy: "same-origin-allow-popups" },
+  referrerPolicy: { policy: "same-origin" },
+  strictTransportSecurity: false,
+  xFrameOptions: { action: "sameorigin" }
+});
+const helmetHttps = helmet.strictTransportSecurity({
+  maxAge: 15552000,
+  includeSubDomains: false,
+  preload: false
+});
 
 const UNSAFE_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
@@ -65,12 +88,10 @@ function hasAllowedOrigin(req){
 }
 
 function securityHeaders(req,res,next){
-  res.setHeader('X-Content-Type-Options','nosniff');
-  res.setHeader('X-Frame-Options','SAMEORIGIN');
-  res.setHeader('Referrer-Policy','same-origin');
-  res.setHeader('Content-Security-Policy',"frame-ancestors 'self'; base-uri 'self'; object-src 'none'");
-  if(req.secure)res.setHeader('Strict-Transport-Security','max-age=15552000');
-  next();
+  helmetHeaders(req,res,error=>{
+    if(error)return next(error);
+    return req.secure ? helmetHttps(req,res,next) : next();
+  });
 }
 
 function bloquearRutaEstaticaPrivada(req,res,next){
