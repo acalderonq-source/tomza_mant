@@ -1,0 +1,9 @@
+<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Marcas de ingreso | Taller</title><link rel="stylesheet" href="/css/marcas-ingreso.css?v=1"><script src="/js/marcas-ingreso.js?v=1" defer></script></head><body>
+<header class="marcas-nav"><strong>Taller · Marcas de ingreso</strong><nav><a href="/dashboard">Taller</a><a href="/inicio">Ir a inicio</a><a href="/logout">Salir</a></nav></header>
+<main><header class="marcas-heading"><h1>Marcas de ingreso</h1><p><%= user.nombre %></p></header>
+<section class="reloj-panel"><p id="reloj-fecha">Costa Rica</p><time id="reloj-hora" aria-label="Hora de Costa Rica">--:--:--</time><p id="marca-estado" role="status">Cargando estado…</p><button type="button" id="abrir-camara" disabled>Registrar marca</button></section>
+<p id="marca-mensaje" role="status" aria-live="polite"></p>
+<section id="marca-camara" class="camara-panel" hidden aria-labelledby="camara-titulo"><h2 id="camara-titulo">Foto de la marca</h2><div class="camara-vista"><video id="camara-video" autoplay playsinline muted></video><img id="foto-preview" alt="Foto capturada para esta marca" hidden></div><p id="camara-estado" role="status"></p><div class="camara-acciones"><button type="button" id="tomar-foto" disabled>Tomar foto</button><button type="button" id="repetir-foto" hidden>Volver a tomar</button><button type="button" id="guardar-marca" hidden>Confirmar marca</button><button type="button" id="cancelar-foto" class="secundario">Cancelar</button></div></section>
+<noscript>Active JavaScript para usar la camara y registrar su marca.</noscript>
+<section class="marcas-lista"><h2>Mis últimas marcas</h2><%- include('tabla',{historial}) %></section>
+</main></body></html>

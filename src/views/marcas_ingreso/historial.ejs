@@ -1,0 +1,6 @@
+<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Historial de marcas | Taller</title><link rel="stylesheet" href="/css/marcas-ingreso.css?v=1"></head><body>
+<header class="marcas-nav"><strong>Taller · Control de asistencia</strong><nav><a href="/dashboard">Taller</a><a href="/inicio">Ir a inicio</a><a href="/logout">Salir</a></nav></header>
+<main><header class="marcas-heading"><h1>Historial de marcas</h1><p>Entradas, salidas y fotografías · Hora de Costa Rica</p></header>
+<form class="marcas-filtros" method="get"><label>Desde<input type="date" name="desde" value="<%= filtros.desde %>" required></label><label>Hasta<input type="date" name="hasta" value="<%= filtros.hasta %>" required></label><button type="submit">Consultar</button></form><p><%= total %> marca(s)</p><%- include('tabla',{historial}) %>
+<nav class="marcas-paginas" aria-label="Paginación"><% if(filtros.pagina>1){ %><a href="?desde=<%= filtros.desde %>&amp;hasta=<%= filtros.hasta %>&amp;pagina=<%= filtros.pagina-1 %>">Anterior</a><% } %><span>Página <%= filtros.pagina %> de <%= Math.max(1,Math.ceil(total/50)) %></span><% if(filtros.pagina*50<total){ %><a href="?desde=<%= filtros.desde %>&amp;hasta=<%= filtros.hasta %>&amp;pagina=<%= filtros.pagina+1 %>">Siguiente</a><% } %></nav>
+</main></body></html>

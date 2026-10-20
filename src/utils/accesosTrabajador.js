@@ -49,6 +49,7 @@ function esRutaSuministrosSeguridad(ruta,metodo='GET'){
     || (metodo==='POST' && (ruta==='/proveeduria/solicitudes' || /^\/proveeduria\/salidas\/\d+\/aceptar$/.test(ruta)));
 }
 function puedeAcceder(config,ruta,metodo){
+  if (config.departamento==='TALLER' && coincide(ruta,'/marcas-ingreso')) return true; // El modulo exige ademas su lista privada de cuentas.
   if (['GET','HEAD'].includes(metodo) && (ruta==='/inicio/noticias' || /^\/inicio\/noticias\/[1-9]\d*\/imagen$/.test(ruta))) return true;
   if(['SEGURIDAD_OCUPACIONAL','RECURSOS_HUMANOS','OPERACIONES'].includes(config.departamento) && esRutaSuministrosSeguridad(ruta,metodo)){
     const permiso=config.permisos[config.departamento==='SEGURIDAD_OCUPACIONAL'?'SEGURIDAD':config.departamento];

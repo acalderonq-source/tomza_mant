@@ -12,6 +12,7 @@ const DEPARTAMENTOS = [
 
 const DEPARTAMENTO_POR_CLAVE = new Map(DEPARTAMENTOS.map(departamento => [departamento.key, departamento]));
 const RUTAS_TALLER = [
+  "/marcas-ingreso",
   "/dashboard/resumen-ejecutivo",
   "/dashboard/conciliacion-pagos",
   "/agenda",

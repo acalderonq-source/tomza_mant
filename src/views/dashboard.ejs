@@ -235,6 +235,9 @@
     <% if(user.rol === "CONTABILIDAD" || (user.rol === "ADMIN" && departamentoActivo === "CONTABILIDAD")){ %><%- include("partials/contabilidad_inicio") %><% } %>
     <h2 class="section-title legacy-modules-title">Módulos</h2>
     <div class="module-grid">
+      <% if (areaTaller && typeof marcasTaller!=='undefined' && (marcasTaller.marcar || marcasTaller.consultar)) { %>
+        <a href="/marcas-ingreso" class="module-card"><span class="module-icon icon-green"><i class="bi bi-clock-history"></i></span><div><div class="module-title"><%= marcasTaller.marcar?'Marcas de ingreso':'Historial de marcas' %></div><p class="module-copy"><%= marcasTaller.marcar?'Registrar entrada y salida con foto de camara.':'Consultar entradas, salidas y fotografias.' %></p></div></a>
+      <% } %>
       <% if (puedeVerResumenEjecutivo && (areaTaller || areaOperaciones || areaProveeduria)) { %>
         <a href="/dashboard/resumen-ejecutivo" class="module-card">
           <span class="module-icon icon-blue"><i class="bi bi-graph-up-arrow"></i></span>

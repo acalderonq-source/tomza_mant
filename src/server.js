@@ -266,6 +266,7 @@ function mecanicoPuedeUsarRuta(pathname) {
   const rutasPermitidas = [
     "/",
     "/inicio",
+    "/marcas-ingreso",
     "/departamento/activo",
     "/login",
     "/logout",
@@ -423,6 +424,7 @@ app.use((req, res, next) => {
 app.use("/", sedeRoutes);
 app.use('/inicio/noticias', noticiasInicio.lectura);
 app.use('/admin/noticias', noticiasInicio.administracion);
+app.use('/marcas-ingreso', require('./routes/marcasIngreso.routes').crearRouter(pool));
 app.use('/administracion',require('./routes/administracion.routes'));
 app.use('/seguridad-ocupacional',require('./routes/seguridadOcupacional.routes'));
 app.use('/recursos-humanos',require('./routes/recursosHumanos.routes'));
