@@ -5,7 +5,7 @@ const {lineasCompra}=require('../src/utils/proveeduria');
 const {versionOrden}=require('../src/utils/proveeduriaOrdenEdicion');
 const solicitante={id:71,usuario:'operaciones',rol:'SUPERVISOR',sede:'Cartago',departamentoActivo:'OPERACIONES',departamentos:['OPERACIONES']};
 const gestor={id:72,usuario:'compras',rol:'PROVEEDURIA',sede:'Cartago',departamentoActivo:'PROVEEDURIA',departamentos:['PROVEEDURIA']};
-const calca=articuloSolicitudDescripcion('Calca TOMZA para tanque estacionario.'),sello=articuloSolicitudDescripcion('Sellos azules (pequeño - presión)'),cilindro=articuloSolicitudDescripcion('CILINDRO DE MONTACARGAS DE 10 LBS PARA GAS LICUADO');
+const servicio=articuloSolicitudDescripcion('Servicios ambientales ordinarios'),sello=articuloSolicitudDescripcion('Sellos azules (pequeño - presión)'),cilindro=articuloSolicitudDescripcion('CILINDRO DE MONTACARGAS DE 10 LBS PARA GAS LICUADO');
 async function servidor(user,run){
   const app=express();app.set('view engine','ejs');app.set('views',path.join(__dirname,'../src/views'));app.use(express.json());app.use(express.urlencoded({extended:true}));app.use((req,res,next)=>{req.session={user};next();});app.use('/proveeduria',router);
   const s=app.listen(0,'127.0.0.1');await new Promise(r=>s.once('listening',r));try{await run(`http://127.0.0.1:${s.address().port}/proveeduria`);}finally{await new Promise(r=>s.close(r));}
@@ -14,11 +14,11 @@ const json=body=>({method:'POST',headers:{'Content-Type':'application/json'},bod
 test('catálogo separado conserva los datos aportados, precios vacíos y decimales, e impide falsear artículos de stock',()=>{
   assert.equal(articulosSolicitud.length,238);assert.equal(new Set(articulosSolicitud.map(a=>a.codigo)).size,238);
   assert.equal(articulosSolicitud.filter(a=>a.precio_unitario!==null).length,68);
-  assert.equal(calca.precio_unitario,null);assert.equal(sello.precio_unitario,0.026);assert.equal(cilindro.iva,0);
+  assert.equal(servicio.precio_unitario,null);assert.equal(sello.precio_unitario,0.026);assert.equal(cilindro.iva,0);
   assert.equal(articuloSolicitudDescripcion('TANQUE DE 500 GLS PARA GAS LICUADO').precio_unitario,1200);
   assert.equal(articuloSolicitudDescripcion('Pintura Azul Tomza').precio_unitario,37611);
   assert.equal(articulosSolicitud.filter(a=>a.descripcion.toLowerCase()==='calca litraje configurable.').length,1);
-  assert(articulosSolicitud.every(a=>a.codigo.startsWith('SOL-')));assert.equal(articulosSolicitud.filter(a=>a.inventariable).length,15);assert.equal(articulosSolicitud.filter(a=>!a.inventariable).length,223);
+  assert(articulosSolicitud.every(a=>a.codigo.startsWith('SOL-')));assert.equal(articulosSolicitud.filter(a=>a.inventariable).length,72);assert.equal(articulosSolicitud.filter(a=>!a.inventariable).length,166);
   const l=lineasCompra([{codigo:cilindro.codigo,descripcion:cilindro.descripcion,cantidad:1,iva:99,inventariable:true},{codigo:'STOCK',descripcion:'Papel',cantidad:1,iva:1,inventariable:false}]);
   assert.equal(l[0].iva,0);assert.equal(l[0].inventariable,false);assert.equal(l[1].inventariable,undefined);assert.equal(esNoInventariable(l[1]),false);
 });
@@ -26,15 +26,15 @@ test('catálogo separado conserva los datos aportados, precios vacíos y decimal
 test('cualquier departamento puede solicitar solo del catálogo separado aunque no exista inventario',async()=>{
   const oq=pool.query,oc=pool.getConnection,guardadas=[];
   const query=async(sql,args=[])=>{
-    assert.doesNotMatch(sql,/prov_inventario/);
+    assert.doesNotMatch(sql,/FROM prov_inventario /);
     if(sql.startsWith('INSERT INTO prov_documentos')){guardadas.push(JSON.parse(args[2]));return [{insertId:guardadas.length}];}
     return [[]];
   };
   pool.query=query;pool.getConnection=async()=>({query,beginTransaction:async()=>{},commit:async()=>{},rollback:async()=>{},release(){}});
   try{
     for(const departamento of ['OPERACIONES','TALLER','CONTABILIDAD','SEGURIDAD_OCUPACIONAL','LOGISTICA','RECURSOS_HUMANOS','CARBURACION','PROVEEDURIA'])await servidor({...solicitante,departamentoActivo:departamento,departamentos:[departamento]},async base=>{
-      const r=await fetch(base+'/solicitudes',json({sede:'Cartago',departamento:'OTRO',lineas:[{codigo:calca.codigo,cantidad:2,descripcion:'Descripción falsa',iva:99,inventariable:true}]}));
-      assert.equal(r.status,200);const d=guardadas.at(-1);assert.equal(d.departamento,departamento);assert.equal(d.lineas[0].descripcion,calca.descripcion);assert.equal(d.lineas[0].inventariable,false);assert.equal(d.lineas[0].iva,13);
+      const r=await fetch(base+'/solicitudes',json({sede:'Cartago',departamento:'OTRO',lineas:[{codigo:servicio.codigo,cantidad:2,descripcion:'Descripción falsa',iva:99,inventariable:true}]}));
+      assert.equal(r.status,200);const d=guardadas.at(-1);assert.equal(d.departamento,departamento);assert.equal(d.lineas[0].descripcion,servicio.descripcion);assert.equal(d.lineas[0].inventariable,false);assert.equal(d.lineas[0].iva,13);
     });
   }finally{pool.query=oq;pool.getConnection=oc;}
 });
@@ -64,27 +64,27 @@ test('solicitud mixta llega hasta recepción confirmada sin crear stock, fichas 
     return [{affectedRows:1}];
   }
   pool.query=query;pool.getConnection=async()=>{let before;return {query,beginTransaction:async()=>{before=structuredClone(state);},commit:async()=>{},rollback:async()=>{Object.assign(state,before);},release(){}};};
-  const articuloPedido=articuloSolicitudDescripcion('Mazo de hule');
-  const pedidas=[{codigo:calca.codigo,cantidad:1},{codigo:articuloPedido.codigo,cantidad:2},{codigo:cilindro.codigo,cantidad:1},{codigo:'STOCK',cantidad:2,inventariable:false}];
+  const articuloPedido=articuloSolicitudDescripcion('Camisa tipo columbia azul Navi mujer talla XS');
+  const pedidas=[{codigo:servicio.codigo,cantidad:1},{codigo:articuloPedido.codigo,cantidad:2},{codigo:cilindro.codigo,cantidad:1},{codigo:'STOCK',cantidad:2,inventariable:false}];
   function formulario(){const f=new URLSearchParams({origen_formulario:'taller',solicitud_id:'1',proveedor:'Proveedor',email:'p@example.com',empresa_destino:'GAS TOMZA',credito:'30',entrega:'5 días',moneda:'CRC'});state.docs.get(1).datos.lineas.forEach((l,i)=>{for(const [k,v]of Object.entries({codigo_producto:l.codigo,descripcion:l.descripcion,cantidad:l.cantidad,precio_unitario:[100,0.026,28,20][i]}))f.set(`lineas[${i}][${k}]`,String(v));});return f;}
   try{
     await servidor(solicitante,async base=>{
       const r=await fetch(base+'/solicitudes',json({sede:'Cartago',departamento:'PROVEEDURIA',lineas:pedidas}));assert.equal(r.status,200);
       assert.equal(state.docs.get(1).datos.departamento,'OPERACIONES');assert.equal(state.stockWrites.length,0);
       assert.deepEqual(state.docs.get(1).datos.lineas.map(l=>l.inventariable),[false,false,false,undefined]);
-      const pagina=await fetch(base+'/mis-solicitudes');assert.equal(pagina.status,200);const html=await pagina.text();assert.match(html,/Compra por solicitud/);assert.match(html,new RegExp(calca.codigo));assert.doesNotMatch(html,/precio_unitario/);
+      const pagina=await fetch(base+'/mis-solicitudes');assert.equal(pagina.status,200);const html=await pagina.text();assert.match(html,/Compra por solicitud/);assert.match(html,new RegExp(servicio.codigo));assert.doesNotMatch(html,/precio_unitario/);
       assert.equal((await fetch(base+'/inventario')).status,403);
     });
     await servidor(gestor,async base=>{
-      const inventario=await (await fetch(base+'/inventario')).text();assert.doesNotMatch(inventario,new RegExp(calca.codigo));assert.doesNotMatch(inventario,/Calca TOMZA para tanque estacionario/);
-      const cotizar=await fetch(base+'/solicitudes/1/cotizacion');assert.equal(cotizar.status,200);assert.match(await cotizar.text(),/precio_unitario":25000/);
+      const inventario=await (await fetch(base+'/inventario')).text();assert.doesNotMatch(inventario,new RegExp(servicio.codigo));assert.doesNotMatch(inventario,/Servicios ambientales ordinarios/);
+      const cotizar=await fetch(base+'/solicitudes/1/cotizacion');assert.equal(cotizar.status,200);assert.match(await cotizar.text(),/precio_unitario":13900/);
       assert.equal((await fetch(base+'/solicitudes/1/cotizacion',{method:'POST',body:formulario(),redirect:'manual'})).status,302);
       assert.equal((await fetch(base+'/ordenes',{method:'POST',body:formulario(),redirect:'manual'})).status,302);
       let orden=state.docs.get(2);assert.equal(orden.datos.lineas[2].iva,0);assert(orden.datos.lineas.slice(0,3).every(esNoInventariable));
       const edicion=formulario();edicion.set('version',versionOrden(orden));edicion.set('sede','Cartago');assert.equal((await fetch(base+'/ordenes/2/editar',{method:'POST',body:edicion,redirect:'manual'})).status,302);
       assert(state.docs.get(2).datos.lineas.slice(0,3).every(esNoInventariable));
       const antes=await fetch(base+'/salidas',json({solicitud_id:1}));assert.equal(antes.status,400);
-      const parcial={token:'a'.repeat(32),version:0,referencia:'Entrega 1',lineas:[{codigo:calca.codigo,cantidad:1},{codigo:articuloPedido.codigo,cantidad:1}]};
+      const parcial={token:'a'.repeat(32),version:0,referencia:'Entrega 1',lineas:[{codigo:servicio.codigo,cantidad:1},{codigo:articuloPedido.codigo,cantidad:1}]};
       assert.equal((await fetch(base+'/ordenes/2/recibir',json(parcial))).status,200);assert.equal(state.stockWrites.length,0);assert.equal(state.docs.get(2).datos.estado,'PARCIAL');
       assert.equal((await fetch(base+'/salidas',json({solicitud_id:1}))).status,400);
       const detalle=await fetch(base+'/ordenes/2/recepcion');assert.equal(detalle.status,200);assert.match(await detalle.text(),/No ingresa a inventario/);
@@ -94,8 +94,8 @@ test('solicitud mixta llega hasta recepción confirmada sin crear stock, fichas 
       assert.equal((await fetch(base+'/salidas',json({solicitud_id:1}))).status,200);assert.equal(state.stock,2);assert.equal(state.movimientos.length,2);
       const salida=state.docs.get(3);assert.equal(salida.datos.lineas.length,4);assert(salida.datos.lineas.filter(esNoInventariable).length===3);
       assert.equal((await fetch(base+'/salidas/3/enviar',{method:'POST'})).status,200);
-      const imprimir=await fetch(base+'/salidas/3/imprimir');assert.equal(imprimir.status,200);assert.match(await imprimir.text(),/Calca TOMZA para tanque estacionario/);
-      const crear=await fetch(base+'/inventario/articulos',json({codigo:calca.codigo,descripcion:calca.descripcion}));assert.equal(crear.status,400);
+      const imprimir=await fetch(base+'/salidas/3/imprimir');assert.equal(imprimir.status,200);assert.match(await imprimir.text(),/Servicios ambientales ordinarios/);
+      const crear=await fetch(base+'/inventario/articulos',json({codigo:servicio.codigo,descripcion:servicio.descripcion}));assert.equal(crear.status,400);
     });
     await servidor(solicitante,async base=>assert.equal((await fetch(base+'/salidas/3/aceptar',{method:'POST'})).status,200));
     assert.equal(state.docs.get(1).datos.estado,'ENTREGADA');assert.equal(state.stock,2);assert.equal(state.movimientos.length,2);

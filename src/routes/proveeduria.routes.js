@@ -2,7 +2,7 @@ const router = require('express').Router();
 const {facturasDeOrden,vincularOrden,adjuntarFacturas}=require('../utils/portalFacturaOrden');
 const {articulosExcel,articuloExcel,ivaArticulo,condicionesOrden}=require('../utils/proveeduriaCatalogo');
 const {motivoBloqueoOrden,versionOrden,cambiosOrden}=require('../utils/proveeduriaOrdenEdicion');
-const {articulosSinInventario,articuloSolicitud,articuloSolicitudDescripcion,esNoInventariable,catalogoParaOrden}=require('../utils/proveeduriaSolicitable');
+const {articulosSinInventario,articuloSolicitud,articuloSolicitudDescripcion,esNoInventariable,catalogoParaOrden,codigoInventario}=require('../utils/proveeduriaSolicitable');
 const {CATEGORIAS_SOLICITUD,categoriaArticulo,agruparArticulos}=require('../utils/proveeduriaCategorias');
 const { leerFacturaXML, consultarHacienda, aprobable, vencimiento } = require('../utils/proveedorHacienda');
 const { rateLimit } = require('express-rate-limit');
@@ -20,6 +20,10 @@ const {GRUPOS,TIPOS,cantidadInventario,fichaInventario,estadoStock,guardarFichaI
 const {resumenRecepcion,leerRecepcion,validarPendientes}=require('../utils/proveeduriaRecepciones');
 const { exigir, numero, lineasCompra, totales, totalesConAjustes, compararFactura, saldo, hash, adjunto, conciliarEstado } = require('../utils/proveeduria');
 const gestion = u => ['ADMIN','PROVEEDURIA','PROVEEDURIA_TALLER','BODEGA','BODEGUERO'].includes(u?.rol);
+const gestionCatalogo=u=>gestion(u)&&(!u.accesoPersonal||require('../utils/accesosTrabajador').puedeAcceder(u.accesoPersonal,'/proveeduria/catalogo/eliminar','POST'));
+async function cargarBajas(db){const [rows]=await db.query('SELECT codigo FROM prov_inventario_bajas');return new Set(rows.map(r=>r.codigo).filter(Boolean));}
+const disponible=(codigo,bajas)=>!bajas.has(codigoInventario(codigo));
+async function catalogoOrdenDisponible(){const bajas=await cargarBajas(pool);return catalogoParaOrden(articulosExcel).filter(a=>disponible(a.codigo||articuloSolicitudDescripcion(a.descripcion)?.codigo||'',bajas));}
 const contabilidad = u => ['ADMIN','CONTABILIDAD'].includes(u?.rol);
 // Clave historica del almacen general; no representa la sede de entrega del pedido.
 const ALMACEN_GENERAL = 'Cartago';
@@ -104,7 +108,8 @@ router.get('/mis-solicitudes',wrap(async(req,res)=>{
   const actual=sedeInventarioCompartido(req.session.sedeSeleccionada||u.sede);
   const [articulos]=await pool.query(`SELECT i.sede,i.codigo,i.descripcion,COALESCE(f.unidad,'UND') AS unidad,COALESCE(f.categoria,'') AS categoria FROM prov_inventario i LEFT JOIN prov_inventario_fichas f ON f.sede=i.sede AND f.codigo=i.codigo WHERE i.sede IN (?) ORDER BY i.descripcion,i.codigo`,[ALMACEN_GENERAL]);
   res.set('Cache-Control','no-store');
-  const catalogo=[...articulos.map(a=>({...a,categoria:categoriaArticulo(a)})),...articulosSinInventario.map(({codigo,descripcion,unidad,inventariable,categoria})=>({codigo,descripcion,unidad,inventariable,categoria}))];
+  const bajas=await cargarBajas(pool);
+  const catalogo=[...articulos.map(a=>({...a,categoria:categoriaArticulo(a)})),...articulosSinInventario.map(({codigo,descripcion,unidad,inventariable,categoria})=>({codigo,descripcion,unidad,inventariable,categoria}))].filter(a=>disponible(a.codigo,bajas));
   res.render('proveeduria/mis_solicitudes',{user:u,docs:rows.map(datos),alertas,sedesPermitidas,articulos:catalogo,categorias:CATEGORIAS_SOLICITUD,agruparArticulos,sedeActual:sedesPermitidas.includes(actual)?actual:''});
 }));
 router.get('/solicitudes',wrap(async(req,res)=>{
@@ -142,7 +147,8 @@ async function cargarInventario(req){
   const where=sedes.map(()=>'?').join(',');
   const [rows]=await pool.query(`SELECT i.*,COALESCE(f.grupo,'INVENTARIO') AS grupo,COALESCE(f.tipo,'OTRO') AS tipo,COALESCE(f.categoria,'') AS categoria,COALESCE(f.unidad,'UND') AS unidad,COALESCE(f.ubicacion,'') AS ubicacion,COALESCE(f.stock_minimo,0) AS stock_minimo,COALESCE(f.stock_maximo,0) AS stock_maximo,COALESCE(f.proveedor,'') AS proveedor FROM prov_inventario i LEFT JOIN prov_inventario_fichas f ON f.sede=i.sede AND f.codigo=i.codigo WHERE i.sede IN (${where}) ORDER BY i.descripcion,i.sede`,sedes);
   const normal=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
-  const inventario=rows.filter(a=>(!filtros.grupo||a.grupo===filtros.grupo)&&(!filtros.estado||estadoStock(a)===filtros.estado)&&(!filtros.q||normal([a.codigo,a.descripcion,a.categoria,a.ubicacion,a.proveedor,a.sede].join(' ')).includes(normal(filtros.q))));
+  const bajas=await cargarBajas(pool);
+  const inventario=rows.map(a=>({...a,categoria:categoriaArticulo(a)})).filter(a=>disponible(a.codigo,bajas)&&(!filtros.grupo||a.grupo===filtros.grupo)&&(!filtros.estado||estadoStock(a)===filtros.estado)&&(!filtros.q||normal([a.codigo,a.descripcion,a.categoria,a.ubicacion,a.proveedor,a.sede].join(' ')).includes(normal(filtros.q))));
   const [movimientos]=await pool.query(`SELECT * FROM prov_inventario_movimientos WHERE sede IN (${where}) ${filtros.q?'AND (codigo LIKE ? OR descripcion LIKE ? OR motivo LIKE ?)':''} ORDER BY id DESC LIMIT 200`,[...sedes,...filtros.q?Array(3).fill('%'+filtros.q+'%'):[]]);
   return {inventario:inventario.map(a=>({...a,sede:'GENERAL'})),movimientos:movimientos.map(m=>({...m,sede:'GENERAL'})),sedesPermitidas,filtros};
 }
@@ -150,7 +156,28 @@ router.get('/inventario',wrap(async(req,res)=>{
   if(!gestion(req.session.user)&&!contabilidad(req.session.user))throw error(403,'No autorizado');
   const data=await cargarInventario(req);
   const [proveedores]=await pool.query('SELECT nombre FROM prov_proveedores WHERE activo=1 ORDER BY nombre');
-  res.render('proveeduria/inventario',{...data,user:req.session.user,puedeGestion:gestion(req.session.user),GRUPOS,TIPOS,estadoStock,proveedores});
+  res.render('proveeduria/inventario',{...data,user:req.session.user,puedeGestion:gestionCatalogo(req.session.user),GRUPOS,TIPOS,estadoStock,proveedores});
+}));
+router.get('/catalogo',wrap(async(req,res)=>{
+  if(!gestion(req.session.user)&&!contabilidad(req.session.user))throw error(403,'No autorizado');
+  const {inventario}=await cargarInventario({...req,query:{}}),bajas=await cargarBajas(pool);
+  const q=String(req.query.q||'').trim().slice(0,200),categoria=String(req.query.categoria||'');
+  const normal=s=>String(s).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+  const articulos=[...inventario.map(a=>({...a,origen:'INVENTARIO'})),...articulosSinInventario.filter(a=>disponible(a.codigo,bajas)).map(a=>({...a,origen:'CATALOGO',cantidad:null}))].filter(a=>(!categoria||a.categoria===categoria)&&(!q||normal(a.codigo+' '+a.descripcion).includes(normal(q)))).sort((a,b)=>a.descripcion.localeCompare(b.descripcion,'es'));
+  res.set('Cache-Control','no-store');
+  res.render('proveeduria/catalogo',{user:req.session.user,articulos,q,categoria,categorias:CATEGORIAS_SOLICITUD,puedeGestion:gestionCatalogo(req.session.user)});
+}));
+router.post('/catalogo/eliminar',wrap(async(req,res)=>{
+  if(!gestionCatalogo(req.session.user))throw error(403,'No autorizado para eliminar productos');
+  const original=String(req.body.codigo||'').trim();exigir(original&&original.length<=80,'Seleccione un producto válido');
+  const codigo=codigoInventario(original);
+  await transaccion(async db=>{
+    const [stock]=await db.query('SELECT * FROM prov_inventario WHERE sede=? AND codigo=? FOR UPDATE',[ALMACEN_GENERAL,codigo]);
+    const articulo=stock[0]||articulosSinInventario.find(a=>a.codigo===codigo);
+    if(!articulo)throw error(404,'Producto no encontrado');
+    await db.query('INSERT INTO prov_inventario_bajas (codigo,descripcion,origen,datos,usuario_id) VALUES (?,?,?,?,?) ON DUPLICATE KEY UPDATE codigo=VALUES(codigo)',[codigo,articulo.descripcion,stock[0]?'INVENTARIO':'CATALOGO',JSON.stringify(articulo),req.session.user.id]);
+  });
+  res.json({ok:true});
 }));
 router.get('/inventario/exportar.xlsx',wrap(async(req,res)=>{
   if(!gestion(req.session.user)&&!contabilidad(req.session.user))throw error(403,'No autorizado');
@@ -163,8 +190,10 @@ router.post('/inventario/articulos',wrap(async(req,res)=>{
   if(!gestion(req.session.user))throw error(403,'No autorizado');
   const sedeArticulo=ALMACEN_GENERAL,d=fichaInventario(req.body),cantidad=cantidadInventario(req.body.cantidad??0,'Stock inicial');
   const codigo=String(req.body.codigo||'').trim()||'PV-'+crypto.randomBytes(4).toString('hex').toUpperCase();exigir(codigo.length<=80,'Código demasiado largo');
+  exigir(codigoInventario(codigo)===codigo,'Este artículo ya tiene un código de inventario. Selecciónelo desde el catálogo');
   exigir(articuloSolicitud(codigo)?.inventariable!==false,'Este código pertenece al catálogo de compra por solicitud y no se registra en inventario');
   await transaccion(async db=>{
+    exigir(disponible(codigo,await cargarBajas(db)),'Este producto fue eliminado del catálogo');
     const [existe]=await db.query('SELECT codigo FROM prov_inventario WHERE sede=? AND codigo=? FOR UPDATE',[sedeArticulo,codigo]);exigir(!existe.length,'El código ya existe en esta sede. Edite su ficha o ajuste la existencia');
     await db.query('INSERT INTO prov_inventario (sede,codigo,descripcion,iva,cantidad) VALUES (?,?,?,?,?)',[sedeArticulo,codigo,d.descripcion,d.iva,cantidad]);
     await guardarFichaInventario(db,sedeArticulo,codigo,d);
@@ -210,7 +239,7 @@ router.get('/ordenes/:id/editar',wrap(async(req,res)=>{
   const [proveedores]=await pool.query('SELECT p.nombre,c.telefono,c.correos,c.correo_original,c.direccion,c.condicion_pago FROM prov_proveedores p LEFT JOIN prov_proveedor_contactos c ON c.clave=p.clave WHERE p.activo=1 ORDER BY p.nombre');proveedores.forEach(p=>{p.correos=leerCorreosJSON(p.correos);});
   const orden={...row.datos,id:row.id,fecha:row.creado_en,cotizacion_archivo:row.datos.cotizacion_archivo?`/proveeduria/adjunto/${row.id}/cotizacion`:null};
   res.set('Cache-Control','no-store');
-  res.render('compras/orden_form',{orden,esNuevaOrden:false,solicitudId:solicitud?.datos.departamento?solicitud.id:'',lineas:row.datos.lineas.map(l=>({...l,codigo:l.referencia||'',codigo_producto:l.codigo})),proveedores,siguientePO:`PR-${row.id}`,esProveeduria:true,sedesPermitidas,sedeActual:row.sede,articulosExcel:catalogoParaOrden(articulosExcel),versionEdicion:versionOrden(row),tituloOrden:`Editar orden PR-${row.id}`,textoGuardar:'Actualizar orden',subtituloOrden:'Proveeduría · Actualice los datos de esta orden de compra.',volverUrl:`/proveeduria/ordenes/${row.id}`,cancelarUrl:`/proveeduria/ordenes/${row.id}`,formAction:`/proveeduria/ordenes/${row.id}/editar`});
+  res.render('compras/orden_form',{orden,esNuevaOrden:false,solicitudId:solicitud?.datos.departamento?solicitud.id:'',lineas:row.datos.lineas.map(l=>({...l,codigo:l.referencia||'',codigo_producto:l.codigo})),proveedores,siguientePO:`PR-${row.id}`,esProveeduria:true,sedesPermitidas,sedeActual:row.sede,articulosExcel:await catalogoOrdenDisponible(),versionEdicion:versionOrden(row),tituloOrden:`Editar orden PR-${row.id}`,textoGuardar:'Actualizar orden',subtituloOrden:'Proveeduría · Actualice los datos de esta orden de compra.',volverUrl:`/proveeduria/ordenes/${row.id}`,cancelarUrl:`/proveeduria/ordenes/${row.id}`,formAction:`/proveeduria/ordenes/${row.id}/editar`});
 }));
 router.post('/ordenes/:id/editar',wrap(async(req,res)=>{
   if(!gestion(req.session.user))throw error(403,'No autorizado');
@@ -288,7 +317,7 @@ router.get(['/ordenes/nueva','/solicitudes/:id/cotizacion'],wrap(async(req,res)=
   const sedeActual=sedesPermitidas.includes(seleccionada)?seleccionada:'';
   const cotizacion=solicitud?.datos.cotizacion;
   const precarga=cotizacion?{...cotizacion,cotizacion_archivo:cotizacion.cotizacion_archivo?`/proveeduria/solicitudes/${solicitud.id}/cotizacion/archivo`:null}:null;
-  res.render('compras/orden_form',{orden:precarga,esNuevaOrden:true,solicitudId:solicitud?.id||'',lineas:solicitud?solicitud.datos.lineas.map(l=>({...l,codigo:'',codigo_producto:l.codigo,iva:articuloSolicitud(l.codigo)?.iva??ivaArticulo(l.descripcion,l.iva),precio_unitario:cotizacion?.lineas.find(x=>x.codigo===l.codigo)?.precio_unitario??articuloSolicitud(l.codigo)?.precio_unitario??articuloExcel(l.descripcion)?.precio_unitario??'',subtotal:cotizacion?.lineas.find(x=>x.codigo===l.codigo)?.subtotal??0})):[],proveedores,siguientePO:esCotizacion?'Cotización · Sin OC':'Se asigna al guardar',esProveeduria:true,sedesPermitidas,sedeActual,articulosExcel:catalogoParaOrden(articulosExcel),tituloOrden:esCotizacion?'Cotizar solicitud PR-'+solicitud.id:'Nueva orden de compra',textoGuardar:esCotizacion?'Guardar cotización':'Guardar orden',subtituloOrden:esCotizacion?`Solicitud de ${solicitud.datos.departamento||'departamento solicitante'} · ${solicitud.datos.solicitante||'Usuario '+solicitud.usuario_id}`:'Departamento de Proveeduría · Complete el encabezado, líneas y totales de la orden.',volverUrl:esCotizacion?'/proveeduria/solicitudes':'/proveeduria/ordenes',cancelarUrl:'/proveeduria/solicitudes',formAction:esCotizacion?`/proveeduria/solicitudes/${solicitud.id}/cotizacion`:'/proveeduria/ordenes'});
+  res.render('compras/orden_form',{orden:precarga,esNuevaOrden:true,solicitudId:solicitud?.id||'',lineas:solicitud?solicitud.datos.lineas.map(l=>({...l,codigo:'',codigo_producto:l.codigo,iva:articuloSolicitud(l.codigo)?.iva??ivaArticulo(l.descripcion,l.iva),precio_unitario:cotizacion?.lineas.find(x=>x.codigo===l.codigo)?.precio_unitario??articuloSolicitud(l.codigo)?.precio_unitario??articuloExcel(l.descripcion)?.precio_unitario??'',subtotal:cotizacion?.lineas.find(x=>x.codigo===l.codigo)?.subtotal??0})):[],proveedores,siguientePO:esCotizacion?'Cotización · Sin OC':'Se asigna al guardar',esProveeduria:true,sedesPermitidas,sedeActual,articulosExcel:await catalogoOrdenDisponible(),tituloOrden:esCotizacion?'Cotizar solicitud PR-'+solicitud.id:'Nueva orden de compra',textoGuardar:esCotizacion?'Guardar cotización':'Guardar orden',subtituloOrden:esCotizacion?`Solicitud de ${solicitud.datos.departamento||'departamento solicitante'} · ${solicitud.datos.solicitante||'Usuario '+solicitud.usuario_id}`:'Departamento de Proveeduría · Complete el encabezado, líneas y totales de la orden.',volverUrl:esCotizacion?'/proveeduria/solicitudes':'/proveeduria/ordenes',cancelarUrl:'/proveeduria/solicitudes',formAction:esCotizacion?`/proveeduria/solicitudes/${solicitud.id}/cotizacion`:'/proveeduria/ordenes'});
 }));
 router.get('/solicitudes/:id/cotizacion/archivo',wrap(async(req,res)=>{
   if(!gestion(req.session.user))throw error(403,'No autorizado');
@@ -316,7 +345,8 @@ router.post('/solicitudes',wrap(async(req,res) => {
     const [articulos]=codigosStock.length?await db.query(`SELECT codigo,descripcion,iva FROM prov_inventario WHERE sede=? AND codigo IN (${codigosStock.map(()=>'?').join(',')})`,[ALMACEN_GENERAL,...codigosStock]):[[]];
     const [fichas]=codigosStock.length?await db.query(`SELECT codigo,categoria FROM prov_inventario_fichas WHERE sede=? AND codigo IN (${codigosStock.map(()=>'?').join(',')})`,[ALMACEN_GENERAL,...codigosStock]):[[]];
     const categorias=new Map(fichas.map(f=>[f.codigo,f.categoria]));
-    const catalogo=new Map([...articulos.map(a=>({...a,categoria:categorias.get(a.codigo)})),...articulosSinInventario].map(a=>[a.codigo,a]));
+    const bajas=await cargarBajas(db);
+    const catalogo=new Map([...articulos.map(a=>({...a,categoria:categorias.get(a.codigo)})),...articulosSinInventario].filter(a=>disponible(a.codigo,bajas)).map(a=>[a.codigo,a]));
     const lineas=lineasCompra(solicitadas.map((l,i)=>{
       const a=catalogo.get(codigos[i]);
       exigir(a,`El artículo ${codigos[i]} no está en el catálogo de Proveeduría. Actualice la página y seleccione otro artículo`);
@@ -362,6 +392,8 @@ router.post(['/ordenes','/solicitudes/:id/cotizacion'],wrap(async(req,res)=>{
     let solicitud;
     if(compartido&&!req.body.solicitud_id){
       const lineas=lineasCompra(req.body.lineas);
+      const bajas=await cargarBajas(db);
+      exigir(lineas.every(l=>disponible(l.codigo,bajas)),'La orden contiene un producto eliminado del catálogo');
       const [r]=await db.query("INSERT INTO prov_documentos (tipo,usuario_id,sede,datos) VALUES ('solicitud',?,?,?)",[req.session.user.id,sedeDirecta,JSON.stringify({lineas,estado:'PENDIENTE',origen:'OC_DIRECTA'})]);
       solicitud={id:r.insertId,usuario_id:req.session.user.id,sede:sedeDirecta,datos:{lineas,estado:'PENDIENTE'}};
     }else solicitud=await documento(db,req.body.solicitud_id,'solicitud',true);
@@ -423,9 +455,9 @@ router.post('/ordenes/:id/recibir',wrap(async(req,res)=>{
     validarPendientes(resumen,recibo);
     const lineas=recibo.lineas.filter(l=>l.cantidad>0).map(l=>({...resumen.lineas.find(x=>x.codigo===l.codigo),cantidad:l.cantidad}));
     for(const l of lineas.filter(l=>!esNoInventariable(l))){
-      await db.query('INSERT INTO prov_inventario (sede,codigo,descripcion,iva,cantidad) VALUES (?,?,?,?,?) ON DUPLICATE KEY UPDATE cantidad = cantidad + VALUES(cantidad), descripcion = VALUES(descripcion), iva = VALUES(iva)',[ALMACEN_GENERAL,l.codigo,l.descripcion,l.iva,l.cantidad]);
-      await db.query('INSERT INTO prov_inventario_fichas (sede,codigo,proveedor) VALUES (?,?,?) ON DUPLICATE KEY UPDATE proveedor=VALUES(proveedor)',[ALMACEN_GENERAL,l.codigo,row.datos.proveedor||'']);
-      await registrarMovimientoInventario(db,{sede:ALMACEN_GENERAL,codigo:l.codigo,tipo:'ENTRADA_OC',cantidad:l.cantidad,documento_id:row.id,usuario_id:req.session.user.id,motivo:`Recepción de OC PR-${row.id} · ${recibo.referencia} · Destino: ${row.sede}`});
+      await db.query('INSERT INTO prov_inventario (sede,codigo,descripcion,iva,cantidad) VALUES (?,?,?,?,?) ON DUPLICATE KEY UPDATE cantidad = cantidad + VALUES(cantidad), descripcion = VALUES(descripcion), iva = VALUES(iva)',[ALMACEN_GENERAL,codigoInventario(l.codigo),l.descripcion,l.iva,l.cantidad]);
+      await db.query('INSERT INTO prov_inventario_fichas (sede,codigo,proveedor) VALUES (?,?,?) ON DUPLICATE KEY UPDATE proveedor=VALUES(proveedor)',[ALMACEN_GENERAL,codigoInventario(l.codigo),row.datos.proveedor||'']);
+      await registrarMovimientoInventario(db,{sede:ALMACEN_GENERAL,codigo:codigoInventario(l.codigo),tipo:'ENTRADA_OC',cantidad:l.cantidad,documento_id:row.id,usuario_id:req.session.user.id,motivo:`Recepción de OC PR-${row.id} · ${recibo.referencia} · Destino: ${row.sede}`});
     }
     const fecha=new Date().toISOString();
     row.datos.recepciones=[...resumen.historial,{id:recibo.id,huella:recibo.huella,fecha,usuario_id:req.session.user.id,recibido_por:req.session.user.nombre||req.session.user.usuario,referencia:recibo.referencia,observaciones:recibo.observaciones,lineas:lineas.map(l=>({codigo:l.codigo,descripcion:l.descripcion,cantidad:l.cantidad}))}];
@@ -446,12 +478,12 @@ router.post('/salidas',wrap(async(req,res)=>{
     const lineas=[];
     for(const l of [...solicitud.datos.lineas].sort((a,b)=>a.codigo.localeCompare(b.codigo))){
       if(esNoInventariable(l)){exigir(solicitud.datos.oc_id,'Primero genere y reciba la OC de los artículos de compra por solicitud');lineas.push(l);continue;}
-      const [stock]=await db.query('SELECT * FROM prov_inventario WHERE sede=? AND codigo=? FOR UPDATE',[ALMACEN_GENERAL,l.codigo]);
+      const [stock]=await db.query('SELECT * FROM prov_inventario WHERE sede=? AND codigo=? FOR UPDATE',[ALMACEN_GENERAL,codigoInventario(l.codigo)]);
       exigir(stock[0] && Number(stock[0].cantidad)>=l.cantidad,`Inventario insuficiente: ${l.codigo}`);
-      await db.query('UPDATE prov_inventario SET cantidad=cantidad-? WHERE sede=? AND codigo=?',[l.cantidad,ALMACEN_GENERAL,l.codigo]);lineas.push(l);
+      await db.query('UPDATE prov_inventario SET cantidad=cantidad-? WHERE sede=? AND codigo=?',[l.cantidad,ALMACEN_GENERAL,codigoInventario(l.codigo)]);lineas.push(l);
     }
     const [r]=await db.query("INSERT INTO prov_documentos (tipo,usuario_id,sede,datos) VALUES ('salida',?,?,?)",[solicitud.usuario_id,solicitud.sede,JSON.stringify({lineas,solicitud_id:solicitud.id,estado:'ALISTANDO'})]);
-    for(const l of lineas.filter(l=>!esNoInventariable(l)))await registrarMovimientoInventario(db,{sede:ALMACEN_GENERAL,codigo:l.codigo,tipo:'SALIDA_PEDIDO',cantidad:-l.cantidad,documento_id:r.insertId,usuario_id:req.session.user.id,motivo:`Entrega de solicitud PR-${solicitud.id} · Destino: ${solicitud.sede}`});
+    for(const l of lineas.filter(l=>!esNoInventariable(l)))await registrarMovimientoInventario(db,{sede:ALMACEN_GENERAL,codigo:codigoInventario(l.codigo),tipo:'SALIDA_PEDIDO',cantidad:-l.cantidad,documento_id:r.insertId,usuario_id:req.session.user.id,motivo:`Entrega de solicitud PR-${solicitud.id} · Destino: ${solicitud.sede}`});
     solicitud.datos.salida_id=r.insertId;solicitud.datos.estado='ALISTANDO';await guardar(db,solicitud,req.session.user.id,'Salida de inventario');await alerta(db,r.insertId,'Su pedido se está alistando',solicitud.usuario_id);return r.insertId;
   });res.json({id});
 }));

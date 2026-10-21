@@ -36,7 +36,7 @@ test('pantalla separada reutiliza estilos de Taller y no consulta sus tablas',as
   try{await servidor(gestor,async base=>{const r=await fetch(base);assert.equal(r.status,200);const html=await r.text();for(const s of ['Solicitudes','Órdenes de compra','Inventario de Proveeduría','Conciliación','topbar','simple-hero','--bg:'])assert.ok(html.includes(s),s);});}finally{pool.query=original;}
 });
 test('órdenes de Proveeduría usan el formulario real de Taller y el listado conserva filtros propios',async()=>{
-  const original=pool.query;pool.query=async sql=>{assert.match(sql,/prov_proveedores|prov_documentos|usuarios_sedes/);return [[]];};
+  const original=pool.query;pool.query=async sql=>{assert.match(sql,/prov_proveedores|prov_documentos|usuarios_sedes|prov_inventario_bajas/);return [[]];};
   try{await servidor(gestor,async base=>{
     const r=await fetch(base+'/ordenes/nueva');assert.equal(r.status,200);const html=await r.text();
     for(const text of ['id="ordenForm"','order-lines-table','Descuento monto','Transporte','Observaciones','Plazo de entrega','Departamento de Proveeduría','action="/proveeduria/ordenes"'])assert.ok(html.includes(text),text);
@@ -48,6 +48,7 @@ test('OC directa guarda detalle y ajustes en Proveeduría y recalcula el total s
   const original=pool.getConnection,originalQuery=pool.query;let orden,solicitudes=0,commit=false;
   pool.query=async()=>[[]];
   pool.getConnection=async()=>({beginTransaction:async()=>{},commit:async()=>{commit=true;},rollback:async()=>{},release(){},query:async(sql,args)=>{
+    if(sql==='SELECT codigo FROM prov_inventario_bajas')return [[]];
     assert.match(sql,/prov_/);assert.doesNotMatch(sql,/ordenes_compra/);
     if(sql.includes("VALUES ('solicitud'")){assert.equal(args[1],'Cartago');solicitudes++;return [{insertId:101}];}
     if(sql.includes("VALUES ('oc'")){orden=JSON.parse(args[2]);return [{insertId:102}];}

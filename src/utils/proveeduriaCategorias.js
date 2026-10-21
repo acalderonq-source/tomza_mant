@@ -2,13 +2,14 @@ const normal=s=>String(s||'').trim().normalize('NFD').replace(/[\u0300-\u036f]/g
 const CATEGORIAS_SOLICITUD=Object.freeze(['Carburación','Limpieza','Oficina','Operaciones','Otros','Papelería','Salud ocupacional','Servicios ambientales','Técnicos','Uniformes']);
 const categoriasPorNombre=new Map(CATEGORIAS_SOLICITUD.map(c=>[normal(c),c]));
 const equivalencias={TI:'Oficina',TECNOLOGIA:'Oficina',INFORMATICA:'Oficina',VENTAS:'Operaciones','EQUIPO DE PROTECCION PERSONAL':'Salud ocupacional','SALUD Y PRIMEROS AUXILIOS':'Salud ocupacional','CILINDROS Y TANQUES':'Carburación','SELLOS Y EMPAQUES':'Operaciones','OTROS SUMINISTROS':'Otros',CAFETERIA:'Otros'};
-const esPapeleria=d=>/^(AMPOS|BLOCK|BOLETA|BOLSAS PARA MONEDAS|BORRADOR|CAJA (?:CLIPS|DE GRAPAS)|CARPETA|CINTA SCOTCH|CORRECTOR|CUADERNO|CUIDO DE CAMIONES|DEDO FACIL|FOLDER|FUNDA|GOMA|GRAPADORA|HOJA|LAPICERO|LAPIZ|LIBRETA|LIQUIDACION DE RUTAS|MAQUINILLA|MASKIN|ORDEN COMBUSTIBLE|PAQUETE DE PRENSAS|PERFORADORA|PILOT|POST|PRENSA|RECIBOS DE DINERO|REGLA|REMESAS|REPORTE DIARIO|REQUISICION|RESALTADOR|RESMAS|REVISION GAS PAR|ROLLO|SACA GRAPAS|SOBRE|SOLICITUD COMBUSTIBLE|TABLA|TACHUELAS|TARJETAS DE PRESENTACION|TIJERAS GRANDES|TINTA|TRAMITE DE FACTURAS|TRASLADO DE TANQUE|PAPEL(?! HIGIENICO))/.test(d);
+const esPapeleria=d=>/^(?:BLOCS?|BLOCKS?)\b/.test(d);
 function categoriaArticulo(a){
   const definida=String(a.categoria||'').trim();
   const d=normal(a.descripcion),clave=normal(definida);
   // Normalizar para las solicitudes sin modificar fichas, códigos ni existencias.
   if(/^(CILINDROS?|TANQUES?)\b/.test(d))return 'Carburación';
-  if(clave==='OFICINA' && esPapeleria(d))return 'Papelería';
+  if(esPapeleria(d))return 'Papelería';
+  if(clave==='PAPELERIA')return 'Oficina';
   if(categoriasPorNombre.has(clave))return categoriasPorNombre.get(clave);
   if(Object.hasOwn(equivalencias,clave))return equivalencias[clave];
   if(/(AMBIENTAL|RECOLECCION.*(?:RESIDUO|DESECHO)|MANEJO.*(?:RESIDUO|DESECHO)|FUMIGACION|CONTROL DE PLAGAS|RECICLAJE)/.test(d))return 'Servicios ambientales';

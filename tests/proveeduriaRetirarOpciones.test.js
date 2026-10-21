@@ -2,9 +2,9 @@ const test=require('node:test'),assert=require('node:assert/strict'),express=req
 const pool=require('../src/db'),router=require('../src/routes/proveeduria.routes');
 const retirados=require('../src/data/proveeduriaArticulosRetiradosSolicitud.json');
 const {articulosSinInventario,articulosInventariables,articuloSolicitud}=require('../src/utils/proveeduriaSolicitable');
-test('se retiran las opciones indicadas en las imágenes y se conservan los quince artículos inventariables',()=>{
+test('se retiran las opciones indicadas en las imágenes y se conservan los artículos inventariables',()=>{
  assert.equal(retirados.length,16);assert.equal(new Set(retirados).size,16);
- assert.equal(articulosSinInventario.length,207);assert.equal(articulosInventariables.length,15);
+ assert.equal(articulosSinInventario.length,150);assert.equal(articulosInventariables.length,72);
  assert.ok(retirados.every(c=>!articulosSinInventario.some(a=>a.codigo===c)));
  assert.ok(retirados.every(c=>articuloSolicitud(c)),'se conserva la lectura de documentos anteriores');
  assert.ok(retirados.every(c=>!articulosInventariables.some(a=>a.codigo===c)));

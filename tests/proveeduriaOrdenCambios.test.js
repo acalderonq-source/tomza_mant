@@ -23,7 +23,7 @@ async function servidor(user,run){
 }
 test('OC directa recalcula IVA del catálogo y respeta el precio editado y días de crédito',async()=>{
   const q=pool.query,c=pool.getConnection;let oc;
-  pool.query=async()=>[[]];pool.getConnection=async()=>({beginTransaction:async()=>{},commit:async()=>{},rollback:async()=>{},release(){},query:async(sql,args)=>{if(sql.includes("VALUES ('oc'"))oc=JSON.parse(args[2]);return [{insertId:9}];}});
+  pool.query=async()=>[[]];pool.getConnection=async()=>({beginTransaction:async()=>{},commit:async()=>{},rollback:async()=>{},release(){},query:async(sql,args)=>{if(sql.startsWith('SELECT codigo FROM prov_inventario_bajas'))return [[]];if(sql.includes("VALUES ('oc'"))oc=JSON.parse(args[2]);return [{insertId:9}];}});
   try{await servidor({id:1,usuario:'compras',rol:'PROVEEDURIA',sede:'Cartago',departamentoActivo:'PROVEEDURIA'},async base=>{
     const body=new URLSearchParams({origen_formulario:'taller',sede:'Cartago',proveedor:'Proveedor',email:'p@example.com',entrega:'5 días',empresa_destino:'SUPER GAS',moneda:'CRC',credito:'45',forma_pago:'Crédito',iva:'99','lineas[0][descripcion]':'Azúcar (2kg)','lineas[0][cantidad]':'2','lineas[0][precio_unitario]':'1500','lineas[1][descripcion]':'Envio Impresora','lineas[1][cantidad]':'1','lineas[1][precio_unitario]':'100'});
     assert.equal((await fetch(base+'/ordenes',{method:'POST',body,redirect:'manual'})).status,302);assert.equal(oc.impuesto,30);assert.equal(oc.total,3130);assert.equal(oc.lineas[0].precio_unitario,1500);assert.equal(oc.lineas[0].iva,1);assert.equal(oc.lineas[1].iva,0);assert.equal(oc.credito,45);assert.equal(oc.iva_global,false);

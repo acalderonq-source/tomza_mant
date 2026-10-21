@@ -1,5 +1,7 @@
 const fuente=require('../data/proveeduriaArticulosSolicitud.json');
 const codigosInventariables=new Set(require('../data/proveeduriaArticulosInventariables.json'));
+const equivalenciasInventario=require('../data/proveeduriaCodigosInventario.json');
+const codigoInventario=codigo=>Object.hasOwn(equivalenciasInventario,String(codigo))?equivalenciasInventario[String(codigo)]:String(codigo);
 const retiradosSolicitud=new Set(require('../data/proveeduriaArticulosRetiradosSolicitud.json'));
 const {categoriaArticulo}=require('./proveeduriaCategorias');
 const normal=s=>String(s||'').trim().normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().replace(/\s+/g,' ');
@@ -14,7 +16,7 @@ const articuloSolicitudDescripcion=descripcion=>porDescripcion.get(normal(descri
 const esNoInventariable=l=>{const a=articuloSolicitud(l.codigo);return a?!a.inventariable:l.inventariable===false;};
 function catalogoParaOrden(base){
   const catalogo=new Map();
-  for(const a of [...articulosSolicitud,...base])if(!catalogo.has(normal(a.descripcion)))catalogo.set(normal(a.descripcion),a);
+  for(const a of [...articulosSolicitud,...base])if(!catalogo.has(normal(a.descripcion)))catalogo.set(normal(a.descripcion),a.inventariable?{...a,codigo:codigoInventario(a.codigo)}:a);
   return [...catalogo.values()];
 }
-module.exports={articulosSolicitud,articulosSinInventario,articulosInventariables,articuloSolicitud,articuloSolicitudDescripcion,esNoInventariable,catalogoParaOrden};
+module.exports={articulosSolicitud,articulosSinInventario,articulosInventariables,articuloSolicitud,articuloSolicitudDescripcion,esNoInventariable,catalogoParaOrden,codigoInventario};

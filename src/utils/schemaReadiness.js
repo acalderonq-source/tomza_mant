@@ -22,6 +22,7 @@ async function verificarColumnasRequeridas(query, columnasRequeridas) {
 }
 
 const COLUMNAS_ESENCIALES_TALLER = {
+  prov_inventario_bajas: ['codigo','descripcion','origen','datos','usuario_id','creado_en'],
   ciberseguridad_eventos: ['id','huella','tipo','gravedad','ip','usuario','departamento','ruta','http_estado','creado_en','ultimo_en','intentos','estado','version'],
   ciberseguridad_seguimiento: ['id','evento_id','administrador_id','estado','nota','creado_en'],
   ciberseguridad_config: ['id','iniciado_en'],

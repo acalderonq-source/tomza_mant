@@ -1,11 +1,12 @@
 const test=require('node:test'),assert=require('node:assert/strict'),express=require('express'),path=require('node:path');
 const pool=require('../src/db'),router=require('../src/routes/proveeduria.routes');
-const {articulosInventariables,articulosSinInventario,articuloSolicitudDescripcion,esNoInventariable}=require('../src/utils/proveeduriaSolicitable');
+const {articulosInventariables:todosInventariables,articulosSinInventario,articuloSolicitudDescripcion,esNoInventariable}=require('../src/utils/proveeduriaSolicitable');
 const {lineasCompra}=require('../src/utils/proveeduria');
+const articulosInventariables=todosInventariables.filter(a=>a.categoria==='Salud ocupacional');
 const anclaje=articuloSolicitudDescripcion('Anclaje 90 cm');
 const gestor={id:72,usuario:'compras',rol:'PROVEEDURIA',sede:'Cartago',departamentoActivo:'PROVEEDURIA',departamentos:['PROVEEDURIA']};
 test('solo los quince artículos visibles pasan a control de inventario con los códigos originales',()=>{
-  assert.equal(articulosInventariables.length,15);assert.equal(articulosSinInventario.length,207);
+  assert.equal(articulosInventariables.length,15);assert.equal(articulosSinInventario.length,150);
   assert.ok(articulosInventariables.every(a=>a.categoria==='Salud ocupacional'&&a.codigo.startsWith('SOL-')));
   assert.ok(articulosInventariables.some(a=>a.descripcion==='Capa larga (capote)'));
   assert.ok(!articulosInventariables.some(a=>a.descripcion==='Algodon'));

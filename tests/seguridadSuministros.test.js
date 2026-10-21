@@ -20,7 +20,7 @@ test('entrada real de Seguridad muestra el módulo y permite enviar una solicitu
  const original=pool.query,originalConnection=pool.getConnection;let guardada;
  const user={id:91,usuario:'seguridad',nombre:'Seguridad',rol:'SEGURIDAD_OCUP',sede:'Cartago',departamentoActivo:'SEGURIDAD_OCUPACIONAL',departamentos:['SEGURIDAD_OCUPACIONAL']};
  const query=async(sql,args)=>{
-   if(sql.includes('FROM prov_inventario'))return [[{sede:'Cartago',codigo:'EPP',descripcion:'Guantes',iva:13,unidad:'UND'}]];
+   if(/FROM prov_inventario(?: |$)/.test(sql))return [[{sede:'Cartago',codigo:'EPP',descripcion:'Guantes',iva:13,unidad:'UND'}]];
    if(sql.startsWith('INSERT INTO prov_documentos')){guardada=JSON.parse(args[2]);return [{insertId:101}];}
    return [[]];
  };
