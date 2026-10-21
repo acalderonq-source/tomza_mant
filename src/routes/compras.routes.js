@@ -4549,6 +4549,10 @@ router.get("/ordenes/:id/editar", requireAuth, allowRoles("ADMIN", "TALLER", "PR
 
 router.post("/ordenes", requireAuth, allowRoles("ADMIN", "TALLER", "PROVEEDURIA_TALLER"), async (req, res) => {
   let connection, liberarNumeracion;
+  // Toda orden de compra debe llevar el archivo de la cotización del proveedor.
+  if (!String(req.body.cotizacion_data || "").trim()) {
+    return res.status(400).send("Adjunte el archivo de la cotización del proveedor (PDF, JPG, PNG o WEBP) para crear la orden.");
+  }
   try {
     await ensureOrdenPlacaColumn();
     await ensureOrdenDetalleCodigoProductoColumn();

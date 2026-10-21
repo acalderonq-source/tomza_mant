@@ -41,7 +41,7 @@ test('aparecen una vez en solicitudes y en inventario; recepción y entrega regi
  const s=app.listen(0,'127.0.0.1');await new Promise(r=>s.once('listening',r));const base=`http://127.0.0.1:${s.address().port}/proveeduria`;
  const json=body=>({method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
  const pedido={sede:'Cartago',lineas:[{codigo:anclaje.codigo,categoria:'Salud ocupacional',cantidad:2,inventariable:false}]};
- const form=()=>new URLSearchParams({origen_formulario:'taller',solicitud_id:'1',proveedor:'Proveedor',email:'proveedor@example.com',empresa_destino:'GAS TOMZA',credito:'30',forma_pago:'Crédito',entrega:'5 días',moneda:'CRC',iva:'13','lineas[0][codigo_producto]':anclaje.codigo,'lineas[0][descripcion]':anclaje.descripcion,'lineas[0][cantidad]':'2','lineas[0][precio_unitario]':'100'});
+ const form=()=>new URLSearchParams({origen_formulario:'taller',cotizacion_data:'data:application/pdf;base64,JVBERi0xLjQK',cotizacion_nombre:'cotizacion.pdf',solicitud_id:'1',proveedor:'Proveedor',email:'proveedor@example.com',empresa_destino:'GAS TOMZA',credito:'30',forma_pago:'Crédito',entrega:'5 días',moneda:'CRC',iva:'13','lineas[0][codigo_producto]':anclaje.codigo,'lineas[0][descripcion]':anclaje.descripcion,'lineas[0][cantidad]':'2','lineas[0][precio_unitario]':'100'});
  try{
   const pagina=await fetch(base+'/mis-solicitudes');assert.equal(pagina.status,200);const html=await pagina.text();
   const catalogo=JSON.parse(html.match(/<script id="prov-datos"[^>]*>([\s\S]*?)<\/script>/)[1]).articulos;

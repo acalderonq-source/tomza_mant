@@ -422,6 +422,8 @@ router.post(['/ordenes','/solicitudes/:id/cotizacion'],wrap(async(req,res)=>{
       d.cotizacion_archivo=await guardarAdjunto(db,adjunto({nombre:req.body.cotizacion_nombre,base64:match[1]}));d.cotizacion_nombre=d.cotizacion_archivo.nombre;
     }
     if(!d.cotizacion_archivo&&solicitud.datos.cotizacion?.cotizacion_archivo){d.cotizacion_archivo=solicitud.datos.cotizacion.cotizacion_archivo;d.cotizacion_nombre=solicitud.datos.cotizacion.cotizacion_nombre;}
+    // Toda cotización y toda OC deben llevar el archivo de la cotización del proveedor.
+    exigir(d.cotizacion_archivo,'Adjunte el archivo de la cotización del proveedor (PDF, PNG o JPG) para continuar');
     if(esCotizacion){
       solicitud.datos.cotizacion={...d,cotizada_por:req.session.user.id,cotizada_en:new Date().toISOString()};solicitud.datos.estado='COTIZADA';
       await guardar(db,solicitud,req.session.user.id,'Cotización preparada');await alerta(db,solicitud.id,'Proveeduría preparó la cotización de su solicitud',solicitud.usuario_id);return solicitud.id;

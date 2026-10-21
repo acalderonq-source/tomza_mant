@@ -80,7 +80,7 @@ test('flujo completo: solicitud de otro departamento, cotización, OC, recepció
   }
   pool.query=query;pool.getConnection=async()=>({query,beginTransaction:async()=>{},commit:async()=>{},rollback:async()=>{},release(){}});
   const json=body=>({method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-  const form=()=>new URLSearchParams({origen_formulario:'taller',solicitud_id:'1',proveedor:'Proveedor',email:'proveedor@example.com',empresa_destino:'GAS TOMZA',credito:'30',forma_pago:'Crédito',entrega:'5 días',moneda:'CRC',iva:'13','lineas[0][codigo_producto]':'PAPEL','lineas[0][descripcion]':'Papel','lineas[0][cantidad]':'2','lineas[0][precio_unitario]':'100'});
+  const form=()=>new URLSearchParams({origen_formulario:'taller',cotizacion_data:'data:application/pdf;base64,JVBERi0xLjQK',cotizacion_nombre:'cotizacion.pdf',solicitud_id:'1',proveedor:'Proveedor',email:'proveedor@example.com',empresa_destino:'GAS TOMZA',credito:'30',forma_pago:'Crédito',entrega:'5 días',moneda:'CRC',iva:'13','lineas[0][codigo_producto]':'PAPEL','lineas[0][descripcion]':'Papel','lineas[0][cantidad]':'2','lineas[0][precio_unitario]':'100'});
   try{
     await server(regional,async base=>{
       const r=await fetch(base+'/solicitudes',json({departamento:'PROVEEDURIA',lineas:[{codigo:'PAPEL',descripcion:'Papel',cantidad:2,iva:99}],motivo:'Para la oficina'}));assert.equal(r.status,200);assert.equal(docs.get(1).datos.departamento,'OPERACIONES');assert.equal(docs.get(1).datos.solicitante,requester.nombre);assert.equal(docs.get(1).datos.lineas[0].iva,13);assert.equal(alerts[0].grupo,'PROVEEDURIA');
@@ -89,6 +89,7 @@ test('flujo completo: solicitud de otro departamento, cotización, OC, recepció
       const bandeja=await fetch(base+'/solicitudes');assert.equal(bandeja.status,200);const html=await bandeja.text();assert.match(html,/Solicitante Operaciones/);assert.match(html,/Preparar cotización/);
       const antes=await fetch(base+'/ordenes/nueva?solicitud_id=1',{redirect:'manual'});assert.equal(antes.status,302);assert.equal(antes.headers.get('location'),'/proveeduria/solicitudes/1/cotizacion');
       assert.equal((await fetch(base+'/ordenes',{method:'POST',body:form(),redirect:'manual'})).status,400);
+      const sinArchivo=form();sinArchivo.delete('cotizacion_data');const rechazada=await fetch(base+'/solicitudes/1/cotizacion',{method:'POST',body:sinArchivo,redirect:'manual'});assert.equal(rechazada.status,400);assert.match(await rechazada.text(),/Adjunte el archivo de la cotización/);assert.equal(docs.get(1).datos.estado,'PENDIENTE');
       const cotizacion=await fetch(base+'/solicitudes/1/cotizacion');assert.equal(cotizacion.status,200);assert.match(await cotizacion.text(),/Guardar cotización/);
       assert.equal((await fetch(base+'/solicitudes/1/cotizacion',{method:'POST',body:form(),redirect:'manual'})).status,302);assert.equal(docs.get(1).datos.estado,'COTIZADA');assert.equal(docs.size,1);
       const nueva=await fetch(base+'/ordenes/nueva?solicitud_id=1');assert.equal(nueva.status,200);assert.match(await nueva.text(),/proveedor@example.com/);

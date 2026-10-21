@@ -325,7 +325,8 @@
 
       <% if (!carburacion) { %>
       <div class="mb-3 quote-box">
-        <label class="form-label fw-semibold">Cotización adjunta</label>
+        <% const cotizacionObligatoria = !esEdicion && !safeOrden.cotizacion_archivo; %>
+        <label class="form-label fw-semibold" for="cotizacionInput">Cotización adjunta<% if (cotizacionObligatoria) { %> <span class="text-danger">(obligatoria)</span><% } %></label>
         <% if (safeOrden.cotizacion_archivo) { %>
           <div class="mb-2">
             <a href="<%= safeOrden.cotizacion_archivo %>" target="_blank" class="btn btn-sm btn-outline-primary">
@@ -334,7 +335,7 @@
             <span class="text-muted small ms-2"><%= safeOrden.cotizacion_nombre || 'Cotización adjunta' %></span>
           </div>
         <% } %>
-        <input type="file" id="cotizacionInput" class="form-control" accept="application/pdf,image/*">
+        <input type="file" id="cotizacionInput" class="form-control" accept="application/pdf,image/*"<%= cotizacionObligatoria ? " required" : "" %>>
         <input type="hidden" name="cotizacion_data" id="cotizacionData">
         <input type="hidden" name="cotizacion_nombre" id="cotizacionNombre">
         <input type="hidden" name="cotizacion_tipo" id="cotizacionTipo">
@@ -344,7 +345,7 @@
           </button>
         </div>
         <div id="cotizacionPreview" class="small text-muted mt-2">
-          <%= safeOrden.cotizacion_archivo ? 'Si selecciona otro archivo, reemplaza la cotización actual. También puede usarlo para llenar la orden.' : 'Opcional. Adjunte PDF o imagen y use el botón para llenar la orden automáticamente.' %>
+          <%= safeOrden.cotizacion_archivo ? 'Si selecciona otro archivo, reemplaza la cotización actual. También puede usarlo para llenar la orden.' : (cotizacionObligatoria ? 'Obligatoria. Adjunte la cotización del proveedor en PDF o imagen; también puede usarla para llenar la orden.' : 'Adjunte PDF o imagen y use el botón para llenar la orden automáticamente.') %>
         </div>
       </div>
 

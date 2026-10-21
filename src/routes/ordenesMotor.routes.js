@@ -306,6 +306,10 @@ router.get("/:id/editar", requireAuth, requireMotor, async (req, res) => {
 });
 
 router.post("/", requireAuth, requireMotor, async (req, res) => {
+  // Toda orden de compra debe llevar el archivo de la cotización del proveedor.
+  if (!String(req.body.cotizacion_data || "").trim()) {
+    return res.status(400).send("Adjunte el archivo de la cotización del proveedor (PDF o imagen) para crear la orden.");
+  }
   const connection = await pool.getConnection();
   try {
     await ensureOrdenesMotorTables();
