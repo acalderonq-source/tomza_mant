@@ -1,6 +1,12 @@
 const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const pdf=require('../src/utils/pasivosPdf');
+test('revisión completa reconoce Turbos Cartago y Lapa Green sin ampliar empresas autorizadas',()=>{
+  assert.equal(pdf.clasificar('RECONSTRUCCION DE TURBOS CARTAGO SOCIEDAD DE RESPONSABILIDAD LIMITADA','GAS TOMZA','3102887390').nombre,'RECONSTRUCCION DE TURBOS CARTAGO');
+  assert.equal(pdf.clasificar('SOLUCIONES AUTOMOTRICES LAPA GREEN S.R.L.','SUPER GAS','3102783927').nombre,'LAPAGREEN (SG)');
+  assert.equal(pdf.clasificar('SOLUCIONES AUTOMOTRICES LAPA GREEN S.R.L.','GAS TOMZA','3102783927'),null);
+  assert.equal(pdf.clasificar('Autopistas del Sol, S.A.','GAS TOMZA','3101428504'),null);
+});
 test('Maxi Repuestos reconoce razón social del XML y cédula en ambas empresas',()=>{
   for(const empresa of ['GAS TOMZA','SUPER GAS']){
     assert.equal(pdf.clasificar('MAXI REPUESTOS SOCIEDAD DE RESPONSABILIDAD LIMITADA',empresa).empresa,empresa);

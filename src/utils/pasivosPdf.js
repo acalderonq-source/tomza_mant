@@ -6,7 +6,7 @@ const {normalizarEmpresa}=require('./empresasContabilidad');
 const clave=v=>String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().replace(/[^A-Z0-9]/g,'');
 const identidades=require('../data/proveedoresPasivosIdentidades');
 const identidad=v=>String(v||'').replace(/\D/g,'').replace(/^0+/,'');
-const razon=v=>clave(v).replace(/SOCIEDADANONIMA$/,'SA').replace(/(?:SA|SRL|LTDA)$/,'');
+const razon=v=>clave(v).replace(/SOCIEDADDERESPONSABILIDADLIMITADA$/,'SRL').replace(/SOCIEDADANONIMA$/,'SA').replace(/(?:SA|SRL|LTDA)$/,'');
 function empresaReceptora(nombre,cedula){
   return {'3101349880':'GAS TOMZA','3101044021':'SUPER GAS'}[identidad(cedula)]||normalizarEmpresa(nombre);
 }
