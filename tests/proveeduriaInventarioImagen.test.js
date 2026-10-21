@@ -5,7 +5,7 @@ const {lineasCompra}=require('../src/utils/proveeduria');
 const anclaje=articuloSolicitudDescripcion('Anclaje 90 cm');
 const gestor={id:72,usuario:'compras',rol:'PROVEEDURIA',sede:'Cartago',departamentoActivo:'PROVEEDURIA',departamentos:['PROVEEDURIA']};
 test('solo los quince artículos visibles pasan a control de inventario con los códigos originales',()=>{
-  assert.equal(articulosInventariables.length,15);assert.equal(articulosSinInventario.length,223);
+  assert.equal(articulosInventariables.length,15);assert.equal(articulosSinInventario.length,214);
   assert.ok(articulosInventariables.every(a=>a.categoria==='Salud ocupacional'&&a.codigo.startsWith('SOL-')));
   assert.ok(articulosInventariables.some(a=>a.descripcion==='Capa larga (capote)'));
   assert.ok(!articulosInventariables.some(a=>a.descripcion==='Algodon'));

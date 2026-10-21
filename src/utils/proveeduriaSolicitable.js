@@ -1,9 +1,11 @@
 const fuente=require('../data/proveeduriaArticulosSolicitud.json');
 const codigosInventariables=new Set(require('../data/proveeduriaArticulosInventariables.json'));
+const retiradosSolicitud=new Set(require('../data/proveeduriaArticulosRetiradosSolicitud.json'));
 const {categoriaArticulo}=require('./proveeduriaCategorias');
 const normal=s=>String(s||'').trim().normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().replace(/\s+/g,' ');
 const articulosSolicitud=fuente.articulos.map(a=>({...a,categoria:categoriaArticulo(a),iva:a.iva??13,unidad:'UND',inventariable:codigosInventariables.has(a.codigo)}));
-const articulosSinInventario=articulosSolicitud.filter(a=>!a.inventariable);
+// El catálogo fuente se conserva para documentos existentes; estas opciones ya no se solicitan.
+const articulosSinInventario=articulosSolicitud.filter(a=>!a.inventariable&&!retiradosSolicitud.has(a.codigo));
 const articulosInventariables=articulosSolicitud.filter(a=>a.inventariable);
 const porCodigo=new Map(articulosSolicitud.map(a=>[a.codigo,a]));
 const porDescripcion=new Map(articulosSolicitud.map(a=>[normal(a.descripcion),a]));

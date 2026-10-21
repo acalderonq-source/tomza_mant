@@ -4,12 +4,13 @@ const assert = require('node:assert/strict');
 const { chromium } = require('playwright');
 const pool = require('../src/db');
 const {articulosInventariables}=require('../src/utils/proveeduriaSolicitable');
+const retirados=require('../src/data/proveeduriaArticulosRetiradosSolicitud.json');
 
 (async () => {
   const original = pool.query;
   pool.query = async sql => {
     if (sql.includes('FROM usuarios_sedes')) return [[{sede:'Cartago'},{sede:'Taller'},{sede:'Tecnicos'},{sede:'granel_la_cruz'}]];
-    if (sql.includes('FROM prov_inventario i')) return [[{sede:'Cartago',codigo:'GUANTE',descripcion:'Guantes de seguridad',unidad:'PAR'},{sede:'Cartago',codigo:'CAFE',descripcion:'Café',unidad:'UND',categoria:'Cafetería'},...articulosInventariables.map(a=>({...a,sede:'Cartago'}))]];
+    if (sql.includes('FROM prov_inventario i')) return [[{sede:'Cartago',codigo:'GUANTE',descripcion:'Guantes de seguridad',unidad:'PAR'},{sede:'Cartago',codigo:'CAFE',descripcion:'Café',unidad:'UND',categoria:'Cafetería'},{sede:'Cartago',codigo:'CLOR-GT',descripcion:'Cloro',unidad:'UND',categoria:'Limpieza'},{sede:'Cartago',codigo:'JAB-bacterial-GT',descripcion:'Jabón antibacterial',unidad:'UND',categoria:'Limpieza'},...articulosInventariables.map(a=>({...a,sede:'Cartago'}))]];
     return [[]];
   };
   const app = express();
@@ -38,6 +39,8 @@ const {articulosInventariables}=require('../src/utils/proveeduriaSolicitable');
       assert.equal(await productos.isDisabled(),true);
       assert.deepEqual(await categorias.locator('option').allTextContents(),['Seleccione una categoría','Limpieza','Oficina','Operaciones','Otros','Papelería','Salud ocupacional','Servicios ambientales','Técnicos','Uniformes']);
       const datos=JSON.parse(await page.locator('#prov-datos').textContent());
+      assert.ok(datos.articulos.every(a=>!retirados.includes(a.codigo)));
+      for(const nombre of ['Cloro','Jabón antibacterial'])assert.equal(datos.articulos.filter(a=>a.descripcion===nombre).length,1);
       for(const categoria of datos.categorias){
         await categorias.selectOption(categoria);
         const visibles=await productos.locator('option').evaluateAll(options=>options.map(o=>o.value).filter(Boolean));
