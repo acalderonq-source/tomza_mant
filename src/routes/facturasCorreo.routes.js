@@ -4,7 +4,8 @@ const fs = require("fs");
 const path = require("path");
 const { ConfidentialClientApplication } = require("@azure/msal-node");
 const pool = require("../db");
-const {conciliarHaciendaCorreo}=require('../utils/haciendaCorreo');
+const {conciliarHaciendaCorreo,verificarRespuesta}=require('../utils/haciendaCorreo');
+const {registrarAceptacionesCorreo}=require('../utils/aceptacionReceptor');
 const {esPropietarioAdministracion}=require('../utils/administracionPrivada');
 const { UPLOAD_ROOT, ensureUploadDirectory } = require("../utils/uploadStorage");
 
@@ -254,7 +255,8 @@ async function synchronizeMailbox(){
     if(!connection)return {processed:0,saved:0,actualizadas:0};
     const result=await syncInbox(await getAccessToken(connection));
     const reconciled=await conciliarHaciendaCorreo(pool);
-    return {...result,...reconciled};
+    const aceptaciones=await registrarAceptacionesCorreo(pool,verificarRespuesta);
+    return {...result,...reconciled,...aceptaciones};
   }finally{syncing=false;}
 }
 

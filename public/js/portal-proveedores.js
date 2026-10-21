@@ -3,7 +3,9 @@
   const aviso=(mensaje,error=false)=>{resultado.className=`alert alert-${error?'danger':'success'}`;resultado.textContent=mensaje;resultado.scrollIntoView({block:'nearest',behavior:'smooth'});};
   async function archivo(file,max){if(!file||file.size>max*1024*1024)throw Error(`Seleccione un archivo de hasta ${max} MB`);return new Promise((resolve,reject)=>{const r=new FileReader();r.onerror=()=>reject(Error('No se pudo leer el archivo'));r.onload=()=>resolve({nombre:file.name,base64:r.result.split(',')[1]});r.readAsDataURL(file);});}
   document.querySelectorAll('[data-portal-api]').forEach(form=>form.addEventListener('submit',async e=>{
-    e.preventDefault();const btn=form.querySelector('button');btn.disabled=true;
+    e.preventDefault();
+    if(form.dataset.confirmar&&!window.confirm(form.dataset.confirmar))return;
+    const btn=form.querySelector('button');btn.disabled=true;
     try{
       const body=Object.fromEntries(new FormData(form));
       if(form.querySelector('[data-portal-xml]'))body.xml=await archivo(form.querySelector('[data-portal-xml]').files[0],2);
@@ -23,7 +25,7 @@
     const q=normalizar(document.querySelector('[data-buscar]')?.value||''),responsable=document.querySelector('[data-responsable-filtro]')?.value||'';let visibles=0;
     const filas=document.querySelectorAll('[data-factura]');
     const empresa=document.querySelector('[data-empresa-filtro]')?.value||'';
-    filas.forEach(row=>{const estado=filtro==='todas'||(filtro==='excepciones'?row.dataset.excepcion==='1':filtro==='vencidas'?row.dataset.vencida==='1':filtro==='atrasadas'?row.dataset.atrasada==='1':filtro==='sin-orden'?row.dataset.sinOrden==='1':row.dataset.invoiceState===filtro);const asignado=!responsable||(responsable==='sin-asignar'?!row.dataset.responsable:row.dataset.responsable===responsable);const mismaEmpresa=!empresa||row.querySelector('[data-empresa-factura]')?.textContent===empresa;row.hidden=!(normalizar(row.textContent).includes(q)&&estado&&asignado&&mismaEmpresa);if(!row.hidden)visibles++;});
+    filas.forEach(row=>{const estado=filtro==='todas'||(filtro==='excepciones'?row.dataset.excepcion==='1':filtro==='vencidas'?row.dataset.vencida==='1':filtro==='atrasadas'?row.dataset.atrasada==='1':filtro==='sin-orden'?row.dataset.sinOrden==='1':filtro==='sin-aceptacion'?row.dataset.sinAceptacion==='1':row.dataset.invoiceState===filtro);const asignado=!responsable||(responsable==='sin-asignar'?!row.dataset.responsable:row.dataset.responsable===responsable);const mismaEmpresa=!empresa||row.querySelector('[data-empresa-factura]')?.textContent===empresa;row.hidden=!(normalizar(row.textContent).includes(q)&&estado&&asignado&&mismaEmpresa);if(!row.hidden)visibles++;});
     const vacio=document.querySelector('[data-sin-resultados]');if(vacio)vacio.hidden=visibles>0||filas.length===0;
     const contador=document.querySelector('[data-invoice-results]');if(contador)contador.textContent=`${visibles} documentos`;
   }

@@ -154,9 +154,20 @@ administracion.post('/receptores',wrap(async(req,res)=>{
   const cedula=String(req.body.cedula||'').trim(),nombre=String(req.body.nombre||'').trim();exigir(/^\d{9,12}$/.test(cedula)&&nombre&&nombre.length<=255,'Cédula y razón social requeridas');
   await pool.query('INSERT INTO prov_portal_receptores (cedula,nombre,activo) VALUES (?,?,?) ON DUPLICATE KEY UPDATE nombre=VALUES(nombre),activo=VALUES(activo)',[cedula,nombre,req.body.activo==='0'?0:1]);res.json({ok:true});
 }));
+// Aceptación de Tomza ante Hacienda (enviada desde Creatica), leída de las respuestas del correo.
+async function agregarAceptacionTomza(docs){
+  const {aceptacionesPorClave,estadoAceptacion}=require('../utils/aceptacionReceptor');
+  try{
+    const mapa=await aceptacionesPorClave(pool,docs.map(d=>d.datos.factura?.electronica?.clave));
+    for(const row of docs)row.aceptacionTomza=estadoAceptacion(mapa.get(row.datos.factura?.electronica?.clave));
+  }catch(error){
+    if(error.code!=='ER_NO_SUCH_TABLE')throw error;
+  }
+}
 async function bandeja(req,res){
   const [r]=await pool.query("SELECT * FROM prov_documentos WHERE tipo='factura_portal' ORDER BY id DESC");
   const docs=r.map(parse);for(const row of docs)row.datos.control=await revisarFactura(pool,row);
+  await agregarAceptacionTomza(docs);
   docs.sort((a,b)=>seguimiento(a.datos).prioridad-seguimiento(b.datos).prioridad||String(a.datos.factura.fecha_vencimiento).localeCompare(String(b.datos.factura.fecha_vencimiento))||b.id-a.id);
   const [responsables]=await pool.query("SELECT id,usuario AS username FROM usuarios WHERE rol IN ('ADMIN','CONTABILIDAD','PROVEEDURIA','PROVEEDURIA_TALLER') ORDER BY username");
   res.render('portal_proveedores/bandeja',{docs,saldo,excepciones,responsables,seguimiento,empresaFactura,usuarioId:req.session.user.id,puedeContabilidad:contabilidad(req.session.user),puedeAdministracion:await esPropietarioAdministracion(req.session.user,pool)});

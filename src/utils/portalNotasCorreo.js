@@ -14,6 +14,7 @@ async function conciliarNotasCorreo(pool,verify){
         if(!fs.existsSync(file)||fs.statSync(file).size>2*1024*1024)continue;
         let v;try{v=await verify(fs.readFileSync(file,'utf8'));}catch(_){continue;}
         const m=v.mensaje,id=x=>String(x||'').replace(/^0+/,'');
+        if(m.NumeroConsecutivoReceptor)continue;
         if(m.Clave!==n.clave||id(m.NumeroCedulaEmisor)!==id(n.emisor)||id(m.NumeroCedulaReceptor)!==id(n.receptor)||!Number.isFinite(Number(m.TotalFactura))||Math.abs(Number(m.TotalFactura)-n.total)>0.01)continue;
         const db=await pool.getConnection();
         try{

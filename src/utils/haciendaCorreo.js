@@ -60,15 +60,18 @@ async function conciliarHaciendaCorreo(pool,verify=verificarRespuesta){
     const [rows]=await pool.query(`SELECT d.id,d.datos,a.id AS adjunto_id,a.ruta_archivo FROM prov_documentos d
       JOIN facturas_correo_adjuntos a ON a.clave_electronica=JSON_UNQUOTE(JSON_EXTRACT(d.datos,'$.factura.electronica.clave'))
       WHERE d.tipo='factura_portal' AND a.tipo_documento='XML'
+      AND NOT EXISTS (SELECT 1 FROM hacienda_aceptaciones_revisadas r WHERE r.adjunto_correo_id=a.id AND r.es_respuesta_receptor=1)
       AND COALESCE(JSON_UNQUOTE(JSON_EXTRACT(d.datos,'$.factura.electronica.hacienda.fuente')),'') <> 'CORREO_XML_FIRMADO'
       ORDER BY d.id,a.id LIMIT 100`);
     for(const row of rows){
       if(!/^[a-f\d-]+\.xml$/i.test(row.ruta_archivo))continue;
       const file=path.join(UPLOAD_ROOT,'facturas-correo',row.ruta_archivo);
       if(!fs.existsSync(file)||fs.statSync(file).size>2*1024*1024)continue;
-      const xml=fs.readFileSync(file,'utf8');if(!xml.includes('MensajeHacienda'))continue;
+      const xml=fs.readFileSync(file,'utf8');if(!xml.includes('MensajeHacienda')||xml.includes('NumeroConsecutivoReceptor'))continue;
       let resultado;try{resultado=await verify(xml);}catch(e){console.warn('Respuesta correo sin verificar:',row.adjunto_id,e.message);continue;}
       const d=typeof row.datos==='string'?JSON.parse(row.datos):row.datos,f=d.factura,e=f.electronica,m=resultado.mensaje,id=n=>String(n||'').replace(/^0+/,'');
+      // La respuesta al mensaje de aceptación de Tomza (Creatica) no es el estado de la factura del proveedor.
+      if(m.NumeroConsecutivoReceptor)continue;
       if(m.Clave!==e.clave||id(m.NumeroCedulaEmisor)!==id(e.emisor)||id(m.NumeroCedulaReceptor)!==id(e.receptor)||!Number.isFinite(Number(m.TotalFactura))||Math.abs(Number(m.TotalFactura)-e.total)>0.01)continue;
       const estado=m.Mensaje==='1'?'ACEPTADA':m.Mensaje==='3'?'RECHAZADA':'ACEPTADA_PARCIAL';
       const hacienda={estado,ambiente:'produccion',fuente:'CORREO_XML_FIRMADO',adjunto_correo_id:row.adjunto_id,huella_firmante:resultado.huella,hash_respuesta:resultado.hash,consultado_en:new Date().toISOString(),detalle:'Respuesta de Hacienda recibida por Outlook; firma, emisor, receptor y monto verificados'};
