@@ -2,7 +2,7 @@ const router = require('express').Router();
 const {facturasDeOrden,vincularOrden,adjuntarFacturas}=require('../utils/portalFacturaOrden');
 const {articulosExcel,articuloExcel,ivaArticulo,condicionesOrden}=require('../utils/proveeduriaCatalogo');
 const {motivoBloqueoOrden,versionOrden,cambiosOrden}=require('../utils/proveeduriaOrdenEdicion');
-const {articulosSolicitud,articuloSolicitud,articuloSolicitudDescripcion,esNoInventariable,catalogoParaOrden}=require('../utils/proveeduriaSolicitable');
+const {articulosSinInventario,articuloSolicitud,articuloSolicitudDescripcion,esNoInventariable,catalogoParaOrden}=require('../utils/proveeduriaSolicitable');
 const {CATEGORIAS_SOLICITUD,categoriaArticulo,agruparArticulos}=require('../utils/proveeduriaCategorias');
 const { leerFacturaXML, consultarHacienda, aprobable, vencimiento } = require('../utils/proveedorHacienda');
 const { rateLimit } = require('express-rate-limit');
@@ -104,7 +104,7 @@ router.get('/mis-solicitudes',wrap(async(req,res)=>{
   const actual=sedeInventarioCompartido(req.session.sedeSeleccionada||u.sede);
   const [articulos]=await pool.query(`SELECT i.sede,i.codigo,i.descripcion,COALESCE(f.unidad,'UND') AS unidad,COALESCE(f.categoria,'') AS categoria FROM prov_inventario i LEFT JOIN prov_inventario_fichas f ON f.sede=i.sede AND f.codigo=i.codigo WHERE i.sede IN (?) ORDER BY i.descripcion,i.codigo`,[ALMACEN_GENERAL]);
   res.set('Cache-Control','no-store');
-  const catalogo=[...articulos.map(a=>({...a,categoria:categoriaArticulo(a)})),...articulosSolicitud.map(({codigo,descripcion,unidad,inventariable,categoria})=>({codigo,descripcion,unidad,inventariable,categoria}))];
+  const catalogo=[...articulos.map(a=>({...a,categoria:categoriaArticulo(a)})),...articulosSinInventario.map(({codigo,descripcion,unidad,inventariable,categoria})=>({codigo,descripcion,unidad,inventariable,categoria}))];
   res.render('proveeduria/mis_solicitudes',{user:u,docs:rows.map(datos),alertas,sedesPermitidas,articulos:catalogo,categorias:CATEGORIAS_SOLICITUD,agruparArticulos,sedeActual:sedesPermitidas.includes(actual)?actual:''});
 }));
 router.get('/solicitudes',wrap(async(req,res)=>{
@@ -163,7 +163,7 @@ router.post('/inventario/articulos',wrap(async(req,res)=>{
   if(!gestion(req.session.user))throw error(403,'No autorizado');
   const sedeArticulo=ALMACEN_GENERAL,d=fichaInventario(req.body),cantidad=cantidadInventario(req.body.cantidad??0,'Stock inicial');
   const codigo=String(req.body.codigo||'').trim()||'PV-'+crypto.randomBytes(4).toString('hex').toUpperCase();exigir(codigo.length<=80,'Código demasiado largo');
-  exigir(!articuloSolicitud(codigo),'Este código pertenece al catálogo de compra por solicitud y no se registra en inventario');
+  exigir(articuloSolicitud(codigo)?.inventariable!==false,'Este código pertenece al catálogo de compra por solicitud y no se registra en inventario');
   await transaccion(async db=>{
     const [existe]=await db.query('SELECT codigo FROM prov_inventario WHERE sede=? AND codigo=? FOR UPDATE',[sedeArticulo,codigo]);exigir(!existe.length,'El código ya existe en esta sede. Edite su ficha o ajuste la existencia');
     await db.query('INSERT INTO prov_inventario (sede,codigo,descripcion,iva,cantidad) VALUES (?,?,?,?,?)',[sedeArticulo,codigo,d.descripcion,d.iva,cantidad]);
@@ -312,11 +312,11 @@ router.post('/solicitudes',wrap(async(req,res) => {
   const u=req.session.user;
   exigir(esDepartamentoValido(u.departamentoActivo),'Seleccione su departamento antes de crear una solicitud');
   const id = await transaccion(async db=>{
-    const codigosStock=codigos.filter(c=>!articuloSolicitud(c));
+    const codigosStock=codigos.filter(c=>articuloSolicitud(c)?.inventariable!==false);
     const [articulos]=codigosStock.length?await db.query(`SELECT codigo,descripcion,iva FROM prov_inventario WHERE sede=? AND codigo IN (${codigosStock.map(()=>'?').join(',')})`,[ALMACEN_GENERAL,...codigosStock]):[[]];
     const [fichas]=codigosStock.length?await db.query(`SELECT codigo,categoria FROM prov_inventario_fichas WHERE sede=? AND codigo IN (${codigosStock.map(()=>'?').join(',')})`,[ALMACEN_GENERAL,...codigosStock]):[[]];
     const categorias=new Map(fichas.map(f=>[f.codigo,f.categoria]));
-    const catalogo=new Map([...articulos.map(a=>({...a,categoria:categorias.get(a.codigo)})),...articulosSolicitud].map(a=>[a.codigo,a]));
+    const catalogo=new Map([...articulos.map(a=>({...a,categoria:categorias.get(a.codigo)})),...articulosSinInventario].map(a=>[a.codigo,a]));
     const lineas=lineasCompra(solicitadas.map((l,i)=>{
       const a=catalogo.get(codigos[i]);
       exigir(a,`El artículo ${codigos[i]} no está en el catálogo de Proveeduría. Actualice la página y seleccione otro artículo`);

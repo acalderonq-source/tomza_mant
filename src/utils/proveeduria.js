@@ -18,10 +18,10 @@ function lineasCompra(lineas, precios = false) {
     const cantidad = numero(l.cantidad, 'Cantidad', 0.001);
     exigir(Math.abs(cantidad * 1000 - Math.round(cantidad * 1000)) < 0.00001, 'Máximo tres decimales en cantidad');
     const solicitable=articuloSolicitud(codigo);
-    const iva = numero(solicitable?.iva ?? l.iva ?? 13, 'IVA'); exigir(iva <= 100, 'IVA inválido');
+    const iva = numero(solicitable?.inventariable===false?solicitable.iva:(l.iva??solicitable?.iva??13), 'IVA'); exigir(iva <= 100, 'IVA inválido');
     const precio = precios ? numero(l.precio_unitario, 'Precio') : 0;
     const subtotal = redondear(cantidad * precio);
-    return { codigo, referencia:String(l.referencia||''), descripcion, cantidad, iva, precio_unitario: precio, subtotal, impuesto: redondear(subtotal * iva / 100),...(solicitable?{inventariable:false}:{}) };
+    return { codigo, referencia:String(l.referencia||''), descripcion, cantidad, iva, precio_unitario: precio, subtotal, impuesto: redondear(subtotal * iva / 100),...(solicitable?.inventariable===false?{inventariable:false}:{}) };
   });
 }
 function totales(lineas) {

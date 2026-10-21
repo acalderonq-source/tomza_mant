@@ -3,12 +3,13 @@ const path = require('node:path');
 const assert = require('node:assert/strict');
 const { chromium } = require('playwright');
 const pool = require('../src/db');
+const {articulosInventariables}=require('../src/utils/proveeduriaSolicitable');
 
 (async () => {
   const original = pool.query;
   pool.query = async sql => {
     if (sql.includes('FROM usuarios_sedes')) return [[{sede:'Cartago'},{sede:'Taller'},{sede:'Tecnicos'},{sede:'granel_la_cruz'}]];
-    if (sql.includes('FROM prov_inventario i')) return [[{sede:'Cartago',codigo:'GUANTE',descripcion:'Guantes de seguridad',unidad:'PAR'},{sede:'Cartago',codigo:'CAFE',descripcion:'Café',unidad:'UND',categoria:'Cafetería'}]];
+    if (sql.includes('FROM prov_inventario i')) return [[{sede:'Cartago',codigo:'GUANTE',descripcion:'Guantes de seguridad',unidad:'PAR'},{sede:'Cartago',codigo:'CAFE',descripcion:'Café',unidad:'UND',categoria:'Cafetería'},...articulosInventariables.map(a=>({...a,sede:'Cartago'}))]];
     return [[]];
   };
   const app = express();
@@ -44,6 +45,13 @@ const pool = require('../src/db');
       }
       await categorias.selectOption('Salud ocupacional');
       await page.waitForSelector('[data-campo="codigo"] option[value="GUANTE"]',{state:'attached'});
+      for(const a of articulosInventariables){
+        assert.equal(await productos.locator(`optgroup[label="Inventario general"] option[value="${a.codigo}"]`).count(),1);
+        assert.equal(await productos.locator(`optgroup[label="Compra por solicitud"] option[value="${a.codigo}"]`).count(),0);
+      }
+      await productos.selectOption(articulosInventariables[0].codigo);
+      assert.equal(await page.locator('.codigo').inputValue(),articulosInventariables[0].codigo);
+      assert.equal(await page.locator('[data-origen-producto]').textContent(),'');
       assert.equal(await productos.locator('option').evaluateAll(options=>options.some(o=>/Café/.test(o.textContent))),false);
       await page.locator('[data-campo="codigo"]').selectOption('GUANTE');
       assert.equal(await page.locator('.codigo').inputValue(),'GUANTE');

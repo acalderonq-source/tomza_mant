@@ -18,7 +18,7 @@ test('catálogo separado conserva los datos aportados, precios vacíos y decimal
   assert.equal(articuloSolicitudDescripcion('TANQUE DE 500 GLS PARA GAS LICUADO').precio_unitario,1200);
   assert.equal(articuloSolicitudDescripcion('Pintura Azul Tomza').precio_unitario,37611);
   assert.equal(articulosSolicitud.filter(a=>a.descripcion.toLowerCase()==='calca litraje configurable.').length,1);
-  assert(articulosSolicitud.every(a=>a.codigo.startsWith('SOL-')&&a.inventariable===false));
+  assert(articulosSolicitud.every(a=>a.codigo.startsWith('SOL-')));assert.equal(articulosSolicitud.filter(a=>a.inventariable).length,15);assert.equal(articulosSolicitud.filter(a=>!a.inventariable).length,223);
   const l=lineasCompra([{codigo:cilindro.codigo,descripcion:cilindro.descripcion,cantidad:1,iva:99,inventariable:true},{codigo:'STOCK',descripcion:'Papel',cantidad:1,iva:1,inventariable:false}]);
   assert.equal(l[0].iva,0);assert.equal(l[0].inventariable,false);assert.equal(l[1].inventariable,undefined);assert.equal(esNoInventariable(l[1]),false);
 });
