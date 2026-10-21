@@ -17,7 +17,8 @@ test('listado conserva columnas, fecha, persona y consecutivo y suma notas negat
 });
 test('monedas diferentes se exportan en hojas separadas y nunca sumadas',()=>{
   assert.deepEqual(generar([fila,{...fila,moneda:'USD'}],f).worksheets.map(s=>s.name),['Pasivos CRC','Pasivos USD']);
-  for(const filas of [[],[{...fila,monto:null}],[{...fila,moneda:null}]])assert.throws(()=>generar(filas,f));
+  assert.throws(()=>generar([],f));
+  for(const filas of [[{...fila,monto:null}],[{...fila,moneda:null}]])assert.ok(generar(filas,f).getWorksheet('Por revisar'));
   assert.throws(()=>generar([fila],{...f,fechaEntrega:'2026-02-30'}));
 });
 test('el XML aporta monto, moneda y nota de crédito sin perder el consecutivo',()=>{

@@ -14,7 +14,7 @@ router.get('/descargas-pdf',wrap(async(req,res)=>{
   const pdf={...require('../utils/pasivosPdf'),...require('../utils/pasivosPdfOutlook')};
   let f={desde:'',hasta:'',fecha_entrega:String(req.query.fecha_entrega||require('../utils/fechaCostaRica').fechaActualCostaRica()).slice(0,10),persona:String(req.query.persona||req.session?.user?.nombre||req.session?.user?.usuario||'').trim().slice(0,120)},filas=[],mensaje='';
   if(req.query.desde||req.query.hasta){
-    try{f={...f,...pdf.fechas(req.query),incluirNotas:req.query.listado==='1',empresa:['GAS TOMZA','SUPER GAS'].includes(req.query.empresa)?req.query.empresa:'',grupo:['OTROS','TALLER'].includes(req.query.grupo)?req.query.grupo:''};}catch(e){return res.status(400).render('contabilidad/descargas_pdf',{f,filas,mensaje:e.message});}
+    try{f={...f,...pdf.fechas(req.query),incluirNotas:req.query.listado==='1',actualizar:req.query.actualizar==='1',empresa:['GAS TOMZA','SUPER GAS'].includes(req.query.empresa)?req.query.empresa:'',grupo:['OTROS','TALLER'].includes(req.query.grupo)?req.query.grupo:''};}catch(e){return res.status(400).render('contabilidad/descargas_pdf',{f,filas,mensaje:e.message});}
     try{filas=await pdf.cargar(pool,f);}catch(e){console.error('Descargas Outlook:',e.errorCode||e.code||e.status||'ERROR',e.message);mensaje=pdf.mensajeError(e);}
   }
   if(req.query.listado==='1'&&!mensaje){
@@ -27,7 +27,7 @@ router.get('/descargas-pdf',wrap(async(req,res)=>{
   if(req.query.descargar==='1'&&!mensaje){
     const zip=new (require('jszip'))(),usados=new Set();
     let cantidad=0,totalBytes=0;
-    const disponibles=filas.filter(r=>r.xmlBuffer);
+    const disponibles=filas.filter(r=>r.xmlBuffer||r.disponible);
     for(let inicio=0;inicio<disponibles.length;inicio+=2){
     const lote=await pdf.paralelo(disponibles.slice(inicio,inicio+2),async r=>{
       try{return {r,buffer:r.disponible?await pdf.contenido(pool,r):null,xml:await pdf.xml(pool,r)};}catch(e){return {r,error:e};}
@@ -35,11 +35,11 @@ router.get('/descargas-pdf',wrap(async(req,res)=>{
     for(const item of lote){
       const {r}=item;
       if(item.error){r.disponible=false;r.error='No se pudo descargar el PDF. Volvé a intentar.';continue;}
-      const buffer=item.buffer;totalBytes+=(buffer?.length||0)+item.xml.length;
+      const buffer=item.buffer;totalBytes+=(buffer?.length||0)+(item.xml?.length||0);
       if(totalBytes>100*1024*1024){mensaje='La descarga supera 100 MB. Seleccioná un período menor.';break;}
       const base=pdf.nombre(r.proveedor_nombre)+'_'+pdf.nombre(r.numero_factura);
       let archivo=base,n=2;while(usados.has(archivo.toLowerCase()))archivo=base+'_'+n++;
-      usados.add(archivo.toLowerCase());if(buffer)zip.file(archivo+'.pdf',buffer);zip.file(archivo+'.xml',item.xml);cantidad++;
+      usados.add(archivo.toLowerCase());if(buffer)zip.file(archivo+'.pdf',buffer);if(item.xml)zip.file(archivo+'.xml',item.xml);cantidad++;
     }
     if(mensaje)break;
     }

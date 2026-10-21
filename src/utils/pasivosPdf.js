@@ -4,9 +4,18 @@ const { UPLOAD_ROOT } = require('./uploadStorage');
 const lista=require('../data/proveedoresPasivosPdf');
 const {normalizarEmpresa}=require('./empresasContabilidad');
 const clave=v=>String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().replace(/[^A-Z0-9]/g,'');
-function clasificar(proveedor,empresa){
-  const candidatos=lista.filter(p=>p.alias.some(a=>clave(a)===clave(proveedor)));
-  const e=empresa==='Sin identificar'?'':normalizarEmpresa(empresa);
+const identidades=require('../data/proveedoresPasivosIdentidades');
+const identidad=v=>String(v||'').replace(/\D/g,'').replace(/^0+/,'');
+const razon=v=>clave(v).replace(/SOCIEDADANONIMA$/,'SA').replace(/(?:SA|SRL|LTDA)$/,'');
+function empresaReceptora(nombre,cedula){
+  return {'3101349880':'GAS TOMZA','3101044021':'SUPER GAS'}[identidad(cedula)]||normalizarEmpresa(nombre);
+}
+function clasificar(proveedor,empresa,cedulaEmisor='',cedulaReceptor=''){
+  const fiscal=identidades.find(r=>cedulaEmisor&&r[0]===identidad(cedulaEmisor));
+  const variante=identidades.find(r=>r.slice(1).some(a=>razon(a)===razon(proveedor)));
+  const nombres=new Set([proveedor,fiscal?.[1],variante?.[1]].filter(Boolean).map(razon));
+  const candidatos=lista.filter(p=>p.alias.some(a=>nombres.has(razon(a))));
+  const e=empresa==='Sin identificar'?'':empresaReceptora(empresa,cedulaReceptor);
   if(e)return candidatos.find(p=>p.empresa===e)||null;
   // Un proveedor compartido requiere empresa confirmada. El sufijo (SG) sí identifica Super Gas.
   return candidatos.length===1?candidatos[0]:null;
@@ -46,4 +55,4 @@ async function contenido(db,r) {
   if(!Buffer.isBuffer(b) || !b.subarray(0,1024).includes(Buffer.from('%PDF-'))) throw new Error('El adjunto no contiene un PDF válido');
   return b;
 }
-module.exports={fechas,nombre,cargar,contenido,clasificar};
+module.exports={fechas,nombre,cargar,contenido,clasificar,empresaReceptora,identidad};
