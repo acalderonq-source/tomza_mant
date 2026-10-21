@@ -42,7 +42,8 @@ test("administra carnets y no expone el hash del PIN", async () => {
     const html = await response.text();
     assert.equal(response.status, 200);
     assert.match(html, /Trabajador Prueba/);
-    assert.match(html, /PIN \/ código de trabajador/);
+    assert.match(html, /Código de trabajador/);
+    assert.doesNotMatch(html, /PIN \/ código de trabajador/);
     assert.match(html, /data:image\/png;base64,/);
     assert.match(html, new RegExp(`data-token="${token}"`));
     assert.match(html, /Crear carnet con acceso existente/);

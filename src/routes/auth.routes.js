@@ -73,7 +73,7 @@ router.post("/login", loginLimiter, limiteCuenta, async (req, res) => {
     // Validación básica
     if (!identificador || !password || identificador.length>254 || password.length>128) {
       return res.render("login", {
-        error: esCedula ? "Ingrese la cédula y el PIN del código de trabajador." : "Debe ingresar usuario y contraseña",
+        error: esCedula ? "Ingrese la cédula y su PIN." : "Debe ingresar usuario y contraseña",
         next: nextUrl,
         departamento,
         departamentoNombre: DEPARTAMENTOS.find(item => item.key === departamento)?.nombre
@@ -85,7 +85,7 @@ router.post("/login", loginLimiter, limiteCuenta, async (req, res) => {
     if (esCedula) {
       [rows] = await pool.query(`
         SELECT u.*, uc.cedula AS cedula_persona, uc.persona_nombre,
-          uc.perfil_excel, uc.pin_hash
+          uc.perfil_excel, uc.pin_hash, uc.requiere_cambio_pin
         FROM usuario_cedulas uc
         JOIN usuarios u ON u.id = uc.usuario_id
         WHERE uc.cedula = ?
@@ -174,7 +174,7 @@ router.post("/login/perfil", async (req, res) => {
 
   try {
     const [[user]] = await pool.query(`
-      SELECT u.*, uc.cedula AS cedula_persona, uc.persona_nombre, uc.perfil_excel, uc.pin_hash
+      SELECT u.*, uc.cedula AS cedula_persona, uc.persona_nombre, uc.perfil_excel, uc.pin_hash, uc.requiere_cambio_pin
       FROM usuarios u
       LEFT JOIN usuario_cedulas uc ON uc.usuario_id = u.id AND uc.cedula = ?
       WHERE u.id = ?
@@ -192,10 +192,24 @@ router.post("/login/perfil", async (req, res) => {
   }
 });
 
+function modoCambio(user) {
+  return user?.requiereCambioPin ? "pin" : "password";
+}
+
+// El PIN personal no puede ser el código impreso en el carnet ni la cédula.
+function validarPinNuevo(pin, { codigoTrabajador, cedula } = {}) {
+  if (!/^\d{6,12}$/.test(pin)) return "El PIN debe tener entre 6 y 12 números.";
+  if (/^(\d)\1+$/.test(pin)) return "El PIN no puede repetir el mismo número.";
+  if ("01234567890".includes(pin) || "09876543210".includes(pin)) return "El PIN no puede ser una secuencia de números.";
+  if (codigoTrabajador && pin === String(codigoTrabajador).trim()) return "El PIN no puede ser el código impreso en el carnet.";
+  if (cedula && String(cedula).includes(pin)) return "El PIN no puede ser parte de la cédula.";
+  return null;
+}
+
 router.get("/cambiar-clave", (req, res) => {
   if (!req.session.user) return res.redirect("/login?departamento=TALLER");
   if (!req.session.user.requiereCambioPassword) return res.redirect("/dashboard");
-  res.render("cambiar_clave", { error: null });
+  res.render("cambiar_clave", { error: null, modo: modoCambio(req.session.user) });
 });
 
 router.post("/cambiar-clave", async (req, res) => {
@@ -203,8 +217,9 @@ router.post("/cambiar-clave", async (req, res) => {
   if (!user?.requiereCambioPassword) return res.redirect("/dashboard");
   const password = String(req.body.password || "");
   const confirmar = String(req.body.confirmar || "");
-  if (password.length < 12 || password.length>128) return res.status(400).render("cambiar_clave", { error: "La contraseña debe tener al menos 12 caracteres." });
-  if (password !== confirmar) return res.status(400).render("cambiar_clave", { error: "Las contraseñas no coinciden." });
+  if (user.requiereCambioPin) return cambiarPinInicial(req, res, user, password, confirmar);
+  if (password.length < 12 || password.length>128) return res.status(400).render("cambiar_clave", { error: "La contraseña debe tener al menos 12 caracteres.", modo: "password" });
+  if (password !== confirmar) return res.status(400).render("cambiar_clave", { error: "Las contraseñas no coinciden.", modo: "password" });
 
   try {
     const hash = await bcrypt.hash(password, 12);
@@ -214,9 +229,30 @@ router.post("/cambiar-clave", async (req, res) => {
     return res.redirect("/dashboard");
   } catch (error) {
     console.error("Error cambiando contraseña inicial:", error.code || error.message);
-    return res.status(500).render("cambiar_clave", { error: "No se pudo cambiar la contraseña. Inténtelo de nuevo." });
+    return res.status(500).render("cambiar_clave", { error: "No se pudo cambiar la contraseña. Inténtelo de nuevo.", modo: "password" });
   }
 });
+
+async function cambiarPinInicial(req, res, user, pin, confirmar) {
+  const fallo = error => res.status(400).render("cambiar_clave", { error, modo: "pin" });
+  if (!user.cedula) return fallo("No se encontró la cédula de la sesión. Cierre sesión e ingrese de nuevo.");
+  if (pin !== confirmar) return fallo("Los PIN no coinciden.");
+  try {
+    const [[registro]] = await pool.query("SELECT codigo_trabajador FROM usuario_cedulas WHERE cedula = ? LIMIT 1", [user.cedula]);
+    const error = validarPinNuevo(pin, { codigoTrabajador: registro?.codigo_trabajador, cedula: user.cedula });
+    if (error) return fallo(error);
+    const hash = await bcrypt.hash(pin, 12);
+    // Todos los perfiles de la misma cédula comparten el PIN.
+    await pool.query("UPDATE usuario_cedulas SET pin_hash = ?, requiere_cambio_pin = 0 WHERE cedula = ?", [hash, user.cedula]);
+    user.requiereCambioPin = false;
+    user.requiereCambioPassword = false;
+    user.authStamp = await leerSello(user, pool, sessionSecret);
+    return res.redirect("/inicio");
+  } catch (error) {
+    console.error("Error cambiando PIN inicial:", error.code || error.message);
+    return res.status(500).render("cambiar_clave", { error: "No se pudo guardar el PIN. Inténtelo de nuevo.", modo: "pin" });
+  }
+}
 
 async function iniciarSesion(req, res, user, departamento, nextUrl) {
     const [departmentRows] = await pool.query(
@@ -239,6 +275,8 @@ async function iniciarSesion(req, res, user, departamento, nextUrl) {
       });
     }
 
+    // Con cédula, el código impreso en el carnet solo sirve como PIN inicial.
+    const requiereCambioPin = Boolean(user.cedula_persona && Number(user.requiere_cambio_pin || 0));
     // Login correcto -> guardar sesión
     const sessionUser = {
       authStamp:selloUsuario(user,departmentRows,sessionSecret),
@@ -249,7 +287,8 @@ async function iniciarSesion(req, res, user, departamento, nextUrl) {
       perfilExcel: user.perfil_excel || null,
       rol: user.rol,
       sede: user.sede,
-      requiereCambioPassword: Boolean(user.requiere_cambio_password),
+      requiereCambioPassword: Boolean(user.requiere_cambio_password) || requiereCambioPin,
+      requiereCambioPin,
       departamentos: departamento === "CARBURACION" ? ["CARBURACION"] : departamentosPermitidos,
       departamentoIngreso: departamento,
       departamentoActivo: departamento
@@ -265,7 +304,8 @@ async function iniciarSesion(req, res, user, departamento, nextUrl) {
       req.session.authenticatedAt=Date.now();
       req.session.lastActivity=Date.now();
       const esCuentaPantalla = ["PANTALLA_MECANICOS", "PANTALLA_PESADOS"].includes(String(user.rol || "").toUpperCase());
-      const destino = departamento === 'CARBURACION' && !esCuentaPantalla && !user.requiere_cambio_password
+      const destino = requiereCambioPin && !esCuentaPantalla ? '/cambiar-clave'
+        : departamento === 'CARBURACION' && !esCuentaPantalla && !user.requiere_cambio_password
         ? '/inicio' : destinoIngreso(nextUrl,user);
       const fallar = error => {
         console.error('No se pudo guardar el ingreso:', error.code || 'ERROR');
@@ -328,3 +368,4 @@ router.get("/logout", (req, res) => {
 
 module.exports = router;
 module.exports.getSafeNextUrl=getSafeNextUrl;
+module.exports.validarPinNuevo=validarPinNuevo;

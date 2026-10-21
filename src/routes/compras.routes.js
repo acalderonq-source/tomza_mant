@@ -346,8 +346,8 @@ async function queryWithRetry(sql, params = []) {
   }
 }
 
-async function guardarColillaPago({ reciboNumero, fechaPago, periodoCierre, tipoPago, totalPagado, comprobanteNumero, comprobanteArchivo, generadoPor, facturas, origen = "actual" }) {
-  const [result] = await pool.query(
+async function guardarColillaPago({ reciboNumero, fechaPago, periodoCierre, tipoPago, totalPagado, comprobanteNumero, comprobanteArchivo, generadoPor, facturas, origen = "actual" }, db = pool) {
+  const [result] = await db.query(
     `INSERT INTO colillas_pago_proveedor
       (recibo_numero, fecha_pago, periodo_cierre, tipo_pago, total_pagado, comprobante_numero, comprobante_archivo, generado_por, facturas_json, origen)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -8355,17 +8355,30 @@ router.post("/facturas/:id/pagar", requireAuth, allowRoles("ADMIN", "TALLER", "P
 
     const comprobante = guardarComprobantePago(req.body.comprobante_data, req.body.comprobante_nombre, req.session.user?.id);
 
+    if (tipo !== "orden" && tipo !== "independiente") {
+      req.session.error = "Tipo de factura inválido.";
+      return res.redirect("/compras/facturas");
+    }
+
+    // El pago y su colilla se guardan juntos: si algo falla, no queda la factura pagada sin colilla.
+    const conn = await pool.getConnection();
     let montoPagoReal = 0;
+    let facturasColilla;
+    let buffer;
+    let colillaId;
+    let reciboNumero;
+    try {
+    await conn.beginTransaction();
     if (tipo === "orden") {
-      const [[saldoAntes]] = await pool.query(`SELECT total, COALESCE(nota_credito_monto, 0) AS nota_credito_monto, COALESCE(abono_monto, 0) AS abono_monto FROM ordenes_compra WHERE id = ? AND facturada = 1`, [id]);
+      const [[saldoAntes]] = await conn.query(`SELECT total, COALESCE(nota_credito_monto, 0) AS nota_credito_monto, COALESCE(abono_monto, 0) AS abono_monto FROM ordenes_compra WHERE id = ? AND facturada = 1 FOR UPDATE`, [id]);
       if (saldoAntes) montoPagoReal = Math.max(parseMonto(saldoAntes.total) - parseMonto(saldoAntes.nota_credito_monto) - parseMonto(saldoAntes.abono_monto), 0);
     } else if (tipo === "independiente") {
-      const [[saldoAntes]] = await pool.query(`SELECT monto, COALESCE(nota_credito_monto, 0) AS nota_credito_monto, COALESCE(abono_monto, 0) AS abono_monto, comprobante_pago_archivo FROM facturas WHERE id = ?`, [id]);
+      const [[saldoAntes]] = await conn.query(`SELECT monto, COALESCE(nota_credito_monto, 0) AS nota_credito_monto, COALESCE(abono_monto, 0) AS abono_monto, comprobante_pago_archivo FROM facturas WHERE id = ? FOR UPDATE`, [id]);
       if (saldoAntes) montoPagoReal = Math.max(parseMonto(saldoAntes.monto) - parseMonto(saldoAntes.nota_credito_monto) - parseMonto(saldoAntes.abono_monto), 0);
     }
 
     if (tipo === 'orden') {
-      const [result] = await pool.query(
+      const [result] = await conn.query(
         `UPDATE ordenes_compra
          SET pagada = 1,
              fecha_pago = ?,
@@ -8382,10 +8395,11 @@ router.post("/facturas/:id/pagar", requireAuth, allowRoles("ADMIN", "TALLER", "P
       );
       if (!result.affectedRows) {
         req.session.error = "La factura de orden no existe, ya estaba pagada o no tiene saldo pendiente.";
+        await conn.rollback();
         return res.redirect("/compras/facturas");
       }
     } else if (tipo === 'independiente') {
-      const [result] = await pool.query(
+      const [result] = await conn.query(
         `UPDATE facturas
          SET pagada = 1,
              fecha_pago = ?,
@@ -8401,24 +8415,22 @@ router.post("/facturas/:id/pagar", requireAuth, allowRoles("ADMIN", "TALLER", "P
       );
       if (!result.affectedRows) {
         req.session.error = "La factura independiente no existe, ya estaba pagada o no tiene saldo pendiente.";
+        await conn.rollback();
         return res.redirect("/compras/facturas");
       }
-    } else {
-      req.session.error = "Tipo de factura inválido.";
-      return res.redirect("/compras/facturas");
     }
 
     const [detalle] = tipo === "orden"
-      ? await pool.query(`SELECT o.po_numero, o.factura, o.fecha_vencimiento_factura, o.total - COALESCE(o.nota_credito_monto, 0) AS total, COALESCE(o.nota_credito_monto, 0) AS nota_credito_monto, o.comprobante_pago_archivo, p.id AS proveedor_id, p.email AS proveedor_email, p.nombre AS proveedor_nombre FROM ordenes_compra o JOIN proveedores p ON p.id = o.proveedor_id WHERE o.id = ?`, [id])
-      : await pool.query(`SELECT NULL AS po_numero, f.numero_factura AS factura, NULL AS fecha_vencimiento_factura,
+      ? await conn.query(`SELECT o.po_numero, o.factura, o.fecha_vencimiento_factura, o.total - COALESCE(o.nota_credito_monto, 0) AS total, COALESCE(o.nota_credito_monto, 0) AS nota_credito_monto, o.comprobante_pago_archivo, p.id AS proveedor_id, p.email AS proveedor_email, p.nombre AS proveedor_nombre FROM ordenes_compra o JOIN proveedores p ON p.id = o.proveedor_id WHERE o.id = ?`, [id])
+      : await conn.query(`SELECT NULL AS po_numero, f.numero_factura AS factura, NULL AS fecha_vencimiento_factura,
           f.monto - COALESCE(f.nota_credito_monto, 0) AS total, COALESCE(f.nota_credito_monto, 0) AS nota_credito_monto, f.comprobante_pago_archivo,
           (SELECT p.id FROM proveedores p WHERE UPPER(TRIM(p.nombre)) = UPPER(TRIM(f.proveedor_nombre)) ORDER BY p.id LIMIT 1) AS proveedor_id,
           (SELECT p.email FROM proveedores p WHERE UPPER(TRIM(p.nombre)) = UPPER(TRIM(f.proveedor_nombre)) ORDER BY p.id LIMIT 1) AS proveedor_email,
           f.proveedor_nombre FROM facturas f WHERE f.id = ?`, [id]);
     const { generarPDFReciboPago } = require("../utils/pdfReciboPago");
-    const reciboNumero = `CP-${fechaPago.replace(/-/g, "")}-${String(Date.now()).slice(-6)}`;
-    const facturasColilla = [{ ...detalle[0], factura_id: Number(id), tipo, monto_pago: montoPagoReal, total: montoPagoReal, comprobante_pago_archivo: comprob?.path || detalle[0].comprobante_pago_archivo }];
-    const buffer = await generarPDFReciboPago({
+    reciboNumero = `CP-${fechaPago.replace(/-/g, "")}-${String(Date.now()).slice(-6)}`;
+    facturasColilla = [{ ...detalle[0], factura_id: Number(id), tipo, monto_pago: montoPagoReal, total: montoPagoReal, comprobante_pago_archivo: comprobante?.path || detalle[0].comprobante_pago_archivo }];
+    buffer = await generarPDFReciboPago({
       facturas: facturasColilla,
       fechaPago,
       totalPagado: montoPagoReal,
@@ -8426,7 +8438,7 @@ router.post("/facturas/:id/pagar", requireAuth, allowRoles("ADMIN", "TALLER", "P
       comprobanteNumero,
       generadoPor: req.session.user?.usuario || "Sistema"
     });
-    const colillaId = await guardarColillaPago({
+    colillaId = await guardarColillaPago({
       reciboNumero,
       fechaPago,
       periodoCierre,
@@ -8436,7 +8448,14 @@ router.post("/facturas/:id/pagar", requireAuth, allowRoles("ADMIN", "TALLER", "P
       comprobanteArchivo: comprobante?.path,
       generadoPor: req.session.user?.usuario || "Sistema",
       facturas: facturasColilla
-    });
+    }, conn);
+    await conn.commit();
+    } catch (error) {
+      await conn.rollback().catch(() => {});
+      throw error;
+    } finally {
+      conn.release();
+    }
     const estadoCorreo = await notificarPagoProveedorSeguro({
       colillaId, correoRespuesta, reciboNumero, fechaPago, tipoPago: "pago", comprobanteNumero, facturas: facturasColilla
     });

@@ -72,7 +72,7 @@ const secciones = {
 const extras = { neto: 'Ingreso neto (CRC)', diferencia: 'Diferencia de litros' };
 function campos(seccion) { return secciones[seccion].groups.flatMap(g => g.fields); }
 function permitidas(user) {
-  if (!['ADMIN', 'CONTABILIDAD', 'TRAMITES'].includes(user?.rol) || /^mecanicos?/i.test(user?.usuario || '')) return [];
+  if (!['ADMIN', 'CONTABILIDAD', 'TRAMITES'].includes(user?.rol)) return [];
   return Object.keys(secciones).filter(k => !secciones[k].privada || ['ADMIN', 'CONTABILIDAD'].includes(user.rol));
 }
 function mesActual() {

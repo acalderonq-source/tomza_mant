@@ -34,10 +34,7 @@ function requireAuth(req, res, next) {
 }
 
 function esUsuarioMecanicoLimitado(user) {
-  const usuario = String(user?.usuario || "").trim().toLowerCase();
-  return user?.rol === "MECANICO" ||
-    usuario === "mecanico" ||
-    usuario.startsWith("mecanico");
+  return user?.rol === "MECANICO";
 }
 
 function puedeTrabajarComoMecanico(user) {

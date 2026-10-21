@@ -62,14 +62,11 @@ process.on("unhandledRejection", error => {
   void alertar('TAREA_NO_CONTROLADA');
 });
 
+// Un error que nadie capturó deja el proceso en un estado desconocido, aunque
+// venga de MySQL: se registra y se reinicia (Render levanta otra instancia).
 process.on("uncaughtException", error => {
-  if (isTransientDbError(error)) {
-    console.warn("Error temporal de MySQL capturado:", error.code);
-    return;
-  }
-
-  console.error("Error no capturado:", error);
-  process.exit(1);
+  console.error(isTransientDbError(error) ? "Error de MySQL no capturado:" : "Error no capturado:", error);
+  void Promise.race([alertar("ERROR_NO_CAPTURADO"), sleep(2000)]).finally(() => process.exit(1));
 });
 
 if (isProduction && !process.env.SESSION_SECRET) {
@@ -257,10 +254,7 @@ app.use(require("./utils/usuariosPantalla").restringirCuentaPantalla);
 app.use(require('./utils/operacionesEmpresa').protegerOperaciones(pool));
 
 function esUsuarioMecanicoLimitado(user) {
-  const usuario = String(user?.usuario || "").trim().toLowerCase();
-  return user?.rol === "MECANICO" ||
-    usuario.startsWith("mecanico") ||
-    usuario.startsWith("mecanicos");
+  return user?.rol === "MECANICO";
 }
 
 function mecanicoPuedeUsarRuta(pathname) {
@@ -505,8 +499,13 @@ cron.schedule("0 7 * * *", async () => {
   if (process.env.APP_ENV === 'staging') return;
   const hoy = new Date().getDate();
   if (hoy === 1 || hoy === 15) {
-    console.log("📧 Enviando alertas DEKRA...");
-    await enviarAlertasDekra();
+    try {
+      console.log("📧 Enviando alertas DEKRA...");
+      await enviarAlertasDekra();
+    } catch (error) {
+      console.error("Error enviando alertas DEKRA:", error);
+      void alertar("ALERTAS_DEKRA_FALLIDAS");
+    }
   }
 });
 

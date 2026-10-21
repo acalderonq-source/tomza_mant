@@ -9,7 +9,7 @@ async function crearGestor(){
   const [result]=await connection.query('INSERT INTO usuarios (nombre,usuario,password,rol,cedula,requiere_cambio_password) VALUES (?,?,?,?,?,0)',
     ['José Luis Zamora Aguilar','jose.zamora.carburacion',await bcrypt.hash(crypto.randomBytes(40).toString('hex'),12),'CARBURACION_GESTOR','206770080']);
   const id=result.insertId;
-  await connection.query('INSERT INTO usuario_cedulas (cedula,usuario_id,persona_nombre,codigo_trabajador,pin_hash,requiere_cambio_pin,perfil_excel) VALUES (?,?,?,?,?,0,?)',
+  await connection.query('INSERT INTO usuario_cedulas (cedula,usuario_id,persona_nombre,codigo_trabajador,pin_hash,requiere_cambio_pin,perfil_excel) VALUES (?,?,?,?,?,1,?)',
     ['206770080',id,'José Luis Zamora Aguilar','2171',await bcrypt.hash('2171',12),'Gestor de Carburación']);
   await connection.query('INSERT INTO usuario_departamentos (usuario_id,departamento,es_principal) VALUES (?,\'CARBURACION\',1)',[id]);
   await connection.query('INSERT INTO carburacion_cliente_editores (usuario_id,motivo) VALUES (?,?)',[id,'Autorización para administrar clientes; órdenes y facturas solo consulta']);

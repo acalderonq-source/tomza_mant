@@ -136,7 +136,7 @@ async function importar(pathArchivo, aplicar) {
           INSERT INTO usuario_cedulas (cedula, usuario_id, persona_nombre, codigo_trabajador, pin_hash, perfil_excel)
           VALUES (?, ?, ?, ?, ?, ?)
           ON DUPLICATE KEY UPDATE persona_nombre = VALUES(persona_nombre),
-            codigo_trabajador = VALUES(codigo_trabajador), pin_hash = VALUES(pin_hash),
+            codigo_trabajador = VALUES(codigo_trabajador), pin_hash = VALUES(pin_hash), requiere_cambio_pin = 1,
             perfil_excel = VALUES(perfil_excel)
         `, [person.cedula, account.id, person.nombre, person.codigo, pinHash, person.perfil]);
         associations += 1;

@@ -98,7 +98,6 @@ function controlarAccesoPorDepartamento(req, res, next) {
 }
 
 function departamentosInicialesPorRol(rol, usuario = "") {
-  if (/^mecanicos?/i.test(String(usuario || "").trim())) return ["TALLER"];
   const asignaciones = {
     ADMIN: DEPARTAMENTOS.filter(d=>d.key!=='ADMINISTRACION').map(({ key }) => key),
     TALLER: ["TALLER"],

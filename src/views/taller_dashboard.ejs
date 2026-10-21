@@ -487,8 +487,6 @@
   const puedeConfigurarVisibilidadPrioridades = ['ADMIN', 'TALLER'].includes(rolDashboard);
   const esPantallaPesados = usuarioDashboard.includes('pesado') || ['SUPERVISOR_PESADO', 'PANTALLA_PESADOS'].includes(rolDashboard);
   const esPantallaMecanico = !esPantallaPesados && (
-    usuarioDashboard === 'mecanico' ||
-    usuarioDashboard.startsWith('mecanico') ||
     ['MECANICO', 'PANTALLA_MECANICOS'].includes(rolDashboard)
   );
   const prioridadesPesadosBase = Array.isArray(prioridadesPesados) ? prioridadesPesados : [];

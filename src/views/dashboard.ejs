@@ -42,9 +42,7 @@
   const areaOperaciones = departamentoActivo === 'OPERACIONES' || adminEnTaller || (!esAdminDashboard && ['SUPERVISOR', 'SUPERVISOR_PESADO', 'TRAMITES'].includes(user.rol));
   const areaContabilidad = departamentoActivo === 'CONTABILIDAD' || adminEnTaller || (!esAdminDashboard && user.rol === 'CONTABILIDAD');
   const areaProveeduria = departamentoActivo === 'PROVEEDURIA' || adminEnTaller || (!esAdminDashboard && ['TALLER', 'PROVEEDURIA', 'PROVEEDURIA_TALLER', 'BODEGA', 'BODEGUERO'].includes(user.rol));
-  const esMecanicoLimitado = user.rol === 'MECANICO'
-    || usuarioDashboardLower.startsWith('mecanico')
-    || usuarioDashboardLower.startsWith('mecanicos');
+  const esMecanicoLimitado = user.rol === 'MECANICO';
   const puedeVerCompras = !esMecanicoLimitado && ['ADMIN', 'TALLER', 'PROVEEDURIA_TALLER', 'CONTABILIDAD'].includes(user.rol) && (areaContabilidad || areaProveeduria);
   const puedeVerOrdenesCompra = (puedeVerCompras || user.rol === 'BODEGUERO') && (areaContabilidad || areaProveeduria);
   const puedeVerOperaciones = user.rol !== 'CONTABILIDAD' && !esMensajeroDashboard && !esBodegaDashboard && areaTaller;

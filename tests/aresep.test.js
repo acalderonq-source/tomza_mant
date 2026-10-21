@@ -21,7 +21,7 @@ test('Roles y protección de planillas', () => {
   assert.equal(a.permitidas({ rol: 'CONTABILIDAD' }).length, 5);
   assert.equal(a.permitidas({ rol: 'TRAMITES' }).includes('planilla'), false);
   for (const rol of ['MECANICO', 'BODEGUERO', 'SUPERVISOR']) assert.equal(a.permitidas({ rol }).length, 0);
-  assert.equal(a.permitidas({ rol: 'ADMIN', usuario: 'mecanico_rio_claro' }).length, 0);
+  assert.equal(a.permitidas({ rol: 'MECANICO', usuario: 'mecanico_rio_claro' }).length, 0);
 });
 test('Períodos, fechas reales y pertenencia al mes', () => {
   for (const p of ['2026-00', '2026-13', '26-09', '', ['2026-09']]) assert.equal(a.periodoValido(p), false);

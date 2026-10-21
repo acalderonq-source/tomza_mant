@@ -22,3 +22,6 @@ secrets/
 *.pfx
 backups/
 *.enc
+
+# Compilaciones Android: solo se publica la copia de public/descargas
+android/*.apk

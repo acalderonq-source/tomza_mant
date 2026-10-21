@@ -36,8 +36,8 @@ async function crearAccesos(personas, aplicar = false, db = pool) {
         }
         await connection.query(
           `INSERT INTO usuario_cedulas (cedula, usuario_id, persona_nombre, codigo_trabajador, pin_hash, requiere_cambio_pin, perfil_excel)
-           VALUES (?, ?, ?, ?, ?, 0, 'CONTABILIDAD') ON DUPLICATE KEY UPDATE persona_nombre = VALUES(persona_nombre),
-           codigo_trabajador = VALUES(codigo_trabajador), pin_hash = VALUES(pin_hash), requiere_cambio_pin = 0, perfil_excel = 'CONTABILIDAD'`,
+           VALUES (?, ?, ?, ?, ?, 1, 'CONTABILIDAD') ON DUPLICATE KEY UPDATE persona_nombre = VALUES(persona_nombre),
+           codigo_trabajador = VALUES(codigo_trabajador), pin_hash = VALUES(pin_hash), requiere_cambio_pin = 1, perfil_excel = 'CONTABILIDAD'`,
           [persona.cedula, usuarioId, persona.nombre, persona.codigo, await bcrypt.hash(persona.codigo, 12)]
         );
         await connection.query("INSERT IGNORE INTO usuario_departamentos (usuario_id, departamento, es_principal) VALUES (?, 'CONTABILIDAD', 1)", [usuarioId]);

@@ -23,6 +23,11 @@ const pool = mysql.createPool({
 });
 
 pool.on("connection", connection => {
+  // Una conexión inactiva que se cae no debe convertirse en un error no capturado;
+  // el pool la descarta y abre otra en la siguiente consulta.
+  connection.on("error", error => {
+    console.warn("Conexion MySQL del pool cerrada:", error.code || error.message);
+  });
   connection.query("SET SESSION time_zone = '-06:00'", error => {
     if (error) console.error("No se pudo establecer la zona horaria de MySQL:", error.message);
   });

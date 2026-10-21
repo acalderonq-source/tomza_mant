@@ -94,7 +94,7 @@ function createRouters(db, opciones = {}) {
         await connection.query('INSERT INTO usuario_accesos_personales (usuario_id,config_json,asignado_por) VALUES (?,?,?)',[nuevo.insertId,JSON.stringify(acceso),req.session.user.id]);
         for (const id of ids) await connection.query(`INSERT INTO usuario_cedulas
           (cedula,usuario_id,persona_nombre,codigo_trabajador,pin_hash,perfil_excel,requiere_cambio_pin)
-          VALUES (?,?,?,?,?,?,0)`, [solicitud.cedula, id, solicitud.nombre_completo, codigo, hash, solicitud.puesto.slice(0, 80)]);
+          VALUES (?,?,?,?,?,?,1)`, [solicitud.cedula, id, solicitud.nombre_completo, codigo, hash, solicitud.puesto.slice(0, 80)]);
         const [carnets] = await connection.query('SELECT cedula FROM carnets_trabajador WHERE cedula=? FOR UPDATE', [solicitud.cedula]);
         if (!carnets.length) await connection.query('INSERT INTO carnets_trabajador (cedula,qr_token) VALUES (?,?)', [solicitud.cedula, crypto.randomBytes(32).toString('hex')]);
         const correo=correoIngreso(req.body.correo !== undefined ? req.body.correo : solicitud.correo);

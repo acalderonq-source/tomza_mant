@@ -107,15 +107,7 @@ function esUsuarioPesados(user) {
 }
 
 function esUsuarioMecanico(user) {
-  const usuario = String(user.usuario || "").trim().toLowerCase();
-  return (
-    !esUsuarioPesados(user) &&
-    (
-      ["MECANICO", "PANTALLA_MECANICOS"].includes(user.rol) ||
-      usuario === "mecanico" ||
-      usuario.startsWith("mecanico")
-    )
-  );
+  return !esUsuarioPesados(user) && ["MECANICO", "PANTALLA_MECANICOS"].includes(user.rol);
 }
 
 function esPrioridadPesados(prioridad) {
