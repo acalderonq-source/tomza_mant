@@ -1,6 +1,7 @@
 const path=require('node:path');
 const {XMLParser}=require('fast-xml-parser');
 const pdf=require('./pasivosPdf');
+const documentos=require('./pasivosDocumentosCorreo');
 const parser=new XMLParser({ignoreAttributes:true,removeNSPrefix:true,parseTagValue:false});
 const ROOT='https://graph.microsoft.com/v1.0';
 const consultas=new Map();
@@ -16,7 +17,7 @@ function obtenerCache(key){
   if(entrada.hasta<Date.now()){bytesCache-=entrada.buffer.length;adjuntosCache.delete(key);return null;}
   return entrada.buffer;
 }
-function filtrar(filas,f){return Object.assign(filas.filter(r=>(!f.empresa||r.empresa===f.empresa)&&(!f.grupo||r.grupo===f.grupo)).map(r=>({...r})),{advertencias:filas.advertencias||[],revision:filas.revision||{}});}
+const filtrar=documentos.filtrar;
 async function paralelo(items,fn,limite=4){
   const resultados=new Array(items.length);let indice=0;
   await Promise.all(Array.from({length:Math.min(limite,items.length)},async()=>{while(indice<items.length){const i=indice++;resultados[i]=await fn(items[i],i);}}));
@@ -40,7 +41,7 @@ function facturaXml(bytes){
   const total=f.ResumenFactura?.TotalComprobante;
   const monto=typeof total==='string'&&/^\d+(?:\.\d{1,5})?$/.test(total)?Number(total)*(credito?-1:1):null;
   const referencias=Array.isArray(f.InformacionReferencia)?f.InformacionReferencia:[f.InformacionReferencia].filter(Boolean);
-  return {cedulaEmisor:String(f.Emisor?.Identificacion?.Numero||''),cedulaReceptor:String(f.Receptor?.Identificacion?.Numero||''),tipoDocumento:credito?'nota_credito':'factura',monto,moneda:f.ResumenFactura?.CodigoTipoMoneda?.CodigoMoneda||null,referenciaFactura:referencias[0]?.Numero||'',proveedor_nombre:String(f.Emisor.Nombre),numero_factura:String(f.NumeroConsecutivo),clave:String(f.Clave||''),empresa:pdf.empresaReceptora(String(f.Receptor?.Nombre||''),f.Receptor?.Identificacion?.Numero)};
+  return {...documentos.condicionVenta(f.CondicionVenta),plazoCredito:typeof f.PlazoCredito==='string'?f.PlazoCredito:'',fechaEmision:typeof f.FechaEmision==='string'?f.FechaEmision:'',cedulaEmisor:String(f.Emisor?.Identificacion?.Numero||''),cedulaReceptor:String(f.Receptor?.Identificacion?.Numero||''),tipoDocumento:credito?'nota_credito':'factura',monto,moneda:f.ResumenFactura?.CodigoTipoMoneda?.CodigoMoneda||null,referenciaFactura:referencias[0]?.Numero||'',proveedor_nombre:String(f.Emisor.Nombre),numero_factura:String(f.NumeroConsecutivo),clave:String(f.Clave||''),empresa:pdf.empresaReceptora(String(f.Receptor?.Nombre||''),f.Receptor?.Identificacion?.Numero)};
 }
 const stem=v=>path.parse(String(v||'').toLowerCase()).name;
 function asociar(archivo,facturas,pdfs){
@@ -69,14 +70,14 @@ async function buscar(f,c,conexion){
   const hasta=new Date(f.hasta+'T00:00:00-06:00');hasta.setUTCDate(hasta.getUTCDate()+1);
   const params=new URLSearchParams({'$select':'id,receivedDateTime,subject,lastModifiedDateTime,webLink','$expand':'attachments($select=id,name,size,isInline,contentType)', '$filter':`receivedDateTime ge ${f.desde}T06:00:00Z and receivedDateTime lt ${hasta.toISOString()} and hasAttachments eq true`,'$top':'100'});
   let url=ROOT+'/me/messages?'+params,total=0,bytesTotal=0;
-  const filas=[],indice=new Map(),advertencias=[],revision={pdfSinXml:0,pdfSinIdentificar:0,fueraLista:0};
+  const filas=[],indice=new Map(),respuestas=[],advertencias=[],revision={pdfSinXml:0,pdfSinIdentificar:0,fueraLista:0};
   function advertir(m,a,motivo){if(advertencias.length<200)advertencias.push({archivo:a.name,fecha:m.receivedDateTime,motivo,urlCorreo:/^https:\/\//i.test(m.webLink||'')?m.webLink:''});}
   function agregar(row){
     const id=row.empresa+'|'+(clasificacion(row)?.nombre||row.proveedor_nombre)+'|'+row.numero_factura;
     const anterior=indice.get(id);
     if(anterior){
       const xml=row.xmlBuffer?row:anterior.xmlBuffer?anterior:null;
-      if(xml)for(const k of ['proveedor_nombre','monto','moneda','cedulaEmisor','referenciaFactura'])anterior[k]=xml[k];
+      if(xml)for(const k of ['proveedor_nombre','monto','moneda','cedulaEmisor','cedulaReceptor','clave','referenciaFactura','condicionVenta','condicionPago','condicionTexto','plazoCredito','fechaEmision'])anterior[k]=xml[k];
       if(row.xmlBuffer)anterior.xmlBuffer=row.xmlBuffer;
       if(row.disponible&&!anterior.disponible){anterior.disponible=true;anterior.obtenerContenido=row.obtenerContenido;}
       anterior.fuenteIdentificacion=anterior.xmlBuffer?'XML':'PDF';
@@ -116,6 +117,10 @@ async function buscar(f,c,conexion){
         const xml=await leer(m,a);let factura;
         try{factura=facturaXml(xml);}catch(e){advertir(m,a,'XML no legible; se intentará identificar el PDF.');continue;}
         if(factura)facturas.push({...factura,xmlNombre:a.name,xmlBuffer:xml,fuenteIdentificacion:'XML'});
+        else if(!/<!DOCTYPE|<!ENTITY/i.test(xml.toString('utf8'))){
+          const respuesta=documentos.respuestaHacienda(parser.parse(xml.toString('utf8')));
+          if(respuesta)respuestas.push({...respuesta,buffer:xml,nombre:a.name,fecha:m.receivedDateTime});
+        }
       }
       const vinculadas=new Set();
       for(const a of pdfs){
@@ -147,6 +152,6 @@ async function buscar(f,c,conexion){
     },2);
     url=data['@odata.nextLink'];
   }
-  return Object.assign(filas,{advertencias,revision});
+  return Object.assign(documentos.preparar(filas,respuestas),{advertencias,revision});
 }
 module.exports={cargar,facturaXml,asociar,paralelo,mensajeError,contenido:async(_db,r)=>r.obtenerContenido(),xml:async(_db,r)=>r.xmlBuffer};

@@ -43,6 +43,10 @@ function generar(filas,{desde,hasta,fechaEntrega,persona}){
     for(const r of filas.advertencias)hoja.addRow({fecha:r.fecha,archivo:r.archivo,motivo:r.motivo});
     hoja.getRow(1).font={bold:true};hoja.views=[{state:'frozen',ySplit:1}];
   }
+  const detalle=libro.addWorksheet('Detalle de documentos');
+  detalle.columns=[['Recepción del correo','recepcion',26],['Empresa','empresa',22],['Grupo','grupo',16],['Proveedor','proveedor',60],['Cédula emisor','cedula',20],['Clave','clave',55],['Consecutivo','consecutivo',28],['Tipo','tipo',20],['Condición de venta','condicion',32],['Código condición','codigoCondicion',20],['Plazo crédito (días)','plazo',22],['Estado de Hacienda','estado',30],['Respuestas adjuntas','respuestas',22],['Moneda','moneda',14],['Total del documento','total',24]].map(([header,key,width])=>({header,key,width}));
+  for(const r of filas)detalle.addRow({recepcion:new Date(r.fecha_factura).toLocaleString('es-CR',{timeZone:'America/Costa_Rica'}),empresa:r.empresa,grupo:r.grupo,proveedor:r.proveedor_nombre,cedula:r.cedulaEmisor||'',clave:r.clave||'',consecutivo:String(r.numero_factura),tipo:r.tipoDocumento==='nota_credito'?'Nota de crédito':'Factura',condicion:r.condicionTexto||'Sin dato en XML',codigoCondicion:r.condicionVenta||'',plazo:r.plazoCredito||'',estado:r.estadoHaciendaTexto||'Sin respuesta adjunta',respuestas:r.respuestasHacienda?.length||0,moneda:r.moneda||'',total:Number.isFinite(r.monto)?r.monto:null});
+  detalle.getRow(1).font={bold:true};detalle.views=[{state:'frozen',ySplit:1}];detalle.autoFilter=`A1:O${detalle.rowCount}`;detalle.getColumn('total').numFmt='#,##0.00;[Red]-#,##0.00';
   return libro;
 }
 module.exports={generar};
