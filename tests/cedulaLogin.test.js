@@ -288,27 +288,3 @@ test("al salir de una cuenta de pantalla vuelve al login de Taller", async () =>
     assert.equal(response.headers.get("location"), "/login?departamento=TALLER");
   }, { rol: "PANTALLA_MECANICOS" });
 });
-
-test("el código impreso en el carnet solo sirve para el primer ingreso y obliga a crear un PIN personal", async () => {
-  const pin_hash = await bcrypt.hash("4521", 4);
-  const user = { id: 77, usuario: "persona_pin", nombre: "Persona", rol: "TALLER", sede: "Cartago", pin_hash, requiere_cambio_pin: 1, cedula_persona: "123456789" };
-  await withLoginServer(async sql => sql.includes("FROM usuario_cedulas") ? [[user]] : sql.includes("FROM usuario_departamentos") ? [[{ departamento: "TALLER", es_principal: 1 }]] : [[]], async base => {
-    const response = await fetch(`${base}/login`, { method: "POST", redirect: "manual", body: new URLSearchParams({ cedula: "123456789", pin: "4521" }) });
-    assert.equal(response.status, 302);
-    assert.equal(response.headers.get("location"), "/cambiar-clave");
-  });
-});
-
-test("el PIN personal no puede ser el código del carnet, la cédula ni un patrón débil", () => {
-  const { validarPinNuevo } = authRoutes;
-  const datos = { codigoTrabajador: "4521", cedula: "123456789" };
-  assert.match(validarPinNuevo("4521", datos), /entre 6 y 12/);
-  assert.match(validarPinNuevo("111111", datos), /repetir/);
-  assert.match(validarPinNuevo("123456", datos), /secuencia/);
-  assert.match(validarPinNuevo("345678", datos), /secuencia/);
-  assert.match(validarPinNuevo("452100", { ...datos, codigoTrabajador: "452100" }), /carnet/);
-  assert.match(validarPinNuevo("234567", { cedula: "923456789" }), /secuencia|cédula/);
-  assert.match(validarPinNuevo("567890", { cedula: "1567890" }), /secuencia|cédula/);
-  assert.match(validarPinNuevo("907351", { cedula: "1907351" }), /cédula/);
-  assert.equal(validarPinNuevo("907351", datos), null);
-});

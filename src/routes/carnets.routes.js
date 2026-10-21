@@ -60,12 +60,12 @@ async function crearPdfCarnet(worker, qr, photoBuffer) {
         { width: "*", stack: [
           { text: worker.nombre || "Trabajador", bold: true, fontSize: 10, color: "#152238", margin: [0, 8, 0, 4] },
           { text: worker.perfil || "Trabajador", fontSize: 7, color: "#64748B", margin: [0, 0, 0, 7] },
-          { text: "CODIGO DE TRABAJADOR", fontSize: 6, color: "#475569" },
+          { text: "PIN / CODIGO DE TRABAJADOR", fontSize: 6, color: "#475569" },
           { text: String(worker.codigo_trabajador || "Pendiente"), bold: true, fontSize: 14, color: "#12396A", margin: [0, 2, 0, 0] }
         ] },
         { image: qr, fit: [65, 65], alignment: "center", margin: [0, 4, 0, 0] }
       ], columnGap: 6 },
-      { text: "El PIN de acceso es personal y no se imprime en el carnet.", fontSize: 6, color: "#64748B", margin: [0, 5, 0, 0], alignment: "center" }
+      { text: "El código de trabajador es el PIN de acceso al sistema.", fontSize: 6, color: "#64748B", margin: [0, 5, 0, 0], alignment: "center" }
     ]
   };
   return pdfBuffer(document);
@@ -207,7 +207,7 @@ router.post("/admin/carnets-trabajadores", requireAdmin, async (req, res) => {
       await connection.query(`
         INSERT INTO usuario_cedulas
           (cedula, usuario_id, persona_nombre, codigo_trabajador, pin_hash, perfil_excel, requiere_cambio_pin)
-        VALUES (?, ?, ?, ?, ?, ?, 1)
+        VALUES (?, ?, ?, ?, ?, ?, 0)
       `, [cedula, cuenta.id, nombre, codigo, pinHash, perfilCarnet]);
     }
     await connection.query(
@@ -215,7 +215,7 @@ router.post("/admin/carnets-trabajadores", requireAdmin, async (req, res) => {
       [cedula, crypto.randomBytes(32).toString("hex")]
     );
     await connection.commit();
-    req.session.accesoCarnetMensaje = `Acceso y carnet creados para ${nombre}. El código de trabajador es su PIN inicial; deberá cambiarlo en el primer ingreso.`;
+    req.session.accesoCarnetMensaje = `Acceso y carnet creados para ${nombre}. El código de trabajador también es su PIN.`;
   } catch (error) {
     if (connection) await connection.rollback().catch(() => {});
     console.error("Error creando acceso y carnet:", error.code || error.message);
