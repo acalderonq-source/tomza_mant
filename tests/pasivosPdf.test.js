@@ -1,6 +1,13 @@
 const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const pdf=require('../src/utils/pasivosPdf');
+test('Maxi Repuestos reconoce razón social del XML y cédula en ambas empresas',()=>{
+  for(const empresa of ['GAS TOMZA','SUPER GAS']){
+    assert.equal(pdf.clasificar('MAXI REPUESTOS SOCIEDAD DE RESPONSABILIDAD LIMITADA',empresa).empresa,empresa);
+    assert.equal(pdf.clasificar('Otra variante',empresa,'3102449648').nombre,empresa==='SUPER GAS'?'MAXI REPUESTOS (SG)':'MAXI REPUESTOS');
+  }
+  assert.equal(pdf.clasificar('MAXI REPUESTOS SOCIEDAD DE RESPONSABILIDAD LIMITADA',''),null);
+});
 test('lista distingue empresa y grupo, tildes y proveedores compartidos',()=>{
   assert.equal(pdf.clasificar('Purdy Motor S.A.','GAS TOMZA').grupo,'TALLER');
   assert.equal(pdf.clasificar('MAXI REPUESTOS','SUPER GAS').empresa,'SUPER GAS');
