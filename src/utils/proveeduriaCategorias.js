@@ -1,12 +1,13 @@
 const normal=s=>String(s||'').trim().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,' ').toUpperCase();
-const CATEGORIAS_SOLICITUD=Object.freeze(['Limpieza','Oficina','Operaciones','Otros','Papelería','Salud ocupacional','Servicios ambientales','Técnicos','Uniformes']);
+const CATEGORIAS_SOLICITUD=Object.freeze(['Carburación','Limpieza','Oficina','Operaciones','Otros','Papelería','Salud ocupacional','Servicios ambientales','Técnicos','Uniformes']);
 const categoriasPorNombre=new Map(CATEGORIAS_SOLICITUD.map(c=>[normal(c),c]));
-const equivalencias={TI:'Oficina',TECNOLOGIA:'Oficina',INFORMATICA:'Oficina',VENTAS:'Operaciones','EQUIPO DE PROTECCION PERSONAL':'Salud ocupacional','SALUD Y PRIMEROS AUXILIOS':'Salud ocupacional','CILINDROS Y TANQUES':'Operaciones','SELLOS Y EMPAQUES':'Operaciones','OTROS SUMINISTROS':'Otros',CAFETERIA:'Otros'};
+const equivalencias={TI:'Oficina',TECNOLOGIA:'Oficina',INFORMATICA:'Oficina',VENTAS:'Operaciones','EQUIPO DE PROTECCION PERSONAL':'Salud ocupacional','SALUD Y PRIMEROS AUXILIOS':'Salud ocupacional','CILINDROS Y TANQUES':'Carburación','SELLOS Y EMPAQUES':'Operaciones','OTROS SUMINISTROS':'Otros',CAFETERIA:'Otros'};
 const esPapeleria=d=>/^(AMPOS|BLOCK|BOLETA|BOLSAS PARA MONEDAS|BORRADOR|CAJA (?:CLIPS|DE GRAPAS)|CARPETA|CINTA SCOTCH|CORRECTOR|CUADERNO|CUIDO DE CAMIONES|DEDO FACIL|FOLDER|FUNDA|GOMA|GRAPADORA|HOJA|LAPICERO|LAPIZ|LIBRETA|LIQUIDACION DE RUTAS|MAQUINILLA|MASKIN|ORDEN COMBUSTIBLE|PAQUETE DE PRENSAS|PERFORADORA|PILOT|POST|PRENSA|RECIBOS DE DINERO|REGLA|REMESAS|REPORTE DIARIO|REQUISICION|RESALTADOR|RESMAS|REVISION GAS PAR|ROLLO|SACA GRAPAS|SOBRE|SOLICITUD COMBUSTIBLE|TABLA|TACHUELAS|TARJETAS DE PRESENTACION|TIJERAS GRANDES|TINTA|TRAMITE DE FACTURAS|TRASLADO DE TANQUE|PAPEL(?! HIGIENICO))/.test(d);
 function categoriaArticulo(a){
   const definida=String(a.categoria||'').trim();
   const d=normal(a.descripcion),clave=normal(definida);
   // Normalizar para las solicitudes sin modificar fichas, códigos ni existencias.
+  if(/^(CILINDROS?|TANQUES?)\b/.test(d))return 'Carburación';
   if(clave==='OFICINA' && esPapeleria(d))return 'Papelería';
   if(categoriasPorNombre.has(clave))return categoriasPorNombre.get(clave);
   if(Object.hasOwn(equivalencias,clave))return equivalencias[clave];
@@ -14,7 +15,7 @@ function categoriaArticulo(a){
   if(/^RECARGA DE EXTINTORES/.test(d))return 'Salud ocupacional';
   if(/^SERVICIO/.test(d))return 'Otros';
   if(/^CAMISA/.test(d))return 'Uniformes';
-  if(/^(CILINDRO|TANQUE DE|VALVULAS CON)/.test(d))return 'Operaciones';
+  if(/^VALVULAS CON/.test(d))return 'Operaciones';
   if(/^(SELLOS|ORINGS)/.test(d))return 'Operaciones';
   if(/^(BLOQUEADOR SOLAR|3M -)/.test(d))return 'Salud ocupacional';
   if(/^(ALGODON|APLICADORES|APOSITO|BAJA LENGUAS|BOTIQUIN|COMPRESAS|CURITAS|ESP[AR]*DRAPO|ESTUCHE PARA FERULA|GASA|INMOVILIZADOR|JUEGO FERULAS|MANTA TERMICA|PANUELO PRIMEROS|PRUEBAS ACTUA|SUERO|TIJERAS PUNTA ROMANA|VENDA)/.test(d))return 'Salud ocupacional';

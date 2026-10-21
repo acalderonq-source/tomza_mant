@@ -37,7 +37,7 @@ const retirados=require('../src/data/proveeduriaArticulosRetiradosSolicitud.json
       const categorias = page.locator('[data-campo="categoria"]');
       const productos = page.locator('[data-campo="codigo"]');
       assert.equal(await productos.isDisabled(),true);
-      assert.deepEqual(await categorias.locator('option').allTextContents(),['Seleccione una categoría','Limpieza','Oficina','Operaciones','Otros','Papelería','Salud ocupacional','Servicios ambientales','Técnicos','Uniformes']);
+      assert.deepEqual(await categorias.locator('option').allTextContents(),['Seleccione una categoría','Carburación','Limpieza','Oficina','Operaciones','Otros','Papelería','Salud ocupacional','Servicios ambientales','Técnicos','Uniformes']);
       const datos=JSON.parse(await page.locator('#prov-datos').textContent());
       assert.ok(datos.articulos.every(a=>!retirados.includes(a.codigo)));
       for(const nombre of ['Cloro','Jabón antibacterial'])assert.equal(datos.articulos.filter(a=>a.descripcion===nombre).length,1);
@@ -45,6 +45,10 @@ const retirados=require('../src/data/proveeduriaArticulosRetiradosSolicitud.json
         await categorias.selectOption(categoria);
         const visibles=await productos.locator('option').evaluateAll(options=>options.map(o=>o.value).filter(Boolean));
         assert.deepEqual(visibles.sort(),datos.articulos.filter(a=>a.categoria===categoria).map(a=>a.codigo).sort());
+        if(categoria==='Carburación'){
+          const envases=datos.articulos.filter(a=>visibles.includes(a.codigo));
+          assert.equal(envases.length,19);assert.ok(envases.every(a=>/^(CILINDRO|TANQUE)/.test(a.descripcion)));
+        }
       }
       await categorias.selectOption('Salud ocupacional');
       await page.waitForSelector('[data-campo="codigo"] option[value="GUANTE"]',{state:'attached'});

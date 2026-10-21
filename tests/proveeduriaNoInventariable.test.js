@@ -64,7 +64,8 @@ test('solicitud mixta llega hasta recepción confirmada sin crear stock, fichas 
     return [{affectedRows:1}];
   }
   pool.query=query;pool.getConnection=async()=>{let before;return {query,beginTransaction:async()=>{before=structuredClone(state);},commit:async()=>{},rollback:async()=>{Object.assign(state,before);},release(){}};};
-  const pedidas=[{codigo:calca.codigo,cantidad:1},{codigo:sello.codigo,cantidad:2},{codigo:cilindro.codigo,cantidad:1},{codigo:'STOCK',cantidad:2,inventariable:false}];
+  const articuloPedido=articuloSolicitudDescripcion('Mazo de hule');
+  const pedidas=[{codigo:calca.codigo,cantidad:1},{codigo:articuloPedido.codigo,cantidad:2},{codigo:cilindro.codigo,cantidad:1},{codigo:'STOCK',cantidad:2,inventariable:false}];
   function formulario(){const f=new URLSearchParams({origen_formulario:'taller',solicitud_id:'1',proveedor:'Proveedor',email:'p@example.com',empresa_destino:'GAS TOMZA',credito:'30',entrega:'5 días',moneda:'CRC'});state.docs.get(1).datos.lineas.forEach((l,i)=>{for(const [k,v]of Object.entries({codigo_producto:l.codigo,descripcion:l.descripcion,cantidad:l.cantidad,precio_unitario:[100,0.026,28,20][i]}))f.set(`lineas[${i}][${k}]`,String(v));});return f;}
   try{
     await servidor(solicitante,async base=>{
@@ -76,18 +77,18 @@ test('solicitud mixta llega hasta recepción confirmada sin crear stock, fichas 
     });
     await servidor(gestor,async base=>{
       const inventario=await (await fetch(base+'/inventario')).text();assert.doesNotMatch(inventario,new RegExp(calca.codigo));assert.doesNotMatch(inventario,/Calca TOMZA para tanque estacionario/);
-      const cotizar=await fetch(base+'/solicitudes/1/cotizacion');assert.equal(cotizar.status,200);assert.match(await cotizar.text(),/precio_unitario":0.026/);
+      const cotizar=await fetch(base+'/solicitudes/1/cotizacion');assert.equal(cotizar.status,200);assert.match(await cotizar.text(),/precio_unitario":25000/);
       assert.equal((await fetch(base+'/solicitudes/1/cotizacion',{method:'POST',body:formulario(),redirect:'manual'})).status,302);
       assert.equal((await fetch(base+'/ordenes',{method:'POST',body:formulario(),redirect:'manual'})).status,302);
       let orden=state.docs.get(2);assert.equal(orden.datos.lineas[2].iva,0);assert(orden.datos.lineas.slice(0,3).every(esNoInventariable));
       const edicion=formulario();edicion.set('version',versionOrden(orden));edicion.set('sede','Cartago');assert.equal((await fetch(base+'/ordenes/2/editar',{method:'POST',body:edicion,redirect:'manual'})).status,302);
       assert(state.docs.get(2).datos.lineas.slice(0,3).every(esNoInventariable));
       const antes=await fetch(base+'/salidas',json({solicitud_id:1}));assert.equal(antes.status,400);
-      const parcial={token:'a'.repeat(32),version:0,referencia:'Entrega 1',lineas:[{codigo:calca.codigo,cantidad:1},{codigo:sello.codigo,cantidad:1}]};
+      const parcial={token:'a'.repeat(32),version:0,referencia:'Entrega 1',lineas:[{codigo:calca.codigo,cantidad:1},{codigo:articuloPedido.codigo,cantidad:1}]};
       assert.equal((await fetch(base+'/ordenes/2/recibir',json(parcial))).status,200);assert.equal(state.stockWrites.length,0);assert.equal(state.docs.get(2).datos.estado,'PARCIAL');
       assert.equal((await fetch(base+'/salidas',json({solicitud_id:1}))).status,400);
       const detalle=await fetch(base+'/ordenes/2/recepcion');assert.equal(detalle.status,200);assert.match(await detalle.text(),/No ingresa a inventario/);
-      const final={token:'b'.repeat(32),version:1,referencia:'Entrega 2',lineas:[{codigo:sello.codigo,cantidad:1},{codigo:cilindro.codigo,cantidad:1},{codigo:'STOCK',cantidad:2}]};
+      const final={token:'b'.repeat(32),version:1,referencia:'Entrega 2',lineas:[{codigo:articuloPedido.codigo,cantidad:1},{codigo:cilindro.codigo,cantidad:1},{codigo:'STOCK',cantidad:2}]};
       assert.equal((await fetch(base+'/ordenes/2/recibir',json(final))).status,200);assert.equal(state.stock,4);assert.equal(state.docs.get(2).datos.estado,'RECIBIDA');assert.equal(state.movimientos.length,1);
       const repetida=await fetch(base+'/ordenes/2/recibir',json(final));assert.equal((await repetida.json()).repetida,true);assert.equal(state.stock,4);
       assert.equal((await fetch(base+'/salidas',json({solicitud_id:1}))).status,200);assert.equal(state.stock,2);assert.equal(state.movimientos.length,2);
