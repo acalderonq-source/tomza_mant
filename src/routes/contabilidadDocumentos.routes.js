@@ -12,10 +12,17 @@ router.use((req,res,next)=>{
 const wrap=fn=>(req,res,next)=>Promise.resolve(fn(req,res)).catch(next);
 router.get('/descargas-pdf',wrap(async(req,res)=>{
   const pdf={...require('../utils/pasivosPdf'),...require('../utils/pasivosPdfOutlook')};
-  let f={desde:'',hasta:''},filas=[],mensaje='';
+  let f={desde:'',hasta:'',fecha_entrega:String(req.query.fecha_entrega||require('../utils/fechaCostaRica').fechaActualCostaRica()).slice(0,10),persona:String(req.query.persona||req.session?.user?.nombre||req.session?.user?.usuario||'').trim().slice(0,120)},filas=[],mensaje='';
   if(req.query.desde||req.query.hasta){
-    try{f={...pdf.fechas(req.query),empresa:['GAS TOMZA','SUPER GAS'].includes(req.query.empresa)?req.query.empresa:'',grupo:['OTROS','TALLER'].includes(req.query.grupo)?req.query.grupo:''};}catch(e){return res.status(400).render('contabilidad/descargas_pdf',{f,filas,mensaje:e.message});}
+    try{f={...f,...pdf.fechas(req.query),incluirNotas:req.query.listado==='1',empresa:['GAS TOMZA','SUPER GAS'].includes(req.query.empresa)?req.query.empresa:'',grupo:['OTROS','TALLER'].includes(req.query.grupo)?req.query.grupo:''};}catch(e){return res.status(400).render('contabilidad/descargas_pdf',{f,filas,mensaje:e.message});}
     try{filas=await pdf.cargar(pool,f);}catch(e){console.error('Descargas Outlook:',e.errorCode||e.code||e.status||'ERROR',e.message);mensaje=pdf.mensajeError(e);}
+  }
+  if(req.query.listado==='1'&&!mensaje){
+    try{
+      const libro=require('../utils/listadoPasivosExcel').generar(filas,{...f,fechaEntrega:f.fecha_entrega,persona:f.persona});
+      const buffer=await libro.xlsx.writeBuffer();
+      return res.type('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet').attachment(`Pasivos_listos_${f.desde}_${f.hasta}.xlsx`).send(Buffer.from(buffer));
+    }catch(e){if(e.status!==400)throw e;mensaje=e.message;}
   }
   if(req.query.descargar==='1'&&!mensaje){
     const zip=new (require('jszip'))(),usados=new Set();

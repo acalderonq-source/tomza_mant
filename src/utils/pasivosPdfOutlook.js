@@ -16,7 +16,7 @@ function obtenerCache(key){
   if(entrada.hasta<Date.now()){bytesCache-=entrada.buffer.length;adjuntosCache.delete(key);return null;}
   return entrada.buffer;
 }
-function filtrar(filas,f){return filas.filter(r=>(!f.empresa||r.empresa===f.empresa)&&(!f.grupo||r.grupo===f.grupo)).map(r=>({...r}));}
+function filtrar(filas,f){return filas.filter(r=>(!f.empresa||r.empresa===f.empresa)&&(!f.grupo||r.grupo===f.grupo)&&(f.incluirNotas||r.tipoDocumento!=='nota_credito')).map(r=>({...r}));}
 async function paralelo(items,fn,limite=4){
   const resultados=new Array(items.length);let indice=0;
   await Promise.all(Array.from({length:Math.min(limite,items.length)},async()=>{while(indice<items.length){const i=indice++;resultados[i]=await fn(items[i],i);}}));
@@ -34,9 +34,13 @@ function mensajeError(e){
 function facturaXml(bytes){
   const xml=bytes.toString('utf8');
   if(/<!DOCTYPE|<!ENTITY/i.test(xml))return null;
-  const doc=parser.parse(xml),f=doc.FacturaElectronica||doc.FacturaElectronicaCompra;
+  const doc=parser.parse(xml),f=doc.FacturaElectronica||doc.FacturaElectronicaCompra||doc.NotaCreditoElectronica;
   if(!f||!f.Emisor?.Nombre||!/^\d{20}$/.test(String(f.NumeroConsecutivo||'')))return null;
-  return {proveedor_nombre:String(f.Emisor.Nombre),numero_factura:String(f.NumeroConsecutivo),clave:String(f.Clave||''),empresa:String(f.Receptor?.Nombre||'')};
+  const credito=!!doc.NotaCreditoElectronica;
+  const total=f.ResumenFactura?.TotalComprobante;
+  const monto=typeof total==='string'&&/^\d+(?:\.\d{1,5})?$/.test(total)?Number(total)*(credito?-1:1):null;
+  const referencias=Array.isArray(f.InformacionReferencia)?f.InformacionReferencia:[f.InformacionReferencia].filter(Boolean);
+  return {tipoDocumento:credito?'nota_credito':'factura',monto,moneda:f.ResumenFactura?.CodigoTipoMoneda?.CodigoMoneda||null,referenciaFactura:referencias[0]?.Numero||'',proveedor_nombre:String(f.Emisor.Nombre),numero_factura:String(f.NumeroConsecutivo),clave:String(f.Clave||''),empresa:String(f.Receptor?.Nombre||'')};
 }
 const stem=v=>path.parse(String(v||'').toLowerCase()).name;
 function asociar(archivo,facturas,pdfs){
