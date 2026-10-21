@@ -1,4 +1,7 @@
-const test=require('node:test');
+// Las plantillas tienen cifras reales y no se publican (el repositorio es público):
+// sin ellas, por ejemplo en GitHub, estas pruebas se omiten en lugar de fallar.
+const sinPlantillas=['captura-general/original.xls'].some(p=>!require('node:fs').existsSync(require('node:path').join(__dirname,'../src/templates',p)));
+const test=(nombre,...resto)=>require('node:test')(nombre,{skip:sinPlantillas&&'Plantilla privada no incluida en el repositorio'},resto.at(-1));
 const assert=require('node:assert/strict');
 const fs=require('node:fs/promises');
 const os=require('node:os');
