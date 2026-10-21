@@ -35,7 +35,7 @@
   <header class="topbar py-3">
     <div class="container-fluid shell d-flex justify-content-between align-items-center flex-wrap gap-2">
       <div><div class="small opacity-75">FACTURAS</div><h1 class="h4 mb-0">Asientos de pasivos</h1></div>
-      <a href="/compras/facturas" class="btn btn-outline-light btn-sm"><i class="bi bi-arrow-left"></i> Facturas</a>
+      <a href="/contabilidad/documentos" class="btn btn-outline-light btn-sm"><i class="bi bi-arrow-left"></i> Cuentas por pagar</a>
     </div>
   </header>
   <main class="container-fluid shell py-3">
@@ -51,7 +51,7 @@
 
     <section class="panel mb-3">
       <div class="p-3 border-bottom d-flex justify-content-between flex-wrap gap-2 align-items-center">
-        <div><h2 class="h6 fw-bold mb-1">Seleccionar facturas</h2><div class="small text-muted"><%= facturas.length %> factura(s) con los filtros actuales. Las ya incluidas permanecen visibles en el historial.</div></div>
+        <div><h2 class="h6 fw-bold mb-1">Seleccionar facturas</h2><div class="small text-muted"><%= facturas.length %> factura(s) de Taller y portal aprobado con los filtros actuales. Las ya incluidas permanecen visibles en el historial.</div></div>
       </div>
       <form method="GET" action="/compras/facturas/asientos" class="row g-2 p-3 border-bottom align-items-end">
         <div class="col-lg-3 col-md-6"><label class="form-label small fw-semibold">Buscar</label><input name="q" class="form-control form-control-sm" value="<%= filtros.q %>" placeholder="Factura, proveedor, PO o placa"></div>
@@ -71,7 +71,7 @@
               <% facturas.forEach(f => { const monto = montoAsientoFactura(f); const enColones = ['CRC', 'COLONES', 'COLON', '₡'].includes(String(f.moneda || 'CRC').trim().toUpperCase()); const disponible = !f.lote_asiento_id && monto > 0 && enColones; const negocio = String(f.negocio_recepcion || '').toLowerCase(); const claseNegocio = negocio.includes('cilindrero') ? 'cilindrero' : negocio.includes('transportadora') ? 'transportadora' : negocio.includes('granel') ? 'granel' : 'otros'; %>
                 <tr class="<%= f.lote_asiento_id ? 'invoice-included' : '' %>">
                   <td class="ps-2"><input type="checkbox" class="factura-check" name="factura_ref" value="<%= f.tipo %>:<%= f.id %>" data-monto="<%= monto %>" aria-label="Seleccionar factura <%= f.numero_factura || f.po_numero || f.id %>" <%= disponible ? '' : 'disabled' %>></td>
-                  <td><%= f.po_numero || '—' %></td>
+                  <td><%= f.po_numero || '—' %><% if(f.tipo==='portal'){ %><br><span class="badge text-bg-primary">Portal aprobado</span><% } %></td>
                   <td><%= f.proveedor_nombre || '—' %></td>
                   <td class="text-nowrap"><%= f.fecha ? new Date(f.fecha).toLocaleDateString('es-CR', { timeZone: 'UTC' }) : '—' %></td>
                   <td class="small">

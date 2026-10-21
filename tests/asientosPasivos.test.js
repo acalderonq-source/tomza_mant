@@ -20,6 +20,7 @@ require.cache[dbPath] = { id: dbPath, filename: dbPath, loaded: true, exports: {
     if (/CREATE TABLE|ALTER TABLE/.test(sql)) return [{}];
     if (/UPDATE pagos_proveedor\s+SET (pagada = 1|periodo_cierre = DATE_FORMAT)/.test(sql)) return [{ affectedRows: 0 }];
     if (/INFORMATION_SCHEMA/i.test(sql)) return [[{ count: 1, dataType: "decimal", maxLength: 255, numeric_scale: 4, numeric_precision: 14 }]];
+    if (/FROM prov_documentos/.test(sql)) return [[]];
     statements.push({ sql, params });
     return query(sql, params);
   }
@@ -162,4 +163,23 @@ test("batch creation rolls back on concurrent duplicate and history marks its in
   assert.equal(list.locals.facturas.length, 1);
   assert.equal(list.locals.facturas[0].lote_asiento_id, 5);
   assert.equal(list.locals.historial.length, 1);
+});
+test('factura aprobada del portal se lista y genera el asiento con su identidad y auditoría',async()=>{
+  const portal=require('../src/utils/portalAsientos'),original=portal.obtener;
+  const factura={id:71,tipo:'portal',fecha:'2026-10-16',numero_factura:'PORTAL-71',clave_electronica:'506PORTAL71',proveedor_nombre:'Proveedor del portal',moneda:'CRC',monto_original:113,monto:113,nota_credito_monto:0};
+  portal.obtener=async(db,f,lock)=>{if(lock){assert.deepEqual(f.ids,[71]);}return [factura];};
+  let archivo;
+  query=async(sql,params)=>{
+    if(/SELECT id, nombre FROM proveedores/.test(sql)||/UNION ALL/.test(sql)||/SELECT factura_tipo/.test(sql)||/SELECT l.id/.test(sql))return [[]];
+    if(/COUNT\(\*\) AS total/.test(sql))return [[{total:0}]];
+    if(/INSERT INTO asientos_pasivos_lotes/.test(sql)){archivo=params[4];return [{insertId:31}];}
+    if(/INSERT INTO asientos_pasivos_facturas/.test(sql)){assert.equal(params[0][0][1],'portal');assert.equal(params[0][0][2],71);return [{}];}
+    if(/INSERT INTO prov_auditoria/.test(sql)){assert.equal(params[0],71);assert.match(params[2],/#31/);return [{}];}
+    throw Error(sql);
+  };
+  try{
+    const lista=await request('GET','/facturas/asientos',{role:'CONTABILIDAD'});assert.equal(lista.locals.facturas[0].tipo,'portal');
+    const r=await request('POST','/facturas/asientos',{role:'CONTABILIDAD',body:{factura_ref:'portal:71'}});assert.equal(r.redirect,'/compras/facturas/asientos?creado=31');assert.equal(committed,true);
+    const w=new ExcelJS.Workbook();await w.xlsx.load(archivo);assert.equal(w.getWorksheet('01').getCell('D2').value,113);assert.equal(w.getWorksheet('01').getCell('K2').value,'PORTAL-71');
+  }finally{portal.obtener=original;}
 });

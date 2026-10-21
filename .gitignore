@@ -17,11 +17,35 @@ public/uploads/facturas-correo/
 public/uploads/facturas/
 public/uploads/cotizaciones/
 secrets/
+public/uploads/.informes-junta/
+public/uploads/.captura-general/
 *.key
 *.p12
 *.pfx
 backups/
 *.enc
 
+# Cachés y archivos locales de herramientas
+.pnpm-store/
+coverage/
+.nyc_output/
+*.log
+*.tsbuildinfo
+__pycache__/
+*.pyc
+.DS_Store
+Thumbs.db
+
 # Compilaciones Android: solo se publica la copia de public/descargas
 android/*.apk
+
+# App de escritorio: dependencias e instaladores compilados
+desktop/node_modules/
+desktop/release/
+
+# Datos internos: no se publican porque el repositorio es público
+src/templates/**/*.xls
+src/templates/**/*.xlsx
+src/templates/**/*.pptx
+docs/diagnosticos/
+.claude/

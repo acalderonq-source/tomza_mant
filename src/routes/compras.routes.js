@@ -785,7 +785,7 @@ async function ensureAsientosPasivosTables() {
         CREATE TABLE IF NOT EXISTS asientos_pasivos_facturas (
           id BIGINT AUTO_INCREMENT PRIMARY KEY,
           lote_id BIGINT NOT NULL,
-          factura_tipo ENUM('orden','independiente') NOT NULL,
+          factura_tipo ENUM('orden','independiente','portal') NOT NULL,
           factura_id INT NOT NULL,
           clave_electronica VARCHAR(80) NULL,
           identidad_documento VARCHAR(255) NULL,
@@ -7599,7 +7599,10 @@ router.get("/facturas/asientos", requireAuth, allowRoles(...ROLES_ASIENTOS_PASIV
       estado: ["pendiente", "incluida"].includes(req.query.estado) ? req.query.estado : "todos"
     };
     const [proveedores] = await queryWithRetry("SELECT id, nombre FROM proveedores ORDER BY nombre");
-    const facturas = await obtenerFacturasCompras({ ...filtros, orden: "desc" });
+    const facturas = [
+      ...await obtenerFacturasCompras({ ...filtros, orden: "desc" }),
+      ...(['ADMIN','CONTABILIDAD'].includes(req.session.user.rol)?await require('../utils/portalAsientos').obtener(pool,{...filtros,proveedor_nombre:filtros.proveedor_id?(proveedores.find(p=>String(p.id)===String(filtros.proveedor_id))?.nombre||'__NO_ENCONTRADO__'):''}):[])
+    ];
     const [registradas] = await queryWithRetry(
       "SELECT factura_tipo, factura_id, lote_id, clave_electronica, identidad_documento FROM asientos_pasivos_facturas"
     );
@@ -7660,7 +7663,7 @@ router.post("/facturas/asientos", requireAuth, allowRoles(...ROLES_ASIENTOS_PASI
     await ensureAsientosPasivosTables();
     const raw = toArray(req.body.factura_ref);
     if (!raw.length || raw.length > 1000) throw new Error("Seleccione entre 1 y 1000 facturas.");
-    const referencias = raw.map(parseFacturaRef);
+    const referencias = raw.map(value=>/^portal:[1-9]\d*$/.test(String(value))?{tipo:'portal',id:String(value).split(':')[1]}:parseFacturaRef(value));
     if (referencias.some(ref => !ref || !Number.isSafeInteger(Number(ref.id)) || Number(ref.id) < 1)) {
       throw new Error("La selección contiene una factura inválida.");
     }
@@ -7668,6 +7671,8 @@ router.post("/facturas/asientos", requireAuth, allowRoles(...ROLES_ASIENTOS_PASI
     if (new Set(claves).size !== claves.length) throw new Error("La selección contiene facturas repetidas.");
     const ordenIds = referencias.filter(ref => ref.tipo === "orden").map(ref => Number(ref.id)).sort((a, b) => a - b);
     const independienteIds = referencias.filter(ref => ref.tipo === "independiente").map(ref => Number(ref.id)).sort((a, b) => a - b);
+    const portalIds=referencias.filter(ref=>ref.tipo==='portal').map(ref=>Number(ref.id)).sort((a,b)=>a-b);
+    if(portalIds.length&&!['ADMIN','CONTABILIDAD'].includes(req.session.user.rol))throw new Error('Solo Contabilidad puede contabilizar facturas del portal');
     connection = await pool.getConnection();
     await connection.beginTransaction();
     if (ordenIds.length) {
@@ -7679,11 +7684,14 @@ router.post("/facturas/asientos", requireAuth, allowRoles(...ROLES_ASIENTOS_PASI
       if (rows.length !== independienteIds.length) throw new Error("Una factura ya no existe. Actualice la lista.");
     }
     const [existentes] = await connection.query(
-      "SELECT factura_tipo, factura_id FROM asientos_pasivos_facturas WHERE (factura_tipo = 'orden' AND factura_id IN (?)) OR (factura_tipo = 'independiente' AND factura_id IN (?)) LIMIT 1",
-      [ordenIds.length ? ordenIds : [0], independienteIds.length ? independienteIds : [0]]
+      "SELECT factura_tipo, factura_id FROM asientos_pasivos_facturas WHERE (factura_tipo = 'orden' AND factura_id IN (?)) OR (factura_tipo = 'independiente' AND factura_id IN (?)) OR (factura_tipo = 'portal' AND factura_id IN (?)) LIMIT 1",
+      [ordenIds.length ? ordenIds : [0], independienteIds.length ? independienteIds : [0],portalIds.length?portalIds:[0]]
     );
     if (existentes.length) throw new Error("Una factura seleccionada ya pertenece a otro asiento.");
-    const facturas = await obtenerFacturasCompras({ orden_ids: ordenIds, independiente_ids: independienteIds, orden: "asc" }, connection);
+    const facturas = [
+      ...(ordenIds.length||independienteIds.length?await obtenerFacturasCompras({ orden_ids: ordenIds, independiente_ids: independienteIds, orden: "asc" }, connection):[]),
+      ...await require('../utils/portalAsientos').obtener(connection,{ids:portalIds},true)
+    ];
     if (facturas.length !== referencias.length) throw new Error("La selección cambió. Actualice la lista.");
     if (facturas.some(factura => montoAsientoFactura(factura) <= 0)) {
       throw new Error("Hay facturas sin monto neto positivo; revise notas de crédito y selección.");
@@ -7710,6 +7718,7 @@ router.post("/facturas/asientos", requireAuth, allowRoles(...ROLES_ASIENTOS_PASI
         factura.consecutivo_electronico || factura.numero_factura || factura.po_numero || null,
         factura.proveedor_nombre || null, fechaSoloSql(factura.fecha), montoAsientoFactura(factura)])]
     );
+    for(const id of portalIds)await connection.query('INSERT INTO prov_auditoria (documento_id,actor,accion) VALUES (?,?,?)',[id,String(req.session.user.id),`Asiento de pasivos #${result.insertId}`]);
     await connection.commit();
     req.session.success = `Asiento #${result.insertId} guardado con ${facturas.length} factura(s).`;
     res.redirect(`/compras/facturas/asientos?creado=${result.insertId}`);

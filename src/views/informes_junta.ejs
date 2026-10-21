@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="csrf-token" content="<%= csrfToken %>">
+  <title>Informes de junta · Tomza</title>
+  <link rel="stylesheet" href="/css/informes-junta.css">
+  <link rel="stylesheet" href="/css/informes-junta-plantillas.css">
+  <script src="/js/informes-junta.js" defer></script>
+  <script src="/js/informes-junta-plantillas.js" defer></script>
+  <script src="/js/informes-junta-relleno.js" defer></script>
+</head>
+<body>
+  <aside class="ij-sidebar">
+    <a class="ij-brand" href="/dashboard">TOMZA<span>Informes gerenciales</span></a>
+    <nav aria-label="Informes de junta">
+      <button data-view="resumen"><span aria-hidden="true">▥</span> Resumen</button>
+      <button data-view="cargar" class="active"><span aria-hidden="true">↑</span> Cargar información</button>
+      <button data-view="validar"><span aria-hidden="true">✓</span> Revisar datos</button>
+      <button data-view="plantillas"><span aria-hidden="true">▧</span> Plantillas originales</button>
+      <button data-view="generar"><span aria-hidden="true">▤</span> Generar informe</button>
+      <button data-view="historial"><span aria-hidden="true">◷</span> Historial</button>
+    </nav>
+    <div class="ij-side-bottom"><span>Versión de pruebas</span><p>Excel y PowerPoint desde una misma fuente.</p><a href="/dashboard">← Volver al sistema</a><% if(user.esPropietarioAdministracion){ %><a href="/administracion">Administración</a><% } %></div>
+  </aside>
+  <div class="ij-main">
+    <header class="ij-topbar"><span id="ij-period">Nuevo informe</span><div><span class="ij-badge">Pruebas · informe parcial</span><span class="ij-user"><%= user.nombre || user.usuario %></span></div></header>
+    <main>
+      <div id="ij-message" role="status" aria-live="polite" hidden></div>
+      <div class="ij-heading"><div><p class="ij-eyebrow">ADMINISTRADOR / INFORMES DE JUNTA</p><h1 id="ij-title">Cargar información</h1><p id="ij-description">Importá la exportación del sistema para preparar el informe mensual.</p></div><span id="ij-source-label" class="ij-badge" hidden></span></div>
+      <ol class="ij-steps"><li data-step="cargar"><span>1</span>Cargar</li><li data-step="validar"><span>2</span>Revisar</li><li data-step="generar"><span>3</span>Generar</li></ol>
+
+      <section data-panel="cargar">
+        <div class="ij-drop" id="ij-drop"><div class="ij-upload-icon" aria-hidden="true">↑</div><h2>Arrastrá tus archivos Excel aquí</h2><p>Exportaciones Libro1 y Libro2 · todas las hojas compatibles · hasta 6 MB en total</p><label class="ij-btn" for="ij-file">Seleccionar archivos</label><input type="file" id="ij-file" accept=".xlsx" multiple class="ij-file"><p class="ij-small">Seleccioná Libro1 y Libro2 juntos para consolidarlos. Cada carga crea un informe independiente y conserva el anterior.</p></div>
+        <div class="ij-card ij-demo"><div><h2>Probalo sin cargar archivos</h2><p>Usá un ejemplo ficticio de Granel para recorrer el proceso y descargar ambos archivos.</p></div><button id="ij-demo" class="ij-btn ij-btn-outline">Cargar ejemplo ficticio</button></div>
+        <div class="ij-card"><h2>Formato de la exportación</h2><p>Columnas: <code>CODIGO</code>, <code>NOMBRE_COMERCIAL</code>, <code>GRUPO</code>, <code>DIVISION</code>, <code>CANAL</code>. Ruta opcional. Los meses deben llamarse <code>2026-08</code>, <code>2026-09</code>, etc.</p><div class="ij-notice">Esta prueba automatiza ventas de los grupos presentes en el archivo. Contabilidad, nómina, cartera y mercado quedan pendientes de incorporar.</div></div>
+        <div id="ij-source-preview" hidden class="ij-card"><div class="ij-section-title"><h2>Vista previa de la fuente</h2><span id="ij-source-count"></span></div><div id="ij-source-table" class="ij-table-scroll"></div><div class="ij-actions"><button class="ij-btn" data-view="validar">Revisar información →</button></div></div>
+      </section>
+
+      <section data-panel="validar" hidden>
+        <div class="ij-empty">Cargá un archivo o el ejemplo ficticio para revisar sus datos.<button class="ij-btn" data-view="cargar">Cargar información</button></div>
+        <div class="ij-loaded" hidden>
+          <div class="ij-notice" id="ij-validation-banner"></div>
+          <div class="ij-metrics" id="ij-compare"></div>
+          <div class="ij-grid">
+            <div class="ij-card"><h2>Verificación de información</h2><div id="ij-checks"></div><h2 class="ij-spaced">Cobertura del informe</h2><p id="ij-scope"></p></div>
+            <form id="ij-params" class="ij-card">
+              <h2>Parámetros editables</h2>
+              <label>Título del informe<input name="title" maxlength="120" required></label>
+              <div class="ij-form-grid"><label>Mes<select name="period" required></select></label><label>Unidad<select name="unit"><option>Unidad por confirmar</option><option>Kilos</option><option>Litros</option><option>Galones</option><option>Colones</option><option>Dólares</option><option>Unidades</option></select></label></div>
+              <div class="ij-form-grid"><label>Días de operación<input name="days" type="number" min="1" max="31" step="1" placeholder="Por confirmar"></label><label>Meta del mes<input name="target" type="number" min="0" max="1000000000000" step="0.01" placeholder="Opcional"></label></div>
+              <label>Total de referencia para comparar<input name="reference" type="number" min="0" max="1000000000000" step="0.01" placeholder="Opcional: total del informe anterior"></label>
+              <label>Observaciones del análisis<textarea name="notes" rows="5" maxlength="4000" placeholder="Explicaciones y ajustes de corte. Para cambiar la PPT, editá sus textos en Plantillas originales."></textarea></label>
+              <p class="ij-small" id="ij-save-state">Los cambios se aplican al guardar.</p><button class="ij-btn" type="submit">Guardar cambios</button>
+            </form>
+          </div>
+          <div class="ij-actions"><button class="ij-btn ij-btn-outline" data-view="cargar">← Volver a carga</button><button class="ij-btn" data-view="generar">Ver informe →</button></div>
+        </div>
+      </section>
+
+      <section data-panel="resumen" hidden>
+        <div class="ij-empty">Cargá una fuente para ver el resumen.<button class="ij-btn" data-view="cargar">Cargar información</button></div>
+        <div class="ij-loaded" hidden><div class="ij-metrics" id="ij-summary-metrics"></div><div class="ij-card"><div class="ij-section-title"><h2>Evolución mensual</h2><span id="ij-history-unit"></span></div><div id="ij-bars" class="ij-bars"></div></div><div class="ij-card"><div class="ij-section-title"><h2>Ventas de la fuente cargada</h2><select id="ij-dimension" aria-label="Agrupar ventas"><option value="canal">Por canal</option><option value="grupo">Por grupo</option><option value="division">Por división</option><option value="cc">Por centro / CC</option></select></div><div id="ij-breakdown" class="ij-table-scroll"></div></div><div class="ij-actions"><button class="ij-btn" data-view="validar">Editar parámetros</button></div></div>
+      </section>
+
+      <section data-panel="generar" hidden>
+        <div class="ij-empty">Cargá una fuente antes de generar los archivos.<button class="ij-btn" data-view="cargar">Cargar información</button></div>
+        <div class="ij-loaded" hidden>
+          <div class="ij-notice" id="ij-export-notice"></div>
+          <div class="ij-card" id="ij-auto-summary" aria-live="polite">Calculando el relleno automático…</div>
+          <div class="ij-grid ij-export-grid">
+            <div class="ij-card"><div class="ij-section-title"><h2><span class="ij-file-icon ij-excel">X</span> Informe Excel original</h2><span>43 hojas · .xlsx</span></div><p>El sistema coloca las ventas, clientes, tramos y promedios en el mismo libro y recalcula las fórmulas vinculadas. Conserva hojas, estilos y gráficos originales.</p><div class="ij-sheet-preview"><div id="ij-excel-title"></div><div id="ij-excel-preview" class="ij-table-scroll"></div><footer>Datos rellenados · formato original conservado</footer></div><button class="ij-btn ij-btn-outline" data-download="xlsx">Descargar Excel</button></div>
+            <div class="ij-card"><div class="ij-section-title"><h2><span class="ij-file-icon ij-ppt">P</span> PowerPoint original</h2><span>29 diapositivas · .pptx</span></div><p>El sistema rellena los números dentro de las mismas tablas de la presentación. Conserva fondos, tipografías, colores, posiciones, tamaños y orden. Los números nuevos también son editables en PowerPoint.</p><div class="ij-original-preview"><strong id="ij-ppt-title">Relleno automático</strong><p id="ij-ppt-period"></p><label>Vista previa del bloque rellenado<select id="ij-auto-slide" aria-label="Bloque rellenado"></select></label><div id="ij-auto-preview"></div><small>Vista de los datos nuevos sobre el formato original. Las secciones sin fuente están pendientes.</small></div><button class="ij-btn ij-btn-outline" data-download="pptx">Descargar PowerPoint</button></div>
+          </div>
+          <div class="ij-card ij-demo"><div><h2>Cargás los archivos y descargás los informes rellenos</h2><p id="ij-version"></p><p>No necesitás copiar números ni reemplazar imágenes. Podés hacer ajustes opcionales antes de descargar.</p><button class="ij-btn ij-btn-outline" data-view="plantillas">Ajustes opcionales de plantilla</button></div><button id="ij-download-all" class="ij-btn">Rellenar y descargar ambos</button></div>
+        </div>
+      </section>
+
+      <section data-panel="plantillas" hidden>
+        <div class="ij-empty">Cargá una fuente o el ejemplo para guardar cambios en una copia de tus formatos.<button class="ij-btn" data-view="cargar">Cargar información</button></div>
+        <div class="ij-loaded" hidden>
+          <div class="ij-notice">El relleno de Excel y PPT ya es automático. Esta sección sirve para ajustes opcionales; no necesitás completar estas pantallas para generar. Los ajustes guardados prevalecen sobre el relleno automático.</div>
+          <div class="ij-card"><h2>Vinculaciones de la fuente</h2><p>Estos valores se incluyen automáticamente al descargar. La clasificación usa CC, porque GRUPO y CANAL pueden variar dentro de una misma hoja.</p><div id="ij-template-suggestions"></div><button id="ij-template-apply" class="ij-btn ij-btn-outline">Guardar estos valores como ajustes fijos</button></div>
+          <div class="ij-card"><div class="ij-section-title"><h2>Excel · mismas hojas y estilos</h2><select id="ij-template-sheet" aria-label="Hoja original"></select></div><p>Editar un número conserva el estilo de su celda. Las fórmulas existentes permanecen intactas.</p><div id="ij-template-cells" class="ij-table-scroll ij-template-cells"></div></div>
+          <div class="ij-card"><div class="ij-section-title"><h2>PPT · mismas diapositivas</h2><select id="ij-template-slide" aria-label="Diapositiva original"></select></div><p>Los textos conservan su fuente y formato. Usá textos de longitud similar para que quepan en el espacio original.</p><div id="ij-template-texts" class="ij-form-grid"></div><div id="ij-template-images"></div></div>
+          <div class="ij-card ij-demo"><div><h2>Guardar cambios de plantilla</h2><p id="ij-template-status">Sin cambios pendientes.</p></div><button id="ij-template-save" class="ij-btn">Guardar plantilla</button></div>
+        </div>
+      </section>
+
+      <section data-panel="historial" hidden><div class="ij-card"><div class="ij-section-title"><h2>Informes guardados</h2><button class="ij-btn ij-btn-outline" id="ij-refresh">Actualizar</button></div><p>Cada archivo cargado crea un informe. Reabrilo para editar sus parámetros y volver a descargarlo. Los informes se guardan por usuario administrador.</p><div id="ij-history" class="ij-table-scroll"></div></div></section>
+    </main>
+  </div>
+</body>
+</html>

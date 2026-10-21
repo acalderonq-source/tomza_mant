@@ -10,6 +10,7 @@ const {identificarReceptor,empresaFactura}=require('../utils/portalEmpresaRecept
 const {seguimiento,responderCorreccion,diaCR}=require('../utils/portalSeguimiento');
 const {exigir,adjunto,saldo,numero}=require('../utils/proveeduria');
 const {leerFacturaXML,consultarHacienda,aprobable,vencimiento}=require('../utils/proveedorHacienda');
+const {validarYAprobar}=require('../utils/portalAprobacionContable');
 const {esPropietarioAdministracion}=require('../utils/administracionPrivada');
 const externo=express.Router(),interno=express.Router(),administracion=express.Router();
 administracion.use(async(req,res,next)=>{try{res.set('Cache-Control','no-store');if(!req.session.user)return res.redirect('/login?departamento=ADMINISTRACION');if(!await esPropietarioAdministracion(req.session.user,pool))return res.status(403).send('Solo el propietario puede administrar el portal de proveedores');next();}catch(e){next(e);}});
@@ -184,8 +185,8 @@ interno.post('/facturas/:id/:accion',wrap(async(req,res)=>{
     }
     if(a==='hacienda'){exigir(f.subida_en===actual.datos.factura.subida_en,'La factura cambió');if(JSON.stringify(f.electronica.hacienda)===JSON.stringify(actual.datos.factura.electronica.hacienda))f.electronica.hacienda=hacienda;for(const c of notasConsultadas){const n=row.datos.notas_credito?.find(n=>n.clave===c.clave);if(n&&JSON.stringify(n.hacienda)===c.anterior)n.hacienda=c.hacienda;}}
     if(a==='orden')await vincularOrden(db,row,req.body,req.session.user.id);
-    if(['aprobar','pago','programar'].includes(a)){row.datos.control=await revisarFactura(db,row,true);exigirControl(row.datos.control);}
-    if(a==='aprobar'){exigir(f.estado==='PENDIENTE','Factura ya revisada');aprobable(f);f.estado='CONCILIADA';f.cuenta_por_pagar=true;f.aprobada_en=new Date().toISOString();}
+    if(['pago','programar'].includes(a)){row.datos.control=await revisarFactura(db,row,true);exigirControl(row.datos.control);}
+    if(a==='aprobar')await validarYAprobar(db,row);
     if(a==='rechazar'){exigir(f.estado==='PENDIENTE','Factura ya revisada');const motivo=String(req.body.motivo||'').trim();exigir(motivo&&motivo.length<=1000,'Indique el motivo');f.estado='RECHAZADA_INTERNA';f.motivo=motivo;(row.datos.mensajes??=[]).push({tipo:'devolucion',texto:motivo,actor:req.session.user.usuario||String(req.session.user.id),fecha:new Date().toISOString()});}
     if(a==='programar'){
       exigir(f.cuenta_por_pagar&&f.estado==='CONCILIADA','Factura pendiente de aprobación');aprobable(f);

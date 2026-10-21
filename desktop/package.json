@@ -1,0 +1,48 @@
+{
+  "name": "gas-tomza-sistema-desktop",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Aplicacion de escritorio de Gas Tomza Sistema",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "package:win": "electron-builder --win nsis --x64"
+  },
+  "devDependencies": {
+    "electron": "^44.5.1",
+    "electron-builder": "26.15.3"
+  },
+  "build": {
+    "appId": "com.gastomza.sistema.desktop",
+    "productName": "Gas Tomza Sistema",
+    "asar": true,
+    "directories": {
+      "buildResources": "assets",
+      "output": "release"
+    },
+    "files": [
+      "main.js",
+      "assets/tomza.ico"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "assets/tomza.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Gas Tomza Sistema",
+      "deleteAppDataOnUninstall": false
+    }
+  }
+}

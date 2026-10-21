@@ -434,6 +434,8 @@ app.use('/recursos-humanos',require('./routes/recursosHumanos.routes'));
 app.use('/operaciones',require('./routes/operaciones.routes'));
 app.use('/administracion/portal-proveedores',portalProveedores.administracion);
 app.use("/", adminRoutes);
+app.use('/admin/informes-junta', require('./routes/informesJunta.routes'));
+app.use('/admin/ventas-gas', require('./routes/ventasGas.routes').createRouter());
 app.use("/", carnetsRoutes);
 app.use("/dashboard", dashboardRoutes);
 app.use('/control-empresa', require('./routes/controlEmpresa.routes'));

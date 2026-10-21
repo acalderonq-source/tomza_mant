@@ -16,7 +16,7 @@
       <a href="/compras/facturas/asientos/<%= lote.id %>/excel" class="btn btn-primary"><i class="bi bi-download"></i> Descargar Excel original</a>
     </section>
     <section class="panel"><div class="p-3 border-bottom fw-bold">Facturas incluidas</div><div class="table-responsive"><table class="table table-sm mb-0 align-middle"><thead class="table-light"><tr><th class="ps-3">Tipo</th><th>N. factura</th><th>Proveedor</th><th>Fecha</th><th class="text-end pe-3">Monto incluido</th></tr></thead><tbody>
-      <% facturas.forEach(f => { %><tr><td class="ps-3"><%= f.factura_tipo === 'orden' ? 'Orden' : 'Independiente' %></td><td><%= f.numero_factura || '-' %></td><td><%= f.proveedor_nombre || '-' %></td><td><%= f.fecha_factura ? new Date(f.fecha_factura).toLocaleDateString('es-CR', { timeZone: 'UTC' }) : '-' %></td><td class="text-end pe-3 amount">₡<%= Number(f.monto_asiento).toLocaleString('es-CR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %></td></tr><% }) %>
+      <% facturas.forEach(f => { %><tr><td class="ps-3"><%= f.factura_tipo === 'portal' ? 'Portal' : f.factura_tipo === 'orden' ? 'Orden' : 'Independiente' %></td><td><%= f.numero_factura || '-' %></td><td><%= f.proveedor_nombre || '-' %></td><td><%= f.fecha_factura ? new Date(f.fecha_factura).toLocaleDateString('es-CR', { timeZone: 'UTC' }) : '-' %></td><td class="text-end pe-3 amount">₡<%= Number(f.monto_asiento).toLocaleString('es-CR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %></td></tr><% }) %>
     </tbody></table></div></section>
   </main>
 </body>
