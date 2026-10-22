@@ -19,7 +19,7 @@ const MODULOS=[
   {id:'TRAMITES',nombre:'ARESEP y tramites',areas:['TALLER','CONTABILIDAD','OPERACIONES','LOGISTICA'],rutas:['/aresep'],url:'/aresep'},
   {id:'OPERACIONES',nombre:'Operaciones',areas:['TALLER','OPERACIONES'],rutas:['/operaciones','/revision-ruta','/giras'],url:'/operaciones'},
   {id:'REPORTES_TALLER',nombre:'Reportes a Taller',areas:['TALLER','OPERACIONES'],rutas:['/reportes-supervisores'],url:'/reportes-supervisores'},
-  {id:'SUMINISTROS',nombre:'Solicitud de suministros',areas:['TALLER','OPERACIONES'],rutas:[],url:'/proveeduria/mis-solicitudes'},
+  {id:'SUMINISTROS',nombre:'Solicitud de suministros',areas:['TALLER','OPERACIONES','CONTABILIDAD'],rutas:[],url:'/proveeduria/mis-solicitudes'},
   {id:'CARBURACION',nombre:'Carburacion',areas:['CARBURACION'],rutas:['/carburacion'],url:'/carburacion/dashboard'},
   {id:'SEGURIDAD',nombre:'Seguridad Ocupacional',areas:['SEGURIDAD_OCUPACIONAL'],rutas:['/seguridad-ocupacional'],url:'/seguridad-ocupacional'},
   {id:'RECURSOS_HUMANOS',nombre:'Recursos Humanos',areas:['RECURSOS_HUMANOS'],rutas:['/recursos-humanos'],url:'/recursos-humanos'},
@@ -41,7 +41,9 @@ function validarAcceso(body){
     permisos[id]=value;
   }
   if(!Object.keys(permisos).some(id=>id!=='DOCUMENTOS'))throw error('Asigne al menos un modulo al trabajador.');
-  return {departamento,sede,permisos,...(['TALLER','OPERACIONES'].includes(departamento)?{permisosOperacionesSeparados:true}:{})};
+  // Cajas es una unidad dentro de Contabilidad: identifica a la persona en sus solicitudes.
+  const unidad=departamento==='CONTABILIDAD'&&body.unidad==='CAJAS'?'CAJAS':'';
+  return {departamento,sede,permisos,...(unidad?{unidad}:{}),...(['TALLER','OPERACIONES'].includes(departamento)?{permisosOperacionesSeparados:true}:{})};
 }
 async function prepararAccesos(db){await db.query(`CREATE TABLE IF NOT EXISTS usuario_accesos_personales (
   usuario_id INT NOT NULL PRIMARY KEY,config_json TEXT NOT NULL,asignado_por INT NOT NULL,
@@ -57,7 +59,7 @@ function puedeAcceder(config,ruta,metodo){
   if(config.departamento==='OPERACIONES' && coincide(ruta,'/reportes-supervisores')){
     return require('./operacionesTaller').rutaReportesOperaciones(ruta,metodo) && permiteModulo(config,'REPORTES_TALLER',metodo);
   }
-  if(['TALLER','OPERACIONES'].includes(config.departamento) && esRutaSuministrosSeguridad(ruta,metodo))return permiteModulo(config,'SUMINISTROS',metodo);
+  if(['TALLER','OPERACIONES','CONTABILIDAD'].includes(config.departamento) && esRutaSuministrosSeguridad(ruta,metodo))return permiteModulo(config,'SUMINISTROS',metodo);
   if(config.perfil==='CARBURACION_SIN_FINANZAS' && esRutaSuministrosSeguridad(ruta,metodo))return true;
   if (config.departamento==='TALLER' && coincide(ruta,'/marcas-ingreso')) return true; // El modulo exige ademas su lista privada de cuentas.
   if (['GET','HEAD'].includes(metodo) && (ruta==='/inicio/noticias' || /^\/inicio\/noticias\/[1-9]\d*\/imagen$/.test(ruta))) return true;

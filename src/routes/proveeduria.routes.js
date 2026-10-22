@@ -353,8 +353,8 @@ router.post('/solicitudes',wrap(async(req,res) => {
       if(Object.hasOwn(l,'categoria'))exigir(l.categoria===categoriaArticulo(a),'El producto no pertenece a la categoría seleccionada. Actualice la página');
       return {codigo:a.codigo,descripcion:a.descripcion,iva:Number(a.iva),cantidad:l.cantidad};
     })).map(l=>({...l,categoria:categoriaArticulo(catalogo.get(l.codigo))}));
-    const [r]=await db.query("INSERT INTO prov_documentos (tipo,usuario_id,sede,datos) VALUES ('solicitud',?,?,?)",[u.id,sedeSolicitud,JSON.stringify({lineas,estado:'PENDIENTE',departamento:u.departamentoActivo,solicitante:u.nombre||u.usuario,motivo:String(req.body.motivo||'').trim().slice(0,2000)})]);
-    await alerta(db,r.insertId,`Nueva solicitud PR-${r.insertId} de ${u.departamentoActivo} · ${u.nombre||u.usuario}`); return r.insertId;
+    const [r]=await db.query("INSERT INTO prov_documentos (tipo,usuario_id,sede,datos) VALUES ('solicitud',?,?,?)",[u.id,sedeSolicitud,JSON.stringify({lineas,estado:'PENDIENTE',departamento:u.departamentoActivo,unidad:u.accesoPersonal?.unidad||undefined,solicitante:u.nombre||u.usuario,motivo:String(req.body.motivo||'').trim().slice(0,2000)})]);
+    await alerta(db,r.insertId,`Nueva solicitud PR-${r.insertId} de ${u.departamentoActivo}${u.accesoPersonal?.unidad==='CAJAS'?' (Cajas)':''} · ${u.nombre||u.usuario}`); return r.insertId;
   }); res.json({id});
 }));
 router.post('/cotizacion/importar',limitarLectura,wrap(async(req,res) => {

@@ -4,7 +4,8 @@ document.addEventListener('DOMContentLoaded',()=>{
     const actualizar=()=>form.querySelectorAll('[data-areas]').forEach(row=>{
       const permitido=row.dataset.areas.split(',').includes(select.value);
       row.hidden=!permitido;row.querySelector('select').disabled=!permitido;
-      if(!permitido)row.querySelector('select').value='NINGUNO';
+      const campo=row.querySelector('select');
+      if(!permitido)campo.value=[...campo.options].some(o=>o.value==='NINGUNO')?'NINGUNO':'';
     });
     select.addEventListener('change',actualizar);actualizar();
   });

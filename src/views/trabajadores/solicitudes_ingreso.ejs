@@ -14,6 +14,7 @@
 <label for="correo-<%= s.id %>">Correo verificado para avisos de ingreso</label><input id="correo-<%= s.id %>" name="correo" type="email" maxlength="254" value="<%= s.correo || '' %>">
 <div class="campos"><div><label for="codigo-<%= s.id %>">Código de trabajador / PIN</label><input id="codigo-<%= s.id %>" name="codigo_trabajador" inputmode="numeric" pattern="[0-9]{1,30}" maxlength="30" required></div>
 <div><label for="departamento-<%= s.id %>">Departamento autorizado</label><select id="departamento-<%= s.id %>" name="departamento" data-departamento-acceso required><option value="">Seleccione departamento</option><% departamentos.forEach(d=>{ %><option value="<%= d.key %>"><%= d.nombre %></option><% }); %></select></div>
+<div data-areas="CONTABILIDAD"><label for="unidad-<%= s.id %>">Unidad dentro de Contabilidad</label><select id="unidad-<%= s.id %>" name="unidad"><option value="">Contabilidad general</option><option value="CAJAS">Cajas</option></select></div>
 <div><label for="sede-asignada-<%= s.id %>">Sede laboral asignada</label><select id="sede-asignada-<%= s.id %>" name="sede_asignada" required><option value="">Seleccione sede</option><% sedesAsignables.forEach(sede=>{ %><option value="<%= sede %>" <%= sede===s.sede?'selected':'' %>><%= sede %></option><% }); %></select></div></div>
 <fieldset class="permisos-modulos"><legend>Permisos por módulo</legend><% modulos.forEach(m=>{ %><div class="permiso-modulo" data-areas="<%= m.areas.join(',') %>"><label for="permiso-<%= s.id %>-<%= m.id %>"><%= m.nombre %></label><select id="permiso-<%= s.id %>-<%= m.id %>" name="permiso_<%= m.id %>"><option value="NINGUNO">Sin acceso</option><option value="LECTURA">Consultar</option><option value="GESTION">Gestionar</option></select></div><% }); %></fieldset>
 <p>La sede es laboral. El alcance operativo y las acciones administrativas conservan las restricciones del módulo; estos permisos solo restringen el acceso.</p>
@@ -21,4 +22,4 @@
 <button type="submit">Aprobar y crear acceso y carnet</button></form>
 <details><summary>Rechazar solicitud</summary><form method="post" action="/admin/solicitudes-trabajadores/<%= s.id %>"><input type="hidden" name="accion" value="rechazar"><label for="motivo-<%= s.id %>">Motivo</label><textarea id="motivo-<%= s.id %>" name="motivo" minlength="5" maxlength="500" required></textarea><button type="submit" class="peligro">Rechazar</button></form></details>
 <% } else { %><p><%= s.motivo || 'Revisión completada.' %><% if (s.codigo_trabajador) { %> · Código: <%= s.codigo_trabajador %><% } %></p><% } %></section><% }); %>
-</main><script src="/js/aprobar-accesos.js?v=1" defer></script></body></html>
+</main><script src="/js/aprobar-accesos.js?v=2" defer></script></body></html>
