@@ -158,6 +158,10 @@ administracion.post('/receptores',wrap(async(req,res)=>{
 async function agregarAceptacionTomza(docs){
   const {aceptacionesPorClave,estadoAceptacion}=require('../utils/aceptacionReceptor');
   try{
+    // Sin ninguna aceptación registrada todavía, no se marca cada factura como pendiente.
+    const [[{total}]]=await pool.query('SELECT COUNT(*) AS total FROM hacienda_aceptaciones_receptor');
+    if(!Number(total))return;
+
     const mapa=await aceptacionesPorClave(pool,docs.map(d=>d.datos.factura?.electronica?.clave));
     for(const row of docs)row.aceptacionTomza=estadoAceptacion(mapa.get(row.datos.factura?.electronica?.clave));
   }catch(error){
