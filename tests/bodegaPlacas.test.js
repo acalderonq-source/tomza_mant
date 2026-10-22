@@ -12,6 +12,8 @@ test("Bodega suggests active plates and rejects invented plates before changing 
   const session = { user: { id: 1, usuario: "taller", rol: "TALLER" } };
   let origenArticulo = "PROPIO";
   pool.query = async (sql, params = []) => {
+    // Mecánicos registrados en los usuarios (lista cerrada de Bodega).
+    if (sql.includes("FROM usuario_cedulas uc JOIN usuarios u")) return [[{ nombre: "Prueba", sede: "Cartago" }]];
     if (sql.includes("INFORMATION_SCHEMA.COLUMNS") || sql.includes("INFORMATION_SCHEMA.STATISTICS") && sql.includes("COUNT(*)")) {
       return [[{ total: 1 }]];
     }

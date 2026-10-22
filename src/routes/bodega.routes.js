@@ -861,9 +861,11 @@ async function renderBodega(req, res, pagina = "inicio") {
         )
     `);
     const proximoCodigoTaller = await siguienteCodigoTaller();
+    const mecanicos = await require('../utils/bodegaMecanicos').listarMecanicos(pool);
 
     res.render("bodega", {
       user: req.session.user,
+      mecanicos,
       q,
       sedeBodega,
       sedesDisponibles,
@@ -1658,6 +1660,11 @@ router.post("/entregar", async (req, res) => {
       || lineas.some(linea => !Number.isSafeInteger(linea.id) || linea.id <= 0 || linea.cantidad <= 0 || linea.origen_salida_invalido);
     if ((!sinPlaca && !placaSolicitada) || !mecanico) {
       req.session.error = "Indique una placa o marque Sin placa; también debe indicar mecánico y al menos un artículo.";
+      return redirectBodega(req, res);
+    }
+    // Solo se entrega a mecánicos registrados en los usuarios; no se aceptan nombres escritos a mano.
+    if (!(await require('../utils/bodegaMecanicos').mecanicoValido(conn, mecanico))) {
+      req.session.error = "Seleccione un mecánico de la lista.";
       return redirectBodega(req, res);
     }
     if (lineasInvalidas) {

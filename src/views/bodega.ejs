@@ -836,7 +836,7 @@
                 <div class="form-check mt-2"><input class="form-check-input" type="checkbox" id="sin-placa-entrega" name="sin_placa" value="1"><label class="form-check-label small" for="sin-placa-entrega">Sin placa (movimiento general)</label></div>
               </div>
               <div class="col-md-3"><label class="form-label">Sede de salida</label><select class="form-select" name="sede" required><option value="">Seleccione</option><% sedesDisponibles.forEach(sede => { %><option value="<%= sede %>" <%= sedeBodega === sede ? 'selected' : '' %>><%= sede === 'POR_CLASIFICAR' ? 'Por clasificar' : sede %></option><% }) %></select></div>
-              <div class="col-md-4"><label class="form-label">Mecánico</label><input class="form-control" name="mecanico" placeholder="Nombre del mecánico" required></div>
+              <div class="col-md-4"><label class="form-label" for="mecanico-entrega">Mecánico</label><select class="form-select" id="mecanico-entrega" name="mecanico" required><option value="">Seleccione el mecánico</option><% (typeof mecanicos !== 'undefined' ? mecanicos : []).forEach(m => { %><option value="<%= m.nombre %>"><%= m.nombre %><%= m.sedes.length ? ' · ' + m.sedes.join(', ') : '' %></option><% }) %></select></div>
               <div class="col-md-1 d-grid align-items-end"><label class="form-label">&nbsp;</label><button class="btn btn-primary fw-bold">Entregar</button></div>
             </div>
 
