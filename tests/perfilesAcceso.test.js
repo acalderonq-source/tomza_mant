@@ -35,6 +35,26 @@ test('edita legacy sin cambiar rol, PIN ni password y audita; configura permisos
     perfil.rol='ADMIN';assert.equal((await post(body)).status,403);assert.equal((await fetch(base+'/8')).status,403);
   });
 });
+test('edita un usuario con TODAS las sedes y conserva sus permisos individuales',async()=>{
+  const {db,perfil,eventos}=base();
+  perfil.config_json=JSON.stringify({departamento:'TALLER',sede:'Cartago',permisos:{MANTENIMIENTOS:'LECTURA'}});
+  await servidor(owner,db,async base=>{
+    const body={nombre:perfil.nombre,modo:'personal',sede_asignada:'TODAS',version:version(perfil),departamento:'TALLER',permiso_MANTENIMIENTOS:'LECTURA'};
+    const post=b=>fetch(base+'/8',{method:'POST',redirect:'manual',body:new URLSearchParams(b)});
+    assert.equal((await post({...body,sede_asignada:'inventada'})).status,400);
+    assert.equal(eventos.length,0);
+    assert.equal((await post(body)).status,303);
+    assert.deepEqual(eventos.find(e=>e[0]==='usuario')[1],[perfil.nombre,'TODAS','TALLER',8]);
+    const config=JSON.parse(eventos.find(e=>e[0]==='config')[1][1]);
+    assert.equal(config.sede,'TODAS');
+    assert.deepEqual(config.permisos,{MANTENIMIENTOS:'LECTURA'});
+    assert.ok(eventos.some(e=>e[0]==='auditoria'));
+    assert.ok(eventos.includes('commit'));
+    perfil.sede='TODAS';perfil.config_json=JSON.stringify(config);
+    assert.match(await (await fetch(base+'/8')).text(),/value="TODAS" selected/);
+  });
+});
+
 test('un perfil legacy configurado respeta inmediatamente sus permisos de lectura',async()=>{
   const config={departamento:'TALLER',sede:'Cartago',permisos:{MANTENIMIENTOS:'LECTURA'}};
   const guard=controlarAccesosPersonales({query:async()=>[[{config_json:JSON.stringify(config)}]]});

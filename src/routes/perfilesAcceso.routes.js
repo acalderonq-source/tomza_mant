@@ -35,7 +35,7 @@ function crearRouter(db,propietario){
     const nombre=String(req.body.nombre||'').trim();
     if(!nombre||nombre.length>100||/[<>\x00-\x1f]/.test(nombre))throw fallo(400,'Revise el nombre del perfil.');
     if(!['conservar','personal'].includes(req.body.modo))throw fallo(400,'Seleccione como configurar el perfil.');
-    const config=req.body.modo==='personal'?validarAcceso(req.body):null;
+    const config=req.body.modo==='personal'?validarAcceso(req.body,{permitirTodas:true}):null;
     const connection=await db.getConnection();
     try{
       await connection.beginTransaction();

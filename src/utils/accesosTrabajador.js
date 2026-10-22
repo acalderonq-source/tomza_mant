@@ -27,11 +27,11 @@ const MODULOS=[
   {id:'DOCUMENTOS',nombre:'Adjuntos autorizados por el sistema',areas:Object.keys(AREAS),rutas:['/uploads'],url:null}
 ];
 function error(message){return Object.assign(Error(message),{status:400});}
-function validarAcceso(body){
+function validarAcceso(body,{permitirTodas=false}={}){
   const departamento=String(body.departamento || '');
   if(!AREAS[departamento])throw error('Seleccione un departamento habilitado, distinto de Administracion.');
   const sede=String(body.sede_asignada || '');
-  if(!SEDES_SOLICITUD.includes(sede))throw error('Seleccione una sede laboral valida.');
+  if(!SEDES_SOLICITUD.includes(sede) && !(permitirTodas && sede==='TODAS'))throw error('Seleccione una sede laboral valida.');
   const permisos={};
   for(const [key,value] of Object.entries(body))if(key.startsWith('permiso_')){
     const id=key.slice(8),modulo=MODULOS.find(m=>m.id===id);
