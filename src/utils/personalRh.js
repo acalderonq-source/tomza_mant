@@ -104,13 +104,14 @@ async function listar(pool, { q = '', estado = 'activos', empresa = EMPRESA } = 
   };
 }
 
+// El conteo es informativo: si falla, el inicio de Recursos Humanos se muestra igual.
 async function contarActivos(pool, empresa = EMPRESA) {
   try {
-    const [[fila]] = await pool.query('SELECT COUNT(*) total FROM rh_personal WHERE empresa = ? AND activo = 1', [empresa]);
-    return Number(fila.total || 0);
+    const [[fila] = []] = await pool.query('SELECT COUNT(*) total FROM rh_personal WHERE empresa = ? AND activo = 1', [empresa]);
+    return Number(fila?.total || 0);
   } catch (error) {
-    if (error.code === 'ER_NO_SUCH_TABLE') return 0;
-    throw error;
+    if (error.code !== 'ER_NO_SUCH_TABLE') console.warn('Conteo de personal RH:', error.code || error.message);
+    return 0;
   }
 }
 
