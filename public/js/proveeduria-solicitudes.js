@@ -48,9 +48,20 @@
       }
       validarRepetidos();
     });
+    function mostrarExistencia() {
+      const a = catalogo.find(a => a.codigo === select.value);
+      const aviso = tr.querySelector('[data-origen-producto]');
+      if (!a) { aviso.textContent = ''; return; }
+      if (a.inventariable === false) { aviso.textContent = 'Compra por solicitud · Sin control de inventario'; return; }
+      const cantidad = Number(tr.querySelector('[data-campo="cantidad"]').value);
+      const stock = Math.max(0, Number(a.cantidad) || 0);
+      const faltante = Math.max(0, Math.round((cantidad-stock)*1000)/1000);
+      aviso.textContent = 'En bodega general: '+stock+' · '+(faltante ? 'Falta: '+faltante : 'Hay suficiente')+'. Se verifica de nuevo al enviar; no reserva productos.';
+    }
+    tr.querySelector('[data-campo="cantidad"]').addEventListener('input', mostrarExistencia);
     select.addEventListener('change', () => {
       tr.querySelector('.codigo').value = select.value;
-      tr.querySelector('[data-origen-producto]').textContent = catalogo.find(a => a.codigo === select.value)?.inventariable === false ? 'Compra por solicitud · Sin control de inventario' : '';
+      mostrarExistencia();
       validarRepetidos();
     });
     tr.querySelector('button').addEventListener('click', () => {

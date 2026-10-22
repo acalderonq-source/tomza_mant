@@ -12,7 +12,7 @@ test('todos los departamentos solicitan del inventario comun de su sede geografi
   async function query(sql,args=[]){
     if(sql.includes('FROM usuarios_sedes'))return [[{sede:'granel_cartago'},{sede:'Tecnicos'},{sede:'Taller'}]];
     if(sql.includes('FROM prov_inventario i')){assert.deepEqual(args,['Cartago']);return [[{sede:'Cartago',codigo:'PAPEL',descripcion:'Papel',unidad:'UND'}]];}
-    if(sql.startsWith('SELECT codigo,descripcion,iva FROM prov_inventario')){assert.equal(args[0],'Cartago');return [[{codigo:'PAPEL',descripcion:'Papel',iva:13}]];}
+    if(sql.startsWith('SELECT codigo,descripcion,iva,cantidad FROM prov_inventario')){assert.equal(args[0],'Cartago');return [[{codigo:'PAPEL',descripcion:'Papel',iva:13}]];}
     if(sql.startsWith('INSERT INTO prov_documentos')){guardadas.push(args);return [{insertId:guardadas.length}];}
     return [[]];
   }
@@ -67,7 +67,7 @@ test('flujo completo: solicitud de otro departamento, cotización, OC, recepció
     if(sql.startsWith('SELECT datos FROM prov_documentos'))return [[...docs.values()].filter(d=>d.tipo==='oc').map(d=>({datos:d.datos}))];
     if(sql.startsWith('SELECT * FROM prov_documentos')){let rows=[...docs.values()];if(sql.includes("tipo='solicitud'"))rows=rows.filter(r=>r.tipo==='solicitud');if(sql.includes('usuario_id=?'))rows=rows.filter(r=>r.usuario_id===args[0]&&['solicitud','salida'].includes(r.tipo));return [structuredClone(rows)];}
     if(sql.includes('FROM usuarios_sedes'))return [[]];
-    if(sql.startsWith('SELECT codigo,descripcion,iva FROM prov_inventario')){assert.equal(args[0],'Cartago');return [[{codigo:'PAPEL',descripcion:'Papel',iva:13}]];}
+    if(sql.startsWith('SELECT codigo,descripcion,iva,cantidad FROM prov_inventario')){assert.equal(args[0],'Cartago');return [[{codigo:'PAPEL',descripcion:'Papel',iva:13}]];}
     if(sql.includes('FROM prov_inventario i'))return [[{sede:'Cartago',codigo:'PAPEL',descripcion:'Papel',unidad:'UND'}]];
     if(sql.startsWith('SELECT')&&sql.includes('FROM prov_inventario'))return [stock.has(args[1])?[{cantidad:stock.get(args[1])}]:[]];
     if(sql.startsWith('SELECT')&&sql.includes('FROM prov_alertas'))return [alerts.filter(a=>a.usuario_id===args[0])];
@@ -111,7 +111,7 @@ test('solicitudes solo admiten artículos existentes de la sede y toman sus dato
   const guardadas=[],alertas=[];
   async function query(sql,args=[]){
     if(sql.includes('FROM usuarios_sedes'))return [[]];
-    if(sql.startsWith('SELECT codigo,descripcion,iva FROM prov_inventario')){
+    if(sql.startsWith('SELECT codigo,descripcion,iva,cantidad FROM prov_inventario')){
       assert.equal(args[0],'Cartago');
       return [[...args.slice(1).filter(c=>['PAPEL','CAFE'].includes(c)).map(c=>({codigo:c,descripcion:c==='PAPEL'?'Papel oficial':'Café',iva:c==='PAPEL'?13:1}))]];
     }
@@ -141,7 +141,7 @@ test('categorías: admite pedidos mixtos y rechaza productos inventados o catego
   const originalQuery=pool.query,originalConnection=pool.getConnection;
   const guardadas=[],alertas=[];
   async function query(sql,args=[]){
-    if(sql.startsWith('SELECT codigo,descripcion,iva FROM prov_inventario'))return [[...args.slice(1).filter(c=>c==='PAPEL').map(c=>({codigo:c,descripcion:'Papel oficial',iva:13}))]];
+    if(sql.startsWith('SELECT codigo,descripcion,iva,cantidad FROM prov_inventario'))return [[...args.slice(1).filter(c=>c==='PAPEL').map(c=>({codigo:c,descripcion:'Papel oficial',iva:13}))]];
     if(sql.startsWith('SELECT codigo,categoria FROM prov_inventario_fichas'))return [[{codigo:'PAPEL',categoria:'Oficina'}]];
     if(sql.startsWith('INSERT INTO prov_documentos')){guardadas.push(JSON.parse(args[2]));return [{insertId:guardadas.length}];}
     if(sql.startsWith('INSERT INTO prov_alertas'))alertas.push(args);
@@ -160,4 +160,32 @@ test('categorías: admite pedidos mixtos y rechaza productos inventados o catego
     }
     assert.equal(guardadas.length,1);assert.equal(alertas.length,1);
   });}finally{pool.query=originalQuery;pool.getConnection=originalConnection;}
+});
+
+test('la solicitud con existencias pasa a entrega directa y se vuelve a comprobar al despachar', async () => {
+  const originalQuery=pool.query, originalConnection=pool.getConnection;
+  const docs=new Map(); let stock=5, siguiente=1;
+  async function query(sql,args=[]){
+    if(sql.startsWith('SELECT codigo,descripcion,iva,cantidad FROM prov_inventario'))return [[{codigo:'PAPEL',descripcion:'Papel',iva:13,cantidad:stock}]];
+    if(sql.startsWith('SELECT * FROM prov_documentos WHERE id')){const d=docs.get(Number(args[0]));return [d&&d.tipo===args[1]?[structuredClone(d)]:[]];}
+    if(sql.startsWith('SELECT * FROM prov_inventario'))return [[{codigo:'PAPEL',cantidad:stock}]];
+    if(sql.startsWith('INSERT INTO prov_documentos')){const id=siguiente++,tipo=sql.match(/VALUES \('(\w+)'/)[1];docs.set(id,{id,tipo,usuario_id:args[0],sede:args[1],datos:JSON.parse(args[2])});return [{insertId:id}];}
+    if(sql.startsWith('UPDATE prov_inventario SET cantidad=cantidad-'))stock-=args[0];
+    if(sql.startsWith('UPDATE prov_documentos'))docs.get(Number(args[1])).datos=JSON.parse(args[0]);
+    if(sql.startsWith('SELECT'))return [[]];
+    return [{affectedRows:1}];
+  }
+  pool.query=query;pool.getConnection=async()=>({query,beginTransaction:async()=>{},commit:async()=>{},rollback:async()=>{},release(){}});
+  try{
+    await server(requester,async base=>{
+      const r=await fetch(base+'/solicitudes',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sede:'Cartago',lineas:[{codigo:'PAPEL',cantidad:3,existencia:999}]})});
+      assert.equal(r.status,200);assert.equal(docs.get(1).datos.estado,'LISTA_PARA_ENTREGA');
+      assert.equal(docs.get(1).datos.existencias.lineas[0].existencia,5);assert.equal(stock,5);
+    });
+    await server(manager,async base=>{
+      const crear=()=>fetch(base+'/salidas',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({solicitud_id:1})});
+      stock=1;assert.equal((await crear()).status,400);assert.equal(docs.size,1);assert.equal(stock,1);
+      stock=5;assert.equal((await crear()).status,200);assert.equal(stock,2);assert.equal(docs.get(1).datos.estado,'ALISTANDO');
+    });
+  }finally{pool.query=originalQuery;pool.getConnection=originalConnection;}
 });

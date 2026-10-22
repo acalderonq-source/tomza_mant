@@ -108,7 +108,7 @@ router.get('/mis-solicitudes',wrap(async(req,res)=>{
   const [alertas]=await pool.query('SELECT * FROM prov_alertas WHERE usuario_id=? ORDER BY id DESC LIMIT 40',[u.id]);
   const sedesPermitidas=await sedesOrden(req);
   const actual=sedeInventarioCompartido(req.session.sedeSeleccionada||u.sede);
-  const [articulos]=await pool.query(`SELECT i.sede,i.codigo,i.descripcion,COALESCE(f.unidad,'UND') AS unidad,COALESCE(f.categoria,'') AS categoria FROM prov_inventario i LEFT JOIN prov_inventario_fichas f ON f.sede=i.sede AND f.codigo=i.codigo WHERE i.sede IN (?) ORDER BY i.descripcion,i.codigo`,[ALMACEN_GENERAL]);
+  const [articulos]=await pool.query(`SELECT i.sede,i.codigo,i.descripcion,i.cantidad,COALESCE(f.unidad,'UND') AS unidad,COALESCE(f.categoria,'') AS categoria FROM prov_inventario i LEFT JOIN prov_inventario_fichas f ON f.sede=i.sede AND f.codigo=i.codigo WHERE i.sede IN (?) ORDER BY i.descripcion,i.codigo`,[ALMACEN_GENERAL]);
   res.set('Cache-Control','no-store');
   const bajas=await cargarBajas(pool);
   const catalogo=[...articulos.map(a=>({...a,categoria:categoriaArticulo(a)})),...articulosSinInventario.map(({codigo,descripcion,unidad,inventariable,categoria})=>({codigo,descripcion,unidad,inventariable,categoria}))].filter(a=>disponible(a.codigo,bajas));
@@ -344,7 +344,7 @@ router.post('/solicitudes',wrap(async(req,res) => {
   exigir(esDepartamentoValido(u.departamentoActivo),'Seleccione su departamento antes de crear una solicitud');
   const id = await transaccion(async db=>{
     const codigosStock=codigos.filter(c=>articuloSolicitud(c)?.inventariable!==false);
-    const [articulos]=codigosStock.length?await db.query(`SELECT codigo,descripcion,iva FROM prov_inventario WHERE sede=? AND codigo IN (${codigosStock.map(()=>'?').join(',')})`,[ALMACEN_GENERAL,...codigosStock]):[[]];
+    const [articulos]=codigosStock.length?await db.query(`SELECT codigo,descripcion,iva,cantidad FROM prov_inventario WHERE sede=? AND codigo IN (${codigosStock.map(()=>'?').join(',')})`,[ALMACEN_GENERAL,...codigosStock]):[[]];
     const [fichas]=codigosStock.length?await db.query(`SELECT codigo,categoria FROM prov_inventario_fichas WHERE sede=? AND codigo IN (${codigosStock.map(()=>'?').join(',')})`,[ALMACEN_GENERAL,...codigosStock]):[[]];
     const categorias=new Map(fichas.map(f=>[f.codigo,f.categoria]));
     const bajas=await cargarBajas(db);
@@ -355,7 +355,8 @@ router.post('/solicitudes',wrap(async(req,res) => {
       if(Object.hasOwn(l,'categoria'))exigir(l.categoria===categoriaArticulo(a),'El producto no pertenece a la categoría seleccionada. Actualice la página');
       return {codigo:a.codigo,descripcion:a.descripcion,iva:Number(a.iva),cantidad:l.cantidad};
     })).map(l=>({...l,categoria:categoriaArticulo(catalogo.get(l.codigo))}));
-    const [r]=await db.query("INSERT INTO prov_documentos (tipo,usuario_id,sede,datos) VALUES ('solicitud',?,?,?)",[u.id,sedeSolicitud,JSON.stringify({lineas,estado:'PENDIENTE',departamento:u.departamentoActivo,unidad:u.accesoPersonal?.unidad||undefined,solicitante:u.nombre||u.usuario,motivo:String(req.body.motivo||'').trim().slice(0,2000)})]);
+    const existencias=require('../utils/solicitudExistencias').revisarExistencias(lineas,articulos);
+    const [r]=await db.query("INSERT INTO prov_documentos (tipo,usuario_id,sede,datos) VALUES ('solicitud',?,?,?)",[u.id,sedeSolicitud,JSON.stringify({lineas,existencias,estado:existencias.estado==='COMPLETA'?'LISTA_PARA_ENTREGA':'PENDIENTE',departamento:u.departamentoActivo,unidad:u.accesoPersonal?.unidad||undefined,solicitante:u.nombre||u.usuario,motivo:String(req.body.motivo||'').trim().slice(0,2000)})]);
     await alerta(db,r.insertId,`Nueva solicitud PR-${r.insertId} de ${u.departamentoActivo}${u.accesoPersonal?.unidad==='CAJAS'?' (Cajas)':''} · ${u.nombre||u.usuario}`); return r.insertId;
   }); res.json({id});
 }));
@@ -522,7 +523,8 @@ router.post('/salidas',wrap(async(req,res)=>{
   const id=await transaccion(async db=>{
     const solicitud=await documento(db,req.body.solicitud_id,'solicitud',true);
     exigir(!solicitud.datos.salida_id,'Solicitud ya despachada');
-    if(solicitud.datos.departamento)exigir(solicitud.datos.oc_id,'Primero cotice la solicitud y genere la OC');
+    // Sin OC se entrega directamente del inventario. Cada línea se valida y bloquea abajo.
+    // Los artículos no inventariables siguen requiriendo una compra recibida.
     if(solicitud.datos.oc_id){const oc=await documento(db,solicitud.datos.oc_id,'oc',true);exigir(oc.datos.estado==='RECIBIDA','Primero registre la recepción de la mercadería');}
     const lineas=[];
     for(const l of [...solicitud.datos.lineas].sort((a,b)=>a.codigo.localeCompare(b.codigo))){

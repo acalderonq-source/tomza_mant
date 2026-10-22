@@ -16,7 +16,7 @@ test('solicitudes conservan cloro, jabón, sellos y orings una vez desde inventa
  stock.push(...sellos);
  async function query(sql,args=[]){
   if(sql.includes('FROM prov_inventario i'))return [stock];
-  if(sql.startsWith('SELECT codigo,descripcion,iva FROM prov_inventario'))return [stock.filter(a=>args.includes(a.codigo))];
+  if(sql.startsWith('SELECT codigo,descripcion,iva,cantidad FROM prov_inventario'))return [stock.filter(a=>args.includes(a.codigo))];
   if(sql.startsWith('SELECT codigo,categoria FROM prov_inventario_fichas'))return [stock.filter(a=>args.includes(a.codigo))];
   if(sql.startsWith('INSERT INTO prov_documentos')){guardadas.push(JSON.parse(args[2]));return [{insertId:guardadas.length}];}
   assert.doesNotMatch(sql,/^(?:DELETE|UPDATE|INSERT INTO prov_inventario)/,'no borrar ni ajustar inventario');

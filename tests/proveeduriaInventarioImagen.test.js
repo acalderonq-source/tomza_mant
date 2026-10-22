@@ -26,7 +26,7 @@ test('aparecen una vez en solicitudes y en inventario; recepción y entrega regi
   if(sql.startsWith('SELECT * FROM prov_documentos'))return [[...docs.values()].map(d=>structuredClone(d))];
   if(sql.startsWith('SELECT datos FROM prov_documentos'))return [[]];
   if(sql.includes('FROM prov_inventario i'))return [articulosInventariables.map(a=>({...a,sede:'Cartago',cantidad,grupo:'INVENTARIO',tipo:'CONSUMIBLE',stock_minimo:0,stock_maximo:0}))];
-  if(sql.startsWith('SELECT codigo,descripcion,iva FROM prov_inventario')){assert.deepEqual(args,['Cartago',anclaje.codigo]);return [existe?[anclaje]:[]];}
+  if(sql.startsWith('SELECT codigo,descripcion,iva,cantidad FROM prov_inventario')){assert.deepEqual(args,['Cartago',anclaje.codigo]);return [existe?[anclaje]:[]];}
   if(sql.startsWith('SELECT codigo,categoria FROM prov_inventario_fichas'))return [[anclaje]];
   if(sql.startsWith('SELECT * FROM prov_inventario WHERE'))return [[{...anclaje,cantidad}]];
   if(sql.startsWith('INSERT INTO prov_documentos')){const id=++nextId,tipo=sql.match(/VALUES \('(\w+)'/)[1];docs.set(id,{id,tipo,usuario_id:args[0],sede:args[1],datos:JSON.parse(args[2]),creado_en:new Date()});return [{insertId:id}];}

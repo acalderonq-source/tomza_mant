@@ -1,0 +1,5 @@
+<% const datoExistencia=revision?.lineas?.find(x=>x.codigo===codigo); if(datoExistencia){ %>
+<div class="small <%= datoExistencia.faltante>0?'text-warning-emphasis':'text-success' %>">
+  Al solicitar: <%= datoExistencia.existencia %> en bodega · <%= datoExistencia.disponible %> para atender · <%= datoExistencia.faltante %> faltantes.
+</div><small class="text-muted">Consulta de existencias; se verifica otra vez al alistar. No reserva productos.</small>
+<% } %>

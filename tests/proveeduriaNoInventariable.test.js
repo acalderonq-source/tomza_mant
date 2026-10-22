@@ -49,7 +49,7 @@ test('solicitud mixta llega hasta recepción confirmada sin crear stock, fichas 
     if(sql.startsWith('SELECT * FROM prov_documentos'))return [[...state.docs.values()].map(d=>structuredClone(d))];
     if(sql.includes('SELECT factura_id FROM prov_portal_factura_orden'))return [[]];
     if(sql.includes('FROM prov_inventario i'))return [[{sede:'Cartago',codigo:'STOCK',descripcion:'Papel',iva:1,cantidad:state.stock,unidad:'UND',grupo:'SUMINISTRO',tipo:'CONSUMIBLE',stock_minimo:0,stock_maximo:0}]];
-    if(sql.startsWith('SELECT codigo,descripcion,iva FROM prov_inventario')){assert.deepEqual(args,['Cartago','STOCK']);return [[{codigo:'STOCK',descripcion:'Papel',iva:1}]];}
+    if(sql.startsWith('SELECT codigo,descripcion,iva,cantidad FROM prov_inventario')){assert.deepEqual(args,['Cartago','STOCK']);return [[{codigo:'STOCK',descripcion:'Papel',iva:1}]];}
     if(sql.startsWith('SELECT * FROM prov_inventario WHERE')){assert.equal(args[1],'STOCK');return [[{codigo:'STOCK',cantidad:state.stock}]];}
     if(sql.startsWith('SELECT'))return [[]];
     if(sql.startsWith('INSERT INTO prov_documentos')){const tipo=sql.match(/VALUES \('(\w+)'/)[1];const next=++id;state.docs.set(next,{id:next,tipo,usuario_id:args[0],sede:args[1],creado_en:new Date(),datos:JSON.parse(args[2])});return [{insertId:next}];}
