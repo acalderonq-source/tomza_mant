@@ -57,12 +57,14 @@ async function conciliarHaciendaCorreo(pool,verify=verificarRespuesta){
   if(ejecutando)return {actualizadas:0};ejecutando=true;
   let actualizadas=0;
   try{
-    const [rows]=await pool.query(`SELECT d.id,d.datos,a.id AS adjunto_id,a.ruta_archivo FROM prov_documentos d
+    const consulta=excluirReceptor=>pool.query(`SELECT d.id,d.datos,a.id AS adjunto_id,a.ruta_archivo FROM prov_documentos d
       JOIN facturas_correo_adjuntos a ON a.clave_electronica=JSON_UNQUOTE(JSON_EXTRACT(d.datos,'$.factura.electronica.clave'))
       WHERE d.tipo='factura_portal' AND a.tipo_documento='XML'
-      AND NOT EXISTS (SELECT 1 FROM hacienda_aceptaciones_revisadas r WHERE r.adjunto_correo_id=a.id AND r.es_respuesta_receptor=1)
+      ${excluirReceptor?'AND NOT EXISTS (SELECT 1 FROM hacienda_aceptaciones_revisadas r WHERE r.adjunto_correo_id=a.id AND r.es_respuesta_receptor=1)':''}
       AND COALESCE(JSON_UNQUOTE(JSON_EXTRACT(d.datos,'$.factura.electronica.hacienda.fuente')),'') <> 'CORREO_XML_FIRMADO'
       ORDER BY d.id,a.id LIMIT 100`);
+    // Si la migración de aceptaciones aún no se aplicó, la revisión sigue funcionando como antes.
+    const [rows]=await consulta(true).catch(error=>{if(error.code==='ER_NO_SUCH_TABLE')return consulta(false);throw error;});
     for(const row of rows){
       if(!/^[a-f\d-]+\.xml$/i.test(row.ruta_archivo))continue;
       const file=path.join(UPLOAD_ROOT,'facturas-correo',row.ruta_archivo);

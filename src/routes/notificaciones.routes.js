@@ -13,7 +13,8 @@ function requireAuth(req, res, next) {
   next();
 }
 
-router.get("/public-key", requireAuth, async (req, res) => {
+// La clave pública VAPID es pública por diseño: la pantalla de ingreso la pide antes de iniciar sesión.
+router.get("/public-key", async (req, res) => {
   try {
     const configurado = configurarWebPush();
     const keys = getVapidKeys();
@@ -45,6 +46,8 @@ router.post("/suscribir", requireAuth, async (req, res) => {
 });
 
 router.post("/probar", requireAuth, async (req, res) => {
+  // Envía recordatorios a todos los usuarios: solo un administrador puede ejecutarlo.
+  if (req.session.user.rol !== "ADMIN") return res.status(403).json({ ok: false, error: "No autorizado" });
   try {
     await ensurePushTables();
     const resultado = await enviarRecordatoriosMantenimientos(req.body.fecha || null);

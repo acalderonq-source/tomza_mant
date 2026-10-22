@@ -76,6 +76,8 @@ if (isProduction && !process.env.SESSION_SECRET) {
 if (isProduction) {
   app.set("trust proxy", 1);
 }
+// IP real de la persona detrás de Cloudflare (ver middleware/ipCliente.js).
+app.use(require("./middleware/ipCliente").usarIpCliente);
 
 // ===================== MIDDLEWARES =====================
 app.use(express.urlencoded({ extended: true, limit: "10mb", parameterLimit: 5000 }));
@@ -209,6 +211,8 @@ app.use(require('./utils/accesosTrabajador').controlarAccesosPersonales(pool));
 
 app.use("/uploads", require("./routes/uploads.routes"));
 // Serve public assets only after the private uploads handler has enforced access.
+// Los navegadores piden /favicon.ico por su cuenta: se responde con el logo para no generar bloqueos.
+app.get("/favicon.ico", (_req, res) => res.redirect(301, "/img/logo_tomza.png"));
 app.use(bloquearRutaEstaticaPrivada,express.static(path.join(__dirname, "..", "public"),{dotfiles:'deny',index:false}));
 
 app.use(ensureCsrfToken);
@@ -276,7 +280,10 @@ function mecanicoPuedeUsarRuta(pathname) {
     "/dekra",
     "/aceite",
     "/api/unidades/buscar",
-    "/cambiar-sede"
+    "/cambiar-sede",
+    // Avisos en el celular: solo la clave pública y la suscripción del propio usuario.
+    "/notificaciones/public-key",
+    "/notificaciones/suscribir"
   ];
 
   return rutasPermitidas.some(ruta => pathname === ruta || pathname.startsWith(`${ruta}/`));

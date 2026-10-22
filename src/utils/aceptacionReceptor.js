@@ -53,6 +53,16 @@ async function receptoresPermitidos(pool) {
 
 // Revisa los XML del correo que aún no se han revisado y guarda las respuestas firmadas.
 async function registrarAceptacionesCorreo(pool, verify) {
+  try {
+    return await registrarPendientes(pool, verify);
+  } catch (error) {
+    // Sin la migración 202610210005 no hay dónde guardar: se omite sin afectar el correo.
+    if (error.code === 'ER_NO_SUCH_TABLE') return { aceptaciones: 0, sinTabla: true };
+    throw error;
+  }
+}
+
+async function registrarPendientes(pool, verify) {
   const [adjuntos] = await pool.query(`SELECT a.id, a.ruta_archivo FROM facturas_correo_adjuntos a
     LEFT JOIN hacienda_aceptaciones_revisadas r ON r.adjunto_correo_id = a.id
     WHERE a.tipo_documento = 'XML' AND r.adjunto_correo_id IS NULL
