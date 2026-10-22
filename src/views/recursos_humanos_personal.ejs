@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+  <title>Personal Gas Tomza | Recursos Humanos</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <%- include('partials/dashboard_styles') %>
+  <script src="/js/rh-personal.js" defer></script>
+</head>
+<body>
+<nav class="navbar navbar-dark topbar px-3 py-2">
+  <a class="navbar-brand" href="/recursos-humanos">Gas Tomza · Recursos Humanos</a>
+  <div class="d-flex align-items-center gap-2 text-white">
+    <span class="small"><%= user.nombre || user.usuario %></span>
+    <a href="/recursos-humanos" class="btn btn-outline-light btn-sm">Volver</a>
+    <a href="/logout" class="btn btn-warning btn-sm rounded-pill px-3">Salir</a>
+  </div>
+</nav>
+<main class="container-fluid shell py-2">
+  <section class="simple-hero mb-3">
+    <h1 class="page-title">Personal Gas Tomza</h1>
+    <div class="page-subtitle"><strong><%= totales.activos %></strong> personas activas<%= totales.inactivos ? ` · ${totales.inactivos} inactivas` : '' %></div>
+  </section>
+
+  <div id="rh-resultado" role="status" class="alert d-none"></div>
+
+  <section class="card p-3 mb-3">
+    <form method="get" class="row g-2 align-items-end">
+      <div class="col-md-5"><label class="form-label" for="rh-q">Buscar por código o nombre</label><input id="rh-q" name="q" value="<%= filtros.q %>" class="form-control" maxlength="80"></div>
+      <div class="col-md-3"><label class="form-label" for="rh-estado">Estado</label><select id="rh-estado" name="estado" class="form-select"><% [['activos','Activos'],['inactivos','Inactivos'],['todos','Todos']].forEach(([v,t]) => { %><option value="<%= v %>" <%= filtros.estado === v ? 'selected' : '' %>><%= t %></option><% }) %></select></div>
+      <div class="col-md-4 d-flex gap-2"><button class="btn btn-primary">Buscar</button><a class="btn btn-outline-secondary" href="/recursos-humanos/personal">Limpiar</a><a class="btn btn-outline-success" href="/recursos-humanos/personal/exportar?<%= new URLSearchParams(filtros) %>"><i class="bi bi-download"></i> Excel</a></div>
+    </form>
+  </section>
+
+  <details class="card p-3 mb-3">
+    <summary class="fw-semibold">Actualizar desde Excel</summary>
+    <p class="small text-secondary mt-2 mb-2">El archivo debe tener las columnas <strong>COD TRAB</strong> y <strong>Apellidos y Nombre</strong>. Las personas nuevas se agregan y los nombres cambiados se actualizan. Quien no venga en el archivo se conserva, salvo que marque la opción de abajo.</p>
+    <form data-rh-importar class="row g-2 align-items-end">
+      <div class="col-md-6"><label class="form-label" for="rh-archivo">Archivo .xlsx</label><input id="rh-archivo" type="file" accept=".xlsx" class="form-control" required></div>
+      <div class="col-md-4 form-check ms-2"><input class="form-check-input" type="checkbox" id="rh-desactivar"><label class="form-check-label" for="rh-desactivar">Marcar como inactivas a las personas que no vienen en el archivo</label></div>
+      <div class="col-md-2"><button class="btn btn-primary w-100">Cargar</button></div>
+    </form>
+  </details>
+
+  <section class="card p-3">
+    <div class="table-responsive">
+      <table class="table table-sm table-striped align-middle">
+        <thead><tr><th>COD TRAB</th><th>Apellidos y Nombre</th><th>Estado</th><th>Acceso al sistema</th></tr></thead>
+        <tbody>
+        <% personas.forEach(p => { %>
+          <tr><td><%= p.codigo %></td><td><%= p.nombre %></td><td><%= Number(p.activo) ? 'Activo' : 'Inactivo' %></td><td><% if (p.conAcceso) { %><span class="badge text-bg-success">Con acceso</span><% } else { %><span class="text-secondary small">Sin acceso</span><% } %></td></tr>
+        <% }) %>
+        <% if (!personas.length) { %><tr><td colspan="4" class="text-center text-secondary py-4"><%= totales.activos || totales.inactivos ? 'No hay personas que coincidan con la búsqueda.' : 'Todavía no se ha cargado el personal. Use "Actualizar desde Excel".' %></td></tr><% } %>
+        </tbody>
+      </table>
+    </div>
+    <div class="small text-secondary"><%= personas.length %> personas en esta lista</div>
+  </section>
+</main>
+</body>
+</html>

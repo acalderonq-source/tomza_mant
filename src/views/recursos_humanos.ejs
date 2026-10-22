@@ -25,6 +25,10 @@
   <section class="mb-2">
     <h2 class="section-title legacy-modules-title">Módulos</h2>
     <div class="module-grid">
+      <a href="/recursos-humanos/personal" class="module-card">
+        <span class="module-icon icon-green"><i class="bi bi-people"></i></span>
+        <div><div class="module-title">Personal Gas Tomza</div><p class="module-copy"><%= typeof totalPersonal==='number'&&totalPersonal ? `${totalPersonal} personas activas. ` : '' %>Lista del personal con su código de trabajador. Busque, exporte o actualice desde Excel.</p></div>
+      </a>
       <a href="/proveeduria/mis-solicitudes" class="module-card">
         <span class="module-icon icon-blue"><i class="bi bi-cart-plus"></i></span>
         <div><div class="module-title">Solicitud de suministros</div><p class="module-copy">Solicite materiales y suministros a Proveeduría. Consulte sus pedidos y confirme la entrega.</p></div>
