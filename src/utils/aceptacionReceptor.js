@@ -7,6 +7,9 @@ const { UPLOAD_ROOT } = require('./uploadStorage');
 
 const RECEPTORES_TOMZA = ['3101349880', '3101044021'];
 const LOTE = 300;
+// Estado de cada adjunto revisado: 0 no es respuesta a Tomza, 1 sí lo es,
+// 2 el archivo no está en este servidor (se reintenta un día después).
+const NO_RECEPTOR = 0, RECEPTOR = 1, SIN_ARCHIVO = 2;
 const sinCeros = valor => String(valor || '').trim().replace(/^0+/, '');
 
 // Tipo de documento dentro del consecutivo: 05 acepta, 06 acepta en parte, 07 rechaza.
@@ -65,21 +68,24 @@ async function registrarAceptacionesCorreo(pool, verify) {
 async function registrarPendientes(pool, verify) {
   const [adjuntos] = await pool.query(`SELECT a.id, a.ruta_archivo FROM facturas_correo_adjuntos a
     LEFT JOIN hacienda_aceptaciones_revisadas r ON r.adjunto_correo_id = a.id
-    WHERE a.tipo_documento = 'XML' AND r.adjunto_correo_id IS NULL
-    ORDER BY a.id LIMIT ${LOTE}`);
+    WHERE a.tipo_documento = 'XML'
+      AND (r.adjunto_correo_id IS NULL OR (r.es_respuesta_receptor = ${SIN_ARCHIVO} AND r.revisado_en < NOW() - INTERVAL 1 DAY))
+    ORDER BY r.adjunto_correo_id IS NOT NULL, a.id DESC LIMIT ${LOTE}`);
   if (!adjuntos.length) return { aceptaciones: 0 };
   const permitidos = await receptoresPermitidos(pool);
   let aceptaciones = 0;
   for (const adjunto of adjuntos) {
     let revisado = true;
-    let esReceptor = 0;
+    let esReceptor = NO_RECEPTOR;
     try {
       if (!/^[a-f\d-]+\.xml$/i.test(adjunto.ruta_archivo || '')) continue;
       const archivo = path.join(UPLOAD_ROOT, 'facturas-correo', adjunto.ruta_archivo);
-      if (!fs.existsSync(archivo) || fs.statSync(archivo).size > 2 * 1024 * 1024) continue;
+      // Un adjunto que aún no llegó a este servidor no se da por revisado.
+      if (!fs.existsSync(archivo)) { esReceptor = SIN_ARCHIVO; continue; }
+      if (fs.statSync(archivo).size > 2 * 1024 * 1024) continue;
       const xml = fs.readFileSync(archivo, 'utf8');
       if (!xml.includes('MensajeHacienda') || !xml.includes('NumeroConsecutivoReceptor')) continue;
-      esReceptor = 1;
+      esReceptor = RECEPTOR;
       let resultado;
       try {
         resultado = await verify(xml);
@@ -107,7 +113,8 @@ async function registrarPendientes(pool, verify) {
         datos.total_factura, datos.fecha_documento, datos.detalle, adjunto.id, resultado.huella, resultado.hash]);
       aceptaciones += 1;
     } finally {
-      if (revisado) await pool.query('INSERT IGNORE INTO hacienda_aceptaciones_revisadas (adjunto_correo_id, es_respuesta_receptor) VALUES (?, ?)', [adjunto.id, esReceptor]);
+      if (revisado) await pool.query(`INSERT INTO hacienda_aceptaciones_revisadas (adjunto_correo_id, es_respuesta_receptor) VALUES (?, ?)
+        ON DUPLICATE KEY UPDATE es_respuesta_receptor = VALUES(es_respuesta_receptor), revisado_en = CURRENT_TIMESTAMP`, [adjunto.id, esReceptor]);
     }
   }
   return { aceptaciones };

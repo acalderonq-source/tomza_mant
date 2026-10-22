@@ -49,10 +49,10 @@ test('registra solo respuestas firmadas a mensajes de Tomza y marca los adjuntos
   const insertados = [];
   const revisados = [];
   const pool = { query: async (sql, params) => {
-    if (sql.includes('FROM facturas_correo_adjuntos')) return [[{ id: 1, ruta_archivo: 'aaaa-1.xml' }, { id: 2, ruta_archivo: 'aaaa-2.xml' }, { id: 3, ruta_archivo: 'aaaa-3.xml' }, { id: 4, ruta_archivo: 'aaaa-4.xml' }]];
+    if (sql.includes('FROM facturas_correo_adjuntos')) return [[{ id: 1, ruta_archivo: 'aaaa-1.xml' }, { id: 2, ruta_archivo: 'aaaa-2.xml' }, { id: 3, ruta_archivo: 'aaaa-3.xml' }, { id: 4, ruta_archivo: 'aaaa-4.xml' }, { id: 5, ruta_archivo: 'aaaa-5.xml' }]];
     if (sql.includes('FROM prov_portal_receptores')) return [[]];
     if (sql.includes('INSERT INTO hacienda_aceptaciones_receptor')) { insertados.push(params); return [{}]; }
-    if (sql.includes('INSERT IGNORE INTO hacienda_aceptaciones_revisadas')) { revisados.push(params); return [{}]; }
+    if (sql.includes('INSERT INTO hacienda_aceptaciones_revisadas')) { revisados.push(params); return [{}]; }
     throw new Error(`Consulta inesperada: ${sql}`);
   } };
   const verify = async xml => {
@@ -71,7 +71,8 @@ test('registra solo respuestas firmadas a mensajes de Tomza y marca los adjuntos
   assert.equal(insertados.length, 1);
   assert.equal(insertados[0][0], CLAVE);
   assert.equal(insertados[0][1], '05');
-  assert.deepEqual(revisados, [[1, 1], [2, 0], [3, 1], [4, 1]]);
+  // El adjunto 5 no tiene archivo en el servidor: queda para reintentar (estado 2), no como revisado.
+  assert.deepEqual(revisados, [[1, 1], [2, 0], [3, 1], [4, 1], [5, 2]]);
 });
 
 test('la bandeja muestra la aceptación y pide confirmar el pago cuando falta', async () => {
