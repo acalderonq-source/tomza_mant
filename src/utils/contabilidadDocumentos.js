@@ -31,7 +31,7 @@ async function cargar(db) {
   }
   const pagadoTaller = (r,t,total) => pagos.has(`${t}:${r.id}`) ? pagos.get(`${t}:${r.id}`) : Number(r.pagada) ? total : cents(r.abono_monto);
   for (const r of oc) {
-    const base = { referencia:r.po_numero,fecha:fecha(r.fecha),empresa:normalizarEmpresa(r.empresa_destino),moneda:r.moneda,proveedor:r.proveedor,total:cents(r.total),estadoOrigen:r.estado,url:`/compras/ordenes/${r.id}/detalle` };
+    const base = { proveedorId:r.proveedor_id||null,referencia:r.po_numero,fecha:fecha(r.fecha),empresa:normalizarEmpresa(r.empresa_destino),moneda:r.moneda,proveedor:r.proveedor,total:cents(r.total),estadoOrigen:r.estado,url:`/compras/ordenes/${r.id}/detalle` };
     agregar('TALLER',r.id,'orden',base);
     if (r.factura || Number(r.facturada)) {
       const e=electronicas.find(e=>Number(e.orden_compra_id)===Number(r.id));
@@ -41,7 +41,7 @@ async function cargar(db) {
   }
   for (const r of independientes) {
     const e=electronicas.find(e=>Number(e.factura_id)===Number(r.id));const total=cents(r.monto)-cents(r.nota_credito_monto);
-    agregar('TALLER_INDEPENDIENTE',r.id,'factura',{numero:r.numero_factura,fecha:fecha(r.fecha),empresa:'',moneda:e?.moneda||'',proveedor:r.proveedor_nombre,total,pagado:pagadoTaller(r,'independiente',total),clave:r.clave_electronica,hacienda:r.estado_hacienda,url:'/compras/facturas?q='+encodeURIComponent(r.numero_factura)});
+    agregar('TALLER_INDEPENDIENTE',r.id,'factura',{proveedorId:r.proveedor_id||null,numero:r.numero_factura,fecha:fecha(r.fecha),empresa:'',moneda:e?.moneda||'',proveedor:r.proveedor_nombre,total,pagado:pagadoTaller(r,'independiente',total),clave:r.clave_electronica,hacienda:r.estado_hacienda,url:'/compras/facturas?q='+encodeURIComponent(r.numero_factura)});
   }
   for (const r of prov) {
     const d=parse(r.datos),f=d.factura;

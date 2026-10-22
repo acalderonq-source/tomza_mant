@@ -1,0 +1,61 @@
+<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Cuentas por pagar</title><link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"><link href="/css/contabilidad-erp.css" rel="stylesheet"><link href="/css/contabilidad-taller.css" rel="stylesheet"><script src="/js/contabilidad-erp.js" defer></script></head><body class="erp-accounting"><%- include('../partials/contabilidad_navegacion') %><main class="container-fluid p-4">
+<% const monto = (centimos, moneda) => (centimos / 100).toLocaleString('es-CR', moneda ? { style: 'currency', currency: moneda } : { minimumFractionDigits: 2 }); %>
+<h1>Cuentas por pagar</h1>
+<p class="text-secondary">Facturas de proveedores con saldo, amarradas a su orden de compra. Solo suman las facturas confirmadas: con OC, empresa, moneda y Hacienda en orden. Cada pago se registra en su módulo de origen con el botón <strong>Pagar</strong>.</p>
+<% advertencias.forEach(a => { %><div class="alert alert-warning"><%= a %></div><% }) %>
+
+<div class="row g-3 mb-4">
+<% resumen.forEach(r => { %>
+  <div class="col-md-6 col-xl-4"><div class="card p-3 h-100">
+    <span class="text-secondary">Saldo por pagar · <%= r.moneda %></span>
+    <strong class="fs-3"><%= monto(r.saldo, r.moneda) %></strong>
+    <span class="text-danger">Vencido: <%= monto(r.vencido, r.moneda) %></span>
+    <small class="text-secondary"><%= r.facturas %> facturas confirmadas</small>
+    <small class="text-secondary">Sin orden de compra (no suma): <%= monto(r.sinOrden, r.moneda) %></small>
+    <small class="text-secondary">Por revisar en su módulo (no suma): <%= monto(r.porRevisar, r.moneda) %></small>
+  </div></div>
+<% }) %>
+<% if (sinOrdenSinMoneda.facturas) { %>
+  <div class="col-md-6 col-xl-4"><div class="card p-3 h-100 border-warning">
+    <span class="text-secondary">Sin orden de compra y sin moneda confirmada</span>
+    <strong class="fs-3"><%= monto(sinOrdenSinMoneda.saldo) %></strong>
+    <small class="text-secondary"><%= sinOrdenSinMoneda.facturas %> facturas que deben ligarse a una OC antes de pagarse</small>
+  </div></div>
+<% } %>
+</div>
+
+<form method="get" class="card p-3 mb-4"><div class="row g-2 align-items-end">
+  <div class="col-md-3"><label class="form-label" for="f-empresa">Empresa</label><select id="f-empresa" name="empresa" class="form-select"><option value="">Todas</option><% ['GAS TOMZA','SUPER GAS'].forEach(v => { %><option <%= filtros.empresa === v ? 'selected' : '' %>><%= v %></option><% }) %></select></div>
+  <div class="col-md-2"><label class="form-label" for="f-moneda">Moneda</label><select id="f-moneda" name="moneda" class="form-select"><option value="">Ambas</option><% ['CRC','USD'].forEach(v => { %><option <%= filtros.moneda === v ? 'selected' : '' %>><%= v %></option><% }) %></select></div>
+  <div class="col-md-2"><label class="form-label" for="f-tramo">Antigüedad</label><select id="f-tramo" name="tramo" class="form-select"><option value="">Todas</option><% tramos.forEach(v => { %><option <%= filtros.tramo === v ? 'selected' : '' %>><%= v %></option><% }) %></select></div>
+  <div class="col-md-3"><label class="form-label" for="f-q">Proveedor, factura u OC</label><input id="f-q" name="q" value="<%= filtros.q %>" class="form-control"></div>
+  <div class="col-md-2 d-flex gap-2"><button class="btn btn-primary">Filtrar</button><a href="/contabilidad/cuentas-por-pagar" class="btn btn-outline-secondary">Limpiar</a></div>
+  <div class="col-12"><a class="btn btn-sm btn-outline-success" href="/contabilidad/documentos/exportar?<%= new URLSearchParams({ tipo: 'factura', empresa: filtros.empresa, q: filtros.q }) %>">Exportar a Excel (documentos, por proveedor y antigüedad)</a></div>
+</div></form>
+
+<section class="card p-3 mb-4"><h2 class="h4">Antigüedad de saldos</h2>
+<div class="table-responsive"><table class="table align-middle"><thead><tr><th>Moneda</th><% tramos.forEach(t => { %><th class="text-end"><%= t %></th><% }) %><th class="text-end">Total</th></tr></thead><tbody>
+<% antiguedad.forEach(a => { const total = a.tramos.reduce((s, t) => s + t.saldo, 0); %><tr><td><%= a.moneda %></td><% a.tramos.forEach(t => { %><td class="text-end"><a href="?<%= new URLSearchParams({ ...filtros, moneda: a.moneda, tramo: t.tramo }) %>"><%= monto(t.saldo, a.moneda) %></a><br><small class="text-secondary"><%= t.facturas %> fact.</small></td><% }) %><td class="text-end fw-semibold"><%= monto(total, a.moneda) %></td></tr><% }) %>
+</tbody></table></div></section>
+
+<section class="card p-3 mb-4"><h2 class="h4">Por proveedor</h2>
+<div class="table-responsive"><table class="table table-striped align-middle"><thead><tr><th>Proveedor</th><th>Empresa</th><th>Moneda</th><th class="text-end">Facturas</th><th class="text-end">Saldo</th><th class="text-end">Vencido</th><th class="text-end">Por vencer</th><th></th></tr></thead><tbody>
+<% proveedores.forEach(p => { %><tr><td><%= p.proveedor %></td><td><%= p.empresa %></td><td><%= p.moneda %></td><td class="text-end"><%= p.facturas %></td><td class="text-end"><%= monto(p.saldo, p.moneda) %></td><td class="text-end text-danger"><%= monto(p.vencido, p.moneda) %></td><td class="text-end"><%= monto(p.porVencer, p.moneda) %></td><td><a class="btn btn-sm btn-outline-primary" href="?<%= new URLSearchParams({ ...filtros, q: p.proveedor, empresa: p.empresa, moneda: p.moneda }) %>">Ver facturas</a></td></tr><% }) %>
+<% if (!proveedores.length) { %><tr><td colspan="8">No hay cuentas por pagar confirmadas con estos filtros.</td></tr><% } %>
+</tbody></table></div></section>
+
+<section class="card p-3 mb-4"><h2 class="h4">Facturas por pagar</h2><p class="text-secondary small">Ordenadas de la más vencida a la más reciente.</p>
+<div class="table-responsive"><table class="table table-striped align-middle"><thead><tr><th>Proveedor / empresa</th><th>Factura</th><th>Orden de compra</th><th>Fecha</th><th>Vence</th><th class="text-end">Total neto</th><th class="text-end">Pagado</th><th class="text-end">Saldo</th><th>Estado</th><th></th></tr></thead><tbody>
+<% detalle.forEach(d => { %><tr><td><%= d.proveedor %><br><small class="text-secondary"><%= d.empresa %></small></td><td><%= d.numero %><br><small class="text-secondary"><%= d.origen %></small></td><td><%= d.referencia || '—' %></td><td><%= d.fecha %></td><td><%= d.vencimiento || 'Sin vencimiento' %></td><td class="text-end"><%= monto(d.total, d.moneda) %></td><td class="text-end"><%= monto(d.pagado, d.moneda) %></td><td class="text-end fw-semibold"><%= monto(d.saldo, d.moneda) %></td><td><span class="badge <%= d.diasVencidos > 0 ? 'text-bg-danger' : 'text-bg-secondary' %>"><%= d.diasVencidos > 0 ? `Vencida ${d.diasVencidos} días` : d.tramoVencimiento %></span></td><td class="text-nowrap"><a class="btn btn-sm btn-primary" href="<%= d.urlPago %>">Pagar</a> <a class="btn btn-sm btn-outline-secondary" href="/contabilidad/documentos/<%= encodeURIComponent(d.key) %>">Detalle</a></td></tr><% }) %>
+<% if (!detalle.length) { %><tr><td colspan="10">No hay facturas por pagar con estos filtros.</td></tr><% } %>
+</tbody></table></div>
+<div class="d-flex gap-3"><span><%= totalDetalle %> facturas · Página <%= pagina %> de <%= paginas %></span><% if (pagina > 1) { %><a href="?<%= new URLSearchParams({ ...filtros, pagina: pagina - 1 }) %>">Anterior</a><% } %><% if (pagina < paginas) { %><a href="?<%= new URLSearchParams({ ...filtros, pagina: pagina + 1 }) %>">Siguiente</a><% } %></div>
+</section>
+
+<section class="card p-3 mb-4 border-warning"><h2 class="h4">Sin orden de compra</h2>
+<p class="text-secondary small">Facturas recibidas que no están ligadas a una OC. No suman a cuentas por pagar ni se deben pagar hasta ligarlas a su orden o justificarlas. <%= sinOrdenTotal %> facturas<%= sinOrdenTotal > sinOrden.length ? `; se muestran las ${sinOrden.length} más recientes` : '' %>.</p>
+<div class="table-responsive"><table class="table table-sm align-middle"><thead><tr><th>Proveedor</th><th>Factura</th><th>Fecha</th><th>Origen</th><th class="text-end">Saldo</th><th></th></tr></thead><tbody>
+<% sinOrden.forEach(d => { %><tr><td><%= d.proveedor || 'Proveedor pendiente' %></td><td><%= d.numero %></td><td><%= d.fecha %></td><td><%= d.origen === 'ELECTRONICA' ? 'Factura electrónica recibida' : 'Factura sin OC' %></td><td class="text-end"><%= d.moneda ? monto(d.saldo, d.moneda) : monto(d.saldo) + ' (moneda pendiente)' %></td><td><a class="btn btn-sm btn-outline-primary" href="<%= d.urlPago %>">Ligar a OC</a></td></tr><% }) %>
+<% if (!sinOrden.length) { %><tr><td colspan="6">No hay facturas sin orden de compra.</td></tr><% } %>
+</tbody></table></div></section>
+</main></body></html>

@@ -462,6 +462,7 @@ app.use("/compras", comprasRoutes);
 app.use('/contabilidad/presupuestos', require('./routes/presupuestos.routes'));
 app.use('/contabilidad/planilla', require('./routes/nominaContabilidad.routes'));
 app.use('/contabilidad/documentos', require('./routes/contabilidadDocumentos.routes'));
+app.use('/contabilidad/cuentas-por-pagar', require('./routes/cuentasPorPagar.routes'));
 app.use('/proveeduria/portal-proveedores', portalProveedores.interno);
 app.use('/proveeduria/portal-proveedores',portalProveedores.administracion);
 app.use("/proveeduria", require("./routes/proveeduria.routes"));
