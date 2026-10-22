@@ -9,7 +9,15 @@ async function permisosMarcas(db, user) {
   const [[row]] = await db.query('SELECT puede_marcar,puede_consultar FROM taller_marcas_accesos WHERE usuario_id=?', [user.id]);
   return { marcar: Number(row?.puede_marcar) === 1, consultar: Number(row?.puede_consultar) === 1 };
 }
-function siguienteTipo(ultimo) { return ultimo?.tipo === 'ENTRADA' ? 'SALIDA' : 'ENTRADA'; }
+// Día en hora de Costa Rica (UTC-6, sin horario de verano).
+const diaCostaRica = ms => new Date(ms - 6 * 3600000).toISOString().slice(0, 10);
+// La primera marca de cada día siempre es Entrada: si alguien olvidó marcar la salida
+// el día anterior, ese olvido no invierte las marcas siguientes.
+function siguienteTipo(ultimo, ahora = Date.now()) {
+  const fecha = Date.parse(ultimo?.fecha_utc || '');
+  if (!ultimo || !Number.isFinite(fecha) || diaCostaRica(fecha) !== diaCostaRica(ahora)) return 'ENTRADA';
+  return ultimo.tipo === 'ENTRADA' ? 'SALIDA' : 'ENTRADA';
+}
 function nuevoReto(usuarioId, tipo, now = Date.now()) {
   const token = crypto.randomBytes(32).toString('hex');
   return { token, guardado: { hash: hash(token), usuarioId, tipo, expira: now + RETO_MS } };

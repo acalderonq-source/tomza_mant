@@ -23,7 +23,7 @@ function fixture() {
     if (sql.startsWith('SELECT usuario_id')) return [[permisos.get(Number(args[0]))?.puede_marcar ? { usuario_id: args[0] } : null].filter(Boolean)];
     if (sql.startsWith('INSERT')) {
       if (rows.some(r => r.reto === args[6] || (r.usuario_id === args[0] && r.sha === args[5]))) throw Object.assign(Error('duplicado'), { code: 'ER_DUP_ENTRY' });
-      rows.push({ id: ++seq, usuario_id: args[0], nombre: args[1], tipo: args[2], foto: args[3], sha: args[5], reto: args[6], fecha_utc: '2026-10-20T14:30:00.000000Z' });
+      rows.push({ id: ++seq, usuario_id: args[0], nombre: args[1], tipo: args[2], foto: args[3], sha: args[5], reto: args[6], fecha_utc: new Date().toISOString() });
       return [{ insertId: seq }];
     }
     if (sql.startsWith('SELECT foto')) return [rows.filter(r => r.id === Number(args[0]) && (args.length === 1 || r.usuario_id === Number(args[1]))).map(r => ({ foto: r.foto }))];
@@ -48,6 +48,17 @@ test('marcas: foto JPEG valida, limite, formato y rango de fechas', () => {
   for (const value of ['', null, 'data:image/jpeg;base64,' + jpeg.toString('base64'), Buffer.from('<svg>foto</svg>').toString('base64'), 'A'.repeat(1400000)]) assert.throws(() => marcas.validarFoto(value));
   assert.deepEqual(marcas.filtrosHistorial({}, '2026-10-20'), { desde: '2026-10-20', hasta: '2026-10-20', pagina: 1 });
   for (const q of [{ desde: '2026-02-30' }, { desde: '2026-12-01', hasta: '2026-10-20' }, { desde: '2020-01-01', hasta: '2026-10-20' }, { pagina: '-1' }]) assert.throws(() => marcas.filtrosHistorial(q));
+});
+test('marcas: la primera marca de cada dia en Costa Rica siempre es Entrada', () => {
+  const ahora = Date.parse('2026-10-22T14:30:00Z'); // 08:30 en Costa Rica
+  assert.equal(marcas.siguienteTipo(null, ahora), 'ENTRADA');
+  // Olvido la salida ayer: hoy empieza con Entrada.
+  assert.equal(marcas.siguienteTipo({ tipo: 'ENTRADA', fecha_utc: '2026-10-21T22:00:00.000Z' }, ahora), 'ENTRADA');
+  // Mismo dia: alterna.
+  assert.equal(marcas.siguienteTipo({ tipo: 'ENTRADA', fecha_utc: '2026-10-22T14:00:00.000Z' }, ahora), 'SALIDA');
+  assert.equal(marcas.siguienteTipo({ tipo: 'SALIDA', fecha_utc: '2026-10-22T14:00:00.000Z' }, ahora), 'ENTRADA');
+  // 11:30 p. m. en Costa Rica sigue siendo el mismo dia aunque en UTC ya sea el siguiente.
+  assert.equal(marcas.siguienteTipo({ tipo: 'ENTRADA', fecha_utc: '2026-10-23T05:00:00.000Z' }, Date.parse('2026-10-23T05:30:00Z')), 'SALIDA');
 });
 test('marcas: serializa doble entrada, conserva servidor UTC y evita repetir foto/reto', async () => {
   const db = fixture(), user = { id: 52, nombre: 'Saul' }, foto = marcas.validarFoto(jpeg.toString('base64'));
@@ -86,7 +97,7 @@ test('marcas HTTP: solo Saul registra; consulta restringida y fotos privadas', a
     assert.equal((await post('/registrar', { tipo: 'ENTRADA', foto: jpeg.toString('base64') })).status, 409);
     const r = await (await post('/reto', {})).json();
     assert.equal((await post('/registrar', { token: r.token, tipo: 'ENTRADA', foto: jpeg.toString('base64'), usuario_id: 3, fecha: '2000-01-01' })).status, 201);
-    assert.equal(db.rows[0].usuario_id, 52); assert.equal(db.rows[0].fecha_utc, '2026-10-20T14:30:00.000000Z');
+    assert.equal(db.rows[0].usuario_id, 52); assert.ok(Math.abs(Date.now() - Date.parse(db.rows[0].fecha_utc)) < 60000, 'usa la hora del servidor, no la fecha enviada');
     assert.equal((await post('/registrar', { token: r.token, tipo: 'ENTRADA', foto: jpeg.toString('base64') })).status, 409);
     const img = await get('/foto/1', 2); assert.equal(img.status, 200); assert.equal(img.headers.get('Content-Type'), 'image/jpeg'); assert.ok(img.headers.get('Cache-Control').includes('no-store'));
     assert.equal((await get('/foto/1', 1)).status, 200);
