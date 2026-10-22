@@ -76,6 +76,8 @@ async function pdf(row) {
   const d = row.datos;
   // Reutiliza el diseño de Taller, con las condiciones y los impuestos de Proveeduría.
   return generarPDFOrden({ ...d, po_numero: `PR-${row.id}`, fecha: row.creado_en,
+    // La OC de precio fijo no lleva cotización: queda indicado en el documento.
+    observaciones: d.precio_fijo ? ['PRECIO FIJO · Compra sin cotización según catálogo de precios fijos.', d.observaciones].filter(Boolean).join(' ') : d.observaciones,
     departamento: 'Proveeduría', etiqueta_referencia: 'Artículo', tipo_mantenimiento: 'PROVEEDURÍA',
     forma_pago: `${d.forma_pago||d.condicion} ${d.credito ? d.credito + ' días' : ''}`, iva: d.iva ?? (d.subtotal ? d.impuesto / d.subtotal * 100 : 0),
     observaciones: `Razón social: ${d.razon_social}\nEntrega: ${d.entrega}\nMoneda: ${d.moneda}\n${d.observaciones||''}`
@@ -432,6 +434,51 @@ router.post(['/ordenes','/solicitudes/:id/cotizacion'],wrap(async(req,res)=>{
     solicitud.datos.estado='ORDENADA';solicitud.datos.oc_id=r.insertId;await guardar(db,solicitud,req.session.user.id,'OC generada');
     await alerta(db,r.insertId,`OC PR-${r.insertId} generada`,solicitud.usuario_id);return r.insertId;
   });if(compartido)return res.redirect(esCotizacion?'/proveeduria/solicitudes':'/proveeduria/ordenes');res.json({id});
+}));
+// ===== Precios fijos: catálogo con proveedor y carrito sin cotización =====
+const preciosFijos=require('../utils/proveeduriaPreciosFijos');
+const EMPRESAS_OC={'GAS TOMZA':'GAS TOMZA DE COSTA RICA S.A.','SUPER GAS':'ENVASADORA SUPER GAS GLP S.A.'};
+router.get('/precios-fijos',wrap(async(req,res)=>{
+  if(!gestion(req.session.user))throw error(403,'No autorizado');
+  res.render('proveeduria/precios_fijos',{user:req.session.user,...await preciosFijos.listarGestion(pool),puedeEditar:gestionCatalogo(req.session.user)});
+}));
+router.post('/precios-fijos',wrap(async(req,res)=>{
+  if(!gestionCatalogo(req.session.user))throw error(403,'No autorizado');
+  res.json(await preciosFijos.guardar(pool,req.body||{},req.session.user.id));
+}));
+router.get('/precio-fijo',wrap(async(req,res)=>{
+  if(!gestion(req.session.user))throw error(403,'No autorizado');
+  const sedes=await sedesOrden(req);
+  res.render('proveeduria/carrito_precio_fijo',{user:req.session.user,grupos:await preciosFijos.carrito(pool),sedes,empresas:Object.keys(EMPRESAS_OC)});
+}));
+// Una OC por proveedor. Los precios salen del catálogo de precios fijos, no del navegador.
+router.post('/precio-fijo/ordenes',wrap(async(req,res)=>{
+  if(!gestion(req.session.user))throw error(403,'No autorizado');
+  const b=req.body||{};
+  exigir(EMPRESAS_OC[b.empresa_destino],'Empresa destinataria inválida');
+  const sedeDestino=await sedeFormulario(req);
+  const condiciones=condicionesOrden(b);
+  const correos=correosValidos(String(b.email||''));
+  exigir(correos.length,'Indique un correo válido del proveedor');
+  const entrega=String(b.entrega||'').trim().slice(0,255);
+  exigir(entrega,'Indique el plazo de entrega');
+  const id=await transaccion(async db=>{
+    const [[proveedor]]=await db.query('SELECT p.clave,p.nombre,c.telefono,c.direccion FROM prov_proveedores p LEFT JOIN prov_proveedor_contactos c ON c.clave=p.clave WHERE p.clave=? AND p.activo=1',[String(b.proveedor_clave||'')]);
+    exigir(proveedor,'Proveedor no encontrado');
+    const {lineas,moneda}=await preciosFijos.lineasPrecioFijo(db,proveedor.clave,b.items);
+    const bajas=await cargarBajas(db);
+    exigir(lineas.every(l=>disponible(l.codigo,bajas)),'La orden contiene un producto eliminado del catálogo');
+    const [s]=await db.query("INSERT INTO prov_documentos (tipo,usuario_id,sede,datos) VALUES ('solicitud',?,?,?)",[req.session.user.id,sedeDestino,JSON.stringify({lineas:lineas.map(l=>({codigo:l.codigo,descripcion:l.descripcion,iva:l.iva,cantidad:l.cantidad})),estado:'PENDIENTE',origen:'OC_PRECIO_FIJO'})]);
+    const d={lineas,...totalesConAjustes(lineas,{}),solicitud_id:s.insertId,proveedor:proveedor.nombre,email:correos.join(', '),razon_social:EMPRESAS_OC[b.empresa_destino],entrega,...condiciones,moneda,empresa_destino:b.empresa_destino,
+      observaciones:String(b.observaciones||'').trim().slice(0,2000),estado:'GENERADA',pagos:[],precio_fijo:true,modo:'precio_fijo',
+      proveedor_telefono:String(proveedor.telefono||'').slice(0,120),proveedor_direccion:String(proveedor.direccion||'').slice(0,4000)};
+    const [r]=await db.query("INSERT INTO prov_documentos (tipo,usuario_id,sede,datos) VALUES ('oc',?,?,?)",[req.session.user.id,sedeDestino,JSON.stringify(d)]);
+    const solicitud={id:s.insertId,usuario_id:req.session.user.id,sede:sedeDestino,datos:{lineas:d.lineas,estado:'ORDENADA',origen:'OC_PRECIO_FIJO',oc_id:r.insertId}};
+    await guardar(db,solicitud,req.session.user.id,'OC de precio fijo generada');
+    await alerta(db,r.insertId,`OC PR-${r.insertId} de precio fijo generada · ${proveedor.nombre}`,req.session.user.id);
+    return r.insertId;
+  });
+  res.json({id,url:`/proveeduria/ordenes/${id}`});
 }));
 router.get('/ordenes/:id/pdf',wrap(async(req,res)=>{const row=await documento(pool,req.params.id,'oc');visible(req,row);res.type('pdf').send(await pdf(row));}));
 router.post('/ordenes/:id/enviar',wrap(async(req,res)=>{

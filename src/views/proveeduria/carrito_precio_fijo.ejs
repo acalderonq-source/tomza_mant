@@ -1,0 +1,27 @@
+<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Compra a precio fijo · Proveeduría</title><link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"><%- include('../partials/dashboard_styles') %><script src="/js/proveeduria-precio-fijo.js" defer></script></head><body>
+<nav class="navbar navbar-dark topbar px-3 py-2"><a class="navbar-brand" href="/proveeduria">Proveeduría · Compra a precio fijo</a><div class="d-flex gap-2"><a class="btn btn-outline-light btn-sm" href="/proveeduria/precios-fijos">Precios fijos</a><a class="btn btn-outline-light btn-sm" href="/proveeduria">Volver</a></div></nav>
+<main class="container-fluid shell py-3">
+<section class="simple-hero mb-3"><h1 class="page-title">Carrito de precio fijo</h1><p class="page-subtitle">Elija los artículos y cantidades. Se genera una orden de compra por proveedor, sin cotización, marcada como <strong>Precio fijo</strong>. Los precios vienen del catálogo y no se modifican aquí.</p></section>
+<div id="resultado" role="status" aria-live="polite"></div>
+<div class="mb-3"><label for="pf-carrito-buscar" class="form-label">Buscar artículo</label><input class="form-control" id="pf-carrito-buscar" data-pf-carrito-buscar placeholder="Nombre del artículo o proveedor"></div>
+<% if (!grupos.length) { %><section class="plain-card p-4"><p class="mb-0">Todavía no hay artículos de precio fijo con proveedor asignado. Asígnelos en <a href="/proveeduria/precios-fijos">Precios fijos</a>.</p></section><% } %>
+<% grupos.forEach(g => { const correo = (g.proveedor.correos || []).join(', '); const dias = Number.parseInt(g.proveedor.condicion_pago, 10); %>
+<section class="plain-card p-3 mb-3" data-pf-grupo data-proveedor="<%= g.proveedor.clave %>" data-texto="<%= g.proveedor.nombre.toLowerCase() %>">
+  <div class="d-flex justify-content-between flex-wrap gap-2"><h2 class="h5 mb-2"><%= g.proveedor.nombre %></h2><span class="badge text-bg-info align-self-start">Precio fijo · sin cotización</span></div>
+  <div class="table-responsive"><table class="table table-sm align-middle"><thead><tr><th>Artículo</th><th class="text-end">Precio</th><th class="text-end">IVA</th><th>Cantidad</th><th class="text-end">Subtotal</th></tr></thead><tbody>
+  <% g.articulos.forEach(a => { %><tr data-pf-articulo data-clave="<%= a.clave %>" data-precio="<%= a.precio_unitario %>" data-iva="<%= a.iva %>" data-moneda="<%= a.moneda %>" data-texto="<%= a.descripcion.toLowerCase() %>">
+    <td><%= a.descripcion %></td><td class="text-end"><%= a.precio_unitario.toLocaleString('es-CR', { style: 'currency', currency: a.moneda }) %></td><td class="text-end"><%= a.iva %>%</td>
+    <td><input class="form-control form-control-sm" type="number" min="0" step="0.001" value="0" data-pf-cantidad aria-label="Cantidad de <%= a.descripcion %>"></td><td class="text-end" data-pf-subtotal>—</td></tr><% }) %>
+  </tbody></table></div>
+  <form class="row g-2 align-items-end" data-pf-orden>
+    <div class="col-md-2"><label class="form-label">Sede</label><select class="form-select form-select-sm" name="sede" required><% sedes.forEach(s => { %><option><%= s %></option><% }) %></select></div>
+    <div class="col-md-2"><label class="form-label">Empresa</label><select class="form-select form-select-sm" name="empresa_destino" required><% empresas.forEach(e => { %><option><%= e %></option><% }) %></select></div>
+    <div class="col-md-3"><label class="form-label">Correo del proveedor</label><input class="form-control form-control-sm" name="email" value="<%= correo %>" required></div>
+    <div class="col-md-2"><label class="form-label">Entrega</label><input class="form-control form-control-sm" name="entrega" placeholder="Ej. 5 días" required maxlength="255"></div>
+    <div class="col-md-1"><label class="form-label">Crédito (días)</label><input class="form-control form-control-sm" name="credito" type="number" min="0" max="3650" value="<%= Number.isFinite(dias) ? dias : 0 %>" required></div>
+    <div class="col-md-2"><div class="small text-secondary">Total con IVA: <strong data-pf-total>—</strong></div><button class="btn btn-sm btn-primary w-100 mt-1">Generar orden de compra</button></div>
+    <div class="col-12"><label class="form-label">Observaciones</label><input class="form-control form-control-sm" name="observaciones" maxlength="2000"></div>
+  </form>
+</section>
+<% }) %>
+</main></body></html>
