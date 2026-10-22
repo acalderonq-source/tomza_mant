@@ -262,7 +262,7 @@ function esUsuarioMecanicoLimitado(user) {
 }
 
 function mecanicoPuedeUsarRuta(pathname) {
-  if(['/proveeduria/mis-solicitudes','/proveeduria/solicitudes','/proveeduria/alertas'].includes(pathname)||/^\/proveeduria\/salidas\/\d+\/aceptar$/.test(pathname))return true;
+  if(['/proveeduria/mis-solicitudes','/proveeduria/solicitudes','/proveeduria/alertas'].includes(pathname)||/^\/proveeduria\/salidas\/\d+\/(aceptar|imprimir)$/.test(pathname))return true;
   const rutasPermitidas = [
     "/",
     "/inicio",

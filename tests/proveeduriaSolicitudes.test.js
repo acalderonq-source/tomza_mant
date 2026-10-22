@@ -83,21 +83,30 @@ test('flujo completo: solicitud de otro departamento, cotización, OC, recepció
   const form=()=>new URLSearchParams({origen_formulario:'taller',cotizacion_data:'data:application/pdf;base64,JVBERi0xLjQK',cotizacion_nombre:'cotizacion.pdf',solicitud_id:'1',proveedor:'Proveedor',email:'proveedor@example.com',empresa_destino:'GAS TOMZA',credito:'30',forma_pago:'Crédito',entrega:'5 días',moneda:'CRC',iva:'13','lineas[0][codigo_producto]':'PAPEL','lineas[0][descripcion]':'Papel','lineas[0][cantidad]':'2','lineas[0][precio_unitario]':'100'});
   try{
     await server(regional,async base=>{
-      const r=await fetch(base+'/solicitudes',json({departamento:'PROVEEDURIA',lineas:[{codigo:'PAPEL',descripcion:'Papel',cantidad:2,iva:99}],motivo:'Para la oficina'}));assert.equal(r.status,200);assert.equal(docs.get(1).datos.departamento,'OPERACIONES');assert.equal(docs.get(1).datos.solicitante,requester.nombre);assert.equal(docs.get(1).datos.lineas[0].iva,13);assert.equal(alerts[0].grupo,'PROVEEDURIA');
+      const r=await fetch(base+'/solicitudes',json({departamento:'PROVEEDURIA',lineas:[{codigo:'PAPEL',descripcion:'Papel',cantidad:2,iva:99}],motivo:'Para la oficina'}));assert.equal(r.status,200);assert.equal(docs.get(1).datos.departamento,'OPERACIONES');assert.equal(docs.get(1).datos.solicitante,requester.nombre);assert.equal(docs.get(1).datos.lineas[0].iva,13);assert.equal(alerts[0].grupo,'BODEGA');
+    });
+    await server(manager,async base=>{
+      assert.equal((await fetch(base+'/solicitudes/1/cotizacion')).status,400);
+      assert.equal((await fetch(base+'/solicitudes/1/solicitar-compra',{method:'POST'})).status,403);
+    });
+    await server({...manager,rol:'BODEGUERO'},async base=>{
+      assert.equal((await fetch(base+'/solicitudes/1/solicitar-compra',{method:'POST'})).status,200);
+      const repetida=await fetch(base+'/solicitudes/1/solicitar-compra',{method:'POST'});assert.equal((await repetida.json()).repetida,true);
+      assert.equal(docs.get(1).datos.compra.solicitada_por,manager.id);
     });
     await server(manager,async base=>{
       const bandeja=await fetch(base+'/solicitudes');assert.equal(bandeja.status,200);const html=await bandeja.text();assert.match(html,/Solicitante Operaciones/);assert.match(html,/Preparar cotización/);
       const antes=await fetch(base+'/ordenes/nueva?solicitud_id=1',{redirect:'manual'});assert.equal(antes.status,302);assert.equal(antes.headers.get('location'),'/proveeduria/solicitudes/1/cotizacion');
       assert.equal((await fetch(base+'/ordenes',{method:'POST',body:form(),redirect:'manual'})).status,400);
-      const sinArchivo=form();sinArchivo.delete('cotizacion_data');const rechazada=await fetch(base+'/solicitudes/1/cotizacion',{method:'POST',body:sinArchivo,redirect:'manual'});assert.equal(rechazada.status,400);assert.match(await rechazada.text(),/Adjunte el archivo de la cotización/);assert.equal(docs.get(1).datos.estado,'PENDIENTE');
+      const sinArchivo=form();sinArchivo.delete('cotizacion_data');const rechazada=await fetch(base+'/solicitudes/1/cotizacion',{method:'POST',body:sinArchivo,redirect:'manual'});assert.equal(rechazada.status,400);assert.match(await rechazada.text(),/Adjunte el archivo de la cotización/);assert.equal(docs.get(1).datos.estado,'SOLICITUD_COMPRA');
       const cotizacion=await fetch(base+'/solicitudes/1/cotizacion');assert.equal(cotizacion.status,200);assert.match(await cotizacion.text(),/Guardar cotización/);
       assert.equal((await fetch(base+'/solicitudes/1/cotizacion',{method:'POST',body:form(),redirect:'manual'})).status,302);assert.equal(docs.get(1).datos.estado,'COTIZADA');assert.equal(docs.size,1);
       const nueva=await fetch(base+'/ordenes/nueva?solicitud_id=1');assert.equal(nueva.status,200);assert.match(await nueva.text(),/proveedor@example.com/);
       assert.equal((await fetch(base+'/ordenes',{method:'POST',body:form(),redirect:'manual'})).status,302);assert.equal(docs.get(1).datos.estado,'ORDENADA');assert.equal(docs.get(2).usuario_id,71);
       assert.equal((await fetch(base+'/salidas',json({solicitud_id:1}))).status,400);
       assert.equal((await fetch(base+'/ordenes/2/recibir',json({token:'a'.repeat(32),version:0,referencia:'Factura 123',lineas:[{codigo:'PAPEL',cantidad:2}]}))).status,200);assert.equal(docs.get(1).datos.estado,'LISTA_PARA_ENTREGA');
-      assert.equal((await fetch(base+'/salidas',json({solicitud_id:1}))).status,200);assert.equal(docs.get(1).datos.estado,'ALISTANDO');assert.equal(stock.get('PAPEL'),0);
-      assert.equal((await fetch(base+'/salidas/3/enviar',{method:'POST'})).status,200);assert.equal(docs.get(1).datos.estado,'EN_CAMINO');
+      assert.equal((await fetch(base+'/salidas',json({solicitud_id:1}))).status,200);assert.equal(docs.get(1).datos.estado,'ALISTANDO');assert.equal(stock.get('PAPEL'),2);
+      assert.equal((await fetch(base+'/salidas/3/enviar',{method:'POST'})).status,200);assert.equal(docs.get(1).datos.estado,'EN_CAMINO');assert.equal(stock.get('PAPEL'),0);
     });
     await server(regional,async base=>{
       const pedidos=await fetch(base+'/mis-solicitudes');assert.equal(pedidos.status,200);assert.match(await pedidos.text(),/Confirmar que recibí los productos/);
@@ -162,15 +171,17 @@ test('categorías: admite pedidos mixtos y rechaza productos inventados o catego
   });}finally{pool.query=originalQuery;pool.getConnection=originalConnection;}
 });
 
-test('la solicitud con existencias pasa a entrega directa y se vuelve a comprobar al despachar', async () => {
+test('aceptar desde Bodega genera boleta sin descontar y registra la salida solo al entregar, una sola vez', async () => {
   const originalQuery=pool.query, originalConnection=pool.getConnection;
-  const docs=new Map(); let stock=5, siguiente=1;
+  const docs=new Map(),movimientos=[]; let stock=5, siguiente=1;
   async function query(sql,args=[]){
     if(sql.startsWith('SELECT codigo,descripcion,iva,cantidad FROM prov_inventario'))return [[{codigo:'PAPEL',descripcion:'Papel',iva:13,cantidad:stock}]];
     if(sql.startsWith('SELECT * FROM prov_documentos WHERE id')){const d=docs.get(Number(args[0]));return [d&&d.tipo===args[1]?[structuredClone(d)]:[]];}
+    if(sql.startsWith('SELECT * FROM prov_documentos'))return [structuredClone([...docs.values()])];
     if(sql.startsWith('SELECT * FROM prov_inventario'))return [[{codigo:'PAPEL',cantidad:stock}]];
-    if(sql.startsWith('INSERT INTO prov_documentos')){const id=siguiente++,tipo=sql.match(/VALUES \('(\w+)'/)[1];docs.set(id,{id,tipo,usuario_id:args[0],sede:args[1],datos:JSON.parse(args[2])});return [{insertId:id}];}
+    if(sql.startsWith('INSERT INTO prov_documentos')){const id=siguiente++,tipo=sql.includes("VALUES ('solicitud'")?'solicitud':'salida';docs.set(id,{id,tipo,usuario_id:args[0],sede:args[1],datos:JSON.parse(args[2]),creado_en:new Date()});return [{insertId:id}];}
     if(sql.startsWith('UPDATE prov_inventario SET cantidad=cantidad-'))stock-=args[0];
+    if(sql.startsWith('INSERT INTO prov_inventario_movimientos'))movimientos.push(args);
     if(sql.startsWith('UPDATE prov_documentos'))docs.get(Number(args[1])).datos=JSON.parse(args[0]);
     if(sql.startsWith('SELECT'))return [[]];
     return [{affectedRows:1}];
@@ -179,13 +190,62 @@ test('la solicitud con existencias pasa a entrega directa y se vuelve a comproba
   try{
     await server(requester,async base=>{
       const r=await fetch(base+'/solicitudes',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sede:'Cartago',lineas:[{codigo:'PAPEL',cantidad:3,existencia:999}]})});
-      assert.equal(r.status,200);assert.equal(docs.get(1).datos.estado,'LISTA_PARA_ENTREGA');
-      assert.equal(docs.get(1).datos.existencias.lineas[0].existencia,5);assert.equal(stock,5);
+      assert.equal(r.status,200);assert.equal(docs.get(1).datos.estado,'PENDIENTE_BODEGA');assert.equal(docs.size,1);
+      assert.equal(docs.get(1).datos.existencias.lineas[0].existencia,5);assert.equal(stock,5);assert.equal(movimientos.length,0);
+
+      assert.equal((await fetch(base+'/salidas/2/enviar',{method:'POST'})).status,403);
+      assert.equal((await fetch(base+'/salidas/2/aceptar',{method:'POST'})).status,404);
+      assert.equal(stock,5);
     });
     await server(manager,async base=>{
-      const crear=()=>fetch(base+'/salidas',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({solicitud_id:1})});
-      stock=1;assert.equal((await crear()).status,400);assert.equal(docs.size,1);assert.equal(stock,1);
-      stock=5;assert.equal((await crear()).status,200);assert.equal(stock,2);assert.equal(docs.get(1).datos.estado,'ALISTANDO');
+      assert.equal((await fetch(base+'/salidas',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({solicitud_id:1})})).status,400);
+      assert.equal((await fetch(base+'/solicitudes/1/aceptar',{method:'POST'})).status,200);assert.equal(docs.get(1).datos.salida_id,2);assert.equal(stock,5);
+      const entregar=()=>fetch(base+'/salidas/2/enviar',{method:'POST'});
+      stock=1;assert.equal((await entregar()).status,400);assert.equal(stock,1);assert.equal(movimientos.length,0);assert.equal(docs.get(2).datos.inventario_pendiente,true);
+      stock=5;assert.equal((await entregar()).status,200);assert.equal(stock,2);assert.equal(movimientos.length,1);
+      assert.equal(docs.get(2).datos.entregado_por,manager.id);assert.ok(docs.get(2).datos.salida_registrada_en);
+      assert.equal((await entregar()).status,400);assert.equal(stock,2);assert.equal(movimientos.length,1);
+      assert.equal((await fetch(base+'/salidas/2/aceptar',{method:'POST'})).status,403);
+    });
+    await server(requester,async base=>{
+      assert.equal((await fetch(base+'/salidas/2/aceptar',{method:'POST'})).status,200);
+      assert.equal(stock,2);assert.equal(movimientos.length,1);assert.equal(docs.get(1).datos.estado,'ENTREGADA');
+    });
+    // Una boleta anterior al cambio ya descontó stock al alistar: no repetir esa salida.
+    docs.set(3,{id:3,tipo:'salida',usuario_id:requester.id,sede:'Cartago',datos:{lineas:[{codigo:'PAPEL',descripcion:'Papel',cantidad:1}],estado:'ALISTANDO'}});
+    await server(manager,async base=>assert.equal((await fetch(base+'/salidas/3/enviar',{method:'POST'})).status,200));
+    assert.equal(stock,2);assert.equal(movimientos.length,1);
+    await server({...requester,id:999},async base=>assert.equal((await fetch(base+'/salidas/2/imprimir')).status,403));
+  }finally{pool.query=originalQuery;pool.getConnection=originalConnection;}
+});
+
+test('Bodega solicita solo el faltante actual y la cotización conserva esa cantidad',async()=>{
+  const originalQuery=pool.query,originalConnection=pool.getConnection;
+  const pedido={id:1,tipo:'solicitud',usuario_id:requester.id,sede:'Cartago',datos:{estado:'PENDIENTE_BODEGA',requiere_revision_bodega:true,departamento:'OPERACIONES',solicitante:requester.nombre,lineas:[{codigo:'PAPEL',descripcion:'Papel',cantidad:5,iva:13}],existencias:{estado:'SIN_EXISTENCIAS',lineas:[{codigo:'PAPEL',existencia:0,faltante:5}]}}};
+  const alertas=[];let inventario=2,stockWrites=0;
+  const query=async(sql,args=[])=>{
+    if(sql.startsWith('SELECT * FROM prov_documentos WHERE id'))return [[structuredClone(pedido)]];
+    if(sql.startsWith('SELECT * FROM prov_inventario'))return [[{codigo:'PAPEL',cantidad:inventario}]];
+    if(sql.startsWith('UPDATE prov_documentos')){pedido.datos=JSON.parse(args[0]);return [{affectedRows:1}];}
+    if(sql.startsWith('UPDATE prov_inventario'))stockWrites++;
+    if(sql.startsWith('INSERT INTO prov_alertas'))alertas.push(args);
+    if(sql.startsWith('SELECT'))return [[]];
+    return [{affectedRows:1,insertId:9}];
+  };
+  pool.query=query;pool.getConnection=async()=>({query,beginTransaction:async()=>{},commit:async()=>{},rollback:async()=>{},release(){}});
+  try{
+    await server(requester,async base=>assert.equal((await fetch(base+'/solicitudes/1/solicitar-compra',{method:'POST'})).status,403));
+    await server({...manager,rol:'BODEGUERO',departamentoActivo:'TALLER',departamentos:['TALLER']},async base=>{
+      const enviar=()=>fetch(base+'/solicitudes/1/solicitar-compra',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({lineas:[{codigo:'PAPEL',cantidad:999}]})});
+      assert.equal((await enviar()).status,200);assert.equal(pedido.datos.compra.lineas[0].cantidad,3);
+      assert.equal(pedido.datos.lineas[0].cantidad,5);assert.equal(pedido.datos.estado,'SOLICITUD_COMPRA');assert.equal(stockWrites,0);
+      assert.equal(alertas.filter(a=>a[1]==='PROVEEDURIA').length,1);
+      assert.equal((await (await enviar()).json()).repetida,true);assert.equal(alertas.length,2);
+    });
+    await server(manager,async base=>{
+      const cotizar={solicitud_id:1,modo:'manual',precios:{PAPEL:100},proveedor:'Proveedor',email:'p@example.com',razon_social:'Gas Tomza',entrega:'5 días',condicion:'CREDITO',credito:30,moneda:'CRC',cotizacion_data:'data:application/pdf;base64,JVBERi0xLjQK',cotizacion_nombre:'cotizacion.pdf'};
+      const res=await fetch(base+'/solicitudes/1/cotizacion',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(cotizar)});
+      assert.equal(res.status,200);assert.equal(pedido.datos.cotizacion.lineas[0].cantidad,3);assert.equal(pedido.datos.lineas[0].cantidad,5);
     });
   }finally{pool.query=originalQuery;pool.getConnection=originalConnection;}
 });

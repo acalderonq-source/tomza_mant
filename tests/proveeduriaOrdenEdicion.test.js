@@ -32,6 +32,20 @@ function formulario(state,extra={}){
 }
 const post=body=>({method:'POST',body,redirect:'manual'});
 const borrar=version=>({method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({version})});
+
+test('lugar de entrega se edita, vuelve a mostrarse y se incluye en el PDF sin alterar el plazo',async()=>{
+  await almacen(state=>servidor(gestor,async base=>{
+    assert.match(await (await fetch(base+'/ordenes/1/editar')).text(),/name="lugar_entrega"/);
+    const r=await fetch(base+'/ordenes/1/editar',post(formulario(state,{lugar_entrega:'Bodega Proveeduría, Cartago, portón 2'})));
+    assert.equal(r.status,302);assert.equal(state.docs.get(1).datos.lugar_entrega,'Bodega Proveeduría, Cartago, portón 2');
+    assert.equal(state.docs.get(1).datos.entrega,'7 días');
+    const html=await (await fetch(base+'/ordenes/1/editar')).text();assert.match(html,/value="Bodega Proveeduría, Cartago, portón 2"/);
+    const pdf=await fetch(base+'/ordenes/1/pdf');assert.equal(pdf.status,200);assert.match(pdf.headers.get('content-type'),/pdf/);
+    const {definirOrden}=require('../src/utils/pdfOrdenCompra');
+    assert.match(JSON.stringify(definirOrden(state.docs.get(1).datos)),/Bodega Proveeduría, Cartago, portón 2/);
+    assert.equal((await fetch(base+'/ordenes/1/editar',post(formulario(state,{lugar_entrega:'x'.repeat(501)})))).status,400);
+  }));
+});
 test('editar usa el formulario de Taller, conserva el número, actualiza solicitud directa y revoca el portal anterior',async()=>{
   await almacen(state=>servidor(gestor,async base=>{
     const pagina=await fetch(base+'/ordenes/1/editar');assert.equal(pagina.status,200);const html=await pagina.text();assert.match(html,/Actualizar orden/);assert.match(html,/PR-1/);assert.match(html,/name="version" value="[a-f0-9]{64}"/);assert.match(html,/action="\/proveeduria\/ordenes\/1\/editar"/);assert.match(html,/precio_unitario":1450/);

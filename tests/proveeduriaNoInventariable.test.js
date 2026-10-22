@@ -75,8 +75,9 @@ test('solicitud mixta llega hasta recepción confirmada sin crear stock, fichas 
       const pagina=await fetch(base+'/mis-solicitudes');assert.equal(pagina.status,200);const html=await pagina.text();assert.match(html,/Compra por solicitud/);assert.match(html,new RegExp(servicio.codigo));assert.doesNotMatch(html,/precio_unitario/);
       assert.equal((await fetch(base+'/inventario')).status,403);
     });
+    await servidor({...gestor,rol:'BODEGUERO'},async base=>assert.equal((await fetch(base+'/solicitudes/1/solicitar-compra',{method:'POST'})).status,200));
     await servidor(gestor,async base=>{
-      const inventario=await (await fetch(base+'/inventario')).text();assert.doesNotMatch(inventario,new RegExp(servicio.codigo));assert.doesNotMatch(inventario,/Servicios ambientales ordinarios/);
+      const inventario=await (await fetch(base+'/inventario')).text();const existencias=JSON.parse(inventario.match(/<script id="inventario-datos"[^>]*>([\s\S]*?)<\/script>/)[1]);assert.equal(existencias.some(a=>a.codigo===servicio.codigo||a.descripcion==='Servicios ambientales ordinarios'),false);
       const cotizar=await fetch(base+'/solicitudes/1/cotizacion');assert.equal(cotizar.status,200);assert.match(await cotizar.text(),/precio_unitario":13900/);
       assert.equal((await fetch(base+'/solicitudes/1/cotizacion',{method:'POST',body:formulario(),redirect:'manual'})).status,302);
       assert.equal((await fetch(base+'/ordenes',{method:'POST',body:formulario(),redirect:'manual'})).status,302);
@@ -91,9 +92,9 @@ test('solicitud mixta llega hasta recepción confirmada sin crear stock, fichas 
       const final={token:'b'.repeat(32),version:1,referencia:'Entrega 2',lineas:[{codigo:articuloPedido.codigo,cantidad:1},{codigo:cilindro.codigo,cantidad:1},{codigo:'STOCK',cantidad:2}]};
       assert.equal((await fetch(base+'/ordenes/2/recibir',json(final))).status,200);assert.equal(state.stock,4);assert.equal(state.docs.get(2).datos.estado,'RECIBIDA');assert.equal(state.movimientos.length,1);
       const repetida=await fetch(base+'/ordenes/2/recibir',json(final));assert.equal((await repetida.json()).repetida,true);assert.equal(state.stock,4);
-      assert.equal((await fetch(base+'/salidas',json({solicitud_id:1}))).status,200);assert.equal(state.stock,2);assert.equal(state.movimientos.length,2);
+      assert.equal((await fetch(base+'/salidas',json({solicitud_id:1}))).status,200);assert.equal(state.stock,4);assert.equal(state.movimientos.length,1);
       const salida=state.docs.get(3);assert.equal(salida.datos.lineas.length,4);assert(salida.datos.lineas.filter(esNoInventariable).length===3);
-      assert.equal((await fetch(base+'/salidas/3/enviar',{method:'POST'})).status,200);
+      assert.equal((await fetch(base+'/salidas/3/enviar',{method:'POST'})).status,200);assert.equal(state.stock,2);assert.equal(state.movimientos.length,2);
       const imprimir=await fetch(base+'/salidas/3/imprimir');assert.equal(imprimir.status,200);assert.match(await imprimir.text(),/Servicios ambientales ordinarios/);
       const crear=await fetch(base+'/inventario/articulos',json({codigo:servicio.codigo,descripcion:servicio.descripcion}));assert.equal(crear.status,400);
     });

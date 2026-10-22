@@ -82,7 +82,8 @@ test('los documentos antiguos con códigos SOL reciben y entregan contra el cód
   const body={token:'c'.repeat(32),version:0,referencia:'Recepción técnica',lineas:[{codigo:origen.codigo,cantidad:2}]};
   assert.equal((await fetch(base+'/ordenes/2/recibir',json(body))).status,200);assert.equal(cantidad,2);
   assert.equal((await (await fetch(base+'/ordenes/2/recibir',json(body))).json()).repetida,true);assert.equal(cantidad,2);
-  assert.equal((await fetch(base+'/salidas',json({solicitud_id:1}))).status,200);assert.equal(cantidad,0);assert.equal(movimientos.length,2);
+  assert.equal((await fetch(base+'/salidas',json({solicitud_id:1}))).status,200);assert.equal(cantidad,2);assert.equal(movimientos.length,1);
+  assert.equal((await fetch(base+'/salidas/3/enviar',{method:'POST'})).status,200);assert.equal(cantidad,0);assert.equal(movimientos.length,2);
   assert.equal(docs.get(3).datos.lineas[0].codigo,origen.codigo,'el documento conserva la referencia histórica');
  });}finally{pool.query=oq;pool.getConnection=oc;}
 });

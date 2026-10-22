@@ -1,4 +1,6 @@
 (() => {
+  const destinoHash=document.getElementById(location.hash.slice(1));
+  if(destinoHash?.tagName==='DETAILS')destinoHash.open=true;
   const datos=JSON.parse(document.getElementById('prov-datos')?.textContent||'{}');
   const escapar=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   function tabla(box,lineas=[{}],bloquear=false){
@@ -25,10 +27,23 @@
   async function api(url,body){const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});const j=await r.json();if(!r.ok)throw Error(j.error||'Error de operación');return j;}
   async function archivo(file){if(file.size>5*1024*1024)throw Error('Máximo 5 MB por archivo');return new Promise((resolve,reject)=>{const r=new FileReader();r.onerror=()=>reject(Error('No se pudo leer el archivo'));r.onload=()=>resolve({nombre:file.name,base64:r.result.split(',')[1]});r.readAsDataURL(file);});}
   document.getElementById('cotizacion')?.addEventListener('change',async e=>{try{if(!e.target.files[0])return;const a=await archivo(e.target.files[0]);const c=await api('/proveeduria/cotizacion/importar',a);for(const [k,v] of Object.entries(c)){if(oc.elements[k] && v!==null)oc.elements[k].value=v;}oc.elements.modo.value='cotizacion';tabla(document.getElementById('oc-lineas'),c.lineas);aviso('Cotización cargada. Verifique datos y seleccione la solicitud correspondiente.');}catch(e){aviso(e.message,true);}});
+  document.querySelectorAll('[data-revision-producto]').forEach(fila=>{
+    const check=fila.querySelector('[data-comprar-producto]');
+    const motivo=fila.querySelector('[data-motivo-rechazo]');
+    const actualizar=()=>{
+      const excluido=!check.checked;
+      fila.querySelector('[data-justificacion-rechazo]').hidden=!excluido;
+      fila.querySelector('[data-producto-incluido]').hidden=excluido;
+      motivo.disabled=!excluido;motivo.required=excluido;
+      check.nextElementSibling.textContent=excluido?'No':'Sí';
+      fila.classList.toggle('table-warning',excluido);
+    };
+    check.addEventListener('change',()=>{actualizar();if(!check.checked)motivo.focus();});actualizar();
+  });
   document.querySelectorAll('form[data-api]').forEach(f=>f.addEventListener('submit',async e=>{
     e.preventDefault();if(f.dataset.confirm&&!confirm(f.dataset.confirm))return;
     const btn=f.querySelector('button[type="submit"],button:not([type])');if(btn)btn.disabled=true;
-    try{const local=f.querySelector('[data-form-status]');if(local)local.hidden=true;const body=Object.fromEntries(new FormData(f));const box=f.querySelector('[data-lineas]');if(box)body.lineas=leer(box);const estado=f.querySelector('[data-estado]');if(estado)body.partidas=leer(estado);if(f===oc&&body.modo==='manual')body.precios=Object.fromEntries(body.lineas.map(l=>[l.codigo,l.precio_unitario]));const file=f.querySelector('[data-archivo]')?.files[0];if(file)body.archivo=await archivo(file);const xml=f.querySelector('[data-xml]')?.files[0];if(xml)body.xml=await archivo(xml);const respuesta=await api(f.dataset.api,body);if(respuesta.redirect)location.assign(respuesta.redirect);else location.reload();}catch(e){const local=f.querySelector('[data-form-status]');if(local){local.hidden=false;local.className='alert alert-danger';local.textContent=e.message;}else aviso(e.message,true);if(btn)btn.disabled=false;}
+    try{const local=f.querySelector('[data-form-status]');if(local)local.hidden=true;const body=Object.fromEntries(new FormData(f));if(f.hasAttribute('data-revision-productos'))body.revision=[...f.querySelectorAll('[data-revision-producto]')].map(fila=>({codigo:fila.dataset.codigo,comprar:fila.querySelector('[data-comprar-producto]').checked,motivo:fila.querySelector('[data-motivo-rechazo]').value}));if(f.hasAttribute('data-consolidar'))body.seleccion=[...f.querySelectorAll('input[name="productos"]:checked')].flatMap(input=>JSON.parse(input.value));const box=f.querySelector('[data-lineas]');if(box)body.lineas=leer(box);const estado=f.querySelector('[data-estado]');if(estado)body.partidas=leer(estado);if(f===oc&&body.modo==='manual')body.precios=Object.fromEntries(body.lineas.map(l=>[l.codigo,l.precio_unitario]));const file=f.querySelector('[data-archivo]')?.files[0];if(file)body.archivo=await archivo(file);const xml=f.querySelector('[data-xml]')?.files[0];if(xml)body.xml=await archivo(xml);const respuesta=await api(f.dataset.api,body);if(respuesta.redirect)location.assign(respuesta.redirect);else location.reload();}catch(e){const local=f.querySelector('[data-form-status]');if(local){local.hidden=false;local.className='alert alert-danger';local.textContent=e.message;}else aviso(e.message,true);if(btn)btn.disabled=false;}
   }));
   oc?.addEventListener('input',()=>{const ls=leer(document.getElementById('oc-lineas'));const total=ls.reduce((s,l)=>{const base=Math.round(Number(l.cantidad)*Number(l.precio_unitario)*100)/100;return s+base+Math.round(base*Number(l.iva))/100;},0);document.getElementById('oc-total').textContent=`Total estimado: ${Number.isFinite(total)?total.toFixed(2):'Complete los precios'}`;});
   document.querySelector('[data-xml]')?.addEventListener('change',async e=>{

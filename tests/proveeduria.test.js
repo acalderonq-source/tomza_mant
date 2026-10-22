@@ -33,7 +33,7 @@ async function servidor(user,run){
 }
 test('pantalla separada reutiliza estilos de Taller y no consulta sus tablas',async()=>{
   const original=pool.query;pool.query=async sql=>{assert.match(sql,/prov_/);assert.doesNotMatch(sql,/ordenes_compra|repuestos|bodega_items/);return [[]];};
-  try{await servidor(gestor,async base=>{const r=await fetch(base);assert.equal(r.status,200);const html=await r.text();for(const s of ['Solicitudes','Órdenes de compra','Inventario de Proveeduría','Conciliación','topbar','simple-hero','--bg:'])assert.ok(html.includes(s),s);});}finally{pool.query=original;}
+  try{await servidor(gestor,async base=>{const r=await fetch(base);assert.equal(r.status,200);const html=await r.text();for(const s of ['Solicitudes','Órdenes de compra','Bodega Proveeduría','Conciliación','topbar','simple-hero','--bg:'])assert.ok(html.includes(s),s);});}finally{pool.query=original;}
 });
 test('órdenes de Proveeduría usan el formulario real de Taller y el listado conserva filtros propios',async()=>{
   const original=pool.query;pool.query=async sql=>{assert.match(sql,/prov_proveedores|prov_documentos|usuarios_sedes|prov_inventario_bajas/);return [[]];};

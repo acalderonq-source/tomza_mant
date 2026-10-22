@@ -203,6 +203,7 @@ function definirOrden(orden, proveedor = {}, lineas = []) {
         layout: "lightHorizontalLines",
         margin: [0, 0, 0, 8]
       },
+      ...(orden.lugar_entrega ? [{text: [{text:'Entregar en: ',bold:true},orden.lugar_entrega],margin:[0,0,0,8]}] : []),
       {
         table: {
           headerRows: 1,

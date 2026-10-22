@@ -506,6 +506,7 @@
 
   <section class="module-tabs mb-3">
     <a class="module-tab <%= paginaActual === 'inicio' ? 'active' : '' %>" href="/bodega">Inicio</a>
+    <% if(['ADMIN','BODEGA','BODEGUERO'].includes(user.rol)||user.accesoPersonal?.permisos?.BODEGA==='GESTION'){ %><a class="module-tab" href="/proveeduria/inventario#solicitudes-bodega">Bodega Proveeduría · Solicitudes</a><% } %>
     <a class="module-tab <%= paginaActual === 'entregas' ? 'active' : '' %>" href="/bodega/entregas">Entregas</a>
     <a class="module-tab <%= paginaActual === 'compatibilidad' ? 'active' : '' %>" href="/bodega/compatibilidad">Compatibilidad</a>
     <a class="module-tab <%= paginaActual === 'consignacion' ? 'active' : '' %>" href="/bodega/consignacion">Consignación</a>

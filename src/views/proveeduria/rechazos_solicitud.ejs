@@ -1,0 +1,9 @@
+<% if(pedido.rechazos?.length){ %>
+<div class="alert alert-warning mt-2 mb-2">
+  <strong><%= pedido.estado==='RECHAZADA'?'Pedido rechazado':'Productos que no se comprarán' %></strong>
+  <% pedido.rechazos.forEach(r=>{ %>
+  <div class="mt-1"><%= r.cantidad %> × <%= r.descripcion %>: <strong><%= r.motivo %></strong></div>
+  <small><%= r.responsable %> · <%= new Date(r.fecha).toLocaleString('es-CR',{timeZone:'America/Costa_Rica'}) %></small>
+  <% }) %>
+</div>
+<% } %>

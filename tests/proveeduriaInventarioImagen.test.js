@@ -49,6 +49,7 @@ test('aparecen una vez en solicitudes y en inventario; recepción y entrega regi
   const inv=await fetch(base+'/inventario');assert.equal(inv.status,200);assert.match(await inv.text(),/Anclaje 90 cm/);
   existe=false;assert.equal((await fetch(base+'/solicitudes',json(pedido))).status,400);assert.equal(docs.size,0);existe=true;
   assert.equal((await fetch(base+'/solicitudes',json(pedido))).status,200);assert.equal(docs.get(1).datos.lineas[0].inventariable,undefined);
+  gestor.rol='BODEGUERO';try{assert.equal((await fetch(base+'/solicitudes/1/solicitar-compra',{method:'POST'})).status,200);}finally{gestor.rol='PROVEEDURIA';}
   assert.equal((await fetch(base+'/solicitudes/1/cotizacion',{method:'POST',body:form(),redirect:'manual'})).status,302);
   assert.equal((await fetch(base+'/ordenes',{method:'POST',body:form(),redirect:'manual'})).status,302);
   assert.equal(esNoInventariable(docs.get(2).datos.lineas[0]),false);
@@ -56,6 +57,7 @@ test('aparecen una vez en solicitudes y en inventario; recepción y entrega regi
   const recibo={token:'a'.repeat(32),version:0,referencia:'Entrega física de anclajes',lineas:[{codigo:anclaje.codigo,cantidad:2}]};
   assert.equal((await fetch(base+'/ordenes/2/recibir',json(recibo))).status,200);assert.equal(cantidad,2);assert.equal(movimientos.length,1);assert.equal(movimientos[0][0],'ENTRADA_OC');
   assert.equal((await (await fetch(base+'/ordenes/2/recibir',json(recibo))).json()).repetida,true);assert.equal(cantidad,2);
-  assert.equal((await fetch(base+'/salidas',json({solicitud_id:1}))).status,200);assert.equal(cantidad,0);assert.equal(movimientos.length,2);assert.equal(movimientos[1][0],'SALIDA_PEDIDO');
+  assert.equal((await fetch(base+'/salidas',json({solicitud_id:1}))).status,200);assert.equal(cantidad,2);assert.equal(movimientos.length,1);
+  assert.equal((await fetch(base+'/salidas/3/enviar',{method:'POST'})).status,200);assert.equal(cantidad,0);assert.equal(movimientos.length,2);assert.equal(movimientos[1][0],'SALIDA_PEDIDO');
  }finally{pool.query=oq;pool.getConnection=oc;await new Promise(r=>s.close(r));}
 });

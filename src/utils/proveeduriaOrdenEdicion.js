@@ -14,7 +14,14 @@ function versionOrden(row){
   const ordenar=x=>Array.isArray(x)?x.map(ordenar):x&&typeof x==='object'?Object.fromEntries(Object.keys(x).sort().map(k=>[k,ordenar(x[k])])):x;
   return hash(JSON.stringify(ordenar({sede:row.sede,datos:d})));
 }
+function lugarEntrega(valor){
+  exigir(valor===undefined||typeof valor==='string','Lugar de entrega inválido');
+  const lugar=String(valor||'').trim();
+  exigir(lugar.length<=500,'El lugar de entrega admite hasta 500 caracteres');
+  return lugar;
+}
 function cambiosOrden(b,solicitud){
+  b={...b,lugar_entrega:lugarEntrega(b.lugar_entrega)};
   const empresas={'GAS TOMZA':'GAS TOMZA DE COSTA RICA S.A.','SUPER GAS':'ENVASADORA SUPER GAS GLP S.A.'};
   exigir(empresas[b.empresa_destino],'Empresa destinataria inválida');
   exigir(b.origen_formulario==='taller','Use el formulario de edición de la orden');
@@ -27,6 +34,6 @@ function cambiosOrden(b,solicitud){
   const proveedor=String(b.proveedor||'').trim(),entrega=String(b.entrega||'').trim(),correos=correosValidos(String(b.email||''));
   exigir(proveedor&&entrega&&correos.length,'Complete proveedor, correo válido y plazo de entrega');
   exigir(['CRC','USD'].includes(b.moneda),'Moneda inválida');
-  return {lineas,...totalesConAjustes(lineas,{...b,iva:13,iva_global:false}),...condicionesOrden(b),proveedor,email:correos.join(', '),entrega,moneda:b.moneda,empresa_destino:b.empresa_destino,razon_social:empresas[b.empresa_destino],proveedor_telefono:String(b.proveedor_telefono||'').trim().slice(0,120),proveedor_direccion:String(b.proveedor_direccion||'').trim().slice(0,4000),observaciones:String(b.observaciones||''),placa_unidad:String(b.placa_unidad||''),iva_global:false};
+  return {lineas,...totalesConAjustes(lineas,{...b,iva:13,iva_global:false}),...condicionesOrden(b),proveedor,email:correos.join(', '),entrega,lugar_entrega:b.lugar_entrega,moneda:b.moneda,empresa_destino:b.empresa_destino,razon_social:empresas[b.empresa_destino],proveedor_telefono:String(b.proveedor_telefono||'').trim().slice(0,120),proveedor_direccion:String(b.proveedor_direccion||'').trim().slice(0,4000),observaciones:String(b.observaciones||''),placa_unidad:String(b.placa_unidad||''),iva_global:false};
 }
-module.exports={motivoBloqueoOrden,versionOrden,cambiosOrden};
+module.exports={motivoBloqueoOrden,versionOrden,cambiosOrden,lugarEntrega};

@@ -9,20 +9,20 @@
 <% if(user.departamentos?.length>1){ %><form method="POST" action="/departamento/activo" class="d-flex gap-2 align-items-center"><label for="area" class="small">Área</label><select id="area" name="departamento" class="form-select form-select-sm" onchange="this.form.submit()"><% user.departamentos.forEach(a=>{ %><option value="<%= a %>" <%= a===user.departamentoActivo?'selected':'' %>><%= a==='PROVEEDURIA'?'Proveeduría':a==='TALLER'?'Taller':a %></option><% }) %></select></form><% } %>
 <span class="small"><%= user.usuario %> · Proveeduría</span><a href="/logout" class="btn btn-warning btn-sm rounded-pill px-3">Salir</a></div></nav>
 <main class="container-fluid shell py-3">
-<section class="simple-hero mb-2"><div class="d-flex justify-content-between align-items-start gap-3 flex-wrap"><div><h1 class="page-title">Inicio</h1><div class="page-subtitle">Departamento: <strong>Proveeduría</strong> · Sede: <strong><%= sedeActual %></strong> · <%= new Date().toLocaleDateString('es-CR',{timeZone:'America/Costa_Rica'}) %></div></div><a class="btn btn-dark btn-sm rounded-pill px-3" href="/proveeduria/solicitudes"><i class="bi bi-clipboard-check"></i> Solicitudes recibidas</a></div></section>
+<section class="simple-hero mb-2"><div class="d-flex justify-content-between align-items-start gap-3 flex-wrap"><div><h1 class="page-title">Inicio</h1><div class="page-subtitle">Departamento: <strong>Proveeduría</strong> · Sede: <strong><%= sedeActual %></strong> · <%= new Date().toLocaleDateString('es-CR',{timeZone:'America/Costa_Rica'}) %></div></div><a class="btn btn-dark btn-sm rounded-pill px-3" href="/proveeduria/inventario#solicitudes-bodega"><i class="bi bi-clipboard-check"></i> Solicitudes recibidas</a></div></section>
 <%
 const ordenes=docs.filter(d=>d.tipo==='oc');
-const solicitudes=docs.filter(d=>d.tipo==='solicitud'&&['PENDIENTE','COTIZADA'].includes(d.datos.estado));
+const solicitudes=docs.filter(d=>d.tipo==='solicitud'&&pendienteRevision(d.datos));
 const facturas=docs.filter(d=>['oc','factura_portal'].includes(d.tipo)&&['PENDIENTE','CONTABILIDAD'].includes(d.datos.factura?.estado));
 const salidas=docs.filter(d=>d.tipo==='salida'&&d.datos.estado!=='RECIBIDA');
-const indicadores=[['Solicitudes pendientes',solicitudes.length,'Pendientes de orden de compra'],['Órdenes por recibir',ordenes.filter(d=>d.datos.estado!=='RECIBIDA').length,'Mercadería pendiente de recepción'],['Facturas por revisar',facturas.length,'Aceptación y revisión contable'],['Pedidos en proceso',salidas.length,'Alistando o en camino']];
+const indicadores=[['Solicitudes pendientes',solicitudes.length,'Pendientes de revisión en Bodega'],['Órdenes por recibir',ordenes.filter(d=>d.datos.estado!=='RECIBIDA').length,'Mercadería pendiente de recepción'],['Facturas por revisar',facturas.length,'Aceptación y revisión contable'],['Pedidos en proceso',salidas.length,'Alistando o en camino']];
 const modulos=[
 ['Bandeja del portal','/proveeduria/portal-proveedores/facturas','bi-receipt','icon-amber','Validación Hacienda y revisión de facturas de proveedores.'],
 ...(['ADMIN','CONTABILIDAD'].includes(user.rol)?[['Cuentas por pagar','/proveeduria/cuentas-por-pagar','bi-journal-check','icon-green','Facturas, aceptación Hacienda, vencimientos y saldos.']]:[]),
-['Solicitudes','/proveeduria/solicitudes','bi-clipboard-check','icon-blue','Recibir solicitudes de otros departamentos, cotizar y gestionar la entrega.'],
+['Solicitudes','/proveeduria/inventario#solicitudes-bodega','bi-clipboard-check','icon-blue','Recibir solicitudes de otros departamentos, cotizar y gestionar la entrega.'],
 ['Órdenes de compra','/proveeduria/ordenes','bi-receipt','icon-green','Cotizaciones, órdenes manuales, PDF y envío al proveedor.'],
 ['Proveedores','/proveeduria/proveedores','bi-building','icon-green','Consultar el catálogo de proveedores de Proveeduría.'],
-['Inventario de Proveeduría','/proveeduria/inventario','bi-box-seam','icon-amber','Consultar existencias e ingresar mercadería recibida.'],
+['Bodega Proveeduría','/proveeduria/inventario','bi-box-seam','icon-amber','Consultar existencias e ingresar mercadería recibida.'],
 ['Administrar productos','/proveeduria/catalogo','bi-list-check','icon-red','Consultar y eliminar productos del catálogo y del inventario.'],
 ['Recepciones de OC','/proveeduria/recepciones','bi-box-arrow-in-down','icon-green','Registrar mercadería recibida, entregas parciales y cantidades pendientes.'],
 ['Salidas de inventario','/proveeduria/salidas','bi-truck','icon-blue','Imprimir salidas y confirmar la recepción del pedido.'],

@@ -1,0 +1,14 @@
+<% const productosVigentes=s.lineas.filter(l=>!s.rechazos?.some(r=>r.codigo===l.codigo)); const productosLibres=productosVigentes.filter(l=>!s.agrupaciones_compra?.some(g=>!g.cancelada&&g.codigo===l.codigo)); if(typeof puedeCompra!=='undefined'&&puedeCompra&&productosLibres.length&&!s.oc_id&&!s.salida_id&&s.estado!=='RECHAZADA'&&s.estado!=='REPOSICION_RECIBIDA'){ %>
+<form class="mt-2" data-api="/proveeduria/solicitudes/<%= d.id %>/aceptar" data-revision-productos>
+  <p class="small text-muted">Desmarque lo que no se va a comprar y escriba la justificación al lado. Los productos marcados se atienden desde Bodega si hay existencias.</p>
+  <div class="table-responsive"><table class="table table-sm align-middle"><thead><tr><th>Producto</th><th>Cantidad</th><th>Se va a comprar</th><th>Justificación</th></tr></thead><tbody>
+    <% productosLibres.forEach(l=>{ %><tr data-revision-producto data-codigo="<%= l.codigo %>">
+      <td><strong><%= l.descripcion %></strong><%- include('existencia_solicitud',{revision:s.existencias,codigo:l.codigo}) %></td>
+      <td><%= l.cantidad %></td>
+      <td><label class="form-check"><input type="checkbox" class="form-check-input" data-comprar-producto aria-label="Comprar <%= l.descripcion %>" checked><span class="form-check-label">Sí</span></label></td>
+      <td><div data-justificacion-rechazo hidden><label class="small w-100">¿Por qué no se va a comprar?<textarea class="form-control form-control-sm" data-motivo-rechazo aria-label="Justificación para <%= l.descripcion %>" maxlength="2000" rows="2" disabled></textarea></label></div><span class="small text-muted" data-producto-incluido>Producto incluido</span></td>
+    </tr><% }) %>
+  </tbody></table></div>
+  <button class="btn btn-success">Guardar revisión de productos</button>
+</form>
+<% } %>

@@ -1,0 +1,76 @@
+<%
+const documentos=typeof docsBodega==='undefined'?[]:docsBodega;
+const pedidos=documentos.filter(d=>d.tipo==='solicitud'&&d.datos.origen!=='COMPRA_CONSOLIDADA');
+const pendientes=pedidos.filter(d=>pendienteRevision(d.datos));
+const revisados=pedidos.filter(d=>!pendienteRevision(d.datos));
+const candidatos=revisados.filter(d=>d.datos.compra&&!d.datos.oc_id&&!d.datos.salida_id&&!['RECHAZADA','REPOSICION_RECIBIDA','CANCELADA'].includes(d.datos.estado));
+const planActual=planCompra(candidatos,existenciasBodega||[]);
+const grupos=new Map();
+for(const d of revisados){
+  const s=d.datos;
+  if(!s.compra||s.oc_id||s.salida_id||['RECHAZADA','REPOSICION_RECIBIDA','CANCELADA'].includes(s.estado))continue;
+  for(const l of sinAgrupar(s)){
+    const actual=planActual.get(JSON.stringify([d.id,l.codigo]));
+    const g=grupos.get(l.codigo)||{codigo:l.codigo,descripcion:l.descripcion,cantidad:0,solicitada:0,bodega:0,existencia:actual.existencia,seleccion:[],origenes:[]};
+    g.cantidad=Math.round((g.cantidad+actual.cantidad)*1000)/1000;
+    g.solicitada=Math.round((g.solicitada+actual.solicitada)*1000)/1000;
+    g.bodega=Math.round((g.bodega+actual.bodega)*1000)/1000;
+    g.existencia=Math.max(g.existencia,actual.existencia);
+    g.seleccion.push({solicitud_id:d.id,codigo:l.codigo});
+    g.origenes.push({id:d.id,sede:d.sede,departamento:s.departamento,unidad:s.unidad,nombre:s.solicitante||'Usuario '+d.usuario_id,cantidad:actual.solicitada});
+    grupos.set(l.codigo,g);
+  }
+}
+const agrupadas=documentos.filter(d=>d.tipo==='solicitud'&&d.datos.origen==='COMPRA_CONSOLIDADA'&&d.datos.estado!=='CANCELADA');
+const etiquetas={PENDIENTE_BODEGA:'Pendiente de revisión',SOLICITUD_COMPRA:'Aceptada · Pendiente de compra',AGRUPADA:'Lista para orden de compra',COTIZADA:'Cotización adjunta',ORDENADA:'Orden de compra generada',COMPRA_PARCIAL:'Compra parcial',LISTA_PARA_ENTREGA:'Lista para entrega',ALISTANDO:'Boleta preparada',EN_CAMINO:'Salida registrada · Pendiente de confirmación',ENTREGADA:'Entregada',RECHAZADA:'Rechazada',COMPRA_RECIBIDA:'Compra recibida',REPOSICION_RECIBIDA:'Reposición recibida',CANCELADA:'Cancelada'};
+%>
+<section class="panel mb-3" id="solicitudes-bodega">
+  <div class="panel-head"><div><h2 class="panel-title">Solicitudes pendientes (<%= pendientes.length %>)</h2><p class="panel-copy">Abra una solicitud para revisar sus productos y aceptarla o rechazarla. Las atendidas pasan al historial.</p></div></div>
+  <div class="panel-body">
+  <% if(!pendientes.length){ %><p class="text-muted">No hay solicitudes pendientes de revisión.</p><% } %>
+  <% pendientes.forEach(d=>{const s=d.datos; %>
+    <details class="border rounded p-3 mb-2" id="solicitud-<%= d.id %>">
+      <summary><strong><%= d.sede %> · <%= s.departamento||'Sin departamento' %><%= s.unidad?' · '+s.unidad:'' %> · PR-<%= d.id %></strong><span class="d-block small mt-1">Solicitante: <%= s.solicitante||'Usuario '+d.usuario_id %></span></summary>
+      <p class="mt-2"><%= s.motivo||'' %></p>
+      <% if(puedeAtender){ %><%- include('rechazar_pedido_form',{d,s,puedeCompra:puedeAtender}) %><% }else{ %><div class="table-responsive"><table class="table table-sm"><thead><tr><th>Producto</th><th>Cantidad</th><th>Bodega al solicitar</th></tr></thead><tbody>
+        <% s.lineas.forEach(l=>{const rechazo=s.rechazos?.find(r=>r.codigo===l.codigo); %><tr><td><%= l.descripcion %><% if(rechazo){ %><div class="text-danger">Rechazado: <%= rechazo.motivo %></div><% } %></td><td><%= l.cantidad %></td><td><%- include('existencia_solicitud',{revision:s.existencias,codigo:l.codigo}) %></td></tr><% }) %>
+      </tbody></table></div>
+      <% } %>
+    </details>
+  <% }) %>
+  </div>
+</section>
+<section class="panel mb-3" id="compras-bodega">
+  <div class="panel-head"><div><h2 class="panel-title">Productos aceptados por comprar</h2><p class="panel-copy">Solo se compra el faltante después de considerar la existencia actual de Bodega. Las reposiciones por stock bajo se compran para reabastecer.</p></div></div>
+  <div class="panel-body">
+  <form data-api="/proveeduria/inventario/agrupar" data-consolidar>
+    <div class="table-responsive"><table class="table"><thead><tr><th>Seleccionar</th><th>Producto</th><th>Solicitado</th><th>Hay en Bodega</th><th>Se atiende de Bodega</th><th>Total a comprar</th><th>Desglose de solicitudes</th></tr></thead><tbody>
+    <% if(!grupos.size){ %><tr><td colspan="7" class="text-muted">No hay productos aceptados pendientes de agrupar.</td></tr><% } %>
+    <% for(const g of grupos.values()){ %><tr><td><input class="form-check-input" type="checkbox" name="productos" value="<%= JSON.stringify(g.seleccion) %>" aria-label="Seleccionar <%= g.descripcion %>" <%= puedeAtender&&g.cantidad>0?'':'disabled' %>></td><td><strong><%= g.descripcion %></strong><div class="small"><%= g.codigo %></div><% if(!g.cantidad){ %><div class="text-success small">Hay suficiente: preparar boleta de entrega desde el pedido.</div><% } %></td><td><%= g.solicitada %></td><td><%= g.existencia %></td><td><%= g.bodega %></td><td><strong><%= g.cantidad %></strong></td><td><% g.origenes.forEach(o=>{ %><div><%= o.departamento %><%= o.unidad?' · '+o.unidad:'' %> · <%= o.sede %> · <%= o.nombre %>: <strong><%= o.cantidad %></strong> (PR-<%= o.id %>)</div><% }) %></td></tr><% } %>
+    </tbody></table></div>
+    <% if(puedeAtender&&grupos.size){ %><button class="btn btn-primary">Preparar orden con productos seleccionados</button><% } %>
+  </form>
+  </div>
+</section>
+<section class="panel mb-3" id="ordenes-agrupadas">
+  <div class="panel-head"><div><h2 class="panel-title">Compras agrupadas y distribución</h2><p class="panel-copy">La OC compra el total; este desglose conserva lo que corresponde a cada sede, departamento y persona.</p></div></div>
+  <div class="panel-body">
+  <% if(!agrupadas.length){ %><p class="text-muted">Todavía no hay compras agrupadas.</p><% } %>
+  <% agrupadas.forEach(d=>{const s=d.datos; %><details class="border rounded p-3 mb-2" id="compra-<%= d.id %>" <%= s.oc_id?'':'open' %>>
+    <summary><strong><%= s.oc_id?'Orden de compra PR-'+s.oc_id:'Compra agrupada PR-'+d.id %></strong> · <%= etiquetas[s.estado]||s.estado %></summary>
+    <div class="table-responsive mt-2"><table class="table table-sm"><thead><tr><th>Producto</th><th>Total</th><th>Asignación</th></tr></thead><tbody>
+    <% s.lineas.forEach(l=>{ %><tr><td><%= l.descripcion %></td><td><%= l.cantidad %></td><td><% s.desglose.filter(x=>x.codigo===l.codigo).forEach(x=>{ %><div><%= x.departamento %><%= x.unidad?' · '+x.unidad:'' %> · <%= x.sede %> · <%= x.solicitante %>: <strong><%= x.cantidad %></strong> (PR-<%= x.solicitud_id %>)</div><% }) %></td></tr><% }) %>
+    </tbody></table></div>
+    <% if(s.oc_id){ %><a class="btn btn-outline-primary btn-sm" href="/proveeduria/ordenes/<%= s.oc_id %>">Ver orden de compra</a><% }else if(puedeAtender){ %><% if(puedeCompra){ %><a class="btn btn-outline-primary btn-sm" href="/proveeduria/solicitudes/<%= d.id %>/cotizacion"><%= s.cotizacion?'Revisar cotización adjunta':'Adjuntar cotización' %></a><% if(s.cotizacion){ %> <a class="btn btn-primary btn-sm" href="/proveeduria/ordenes/nueva?solicitud_id=<%= d.id %>">Generar orden de compra</a><% } %><% }else{ %><p class="small text-muted">Proveeduría debe adjuntar la cotización y generar la OC de este grupo.</p><% } %><form class="mt-2" data-api="/proveeduria/agrupaciones/<%= d.id %>/cancelar" data-confirm="¿Cancelar esta agrupación y devolver sus cantidades a productos pendientes?"><button class="btn btn-sm btn-outline-secondary">Cancelar agrupación</button></form><% } %>
+  </details><% }) %>
+  </div>
+</section>
+<details class="panel mb-3" id="historial-solicitudes"><summary class="panel-head"><strong>Historial de solicitudes atendidas (<%= revisados.length %>)</strong></summary><div class="panel-body">
+  <% revisados.forEach(d=>{const s=d.datos; %><details class="border rounded p-3 mb-2"><summary><%= d.sede %> · <%= s.departamento %><%= s.unidad?' · '+s.unidad:'' %> · <%= s.solicitante||'Usuario '+d.usuario_id %> · PR-<%= d.id %> · <%= etiquetas[s.estado]||s.estado %></summary>
+    <%- include('rechazos_solicitud',{pedido:s}) %>
+    <% if(s.revision_bodega){ %><p class="small">Aceptada por <%= s.revision_bodega.responsable %> el <%= new Date(s.revision_bodega.fecha).toLocaleString('es-CR',{timeZone:'America/Costa_Rica'}) %>.</p><% } %>
+    <% s.lineas.forEach(l=>{ %><div><%= l.cantidad %> × <%= l.descripcion %></div><% }) %>
+    <%- include('rechazar_pedido_form',{d,s,puedeCompra:puedeAtender}) %>
+    <% if(s.salida_id){ %><a class="btn btn-sm btn-outline-primary mt-2" href="/proveeduria/salidas">Ver boleta y registrar entrega</a><% }else if(puedeAtender&&s.revision_bodega&&s.estado!=='RECHAZADA'&&s.origen!=='REPOSICION_STOCK'){ %><form class="mt-2" data-api="/proveeduria/salidas"><input type="hidden" name="solicitud_id" value="<%= d.id %>"><button class="btn btn-sm btn-success">Generar boleta de entrega</button><span class="small ms-2">Requiere existencia suficiente y compras pendientes recibidas.</span></form><% } %>
+  </details><% }) %>
+</div></details>

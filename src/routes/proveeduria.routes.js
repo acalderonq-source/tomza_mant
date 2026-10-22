@@ -1,7 +1,7 @@
 const router = require('express').Router();
 const {facturasDeOrden,vincularOrden,adjuntarFacturas}=require('../utils/portalFacturaOrden');
 const {articulosExcel,articuloExcel,ivaArticulo,condicionesOrden}=require('../utils/proveeduriaCatalogo');
-const {motivoBloqueoOrden,versionOrden,cambiosOrden}=require('../utils/proveeduriaOrdenEdicion');
+const {motivoBloqueoOrden,versionOrden,cambiosOrden,lugarEntrega}=require('../utils/proveeduriaOrdenEdicion');
 const {articulosSinInventario,articuloSolicitud,articuloSolicitudDescripcion,esNoInventariable,catalogoParaOrden,codigoInventario}=require('../utils/proveeduriaSolicitable');
 const {CATEGORIAS_SOLICITUD,categoriaArticulo,agruparArticulos}=require('../utils/proveeduriaCategorias');
 const { leerFacturaXML, consultarHacienda, aprobable, vencimiento } = require('../utils/proveedorHacienda');
@@ -20,6 +20,12 @@ const {GRUPOS,TIPOS,cantidadInventario,fichaInventario,estadoStock,guardarFichaI
 const {resumenRecepcion,leerRecepcion,validarPendientes}=require('../utils/proveeduriaRecepciones');
 const { exigir, numero, lineasCompra, totales, totalesConAjustes, compararFactura, saldo, hash, adjunto, conciliarEstado } = require('../utils/proveeduria');
 const gestion = u => ['ADMIN','PROVEEDURIA','PROVEEDURIA_TALLER','BODEGA','BODEGUERO'].includes(u?.rol);
+const bodeguero = u => ['ADMIN','BODEGA','BODEGUERO'].includes(u?.rol)||u?.accesoPersonal?.permisos?.BODEGA==='GESTION';
+const {lineasActivas,lineasCompraPendientes:lineasPorComprar,rechazarProductos,revisarProductos}=require('../utils/solicitudCompras');
+const {sinAgrupar,pendienteRevision,estadoAgrupado,agruparSeleccion,asignaciones,planCompra}=require('../utils/proveeduriaAgrupacion');
+const puedeComprar = u => ['ADMIN','PROVEEDURIA','PROVEEDURIA_TALLER'].includes(u?.rol);
+const solicitudCerrada = s => ['RECHAZADA','REPOSICION_RECIBIDA','COMPRA_RECIBIDA','CANCELADA'].includes(s.estado);
+function validarPasoBodega(s){exigir(!asignaciones(s).length,'Este pedido se compra desde sus agrupaciones. Revise Bodega Proveeduría');exigir(!solicitudCerrada(s)&&lineasPorComprar(s).length,'Este pedido está cerrado o no tiene productos por comprar');exigir(!s.requiere_revision_bodega||s.compra,'Bodega debe generar primero la solicitud de compra por los faltantes');}
 const gestionCatalogo=u=>gestion(u)&&(!u.accesoPersonal||require('../utils/accesosTrabajador').puedeAcceder(u.accesoPersonal,'/proveeduria/catalogo/eliminar','POST'));
 async function cargarBajas(db){const [rows]=await db.query('SELECT codigo FROM prov_inventario_bajas');return new Set(rows.map(r=>r.codigo).filter(Boolean));}
 const disponible=(codigo,bajas)=>!bajas.has(codigoInventario(codigo));
@@ -51,6 +57,18 @@ async function transaccion(fn) {
   const db = await pool.getConnection();
   try { await db.beginTransaction(); const result = await fn(db); await db.commit(); return result; }
   catch(e) { await db.rollback(); throw e; } finally { db.release(); }
+}
+async function actualizarPedidosAgrupados(db,agrupada,cambios,actor){
+  if(agrupada.datos.origen!=='COMPRA_CONSOLIDADA')return;
+  const ids=[...new Set(agrupada.datos.desglose.map(l=>l.solicitud_id))].sort((a,b)=>a-b);
+  for(const id of ids){
+    const pedido=await documento(db,id,'solicitud',true);
+    const partes=(pedido.datos.agrupaciones_compra||[]).filter(g=>g.solicitud_agrupada_id===agrupada.id&&!g.cancelada);
+    exigir(partes.length,'El desglose de la compra cambió; revise las solicitudes');
+    partes.forEach(g=>Object.assign(g,cambios));
+    pedido.datos.estado=estadoAgrupado(pedido.datos);
+    await guardar(db,pedido,actor,'Actualización del desglose de compra agrupada');
+  }
 }
 function visible(req,row) {
   if (!gestion(req.session.user) && !contabilidad(req.session.user) && row.usuario_id !== req.session.user.id) throw error(403,'No autorizado');
@@ -97,8 +115,9 @@ router.use(wrap(async(req,res,next) => {
   }
   if (!req.session.user) return res.redirect('/login');
   const u = req.session.user;
-  const compartida=(req.method==='GET'&&['/mis-solicitudes','/alertas'].includes(req.path))||(req.method==='POST'&&(req.path==='/solicitudes'||/^\/salidas\/\d+\/aceptar$/.test(req.path)));
+  const compartida=(req.method==='GET'&&(['/mis-solicitudes','/alertas'].includes(req.path)||/^\/salidas\/\d+\/imprimir$/.test(req.path)))||(req.method==='POST'&&(req.path==='/solicitudes'||/^\/salidas\/\d+\/aceptar$/.test(req.path)));
   if(compartida&&esDepartamentoValido(u.departamentoActivo)&&!['PANTALLA_MECANICOS','PANTALLA_PESADOS'].includes(u.rol))return next();
+  if(bodeguero(u)&&(['/inventario','/inventario/agrupar','/solicitudes','/salidas','/alertas'].includes(req.path)||/^\/solicitudes\/\d+\/(solicitar-compra|aceptar|rechazar)$/.test(req.path)||/^\/agrupaciones\/\d+\/cancelar$/.test(req.path)||/^\/salidas\/\d+\/(enviar|imprimir)$/.test(req.path)))return next();
   if (!(u.departamentos || []).includes('PROVEEDURIA') && !['PROVEEDURIA','CONTABILIDAD'].includes(u.departamentoActivo) && u.rol !== 'ADMIN') throw error(403,'Sin acceso a Proveeduría');
   next();
 }));
@@ -115,15 +134,15 @@ router.get('/mis-solicitudes',wrap(async(req,res)=>{
   res.render('proveeduria/mis_solicitudes',{user:u,docs:rows.map(datos),alertas,sedesPermitidas,articulos:catalogo,categorias:CATEGORIAS_SOLICITUD,agruparArticulos,sedeActual:sedesPermitidas.includes(actual)?actual:''});
 }));
 router.get('/solicitudes',wrap(async(req,res)=>{
-  if(!gestion(req.session.user))throw error(403,'Solo Proveeduría puede gestionar solicitudes');
+  if(!gestion(req.session.user)&&!bodeguero(req.session.user))throw error(403,'Solo Bodega o Proveeduría pueden gestionar solicitudes');
   const [rows]=await pool.query("SELECT * FROM prov_documentos WHERE tipo='solicitud' ORDER BY id DESC LIMIT 500");
-  res.render('proveeduria/solicitudes',{user:req.session.user,docs:rows.map(datos),puedeGestion:true,agruparArticulos});
+  res.render('proveeduria/solicitudes',{user:req.session.user,docs:rows.map(datos),puedeGestion:true,puedeBodega:bodeguero(req.session.user),puedeCompra:puedeComprar(req.session.user),agruparArticulos});
 }));
 // Compatibilidad con enlaces antiguos: la pantalla única fue reemplazada por módulos.
 router.get('/gestion',(req,res)=>res.redirect('/proveeduria/ordenes'));
 router.get(['/', '/salidas', '/facturas', '/pagos', '/conciliacion', '/avisos'],wrap(async(req,res) => {
   const u = req.session.user;
-  const completo = gestion(u) || contabilidad(u);
+  const completo = gestion(u) || bodeguero(u) || contabilidad(u);
   const [docs] = await pool.query(`SELECT * FROM prov_documentos ${completo ? '' : 'WHERE usuario_id = ?'} ORDER BY id DESC LIMIT 500`, completo ? [] : [u.id]);
   docs.forEach(datos);
   await adjuntarFacturas(pool,docs);
@@ -132,13 +151,13 @@ router.get(['/', '/salidas', '/facturas', '/pagos', '/conciliacion', '/avisos'],
   const ordenesConciliacion=[...docs,...historicas.map(datos)].filter(d=>d.tipo==='oc');
   if(historicas.length)await adjuntarFacturas(pool,ordenesConciliacion);
   const sedeActual=sedeInventarioCompartido(req.session.sedeSeleccionada || u.sede || 'TODAS');
-  const [alertas] = await pool.query('SELECT * FROM prov_alertas WHERE usuario_id = ? OR grupo = ? ORDER BY id DESC LIMIT 40',[u.id,gestion(u) ? 'PROVEEDURIA' : contabilidad(u) ? 'CONTABILIDAD' : 'USUARIO']);
+  const [alertas] = await pool.query('SELECT * FROM prov_alertas WHERE usuario_id = ? OR grupo = ? ORDER BY id DESC LIMIT 40',[u.id,bodeguero(u)?'BODEGA':gestion(u) ? 'PROVEEDURIA' : contabilidad(u) ? 'CONTABILIDAD' : 'USUARIO']);
   const modulo=req.path.slice(1),titulos={salidas:'Salidas de inventario',facturas:'Facturas',pagos:'Pagos y comprobantes',conciliacion:'Conciliación',avisos:'Alertas'};
-  res.render(req.path==='/'?'proveeduria/dashboard':'proveeduria/modulo',{user:u,sedeActual,docs,alertas,puedeGestion:gestion(u),puedeContabilidad:contabilidad(u),saldo,conciliarEstado,ordenesConciliacion,modulo,titulo:titulos[modulo]});
+  res.render(req.path==='/'?'proveeduria/dashboard':'proveeduria/modulo',{user:u,sedeActual,docs,alertas,pendienteRevision,puedeGestion:gestion(u)||bodeguero(u),puedeBodega:bodeguero(u),puedeCompra:puedeComprar(u),puedeContabilidad:contabilidad(u),saldo,conciliarEstado,ordenesConciliacion,modulo,titulo:titulos[modulo]});
 }));
 router.get('/alertas',wrap(async(req,res) => {
   const u=req.session.user;
-  const [rows]=await pool.query('SELECT * FROM prov_alertas WHERE id > ? AND (usuario_id = ? OR grupo = ?) ORDER BY id LIMIT 50',[Number(req.query.desde)||0,u.id,gestion(u)?'PROVEEDURIA':contabilidad(u)?'CONTABILIDAD':'USUARIO']);
+  const [rows]=await pool.query('SELECT * FROM prov_alertas WHERE id > ? AND (usuario_id = ? OR grupo = ?) ORDER BY id LIMIT 50',[Number(req.query.desde)||0,u.id,bodeguero(u)?'BODEGA':gestion(u)?'PROVEEDURIA':contabilidad(u)?'CONTABILIDAD':'USUARIO']);
   res.json(rows);
 }));
 async function cargarInventario(req){
@@ -152,13 +171,75 @@ async function cargarInventario(req){
   const bajas=await cargarBajas(pool);
   const inventario=rows.map(a=>({...a,categoria:categoriaArticulo(a)})).filter(a=>disponible(a.codigo,bajas)&&(!filtros.grupo||a.grupo===filtros.grupo)&&(!filtros.estado||estadoStock(a)===filtros.estado)&&(!filtros.q||normal([a.codigo,a.descripcion,a.categoria,a.ubicacion,a.proveedor,a.sede].join(' ')).includes(normal(filtros.q))));
   const [movimientos]=await pool.query(`SELECT * FROM prov_inventario_movimientos WHERE sede IN (${where}) ${filtros.q?'AND (codigo LIKE ? OR descripcion LIKE ? OR motivo LIKE ?)':''} ORDER BY id DESC LIMIT 200`,[...sedes,...filtros.q?Array(3).fill('%'+filtros.q+'%'):[]]);
-  return {inventario:inventario.map(a=>({...a,sede:'GENERAL'})),movimientos:movimientos.map(m=>({...m,sede:'GENERAL'})),sedesPermitidas,filtros};
+  return {inventario:inventario.map(a=>({...a,sede:'GENERAL'})),existenciasBodega:rows,movimientos:movimientos.map(m=>({...m,sede:'GENERAL'})),sedesPermitidas,filtros};
 }
 router.get('/inventario',wrap(async(req,res)=>{
-  if(!gestion(req.session.user)&&!contabilidad(req.session.user))throw error(403,'No autorizado');
+  if(!gestion(req.session.user)&&!bodeguero(req.session.user)&&!contabilidad(req.session.user))throw error(403,'No autorizado');
   const data=await cargarInventario(req);
+  const [documentosBodega]=await pool.query("SELECT * FROM prov_documentos WHERE tipo IN ('solicitud','oc') ORDER BY id DESC LIMIT 2000");
+  const docsBodega=documentosBodega.map(datos);
   const [proveedores]=await pool.query('SELECT nombre FROM prov_proveedores WHERE activo=1 ORDER BY nombre');
-  res.render('proveeduria/inventario',{...data,user:req.session.user,puedeGestion:gestionCatalogo(req.session.user),GRUPOS,TIPOS,estadoStock,proveedores});
+  res.render('proveeduria/inventario',{...data,docsBodega,pendienteRevision,sinAgrupar,planCompra,user:req.session.user,puedeBodega:bodeguero(req.session.user),puedeAtender:bodeguero(req.session.user)||puedeComprar(req.session.user),puedeGestion:gestionCatalogo(req.session.user),GRUPOS,TIPOS,estadoStock,proveedores,puedeCompra:puedeComprar(req.session.user)});
+}));
+router.post('/inventario/agrupar',wrap(async(req,res)=>{
+  if(!puedeComprar(req.session.user)&&!bodeguero(req.session.user))throw error(403,'No autorizado para preparar compras');
+  const seleccion=req.body.seleccion;
+  exigir(Array.isArray(seleccion)&&seleccion.length>0&&seleccion.length<=200,'Seleccione entre 1 y 200 productos aceptados');
+  exigir(seleccion.every(i=>i&&Number.isSafeInteger(i.solicitud_id)&&i.solicitud_id>0&&typeof i.codigo==='string'),'Selección inválida');
+  const resultado=await transaccion(async db=>{
+    const pedidos=[];
+    for(const id of [...new Set(seleccion.map(i=>i.solicitud_id))].sort((a,b)=>a-b))pedidos.push(await documento(db,id,'solicitud',true));
+    const articulos=[];
+    for(const codigo of [...new Set(seleccion.map(i=>codigoInventario(i.codigo)))].sort()){
+      const [rows]=await db.query('SELECT * FROM prov_inventario WHERE sede=? AND codigo=? FOR UPDATE',[ALMACEN_GENERAL,codigo]);
+      if(rows[0])articulos.push(rows[0]);
+    }
+    const agrupacion=agruparSeleccion(pedidos,seleccion,articulos),u=req.session.user;
+    const compra={solicitada_por:u.id,solicitante:u.nombre||u.usuario,solicitada_en:new Date().toISOString(),lineas:agrupacion.lineas};
+    const d={...agrupacion,compra,origen:'COMPRA_CONSOLIDADA',estado:'SOLICITUD_COMPRA',departamento:'PROVEEDURIA',solicitante:compra.solicitante};
+    const [r]=await db.query("INSERT INTO prov_documentos (tipo,usuario_id,sede,datos) VALUES ('solicitud',?,?,?)",[u.id,ALMACEN_GENERAL,JSON.stringify(d)]);
+    for(const p of pedidos){
+      const partes=agrupacion.desglose.filter(l=>l.solicitud_id===p.id).map(l=>({solicitud_agrupada_id:r.insertId,codigo:l.codigo_solicitado,cantidad:l.cantidad_pendiente,orden_id:null,recibida:false}));
+      p.datos.agrupaciones_compra=[...(p.datos.agrupaciones_compra||[]),...partes];
+      if(p.datos.cotizacion){p.datos.cotizaciones_anteriores=[...(p.datos.cotizaciones_anteriores||[]),p.datos.cotizacion];delete p.datos.cotizacion;}
+      p.datos.estado=estadoAgrupado(p.datos);
+      await guardar(db,p,u.id,'Productos agrupados para compra');
+    }
+    await alerta(db,r.insertId,`Compra agrupada PR-${r.insertId}: ${agrupacion.lineas.length} productos`);
+    return {id:r.insertId,redirect:`/proveeduria/inventario#compra-${r.insertId}`};
+  });res.json(resultado);
+}));
+router.post('/agrupaciones/:id/cancelar',wrap(async(req,res)=>{
+  if(!puedeComprar(req.session.user)&&!bodeguero(req.session.user))throw error(403,'No autorizado');
+  await transaccion(async db=>{
+    const p=await documento(db,req.params.id,'solicitud',true);
+    exigir(p.datos.origen==='COMPRA_CONSOLIDADA'&&!p.datos.oc_id&&p.datos.estado!=='CANCELADA','Solo se puede cancelar una agrupación sin OC');
+    await actualizarPedidosAgrupados(db,p,{cancelada:true},req.session.user.id);
+    p.datos.estado='CANCELADA';p.datos.cancelada_en=new Date().toISOString();
+    await guardar(db,p,req.session.user.id,'Agrupación cancelada; cantidades disponibles nuevamente');
+  });res.json({ok:true});
+}));
+router.post('/inventario/reposicion',wrap(async(req,res)=>{
+  if(!puedeComprar(req.session.user))throw error(403,'Solo Proveeduría puede solicitar reposiciones');
+  const codigo=String(req.body.codigo||'').trim();exigir(codigo&&codigo.length<=80,'Seleccione un artículo del inventario');
+  const resultado=await transaccion(async db=>{
+    const [rows]=await db.query('SELECT * FROM prov_inventario WHERE sede=? AND codigo=? FOR UPDATE',[ALMACEN_GENERAL,codigo]);
+    const a=rows[0];exigir(a,'Artículo no encontrado en la bodega general');
+    exigir(disponible(codigo,await cargarBajas(db)),'El artículo está retirado del catálogo');
+    const [fichas]=await db.query('SELECT stock_minimo,stock_maximo FROM prov_inventario_fichas WHERE sede=? AND codigo=?',[ALMACEN_GENERAL,codigo]);
+    Object.assign(a,fichas[0]||{});
+    exigir(['BAJO','AGOTADO'].includes(estadoStock(a)),'El artículo no está bajo de stock. Revise su existencia y mínimo');
+    const [pendientes]=await db.query(`SELECT id,datos FROM prov_documentos WHERE tipo='solicitud' AND JSON_UNQUOTE(JSON_EXTRACT(datos,'$.origen'))='REPOSICION_STOCK' AND JSON_UNQUOTE(JSON_EXTRACT(datos,'$.codigo_reposicion'))=? AND JSON_UNQUOTE(JSON_EXTRACT(datos,'$.estado')) NOT IN ('RECHAZADA','REPOSICION_RECIBIDA') ORDER BY id DESC LIMIT 1`,[codigo]);
+    if(pendientes.length)return {id:pendientes[0].id,repetida:true,redirect:`/proveeduria/inventario#solicitud-${pendientes[0].id}`};
+    const cantidad=cantidadInventario(req.body.cantidad,'Cantidad de reposición');exigir(cantidad>0,'La cantidad debe ser mayor que cero');
+    const lineas=lineasCompra([{codigo:a.codigo,descripcion:a.descripcion,iva:a.iva,cantidad}]);
+    const usuario=req.session.user;
+    const pedido={lineas,origen:'REPOSICION_STOCK',codigo_reposicion:codigo,estado:'SOLICITUD_COMPRA',departamento:'PROVEEDURIA',solicitante:usuario.nombre||usuario.usuario,motivo:String(req.body.motivo||'Reposición por stock bajo').trim().slice(0,2000),reposicion:{existencia:Number(a.cantidad),minimo:Number(a.stock_minimo||0),maximo:Number(a.stock_maximo||0)},compra:{lineas,solicitada_por:usuario.id,solicitante:usuario.nombre||usuario.usuario,solicitada_en:new Date().toISOString()}};
+    const [r]=await db.query("INSERT INTO prov_documentos (tipo,usuario_id,sede,datos) VALUES ('solicitud',?,?,?)",[usuario.id,ALMACEN_GENERAL,JSON.stringify(pedido)]);
+    await db.query('INSERT INTO prov_auditoria (documento_id,actor,accion) VALUES (?,?,?)',[r.insertId,String(usuario.id),'Reposición por stock bajo solicitada']);
+    await alerta(db,r.insertId,`Reposición PR-${r.insertId}: ${cantidad} × ${a.descripcion}`);
+    return {id:r.insertId,redirect:`/proveeduria/inventario#solicitud-${r.insertId}`};
+  });res.json(resultado);
 }));
 router.get('/catalogo',wrap(async(req,res)=>{
   if(!gestion(req.session.user)&&!contabilidad(req.session.user))throw error(403,'No autorizado');
@@ -255,7 +336,7 @@ router.post('/ordenes/:id/editar',wrap(async(req,res)=>{
     if(s)exigir(Number(s.datos.oc_id)===Number(row.id)&&!s.datos.salida_id,'La solicitud cambió o ya tiene una entrega asociada');
     const destino=req.body.sede?await sedeFormulario(req):row.sede;
     if(s?.datos.departamento)exigir(destino===s.sede,'Conserve la sede de la solicitud');
-    const cambios=cambiosOrden(req.body,s);
+    const cambios=cambiosOrden({...req.body,lugar_entrega:req.body.lugar_entrega??row.datos.lugar_entrega},s);
     if(req.body.cotizacion_data){const match=String(req.body.cotizacion_data).match(/^data:[^;]+;base64,(.+)$/);exigir(match,'Cotización inválida');cambios.cotizacion_archivo=await guardarAdjunto(db,adjunto({nombre:req.body.cotizacion_nombre,base64:match[1]}));cambios.cotizacion_nombre=cambios.cotizacion_archivo.nombre;}
     row.datos={...row.datos,...cambios,revision:Number(row.datos.revision||0)+1,editada_en:new Date().toISOString(),editada_por:req.session.user.id};
     delete row.datos.portal_hash;delete row.datos.portal_vence;
@@ -272,7 +353,7 @@ router.post('/ordenes/:id/eliminar',wrap(async(req,res)=>{
     if(!sedesPermitidas.includes(row.sede))throw error(403,'No tiene acceso a la sede de esta OC');
     await ordenModificable(db,row,true);
     exigir(req.body.version===versionOrden(row),'La orden cambió. Recargue el listado antes de eliminar');
-    if(row.datos.solicitud_id){const s=await documento(db,row.datos.solicitud_id,'solicitud',true);exigir(Number(s.datos.oc_id)===Number(row.id)&&!s.datos.salida_id,'La solicitud cambió o ya tiene una entrega asociada');delete s.datos.oc_id;s.datos.estado=s.datos.cotizacion?'COTIZADA':'PENDIENTE';await guardar(db,s,req.session.user.id,'OC eliminada; solicitud disponible nuevamente');}
+    if(row.datos.solicitud_id){const s=await documento(db,row.datos.solicitud_id,'solicitud',true);exigir(Number(s.datos.oc_id)===Number(row.id)&&!s.datos.salida_id,'La solicitud cambió o ya tiene una entrega asociada');delete s.datos.oc_id;await actualizarPedidosAgrupados(db,s,{orden_id:null,recibida:false},req.session.user.id);s.datos.estado=s.datos.cotizacion?'COTIZADA':'PENDIENTE';await guardar(db,s,req.session.user.id,'OC eliminada; solicitud disponible nuevamente');}
     row.datos.eliminada_en=new Date().toISOString();row.datos.eliminada_por=req.session.user.id;delete row.datos.portal_hash;delete row.datos.portal_vence;
     await guardar(db,row,req.session.user.id,'Orden de compra eliminada');
     // Sale de los listados y de los enlaces públicos; se conserva para auditoría.
@@ -312,14 +393,14 @@ router.get(['/ordenes/nueva','/solicitudes/:id/cotizacion'],wrap(async(req,res)=
   proveedores.forEach(p=>{p.correos=leerCorreosJSON(p.correos);});
   const solicitudId=req.params.id||req.query.solicitud_id;
   const solicitud=solicitudId?await documento(pool,solicitudId,'solicitud'):null;
-  if(solicitud)exigir(!solicitud.datos.oc_id&&!solicitud.datos.salida_id,'Esta solicitud ya tiene OC o fue despachada');
+  if(solicitud){exigir(!solicitud.datos.oc_id&&!solicitud.datos.salida_id,'Esta solicitud ya tiene OC o fue despachada');validarPasoBodega(solicitud.datos);}
   if(solicitud&&!esCotizacion&&!solicitud.datos.cotizacion)return res.redirect(`/proveeduria/solicitudes/${solicitud.id}/cotizacion`);
   const sedesPermitidas=solicitud?[solicitud.sede]:await sedesOrden(req);
   const seleccionada=sedeInventarioCompartido(solicitud?.sede||req.session.sedeSeleccionada||req.session.user.sede);
   const sedeActual=sedesPermitidas.includes(seleccionada)?seleccionada:'';
   const cotizacion=solicitud?.datos.cotizacion;
   const precarga=cotizacion?{...cotizacion,cotizacion_archivo:cotizacion.cotizacion_archivo?`/proveeduria/solicitudes/${solicitud.id}/cotizacion/archivo`:null}:null;
-  res.render('compras/orden_form',{orden:precarga,esNuevaOrden:true,solicitudId:solicitud?.id||'',lineas:solicitud?solicitud.datos.lineas.map(l=>({...l,codigo:'',codigo_producto:l.codigo,iva:articuloSolicitud(l.codigo)?.iva??ivaArticulo(l.descripcion,l.iva),precio_unitario:cotizacion?.lineas.find(x=>x.codigo===l.codigo)?.precio_unitario??articuloSolicitud(l.codigo)?.precio_unitario??articuloExcel(l.descripcion)?.precio_unitario??'',subtotal:cotizacion?.lineas.find(x=>x.codigo===l.codigo)?.subtotal??0})):[],proveedores,siguientePO:esCotizacion?'Cotización · Sin OC':'Se asigna al guardar',esProveeduria:true,sedesPermitidas,sedeActual,articulosExcel:await catalogoOrdenDisponible(),tituloOrden:esCotizacion?'Cotizar solicitud PR-'+solicitud.id:'Nueva orden de compra',textoGuardar:esCotizacion?'Guardar cotización':'Guardar orden',subtituloOrden:esCotizacion?`Solicitud de ${solicitud.datos.departamento||'departamento solicitante'} · ${solicitud.datos.solicitante||'Usuario '+solicitud.usuario_id}`:'Departamento de Proveeduría · Complete el encabezado, líneas y totales de la orden.',volverUrl:esCotizacion?'/proveeduria/solicitudes':'/proveeduria/ordenes',cancelarUrl:'/proveeduria/solicitudes',formAction:esCotizacion?`/proveeduria/solicitudes/${solicitud.id}/cotizacion`:'/proveeduria/ordenes'});
+  res.render('compras/orden_form',{orden:precarga,esNuevaOrden:true,solicitudId:solicitud?.id||'',lineas:solicitud?lineasPorComprar(solicitud.datos).map(l=>({...l,codigo:'',codigo_producto:l.codigo,iva:articuloSolicitud(l.codigo)?.iva??ivaArticulo(l.descripcion,l.iva),precio_unitario:cotizacion?.lineas.find(x=>x.codigo===l.codigo)?.precio_unitario??articuloSolicitud(l.codigo)?.precio_unitario??articuloExcel(l.descripcion)?.precio_unitario??'',subtotal:cotizacion?.lineas.find(x=>x.codigo===l.codigo)?.subtotal??0})):[],proveedores,siguientePO:esCotizacion?'Cotización · Sin OC':'Se asigna al guardar',esProveeduria:true,sedesPermitidas,sedeActual,articulosExcel:await catalogoOrdenDisponible(),tituloOrden:esCotizacion?'Cotizar solicitud PR-'+solicitud.id:'Nueva orden de compra',textoGuardar:esCotizacion?'Guardar cotización':'Guardar orden',subtituloOrden:esCotizacion?`Solicitud de ${solicitud.datos.departamento||'departamento solicitante'} · ${solicitud.datos.solicitante||'Usuario '+solicitud.usuario_id}`:'Departamento de Proveeduría · Complete el encabezado, líneas y totales de la orden.',volverUrl:esCotizacion?'/proveeduria/solicitudes':'/proveeduria/ordenes',cancelarUrl:'/proveeduria/solicitudes',formAction:esCotizacion?`/proveeduria/solicitudes/${solicitud.id}/cotizacion`:'/proveeduria/ordenes'});
 }));
 router.get('/solicitudes/:id/cotizacion/archivo',wrap(async(req,res)=>{
   if(!gestion(req.session.user))throw error(403,'No autorizado');
@@ -356,9 +437,72 @@ router.post('/solicitudes',wrap(async(req,res) => {
       return {codigo:a.codigo,descripcion:a.descripcion,iva:Number(a.iva),cantidad:l.cantidad};
     })).map(l=>({...l,categoria:categoriaArticulo(catalogo.get(l.codigo))}));
     const existencias=require('../utils/solicitudExistencias').revisarExistencias(lineas,articulos);
-    const [r]=await db.query("INSERT INTO prov_documentos (tipo,usuario_id,sede,datos) VALUES ('solicitud',?,?,?)",[u.id,sedeSolicitud,JSON.stringify({lineas,existencias,estado:existencias.estado==='COMPLETA'?'LISTA_PARA_ENTREGA':'PENDIENTE',departamento:u.departamentoActivo,unidad:u.accesoPersonal?.unidad||undefined,solicitante:u.nombre||u.usuario,motivo:String(req.body.motivo||'').trim().slice(0,2000)})]);
-    await alerta(db,r.insertId,`Nueva solicitud PR-${r.insertId} de ${u.departamentoActivo}${u.accesoPersonal?.unidad==='CAJAS'?' (Cajas)':''} · ${u.nombre||u.usuario}`); return r.insertId;
+    const pedido={lineas,existencias,requiere_revision_bodega:true,estado:'PENDIENTE_BODEGA',departamento:u.departamentoActivo,unidad:u.accesoPersonal?.unidad||undefined,solicitante:u.nombre||u.usuario,motivo:String(req.body.motivo||'').trim().slice(0,2000)};
+    const [r]=await db.query("INSERT INTO prov_documentos (tipo,usuario_id,sede,datos) VALUES ('solicitud',?,?,?)",[u.id,sedeSolicitud,JSON.stringify(pedido)]);
+    await alerta(db,r.insertId,`Nueva solicitud PR-${r.insertId} de ${u.departamentoActivo}${u.accesoPersonal?.unidad==='CAJAS'?' (Cajas)':''} · ${u.nombre||u.usuario} · Revisar bodega`,null,'BODEGA'); return r.insertId;
   }); res.json({id});
+}));
+// Bodega solicita la compra solamente después de revisar nuevamente las existencias.
+router.post('/solicitudes/:id/rechazar',wrap(async(req,res)=>{
+  if(!puedeComprar(req.session.user)&&!bodeguero(req.session.user))throw error(403,'Solo Bodega o Proveeduría pueden rechazar pedidos o productos');
+  await transaccion(async db=>{
+    const row=await documento(db,req.params.id,'solicitud',true);
+    exigir(row.datos.origen!=='COMPRA_CONSOLIDADA','Cancele la agrupación para revisar los pedidos originales');
+    const codigo=req.body.codigo===''?undefined:req.body.codigo;
+    exigir(codigo===undefined||(typeof codigo==='string'&&codigo.trim()),'Seleccione un producto válido');
+    rechazarProductos(row.datos,codigo===undefined?undefined:[codigo.trim()],req.body.motivo,req.session.user);
+    await guardar(db,row,req.session.user.id,`Rechazo ${codigo===undefined?'del pedido':codigo}`.slice(0,100));
+    await alerta(db,row.id,`Proveeduría rechazó ${codigo===undefined?'el pedido':codigo}: ${req.body.motivo.trim()}`.slice(0,500),row.usuario_id);
+    await alerta(db,row.id,'Proveeduría registró un rechazo; revise los productos y el motivo',null,'BODEGA');
+  });res.json({ok:true});
+}));
+router.post(['/solicitudes/:id/solicitar-compra','/solicitudes/:id/aceptar'],wrap(async(req,res)=>{
+  const aceptar=req.path.endsWith('/aceptar');
+  if(!(bodeguero(req.session.user)||(aceptar&&puedeComprar(req.session.user))))throw error(403,'Solo Bodega puede solicitar la compra por faltantes');
+  const resultado=await transaccion(async db=>{
+    const row=await documento(db,req.params.id,'solicitud',true);
+    exigir(!solicitudCerrada(row.datos),'El pedido está cerrado');
+    if(req.body.revision!==undefined){
+      const descartados=revisarProductos(row.datos,req.body.revision,req.session.user);
+      if(descartados.length){
+        if(asignaciones(row.datos).length)row.datos.estado=estadoAgrupado(row.datos);
+        await guardar(db,row,req.session.user.id,'Revisión por producto: exclusiones con justificación');
+        const motivos=descartados.map(r=>r.codigo+': '+r.motivo.trim()).join(' · ');
+        await alerta(db,row.id,('Productos que no se comprarán: '+motivos).slice(0,500),row.usuario_id);
+        await alerta(db,row.id,'Se registraron productos que no se comprarán; consulte las justificaciones',null,'BODEGA');
+      }
+      if(row.datos.estado==='RECHAZADA')return {id:row.id,rechazada:true};
+    }
+    if(row.datos.revision_bodega)return {id:row.id,repetida:true};
+    exigir(!row.datos.oc_id&&!row.datos.salida_id,'La solicitud ya tiene una OC o una boleta de entrega');
+    if(row.datos.compra){
+      if(!row.datos.revision_bodega){row.datos.revision_bodega={estado:'ACEPTADA',fecha:new Date().toISOString(),usuario_id:req.session.user.id,responsable:req.session.user.nombre||req.session.user.usuario};await guardar(db,row,req.session.user.id,'Solicitud revisada y aceptada en Bodega');}
+      return {id:row.id,repetida:true};
+    }
+    const stock=[];
+    for(const l of [...lineasActivas(row.datos)].sort((a,b)=>codigoInventario(a.codigo).localeCompare(codigoInventario(b.codigo)))){
+      if(esNoInventariable(l))continue;
+      const [rows]=await db.query('SELECT * FROM prov_inventario WHERE sede=? AND codigo=? FOR UPDATE',[ALMACEN_GENERAL,codigoInventario(l.codigo)]);
+      stock.push({codigo:l.codigo,cantidad:rows[0]?.cantidad||0});
+    }
+    const revision=require('../utils/solicitudExistencias').revisarExistencias(lineasActivas(row.datos).map(l=>({...l,inventariable:!esNoInventariable(l)})),stock);
+    row.datos.revision_bodega={estado:'ACEPTADA',fecha:new Date().toISOString(),usuario_id:req.session.user.id,responsable:req.session.user.nombre||req.session.user.usuario};
+    if(revision.estado==='COMPLETA'){
+      const lineas=lineasActivas(row.datos);
+      const [boleta]=await db.query("INSERT INTO prov_documentos (tipo,usuario_id,sede,datos) VALUES ('salida',?,?,?)",[row.usuario_id,row.sede,JSON.stringify({lineas,solicitud_id:row.id,estado:'ALISTANDO',inventario_pendiente:true,solicitante:row.datos.solicitante,departamento:row.datos.departamento,boleta_creada_en:new Date().toISOString()})]);
+      row.datos.salida_id=boleta.insertId;row.datos.estado='ALISTANDO';
+      await guardar(db,row,req.session.user.id,'Solicitud aceptada y boleta preparada; inventario sin descontar');
+      await alerta(db,row.id,'Bodega aceptó su solicitud y preparó la boleta de entrega',row.usuario_id);
+      return {id:row.id,boleta_id:boleta.insertId};
+    }
+    const lineas=revision.lineas.filter(l=>l.faltante>0).map(l=>({...row.datos.lineas.find(x=>x.codigo===l.codigo),cantidad:l.faltante}));
+    row.datos.compra={lineas,existencias:revision,solicitada_por:req.session.user.id,solicitante:req.session.user.nombre||req.session.user.usuario,solicitada_en:new Date().toISOString()};
+    row.datos.estado='SOLICITUD_COMPRA';
+    await guardar(db,row,req.session.user.id,'Bodega solicitó a Proveeduría la compra de los faltantes');
+    await alerta(db,row.id,`Bodega solicita compra PR-${row.id}: ${lineas.length} artículo(s) faltante(s)`);
+    await alerta(db,row.id,'Bodega solicitó a Proveeduría la compra de los productos faltantes',row.usuario_id);
+    return {id:row.id};
+  });res.json(resultado);
 }));
 router.post('/cotizacion/importar',limitarLectura,wrap(async(req,res) => {
   if (!gestion(req.session.user)) throw error(403,'No autorizado');
@@ -389,6 +533,7 @@ router.post(['/ordenes','/solicitudes/:id/cotizacion'],wrap(async(req,res)=>{
     b.iva_global=false;b.iva=13;
     b.razon_social=empresas[b.empresa_destino];b.condicion=Number(b.credito)?'CREDITO':'CONTADO';b.modo=b.solicitud_id?'manual':'cotizacion';
   }
+  let agrupadaId=null;
   const sedeDirecta=compartido&&!req.body.solicitud_id?await sedeFormulario(req):null;
   if(compartido)Object.assign(req.body,condicionesOrden(req.body));
   const id=await transaccion(async db=>{
@@ -401,15 +546,36 @@ router.post(['/ordenes','/solicitudes/:id/cotizacion'],wrap(async(req,res)=>{
       solicitud={id:r.insertId,usuario_id:req.session.user.id,sede:sedeDirecta,datos:{lineas,estado:'PENDIENTE'}};
     }else solicitud=await documento(db,req.body.solicitud_id,'solicitud',true);
     exigir(!solicitud.datos.oc_id&&!solicitud.datos.salida_id,'Esta solicitud ya tiene OC o fue despachada');
+    validarPasoBodega(solicitud.datos);
+    if(solicitud.datos.origen==='COMPRA_CONSOLIDADA'){
+      for(const codigo of [...new Set(solicitud.datos.desglose.map(l=>l.codigo))].sort()){
+        const partes=solicitud.datos.desglose.filter(l=>l.codigo===codigo);
+        // Las reposiciones son para aumentar stock; los pedidos ordinarios solo compran faltantes.
+        const originales=[];
+        for(const id of [...new Set(partes.map(l=>l.solicitud_id))].sort((a,b)=>a-b))originales.push(await documento(db,id,'solicitud',true));
+        if(originales.every(p=>p.datos.origen==='REPOSICION_STOCK'))continue;
+        const [stock]=await db.query('SELECT * FROM prov_inventario WHERE sede=? AND codigo=? FOR UPDATE',[ALMACEN_GENERAL,codigo]);
+        const existencia=Math.max(0,Number(stock[0]?.cantidad)||0);
+        exigir(existencia<=Math.max(...partes.map(l=>Number(l.existencia)||0)),'Cambió la existencia en Bodega: cancele esta agrupación y vuelva a prepararla para comprar solo el faltante');
+      }
+    }
+    else if(solicitud.datos.requiere_revision_bodega&&solicitud.datos.compra&&solicitud.datos.origen!=='REPOSICION_STOCK'){
+      for(const l of lineasPorComprar(solicitud.datos)){
+        if(esNoInventariable(l))continue;
+        const [stock]=await db.query('SELECT * FROM prov_inventario WHERE sede=? AND codigo=? FOR UPDATE',[ALMACEN_GENERAL,codigoInventario(l.codigo)]);
+        const pedida=Number(lineasActivas(solicitud.datos).find(x=>x.codigo===l.codigo).cantidad);
+        exigir(l.cantidad<=Math.max(0,pedida-Math.max(0,Number(stock[0]?.cantidad)||0)),'Cambió la existencia en Bodega: prepare la compra desde Productos aceptados para comprar solo el faltante');
+      }
+    }
     if(!esCotizacion&&solicitud.datos.departamento)exigir(solicitud.datos.cotizacion,'Primero prepare y guarde la cotización');
     let lineas;
     if(req.body.modo==='manual') {
-      lineas=lineasCompra(solicitud.datos.lineas.map(l=>({...l,iva:ivaArticulo(l.descripcion,l.iva),precio_unitario:req.body.precios?.[l.codigo]})),true);
+      lineas=lineasCompra(lineasPorComprar(solicitud.datos).map(l=>({...l,iva:ivaArticulo(l.descripcion,l.iva),precio_unitario:req.body.precios?.[l.codigo]})),true);
     } else {
       lineas=lineasCompra(req.body.lineas,true);
-      exigir(lineas.length===solicitud.datos.lineas.length && solicitud.datos.lineas.every(l=>lineas.some(x=>x.codigo===l.codigo && x.cantidad===l.cantidad)),'La cotización debe corresponder a la solicitud');
+      exigir(lineas.length===lineasPorComprar(solicitud.datos).length && lineasPorComprar(solicitud.datos).every(l=>lineas.some(x=>x.codigo===l.codigo && x.cantidad===l.cantidad)),'La cotización debe corresponder a la solicitud');
     }
-    const d={lineas,...totalesConAjustes(lineas,req.body),solicitud_id:solicitud.id,proveedor:String(req.body.proveedor||'').trim(),email:String(req.body.email||'').trim(),razon_social:String(req.body.razon_social||'').trim(),entrega:String(req.body.entrega||'').trim(),condicion:req.body.condicion,credito:Number(req.body.credito),moneda:req.body.moneda,empresa_destino:req.body.empresa_destino||'GAS TOMZA',forma_pago:String(req.body.forma_pago||''),observaciones:String(req.body.observaciones||''),estado:'GENERADA',pagos:[]};
+    const d={lineas,...totalesConAjustes(lineas,req.body),solicitud_id:solicitud.id,proveedor:String(req.body.proveedor||'').trim(),email:String(req.body.email||'').trim(),razon_social:String(req.body.razon_social||'').trim(),entrega:String(req.body.entrega||'').trim(),lugar_entrega:lugarEntrega(req.body.lugar_entrega),condicion:req.body.condicion,credito:Number(req.body.credito),moneda:req.body.moneda,empresa_destino:req.body.empresa_destino||'GAS TOMZA',forma_pago:String(req.body.forma_pago||''),observaciones:String(req.body.observaciones||''),estado:'GENERADA',pagos:[]};
     const correos=correosValidos(d.email);
     exigir(d.proveedor && d.razon_social && d.entrega && correos.length,'Complete proveedor, correo válido, razón social y entrega');
     d.email=correos.join(', ');
@@ -418,6 +584,7 @@ router.post(['/ordenes','/solicitudes/:id/cotizacion'],wrap(async(req,res)=>{
     condicionesOrden(req.body);
     exigir(['CRC','USD'].includes(d.moneda)&&['CONTADO','CREDITO'].includes(d.condicion),'Condición o moneda inválida');
     exigir(d.condicion==='CONTADO' ? d.credito===0 : d.credito>0,'Los días de crédito deben corresponder a la condición de pago');
+    if(solicitud.datos.origen==='COMPRA_CONSOLIDADA'){agrupadaId=solicitud.id;d.origen='COMPRA_CONSOLIDADA';d.desglose=solicitud.datos.desglose;}
     d.placa_unidad=String(req.body.placa_unidad||'');
     d.iva_global=req.body.iva_global===true;
     if(req.body.cotizacion_data){
@@ -433,8 +600,9 @@ router.post(['/ordenes','/solicitudes/:id/cotizacion'],wrap(async(req,res)=>{
     }
     const [r]=await db.query("INSERT INTO prov_documentos (tipo,usuario_id,sede,datos) VALUES ('oc',?,?,?)",[solicitud.usuario_id,solicitud.sede,JSON.stringify(d)]);
     solicitud.datos.estado='ORDENADA';solicitud.datos.oc_id=r.insertId;await guardar(db,solicitud,req.session.user.id,'OC generada');
+    await actualizarPedidosAgrupados(db,solicitud,{orden_id:r.insertId,recibida:false},req.session.user.id);
     await alerta(db,r.insertId,`OC PR-${r.insertId} generada`,solicitud.usuario_id);return r.insertId;
-  });if(compartido)return res.redirect(esCotizacion?'/proveeduria/solicitudes':'/proveeduria/ordenes');res.json({id});
+  });if(compartido)return res.redirect(agrupadaId?`/proveeduria/inventario#compra-${agrupadaId}`:esCotizacion?'/proveeduria/inventario#compras-bodega':'/proveeduria/ordenes');res.json({id});
 }));
 // ===== Precios fijos: catálogo con proveedor y carrito sin cotización =====
 const preciosFijos=require('../utils/proveeduriaPreciosFijos');
@@ -470,7 +638,7 @@ router.post('/precio-fijo/ordenes',wrap(async(req,res)=>{
     const bajas=await cargarBajas(db);
     exigir(lineas.every(l=>disponible(l.codigo,bajas)),'La orden contiene un producto eliminado del catálogo');
     const [s]=await db.query("INSERT INTO prov_documentos (tipo,usuario_id,sede,datos) VALUES ('solicitud',?,?,?)",[req.session.user.id,sedeDestino,JSON.stringify({lineas:lineas.map(l=>({codigo:l.codigo,descripcion:l.descripcion,iva:l.iva,cantidad:l.cantidad})),estado:'PENDIENTE',origen:'OC_PRECIO_FIJO'})]);
-    const d={lineas,...totalesConAjustes(lineas,{}),solicitud_id:s.insertId,proveedor:proveedor.nombre,email:correos.join(', '),razon_social:EMPRESAS_OC[b.empresa_destino],entrega,...condiciones,moneda,empresa_destino:b.empresa_destino,
+    const d={lineas,...totalesConAjustes(lineas,{}),solicitud_id:s.insertId,proveedor:proveedor.nombre,email:correos.join(', '),razon_social:EMPRESAS_OC[b.empresa_destino],entrega,lugar_entrega:lugarEntrega(b.lugar_entrega),...condiciones,moneda,empresa_destino:b.empresa_destino,
       observaciones:String(b.observaciones||'').trim().slice(0,2000),estado:'GENERADA',pagos:[],precio_fijo:true,modo:'precio_fijo',
       proveedor_telefono:String(proveedor.telefono||'').slice(0,120),proveedor_direccion:String(proveedor.direccion||'').slice(0,4000)};
     const [r]=await db.query("INSERT INTO prov_documentos (tipo,usuario_id,sede,datos) VALUES ('oc',?,?,?)",[req.session.user.id,sedeDestino,JSON.stringify(d)]);
@@ -514,39 +682,62 @@ router.post('/ordenes/:id/recibir',wrap(async(req,res)=>{
     row.datos.estado=resumenRecepcion(row.datos).estado;
     if(row.datos.estado==='RECIBIDA')row.datos.recibida_en=fecha;
     await guardar(db,row,req.session.user.id,`Recepción ${row.datos.estado==='RECIBIDA'?'completa':'parcial'} · ${recibo.referencia}`);
-    if(row.datos.estado==='RECIBIDA'&&row.datos.solicitud_id){const s=await documento(db,row.datos.solicitud_id,'solicitud',true);if(!s.datos.salida_id){s.datos.estado='LISTA_PARA_ENTREGA';await guardar(db,s,req.session.user.id,'Compra recibida en Proveeduría');await alerta(db,s.id,'Proveeduría recibió la compra de su solicitud. La entrega está pendiente de alistar.',s.usuario_id);}}
+    if(row.datos.estado==='RECIBIDA'&&row.datos.solicitud_id){const s=await documento(db,row.datos.solicitud_id,'solicitud',true);if(!s.datos.salida_id){s.datos.estado=s.datos.origen==='COMPRA_CONSOLIDADA'?'COMPRA_RECIBIDA':s.datos.origen==='REPOSICION_STOCK'?'REPOSICION_RECIBIDA':'LISTA_PARA_ENTREGA';
+    await actualizarPedidosAgrupados(db,s,{recibida:true},req.session.user.id);await guardar(db,s,req.session.user.id,'Compra recibida en Proveeduría');await alerta(db,s.id,s.datos.origen==='REPOSICION_STOCK'?'Reposición recibida e ingresada al inventario de Bodega':'Proveeduría recibió la compra de su solicitud. La entrega está pendiente de alistar.',s.usuario_id);}}
     return {ok:true,estado:row.datos.estado,recepcion_id:recibo.id};
   });res.json(resultado);
 }));
 router.post('/salidas',wrap(async(req,res)=>{
-  if(!gestion(req.session.user))throw error(403,'No autorizado');
+  if(!gestion(req.session.user)&&!bodeguero(req.session.user))throw error(403,'No autorizado');
   const id=await transaccion(async db=>{
     const solicitud=await documento(db,req.body.solicitud_id,'solicitud',true);
+    exigir(!solicitudCerrada(solicitud.datos)&&lineasActivas(solicitud.datos).length,'El pedido está cerrado o no tiene productos para entregar');
+    exigir(!['REPOSICION_STOCK','COMPRA_CONSOLIDADA'].includes(solicitud.datos.origen),'La compra agrupada o reposición permanece en inventario; entregue desde el pedido original');
+    exigir(!asignaciones(solicitud.datos).length||(!sinAgrupar(solicitud.datos).length&&asignaciones(solicitud.datos).every(g=>g.recibida)),'Primero complete la compra y recepción de todos los productos de este pedido');
+    exigir(!solicitud.datos.requiere_revision_bodega||solicitud.datos.revision_bodega,'Primero revise y acepte el pedido en Bodega Proveeduría');
     exigir(!solicitud.datos.salida_id,'Solicitud ya despachada');
     // Sin OC se entrega directamente del inventario. Cada línea se valida y bloquea abajo.
     // Los artículos no inventariables siguen requiriendo una compra recibida.
     if(solicitud.datos.oc_id){const oc=await documento(db,solicitud.datos.oc_id,'oc',true);exigir(oc.datos.estado==='RECIBIDA','Primero registre la recepción de la mercadería');}
     const lineas=[];
-    for(const l of [...solicitud.datos.lineas].sort((a,b)=>a.codigo.localeCompare(b.codigo))){
+    for(const l of [...lineasActivas(solicitud.datos)].sort((a,b)=>a.codigo.localeCompare(b.codigo))){
       if(esNoInventariable(l)){exigir(solicitud.datos.oc_id,'Primero genere y reciba la OC de los artículos de compra por solicitud');lineas.push(l);continue;}
       const [stock]=await db.query('SELECT * FROM prov_inventario WHERE sede=? AND codigo=? FOR UPDATE',[ALMACEN_GENERAL,codigoInventario(l.codigo)]);
       exigir(stock[0] && Number(stock[0].cantidad)>=l.cantidad,`Inventario insuficiente: ${l.codigo}`);
-      await db.query('UPDATE prov_inventario SET cantidad=cantidad-? WHERE sede=? AND codigo=?',[l.cantidad,ALMACEN_GENERAL,codigoInventario(l.codigo)]);lineas.push(l);
+      lineas.push(l);
     }
-    const [r]=await db.query("INSERT INTO prov_documentos (tipo,usuario_id,sede,datos) VALUES ('salida',?,?,?)",[solicitud.usuario_id,solicitud.sede,JSON.stringify({lineas,solicitud_id:solicitud.id,estado:'ALISTANDO'})]);
-    for(const l of lineas.filter(l=>!esNoInventariable(l)))await registrarMovimientoInventario(db,{sede:ALMACEN_GENERAL,codigo:codigoInventario(l.codigo),tipo:'SALIDA_PEDIDO',cantidad:-l.cantidad,documento_id:r.insertId,usuario_id:req.session.user.id,motivo:`Entrega de solicitud PR-${solicitud.id} · Destino: ${solicitud.sede}`});
-    solicitud.datos.salida_id=r.insertId;solicitud.datos.estado='ALISTANDO';await guardar(db,solicitud,req.session.user.id,'Salida de inventario');await alerta(db,r.insertId,'Su pedido se está alistando',solicitud.usuario_id);return r.insertId;
+    const [r]=await db.query("INSERT INTO prov_documentos (tipo,usuario_id,sede,datos) VALUES ('salida',?,?,?)",[solicitud.usuario_id,solicitud.sede,JSON.stringify({lineas,solicitud_id:solicitud.id,estado:'ALISTANDO',inventario_pendiente:true,boleta_creada_en:new Date().toISOString()})]);
+
+    solicitud.datos.salida_id=r.insertId;solicitud.datos.estado='ALISTANDO';await guardar(db,solicitud,req.session.user.id,'Boleta de entrega creada; sin salida de inventario');await alerta(db,r.insertId,'Su pedido se está alistando',solicitud.usuario_id);return r.insertId;
   });res.json({id});
 }));
 router.post('/salidas/:id/:accion',wrap(async(req,res)=>{
   await transaccion(async db=>{
     const row=await documento(db,req.params.id,'salida',true);
     if(req.params.accion==='enviar'){
-      if(!gestion(req.session.user))throw error(403,'No autorizado');exigir(row.datos.estado==='ALISTANDO','Salida ya enviada');row.datos.estado='EN_CAMINO';await alerta(db,row.id,'Su pedido va en camino. Confirme al recibirlo.',row.usuario_id);
+      if(!gestion(req.session.user)&&!bodeguero(req.session.user))throw error(403,'No autorizado');
+      exigir(row.datos.estado==='ALISTANDO','La entrega ya fue registrada');
+      // Las boletas antiguas ya descontaron al alistar. Solo las nuevas quedan pendientes.
+      if(row.datos.inventario_pendiente===true){
+        const lineas=[...row.datos.lineas].filter(l=>!esNoInventariable(l)).sort((a,b)=>codigoInventario(a.codigo).localeCompare(codigoInventario(b.codigo)));
+        // Primero verificar todas las líneas; descontar y registrar junto con la entrega.
+        for(const l of lineas){
+          const [stock]=await db.query('SELECT * FROM prov_inventario WHERE sede=? AND codigo=? FOR UPDATE',[ALMACEN_GENERAL,codigoInventario(l.codigo)]);
+          exigir(stock[0]&&Number(stock[0].cantidad)>=l.cantidad,`Inventario insuficiente: ${l.codigo}. La boleta sigue pendiente de entrega`);
+        }
+        for(const l of lineas){
+          await db.query('UPDATE prov_inventario SET cantidad=cantidad-? WHERE sede=? AND codigo=?',[l.cantidad,ALMACEN_GENERAL,codigoInventario(l.codigo)]);
+          await registrarMovimientoInventario(db,{sede:ALMACEN_GENERAL,codigo:codigoInventario(l.codigo),tipo:'SALIDA_PEDIDO',cantidad:-l.cantidad,documento_id:row.id,usuario_id:req.session.user.id,motivo:`Entrega de solicitud PR-${row.datos.solicitud_id} · Destino: ${row.sede}`});
+        }
+        row.datos.inventario_pendiente=false;
+        row.datos.salida_registrada_en=new Date().toISOString();
+        row.datos.entregado_por=req.session.user.id;
+      }
+      row.datos.estado='EN_CAMINO';await alerta(db,row.id,'Bodega registró la entrega y la salida de los productos. Confirme recibido.',row.usuario_id);
     }else if(req.params.accion==='aceptar'){
       if(row.usuario_id!==req.session.user.id)throw error(403,'Solo el solicitante puede confirmar la recepción');exigir(row.datos.estado==='EN_CAMINO','Pedido no enviado o ya recibido');row.datos.estado='RECIBIDA';row.datos.aceptada_en=new Date().toISOString();await alerta(db,row.id,'El solicitante confirmó la recepción del pedido');
     }else throw error(404,'Acción inválida');
-    await guardar(db,row,req.session.user.id,req.params.accion);
+    await guardar(db,row,req.session.user.id,req.params.accion==='enviar'?'Entrega y salida de productos registradas':req.params.accion);
     if(row.datos.solicitud_id){const s=await documento(db,row.datos.solicitud_id,'solicitud',true);s.datos.estado=req.params.accion==='aceptar'?'ENTREGADA':'EN_CAMINO';await guardar(db,s,req.session.user.id,'Seguimiento de entrega');}
   });res.json({ok:true});
 }));

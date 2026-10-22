@@ -50,11 +50,19 @@ async function prepararAccesos(db){await db.query(`CREATE TABLE IF NOT EXISTS us
   actualizado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP)`);}
 function coincide(ruta,prefijo){return ruta===prefijo || ruta.startsWith(prefijo+'/');}
 function esRutaSuministrosSeguridad(ruta,metodo='GET'){
-  return (['GET','HEAD'].includes(metodo) && ['/proveeduria/mis-solicitudes','/proveeduria/alertas'].includes(ruta))
+  return (['GET','HEAD'].includes(metodo) && (['/proveeduria/mis-solicitudes','/proveeduria/alertas'].includes(ruta)||/^\/proveeduria\/salidas\/\d+\/imprimir$/.test(ruta)))
     || (metodo==='POST' && (ruta==='/proveeduria/solicitudes' || /^\/proveeduria\/salidas\/\d+\/aceptar$/.test(ruta)));
 }
 function puedeAcceder(config,ruta,metodo){
   config=separarPermisos(config);
+  const lecturaBodega=['GET','HEAD'].includes(metodo)&&(
+    ['/proveeduria/inventario','/proveeduria/solicitudes','/proveeduria/salidas','/proveeduria/alertas'].includes(ruta)
+    || /^\/proveeduria\/salidas\/\d+\/imprimir$/.test(ruta));
+  const gestionBodega=metodo==='POST'&&(
+    /^\/proveeduria\/solicitudes\/\d+\/(solicitar-compra|aceptar|rechazar)$/.test(ruta)
+    || ruta==='/proveeduria/inventario/agrupar'||/^\/proveeduria\/agrupaciones\/\d+\/cancelar$/.test(ruta)|| ruta==='/proveeduria/salidas' || /^\/proveeduria\/salidas\/\d+\/enviar$/.test(ruta));
+  if(['TALLER','PROVEEDURIA'].includes(config.departamento)&&(lecturaBodega||gestionBodega)
+    &&(permiteModulo(config,'BODEGA',metodo)||permiteModulo(config,'PROVEEDURIA',metodo)))return true;
   if(config.departamento==='OPERACIONES' && ['/operaciones','/operaciones/'].includes(ruta) && ['GET','HEAD'].includes(metodo))return ['OPERACIONES','REPORTES_TALLER','SUMINISTROS'].some(id=>permiteModulo(config,id,metodo));
   if(config.departamento==='OPERACIONES' && coincide(ruta,'/reportes-supervisores')){
     return require('./operacionesTaller').rutaReportesOperaciones(ruta,metodo) && permiteModulo(config,'REPORTES_TALLER',metodo);

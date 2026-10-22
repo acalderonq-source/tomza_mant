@@ -35,3 +35,24 @@ test('Permisos personales se verifican frescos, deniegan faltantes y no afectan 
   const broken=controlarAccesosPersonales({query:async()=>{throw Error('offline');}});
   r=res();await broken(req,r,()=>assert.fail());assert.equal(r.code,503);
 });
+
+test('el permiso de suministros permite consultar boletas pero no registrar entregas',()=>{
+  const config={departamento:'OPERACIONES',permisos:{SUMINISTROS:'GESTION'}};
+  assert.equal(puedeAcceder(config,'/proveeduria/salidas/2/imprimir','GET'),true);
+  assert.equal(puedeAcceder(config,'/proveeduria/salidas/2/enviar','POST'),false);
+  assert.equal(puedeAcceder(config,'/proveeduria/salidas/2/imprimir','POST'),false);
+});
+
+test('Bodega puede tramitar faltantes y entregar; suministros conserva solo sus propias operaciones',()=>{
+  const config={departamento:'TALLER',permisos:{BODEGA:'GESTION'}};
+  assert.equal(puedeAcceder(config,'/proveeduria/solicitudes','GET'),true);
+  assert.equal(puedeAcceder(config,'/proveeduria/inventario','GET'),true);
+  for(const ruta of ['/proveeduria/solicitudes/2/aceptar','/proveeduria/solicitudes/2/rechazar','/proveeduria/inventario/agrupar','/proveeduria/agrupaciones/2/cancelar'])assert.equal(puedeAcceder(config,ruta,'POST'),true);
+  assert.equal(puedeAcceder(config,'/proveeduria/solicitudes/2/solicitar-compra','POST'),true);
+  assert.equal(puedeAcceder(config,'/proveeduria/salidas/2/imprimir','GET'),true);
+  assert.equal(puedeAcceder(config,'/proveeduria/salidas/2/enviar','POST'),true);
+  assert.equal(puedeAcceder(config,'/proveeduria/ordenes','POST'),false);
+  const consulta={departamento:'TALLER',permisos:{BODEGA:'LECTURA'}};
+  assert.equal(puedeAcceder(consulta,'/proveeduria/solicitudes','GET'),true);
+  assert.equal(puedeAcceder(consulta,'/proveeduria/solicitudes/2/solicitar-compra','POST'),false);
+});

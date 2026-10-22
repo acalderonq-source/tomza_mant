@@ -1,0 +1,7 @@
+<% if(pedido.compra){ %>
+<div class="small mt-2">
+  <strong><%= pedido.origen==='REPOSICION_STOCK'?'Reposición de inventario solicitada por Proveeduría':'Compra solicitada por Bodega' %></strong>
+  <div><%= pedido.compra.solicitante %> · <%= new Date(pedido.compra.solicitada_en).toLocaleString('es-CR',{timeZone:'America/Costa_Rica'}) %></div>
+  <% pedido.compra.lineas.filter(l=>!pedido.rechazos?.some(r=>r.codigo===l.codigo)).forEach(l=>{ %><div>Comprar: <%= l.cantidad %> × <%= l.descripcion %></div><% }) %>
+</div>
+<% } %>
